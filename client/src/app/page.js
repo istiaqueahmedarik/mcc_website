@@ -11,6 +11,7 @@ import { InfiniteMovingCards } from '@/components/ui/InfiniteMovingCard'
 import MagicButton from '@/components/ui/MagicButton'
 import MagicButton2 from '@/components/ui/MagicButton2'
 import { Spotlight } from '@/components/ui/Spotlight'
+import { TextRevealCard, TextRevealCardDescription, TextRevealCardTitle } from '@/components/ui/text-reveal-card'
 import { TextGenerateEffect } from '@/components/ui/TextGenEffect'
 import { Anvil, AudioWaveform, Landmark, MoveRight, Tv } from 'lucide-react'
 import Image from 'next/image'
@@ -53,7 +54,7 @@ export default function Home() {
 
 
   return (
-    <main className="scroll-smooth w-full flex flex-col gap-12 justify-center items-center overflow-x-hidden">
+    <main className="scroll-smooth w-full flex flex-col gap-12 justify-center items-center overflow-x-hidden bg-background">
       <Spotlight
         className="-top-40 left-0 md:left-60 md:-top-20"
         fill="white"
@@ -87,9 +88,9 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="w-[90vw] max-w-7xl flex flex-col justify-center">
+      <div className="w-[90vw] max-w-7xl flex flex-col justify-center ">
         <div>
-          <h1 className="uppercase text-2xl sm:text-4xl font-bold tracking-wider">
+          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
             Upcoming Events
           </h1>
         </div>
@@ -146,13 +147,13 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="w-[90vw] max-w-7xl flex flex-col gap-4 justify-center">
+      <div className="w-[90vw] max-w-7xl flex flex-col gap-4 justify-center min-h-[40vw]">
         <div>
-          <h1 className="uppercase text-2xl sm:text-4xl font-bold tracking-wider">
+          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
             What We Offer
           </h1>
         </div>
-        <div className="flex flex-wrap items-center sm:flex-row flex-col max-sm:gap-4 justify-around">
+        <div className="flex flex-wrap items-center sm:flex-row flex-col max-sm:gap-4 justify-between">
           <MagicButton2
             title="Problem Tracker"
             otherClasses="sm:text-2xl hover:text-yellowCus1-foreground"
@@ -226,8 +227,8 @@ export default function Home() {
 
       <div className='w-[90vw] max-w-7xl flex flex-col gap-4 justify-center'>
       <div>
-          <h1 className="uppercase text-2xl sm:text-4xl font-bold tracking-wider">
-            Out Achievements
+          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
+            Our Achievements
           </h1>
         </div>
 
@@ -238,6 +239,17 @@ export default function Home() {
                 speed="slow"
             />
         </div>
+    </div>
+
+    <div className="flex items-center justify-center  h-[40rem] w-full">
+      <TextRevealCard
+        text="MIST Computer Club"
+        revealText="MIST Computer Club"
+      >
+        <TextRevealCardTitle>
+          Be a part of something bigger!
+        </TextRevealCardTitle>
+      </TextRevealCard>
     </div>
     </main>
   )

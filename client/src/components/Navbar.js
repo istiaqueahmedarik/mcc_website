@@ -7,7 +7,7 @@ import ThemeChanger from './ThemeChanger'
 
 const Navbar = async () => {
   return (
-    <div className="w-full px-8 py-4">
+    <div className="w-full px-8 py-4 bg-background">
       <div className="flex flex-row justify-between">
         <div className="flex flex-row items-center gap-12 ">
           <Image
