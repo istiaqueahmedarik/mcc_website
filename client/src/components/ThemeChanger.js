@@ -1,16 +1,22 @@
 'use client'
+import { cn } from '@/lib/utils'
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState } from 'react'
 
 const ThemeChanger = () => {
   const { theme, setTheme } = useTheme()
   function handleClick() {
+    console.log(theme)
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
+
   return (
-    <div className='cursor-pointer' onClick={handleClick}>
-      {theme === 'light' ? <Moon /> : <Sun />}
+    <div
+      className="cursor-pointer"
+      onClick={handleClick}
+    >
+      <Sun className={cn({ hidden: theme !== 'light' })} />
+      <Moon className={cn({ hidden: theme === 'light' })} />
     </div>
   )
 }

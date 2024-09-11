@@ -67,13 +67,13 @@ export default function Home() {
             className="uppercase text-center text-2xl md:text-5xl"
             words="Hello Programmer, Welcome To"
           />
-          <Link href="/">
+          
             <MccLogo
               classes="animate-appear"
               w={400}
               h={400}
             />
-          </Link>
+          
 
           <div className="flex sm:flex-row gap-4 line-clamp-1">
             <MagicButton
@@ -155,7 +155,7 @@ export default function Home() {
             What We Offer
           </h1>
         </div>
-        <div className="flex flex-wrap items-center sm:flex-row flex-col max-sm:gap-4 justify-between">
+        <div className="flex flex-wrap sm:items-center sm:flex-row flex-col max-sm:gap-4 sm:justify-between justify-center">
           <MagicButton2
             title="Problem Tracker"
             otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
