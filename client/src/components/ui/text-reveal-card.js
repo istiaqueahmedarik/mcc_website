@@ -112,7 +112,7 @@ export const TextRevealCard = ({ text, revealText, children, className }) => {
 
 export const TextRevealCardTitle = ({ children, className }) => {
   return (
-    <h2 className={twMerge('text-white text-xl mb-2 text-center tracking-widest', className)}>
+    <h2 className={twMerge('text-primary text-xl mb-2 text-center tracking-widest', className)}>
       {children}
     </h2>
   )

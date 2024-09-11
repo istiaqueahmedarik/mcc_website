@@ -4,20 +4,13 @@ import { useTheme } from 'next-themes'
 import { useState } from 'react'
 
 const ThemeChanger = () => {
-  const { setTheme } = useTheme()
-  const [themeName, setThemeName] = useState('dark')
-  const handleClick = () => {
-    if (themeName === 'dark') {
-      setTheme('light')
-      setThemeName('light')
-    } else {
-      setTheme('dark')
-      setThemeName('dark')
-    }
+  const { theme, setTheme } = useTheme()
+  function handleClick() {
+    setTheme(theme === 'light' ? 'dark' : 'light')
   }
   return (
-    <div onClick={handleClick}>
-      {themeName === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+    <div className='cursor-pointer' onClick={handleClick}>
+      {theme === 'light' ? <Moon /> : <Sun />}
     </div>
   )
 }

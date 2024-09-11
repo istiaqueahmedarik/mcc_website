@@ -1,3 +1,4 @@
+import MccLogo from '@/components/IconChanger/MccLogo'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -15,6 +16,7 @@ import { TextRevealCard, TextRevealCardDescription, TextRevealCardTitle } from '
 import { TextGenerateEffect } from '@/components/ui/TextGenEffect'
 import { Anvil, AudioWaveform, Landmark, MoveRight, Tv } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function Home() {
 
@@ -65,24 +67,24 @@ export default function Home() {
             className="uppercase text-center text-2xl md:text-5xl"
             words="Hello Programmer, Welcome To"
           />
-
-          <Image
-            className="animate-appear"
-            src="/mccLogo.png"
-            width={400}
-            height={400}
-          />
+          <Link href="/">
+            <MccLogo
+              classes="animate-appear"
+              w={400}
+              h={400}
+            />
+          </Link>
 
           <div className="flex sm:flex-row gap-4 line-clamp-1">
             <MagicButton
               title="Join Now"
               position="right"
               icon={<MoveRight />}
-              otherClasses="hover:bg-slate-900"
+              otherClasses="hover:bg-muted  hover:text-primary"
             />
             <MagicButton
               title="Learn More"
-              otherClasses="hover:bg-slate-900"
+              otherClasses="hover:bg-muted hover:text-primary"
             />
           </div>
         </div>
@@ -156,26 +158,26 @@ export default function Home() {
         <div className="flex flex-wrap items-center sm:flex-row flex-col max-sm:gap-4 justify-between">
           <MagicButton2
             title="Problem Tracker"
-            otherClasses="sm:text-2xl hover:text-yellowCus1-foreground"
+            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
             position="left"
             icon={<AudioWaveform />}
           />
           <MagicButton2
             title="Problem Bank"
             position="left"
-            otherClasses="sm:text-2xl hover:text-yellowCus1-foreground"
+            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
             icon={<Landmark />}
           />
           <MagicButton2
             title="Class Videos"
-            otherClasses="sm:text-2xl hover:text-yellowCus1-foreground"
+            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
             position="left"
             icon={<Tv />}
           />
           <MagicButton2
             title="Standing"
             position="left"
-            otherClasses="sm:text-2xl hover:text-yellowCus1-foreground"
+            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
             icon={<Anvil />}
           />
         </div>

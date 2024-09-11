@@ -28,7 +28,7 @@ export const TextGenerateEffect = ({
           return (
             (<motion.span
               key={word + idx}
-              className={`opacity-0 ${idx === 1 && 'text-yellowCus1-foreground'}`}
+              className={`opacity-0 ${idx === 1 ? 'text-yellowCus1-foreground' : 'text-primary'}`}
               style={{
                 filter: filter ? "blur(10px)" : "none",
               }}>
