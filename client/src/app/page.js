@@ -1,3 +1,5 @@
+'use client'
+
 import MccLogo from '@/components/IconChanger/MccLogo'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,16 +14,16 @@ import { InfiniteMovingCards } from '@/components/ui/InfiniteMovingCard'
 import MagicButton from '@/components/ui/MagicButton'
 import MagicButton2 from '@/components/ui/MagicButton2'
 import { Spotlight } from '@/components/ui/Spotlight'
-import {
-  TextRevealCard,
-  TextRevealCardTitle,
-} from '@/components/ui/text-reveal-card'
+
+import { TextRevealCard, TextRevealCardTitle } from '@/components/ui/text-reveal-card'
+
 import { TextGenerateEffect } from '@/components/ui/TextGenEffect'
 import { Anvil, AudioWaveform, Landmark, MoveRight, Tv } from 'lucide-react'
 
 export default function Home() {
   const testimonials = [
     {
+
       quote:
         "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
       name: 'Michael Johnson',
@@ -53,177 +55,158 @@ export default function Home() {
     },
   ]
 
+    
+
+  const events = [
+    { id: 1, title: "Hackathon 2024", description: "Annual coding competition" },
+    { id: 2, title: "Test Test", description: "Test Test Test Test" },
+    { id: 3, title: "Test Test Test", description: "Test Test Test Test" },
+    { id: 4, title: "Test Test Test", description: "Test Test Test" },
+    { id: 5, title: "Test Test", description: "Test Test Test Test" },
+  ];
+
+
   return (
-    <main className="scroll-smooth w-full flex flex-col gap-12 justify-center items-center overflow-x-hidden bg-background">
+    <main className="scroll-smooth w-full flex flex-col gap-16 justify-center items-center overflow-x-hidden bg-background">
       <Spotlight
         className="-top-40 left-0 md:left-60 md:-top-20"
         fill="white"
       />
-      <div className="p-12 w-full flex justify-center items-center">
-        <div className="flex justify-center items-center flex-col max-w-96 gap-10">
+
+
+      <section className="min-h-screen w-full flex justify-center items-center px-4">
+        <div className="flex justify-center items-center flex-col max-w-2xl gap-10 text-center">
+
           <TextGenerateEffect
-            className="uppercase text-center text-2xl md:text-5xl"
+            className="uppercase text-3xl md:text-5xl font-bold"
             words="Hello Programmer, Welcome To"
           />
 
           <MccLogo
-            classes="animate-appear max-sm:w-80"
-            w={400}
-            h={400}
+            classes="animate-appear"
+            w={300}
+            h={300}
           />
+          <div className="flex flex-col sm:flex-row gap-4">
 
-          <div className="flex sm:flex-row gap-4 line-clamp-1">
             <MagicButton
               title="Join Now"
               position="right"
-              icon={<MoveRight />}
-              otherClasses="hover:bg-muted  hover:text-primary"
+              icon={<MoveRight className="ml-2" />}
+              otherClasses="hover:bg-primary hover:text-primary-foreground"
             />
             <MagicButton
               title="Learn More"
-              otherClasses="hover:bg-muted hover:text-primary"
+              otherClasses="hover:bg-secondary hover:text-secondary-foreground"
             />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="w-[90vw] max-w-7xl flex flex-col justify-center ">
-        <div>
-          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
-            Upcoming Events
-          </h1>
-        </div>
-        <div className="flex flex-col sm:flex-row w-full gap-4 ">
-          <div className="flex-grow m-4">
-            <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Event 1</CardTitle>
-                <CardDescription>Great event will occur</CardDescription>
-              </CardHeader>
-              <CardContent className="text-card-foreground">
-                <p>
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event{' '}
-                </p>
-              </CardContent>
-              <CardFooter className="w-full flex justify-end ">
-                <Button>See Event</Button>
-              </CardFooter>
-            </Card>
-          </div>
-          <div className="m-4 flex flex-col w-fit">
-            <div className="px-4 border-l-2 text-nowrap nowrap hover:border-l-2 hover:border-yellowCus1-foreground text-2xl hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2  hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
-            <div className="px-4 border-l-2 hover:border-l-2 hover:border-yellowCus1-foreground  hover:text-yellowCus1-foreground">
-              Event 1
-            </div>
 
-            <Button className="w-full m-4">See All</Button>
+      <section className="w-full max-w-7xl px-4 py-16 bg-secondary/10 rounded-lg">
+        <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
+          Upcoming Events
+        </h2>
+        <div className="grid md:grid-cols-2 gap-8">
+          <Card className="bg-background/60 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>{events[0].title}</CardTitle>
+              <CardDescription>{events[0].description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test 
+              </p>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button>Learn More</Button>
+            </CardFooter>
+          </Card>
+          <div className="space-y-4">
+            {events.slice(1).map((event) => (
+              <div key={event.id} className="group">
+                <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">
+                  {event.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">{event.description}</p>
+              </div>
+            ))}
+            <Button className="w-full mt-4">See All Events</Button>
+
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="w-[90vw] max-w-7xl flex flex-col gap-4 justify-center min-h-[40vw]">
-        <div>
-          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
-            What We Offer
-          </h1>
-        </div>
-        <div className="flex flex-wrap sm:items-center sm:flex-row flex-col max-sm:gap-4 sm:justify-between justify-center">
+      <section className="w-full max-w-7xl px-4 py-16">
+        <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
+          What We Offer
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
           <MagicButton2
             title="Problem Tracker"
-            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
+            otherClasses="text-xl md:text-2xl hover:text-primary"
             position="left"
-            icon={<AudioWaveform />}
+            icon={<AudioWaveform className="mr-2" />}
           />
           <MagicButton2
             title="Problem Bank"
             position="left"
-            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
-            icon={<Landmark />}
+            otherClasses="text-xl md:text-2xl hover:text-primary"
+            icon={<Landmark className="mr-2" />}
           />
           <MagicButton2
             title="Class Videos"
-            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
+            otherClasses="text-xl md:text-2xl hover:text-primary"
             position="left"
-            icon={<Tv />}
+            icon={<Tv className="mr-2" />}
           />
           <MagicButton2
             title="Standing"
             position="left"
-            otherClasses="sm:text-2xl dark:text-primary hover:text-yellowCus1 dark:hover:text-yellowCus1-foreground"
-            icon={<Anvil />}
+            otherClasses="text-xl md:text-2xl hover:text-primary"
+            icon={<Anvil className="mr-2" />}
           />
         </div>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="sm:w-2/3">
-            <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Event 1</CardTitle>
-                <CardDescription>Great event will occur</CardDescription>
-              </CardHeader>
-              <CardContent className="text-card-foreground">
-                <p>
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event{' '}
-                </p>
-              </CardContent>
-              <CardFooter className="w-full flex justify-end ">
-                <Button>See Event</Button>
-              </CardFooter>
-            </Card>
-          </div>
-          <div className="">
-            <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Event 1</CardTitle>
-                <CardDescription>Great event will occur</CardDescription>
-              </CardHeader>
-              <CardContent className="text-card-foreground">
-                <p>
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event The event
-                  The event The event The event The event The event{' '}
-                </p>
-              </CardContent>
-              <CardFooter className="w-full flex justify-end ">
-                <Button>See Event</Button>
-              </CardFooter>
-            </Card>
-          </div>
-        </div>
-      </div>
 
-      <div className="w-[90vw] max-w-7xl flex flex-col gap-4 justify-center">
-        <div>
-          <h1 className="font-mono uppercase text-2xl sm:text-4xl font-bold tracking-wider">
-            Our Achievements
-          </h1>
+        <div className="grid md:grid-cols-3 gap-8">
+          <Card className="md:col-span-2 bg-background/60 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Test Test Test</CardTitle>
+              <CardDescription>Test Test Test Test Test Test Test </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test 
+              </p>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button>Explore Resources</Button>
+            </CardFooter>
+          </Card>
+          <Card className="bg-background/60 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Community Support</CardTitle>
+              <CardDescription>Learn together, grow together</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test Test 
+              </p>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button>Join Community</Button>
+            </CardFooter>
+          </Card>
+
         </div>
+      </section>
+
+
+      <section className="w-full max-w-7xl px-4 py-16 bg-primary/5">
+        <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
+          Our Achievements
+        </h2>
 
         <div className="flex flex-col items-center">
           <InfiniteMovingCards
@@ -232,18 +215,22 @@ export default function Home() {
             speed="slow"
           />
         </div>
-      </div>
 
-      <div className="flex items-center justify-center  h-[40rem] w-full">
+      </section>
+
+      <section className="flex items-center justify-center h-[40rem] w-full bg-gradient-to-b from-background to-secondary/20">
         <TextRevealCard
           text="MIST Computer Club"
-          revealText="MIST Computer Club"
+          revealText="Join Us Today!"
+
         >
           <TextRevealCardTitle>
             Be a part of something bigger!
           </TextRevealCardTitle>
         </TextRevealCard>
-      </div>
+
+      </section>
+
     </main>
   )
 }
