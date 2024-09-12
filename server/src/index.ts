@@ -1,10 +1,16 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
+import { prettyJSON } from 'hono/pretty-json'
+import type { JwtVariables } from 'hono/jwt'
 
-const app = new Hono()
+import achievementRoute from './routes/achievementRoute'
 
-app.get('/', (c) => {
-  return c.text('Hello Hono!')
-})
+const app = new Hono<{ Variables: JwtVariables }>()
+
+app.use(prettyJSON())
+app.use('/*', cors())
+
+app.route('/achieve', achievementRoute)
 
 export default {
   port: process.env.PORT || 5000,
