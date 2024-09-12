@@ -5,7 +5,9 @@
   },
   "dependencies": {
     "hono": "^4.5.11",
-    "server": "file:"
+
+    "postgres": "^3.4.4"
+
   },
   "devDependencies": {
     "@types/bun": "latest"

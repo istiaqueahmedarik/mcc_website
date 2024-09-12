@@ -14,19 +14,48 @@ import { InfiniteMovingCards } from '@/components/ui/InfiniteMovingCard'
 import MagicButton from '@/components/ui/MagicButton'
 import MagicButton2 from '@/components/ui/MagicButton2'
 import { Spotlight } from '@/components/ui/Spotlight'
+
 import { TextRevealCard, TextRevealCardTitle } from '@/components/ui/text-reveal-card'
+
 import { TextGenerateEffect } from '@/components/ui/TextGenEffect'
 import { Anvil, AudioWaveform, Landmark, MoveRight, Tv } from 'lucide-react'
 
 export default function Home() {
   const testimonials = [
     {
-      quote: "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
-      name: "Michael Johnson",
-      title: "Director of AlphaStream Technologies",
+
+      quote:
+        "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
+      name: 'Michael Johnson',
+      title: 'Director of AlphaStream Technologies',
     },
-    // ... (other testimonials)
-  ];
+    {
+      quote:
+        "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
+      name: 'Michael Johnson',
+      title: 'Director of AlphaStream Technologies',
+    },
+    {
+      quote:
+        "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
+      name: 'Michael Johnson',
+      title: 'Director of AlphaStream Technologies',
+    },
+    {
+      quote:
+        "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
+      name: 'Michael Johnson',
+      title: 'Director of AlphaStream Technologies',
+    },
+    {
+      quote:
+        "Collaborating with Adrian was an absolute pleasure. His professionalism, promptness, and dedication to delivering exceptional results were evident throughout our project. Adrian's enthusiasm for every facet of development truly stands out. If you're seeking to elevate your website and elevate your brand, Adrian is the ideal partner.",
+      name: 'Michael Johnson',
+      title: 'Director of AlphaStream Technologies',
+    },
+  ]
+
+    
 
   const events = [
     { id: 1, title: "Hackathon 2024", description: "Annual coding competition" },
@@ -36,6 +65,7 @@ export default function Home() {
     { id: 5, title: "Test Test", description: "Test Test Test Test" },
   ];
 
+
   return (
     <main className="scroll-smooth w-full flex flex-col gap-16 justify-center items-center overflow-x-hidden bg-background">
       <Spotlight
@@ -43,18 +73,22 @@ export default function Home() {
         fill="white"
       />
 
+
       <section className="min-h-screen w-full flex justify-center items-center px-4">
         <div className="flex justify-center items-center flex-col max-w-2xl gap-10 text-center">
+
           <TextGenerateEffect
             className="uppercase text-3xl md:text-5xl font-bold"
             words="Hello Programmer, Welcome To"
           />
+
           <MccLogo
             classes="animate-appear"
             w={300}
             h={300}
           />
           <div className="flex flex-col sm:flex-row gap-4">
+
             <MagicButton
               title="Join Now"
               position="right"
@@ -68,6 +102,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+
 
       <section className="w-full max-w-7xl px-4 py-16 bg-secondary/10 rounded-lg">
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
@@ -98,6 +133,7 @@ export default function Home() {
               </div>
             ))}
             <Button className="w-full mt-4">See All Events</Button>
+
           </div>
         </div>
       </section>
@@ -132,6 +168,7 @@ export default function Home() {
             icon={<Anvil className="mr-2" />}
           />
         </div>
+
         <div className="grid md:grid-cols-3 gap-8">
           <Card className="md:col-span-2 bg-background/60 backdrop-blur-sm">
             <CardHeader>
@@ -161,13 +198,16 @@ export default function Home() {
               <Button>Join Community</Button>
             </CardFooter>
           </Card>
+
         </div>
       </section>
+
 
       <section className="w-full max-w-7xl px-4 py-16 bg-primary/5">
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
           Our Achievements
         </h2>
+
         <div className="flex flex-col items-center">
           <InfiniteMovingCards
             items={testimonials}
@@ -175,18 +215,22 @@ export default function Home() {
             speed="slow"
           />
         </div>
+
       </section>
 
       <section className="flex items-center justify-center h-[40rem] w-full bg-gradient-to-b from-background to-secondary/20">
         <TextRevealCard
           text="MIST Computer Club"
           revealText="Join Us Today!"
+
         >
           <TextRevealCardTitle>
             Be a part of something bigger!
           </TextRevealCardTitle>
         </TextRevealCard>
+
       </section>
+
     </main>
   )
 }
