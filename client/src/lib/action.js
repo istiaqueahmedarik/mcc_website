@@ -1,8 +1,9 @@
 'use server'
 
-import { supabase } from '../config/supabaseClient';
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
+import { createClient } from '../utils/supabase/server';
 
 const server_url = process.env.SERVER_URL + '/'
 
@@ -33,40 +34,29 @@ export const post = cache(async (url, data) => {
 })
 
 async function uploadImage(folder, uId, file, bucket) {
-    const fileName = Date.now() + '_' + file.name;
-    console.log(fileName);
-  
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(`${folder}/${uId}/${fileName}`, file);
-  
-    if (error) {
-      console.error('Upload error:', error);
-      return { error };
-    }
-  
-    // Use getPublicUrl to avoid manual URL concatenation
-    const { publicURL, error: urlError } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(`${folder}/${uId}/${fileName}`);
-  
-    if (urlError) {
-      console.error('Error generating public URL:', urlError);
-      return { error: urlError };
-    }
-  
-    return { data, url: publicURL };
-  }
+  console.log(process.env.SUPABASE_URL)
+  const supabase = createClient()
+  const fileName = Date.now() + '_' + file.name
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(folder + '/' + uId + '/' + fileName, file)
+  if (error) return { error }
+  const url =
+    process.env.SUPABASE_URL + `/storage/v1/object/public/` + data.fullPath
+
+  return { data, url }
+}
+
 
 export async function createAchievement(prevState, formData) {
   let raw = Object.fromEntries(formData)
-  console.log(supabase)
   const { url } = await uploadImage(
     'achievements',
     raw.title,
     raw.image,
-    'profile_image',
+    'all_picture',
   )
+  console.log(url);
   raw.image = url
 
   console.log('File uploaded', raw);
@@ -74,7 +64,12 @@ export async function createAchievement(prevState, formData) {
   const response = await post('achieve/insert', raw)
   if (response.error)
     return {
+      success: false,
       message: response.error,
     }
-  redirect('/achievements/insert')
+  revalidatePath('/achievements/insert')
+  return {
+    success: true,
+    message: 'Achievement created successfully',
+  }
 }
