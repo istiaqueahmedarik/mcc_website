@@ -4,7 +4,8 @@
     "dev": "bun run --hot src/index.ts"
   },
   "dependencies": {
-    "hono": "^4.5.11"
+    "hono": "^4.5.11",
+    "server": "file:"
   },
   "devDependencies": {
     "@types/bun": "latest"
