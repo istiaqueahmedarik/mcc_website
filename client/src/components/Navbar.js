@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -87,15 +88,15 @@ const Navbar = async () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {adminTools.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                  >
-                    <DropdownMenuItem>
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
-                    </DropdownMenuItem>
-                  </Link>
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                    >
+                      <DropdownMenuItem>
+                        <item.icon className="w-4 h-4 mr-2" />
+                        {item.label}
+                      </DropdownMenuItem>
+                    </Link>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -165,76 +166,85 @@ const Navbar = async () => {
                   Navigate through our platform
                 </SheetDescription>
               </SheetHeader>
-              <div className="mt-6 flex flex-col space-y-4">
-                {navItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                  >
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-lg"
-                    >
-                      <item.icon className="mr-2 h-5 w-5" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                ))}
+              <SheetClose asChild>
+                <div className="mt-6 flex flex-col space-y-4">
+                  {navItems.map((item) => (
+                    <SheetClose asChild>
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                      >
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start text-lg"
+                        >
+                          <item.icon className="mr-2 h-5 w-5" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    </SheetClose>
+                  ))}
 
-                <hr className="my-4" />
-                {user && user.result && user.result[0].admin && adminTools.map((item) => (
+                  <hr className="my-4" />
+                  {user &&
+                    user.result &&
+                    user.result[0].admin &&
+                    adminTools.map((item) => (
+                      <SheetClose asChild>
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                        >
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-lg"
+                          >
+                            <item.icon className="mr-2 h-5 w-5" />
+                            {item.label}
+                          </Button>
+                        </Link>
+                      </SheetClose>
+                    ))}
+                  <hr className="my-4" />
                   <Link
-                    key={item.href}
-                    href={item.href}
+                    href="/login"
+                    className={`${loggedIn && 'hidden'}`}
                   >
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       className="w-full justify-start text-lg"
                     >
-                      <item.icon className="mr-2 h-5 w-5" />
-                      {item.label}
+                      <LogIn className="mr-2 h-5 w-5" />
+                      Login
                     </Button>
                   </Link>
-                ))}
-                <hr className="my-4" />
-                <Link
-                  href="/login"
-                  className={`${loggedIn && 'hidden'}`}
-                >
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-lg"
+                  <Link
+                    href="/signup"
+                    className={`${loggedIn && 'hidden'}`}
                   >
-                    <LogIn className="mr-2 h-5 w-5" />
-                    Login
-                  </Button>
-                </Link>
-                <Link
-                  href="/signup"
-                  className={`${loggedIn && 'hidden'}`}
-                >
-                  <Button
-                    variant="default"
-                    className="w-full justify-start text-lg"
+                    <Button
+                      variant="default"
+                      className="w-full justify-start text-lg"
+                    >
+                      <UserPlus className="mr-2 h-5 w-5" />
+                      Sign Up
+                    </Button>
+                  </Link>
+                  <Link
+                    href="/profile"
+                    className={`${!loggedIn && 'hidden'}`}
                   >
-                    <UserPlus className="mr-2 h-5 w-5" />
-                    Sign Up
-                  </Button>
-                </Link>
-                <Link
-                  href="/profile"
-                  className={`${!loggedIn && 'hidden'}`}
-                >
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage
-                      src={user && user.result && user.result[0].profile_pic}
-                    />
-                    <AvatarFallback>
-                      {user && user.result && user.result[0].full_name[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                </Link>
-              </div>
+                    <Avatar className="w-8 h-8">
+                      <AvatarImage
+                        src={user && user.result && user.result[0].profile_pic}
+                      />
+                      <AvatarFallback>
+                        {user && user.result && user.result[0].full_name[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                </div>
+              </SheetClose>
             </SheetContent>
           </Sheet>
         </div>
