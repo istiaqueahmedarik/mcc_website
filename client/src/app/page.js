@@ -145,7 +145,7 @@ export default function Home() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
           <MagicButton2
             title="Problem Tracker"
-            otherClasses="text-xl md:text-2xl hover:text-primary"
+            otherClasses="text-xl md:text-xl hover:text-primary"
             position="left"
             icon={<AudioWaveform className="mr-2" />}
           />
