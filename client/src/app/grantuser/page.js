@@ -11,7 +11,6 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -41,7 +40,7 @@ export default async function Page() {
       {pendingU && pendingU.length > 0 ? (
         <div className="flex flex-col items-center gap-4">
           <h1 className="text-3xl uppercase font-mono">All pending users</h1>
-          <div className='max-sm:w-screen'>
+          <div className="max-sm:w-screen">
             <Table className="w-full max-w-5xl">
               <TableHeader>
                 <TableRow>

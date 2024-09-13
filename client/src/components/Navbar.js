@@ -47,6 +47,7 @@ const Navbar = async () => {
 
   const loggedIn = cookies().get('token')
   const user = await get_with_token('auth/user/profile')
+  console.log(user)
 
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
@@ -78,13 +79,14 @@ const Navbar = async () => {
                 </Button>
               </Link>
             ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex flex-row items-center gpa-2">
-                {' '}
-                <ShieldHalf className="w-4 h-4 mr-2" /> Admin Tools
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {adminTools.map((item) => (
+            {user && user.result && user.result[0].admin && (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex flex-row items-center gpa-2">
+                  {' '}
+                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin Tools
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {adminTools.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -94,9 +96,10 @@ const Navbar = async () => {
                       {item.label}
                     </DropdownMenuItem>
                   </Link>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
@@ -133,14 +136,10 @@ const Navbar = async () => {
             >
               <Avatar className="w-8 h-8">
                 <AvatarImage
-                  src={
-                    user && user.result.length > 0 && user.result[0].profile_pic
-                  }
+                  src={user && user.result && user.result[0].profile_pic}
                 />
                 <AvatarFallback>
-                  {user &&
-                    user.result.length > 0 &&
-                    user.result[0].full_name[0]}
+                  {user && user.result && user.result[0].full_name[0]}
                 </AvatarFallback>
               </Avatar>
             </Link>
@@ -183,7 +182,7 @@ const Navbar = async () => {
                 ))}
 
                 <hr className="my-4" />
-                {adminTools.map((item) => (
+                {user && user.result && user.result[0].admin && adminTools.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -228,16 +227,10 @@ const Navbar = async () => {
                 >
                   <Avatar className="w-8 h-8">
                     <AvatarImage
-                      src={
-                        user &&
-                        user.result.length > 0 &&
-                        user.result[0].profile_pic
-                      }
+                      src={user && user.result && user.result[0].profile_pic}
                     />
                     <AvatarFallback>
-                      {user &&
-                        user.result.length > 0 &&
-                        user.result[0].full_name[0]}
+                      {user && user.result && user.result[0].full_name[0]}
                     </AvatarFallback>
                   </Avatar>
                 </Link>

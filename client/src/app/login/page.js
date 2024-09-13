@@ -11,17 +11,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { login, signUp } from '@/lib/action'
-import {
-  AtSign,
-  FileDigit,
-  IdCard,
-  Lock,
-  LockKeyhole,
-  Phone,
-  UserPlus,
-  UserRound,
-} from 'lucide-react'
+import { login } from '@/lib/action'
+import { AtSign, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useActionState } from 'react'
 const initialState = {
@@ -52,7 +43,6 @@ export default function Page() {
             action={formAction}
             className="space-y-4"
           >
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
