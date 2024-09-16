@@ -5,6 +5,7 @@ import type { JwtVariables } from 'hono/jwt'
 
 import achievementRoute from './routes/achievementRoute'
 import authRoute from './routes/authRoute'
+import courseRoute from './routes/courseRoute'
 
 const app = new Hono<{ Variables: JwtVariables }>()
 
@@ -13,6 +14,7 @@ app.use('/*', cors())
 
 app.route('/achieve', achievementRoute)
 app.route('/auth', authRoute)
+app.route('/course', courseRoute)
 
 export default {
   port: process.env.PORT || 5000,

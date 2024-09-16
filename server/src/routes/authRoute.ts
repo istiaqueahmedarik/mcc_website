@@ -3,6 +3,7 @@ import { jwt } from 'hono/jwt'
 import {
   acceptUser,
   getProfile,
+  getProfilePost,
   login,
   pendingUser,
   rejectUser,
@@ -26,7 +27,7 @@ route.use(
 //     }
 //     const secret = process.env.SECRET
 //     if (!secret) {
-//       console.log('JWT secret is not defined')
+//       ('JWT secret is not defined')
 //       return c.json({ error: 'Internal server error' }, 500)
 //     }
 //     let payload = null
@@ -40,7 +41,7 @@ route.use(
 //     }
 //     return c.json({ error: 'Unauthorized' }, 401)
 //   } catch (error) {
-//     console.log(error)
+//     (error)
 //     return c.json({ error: 'Something went wrong' }, 400)
 //   }
 // })
@@ -51,5 +52,6 @@ route.get('/user/pendings', pendingUser)
 route.post('/user/reject', rejectUser)
 route.post('/user/accept', acceptUser)
 route.get('/user/profile', getProfile)
+route.post('/profile', getProfilePost)
 
 export default route

@@ -2,13 +2,11 @@
 import { rejectUser } from '@/lib/action'
 import Image from 'next/image'
 import { useActionState } from 'react'
-import { IoCheckmarkCircleOutline } from 'react-icons/io5'
-import { Button } from './ui/button'
 import { RxCrossCircled } from 'react-icons/rx'
+import { Button } from './ui/button'
 
 const Reject = ({ userId }) => {
   const [state, formAction, pending] = useActionState(rejectUser, userId)
-  console.log('state', state)
   return (
     <form action={formAction}>
       <Button

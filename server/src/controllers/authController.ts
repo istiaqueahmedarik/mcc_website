@@ -13,6 +13,10 @@ export const signup = async (c: any) => {
     password,
   } = await c.req.json()
   try {
+    const exists = await sql`select * from users where email = ${email}`
+    if(exists.length > 0) {
+      return c.json({ error: 'This email already exists' }, 400)
+    }
     const hash = await Bun.password.hash(password)
     const result =
       await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
@@ -57,7 +61,19 @@ export const getProfile = async (c: any) => {
     return c.json({ result })
   } catch (error) {
     console.log(error)
-    return c.json({ error: 'error' }, 400)
+    return c.json({ error: 'User not found' }, 400)
+  }
+}
+
+export const getProfilePost = async (c: any) => {
+  const { email } = await c.req.json()
+  try {
+    const result =
+      await sql`select full_name, profile_pic, mist_id, phone from users where email = ${email}`
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'User not found' }, 400)
   }
 }
 

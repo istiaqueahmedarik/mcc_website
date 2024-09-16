@@ -6,7 +6,7 @@ import { useTheme } from 'next-themes'
 const ThemeChanger = () => {
   const { theme, setTheme } = useTheme()
   function handleClick() {
-    console.log(theme)
+    theme
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
 

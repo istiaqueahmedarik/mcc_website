@@ -36,7 +36,7 @@ import ThemeChanger from './ThemeChanger'
 const Navbar = async () => {
   const navItems = [
     { href: '/upcomingContest', icon: Calendar, label: 'Upcoming Contests' },
-    { href: '/courseDetails', icon: BookOpen, label: 'Course Details' },
+    { href: '/course', icon: BookOpen, label: 'Course Details' },
     { href: '/problems', icon: Code, label: 'Problems' },
     { href: '/resources', icon: FileText, label: 'Resources' },
   ]
@@ -48,7 +48,6 @@ const Navbar = async () => {
 
   const loggedIn = cookies().get('token')
   const user = await get_with_token('auth/user/profile')
-  console.log(user)
 
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
@@ -168,8 +167,11 @@ const Navbar = async () => {
               </SheetHeader>
               <SheetClose asChild>
                 <div className="mt-6 flex flex-col space-y-4">
-                  {navItems.map((item) => (
-                    <SheetClose asChild>
+                  {navItems.map((item, index) => (
+                    <SheetClose
+                      asChild
+                      key={index}
+                    >
                       <Link
                         key={item.href}
                         href={item.href}
@@ -189,8 +191,11 @@ const Navbar = async () => {
                   {user &&
                     user.result &&
                     user.result[0].admin &&
-                    adminTools.map((item) => (
-                      <SheetClose asChild>
+                    adminTools.map((item, index) => (
+                      <SheetClose
+                        asChild
+                        key={index}
+                      >
                         <Link
                           key={item.href}
                           href={item.href}

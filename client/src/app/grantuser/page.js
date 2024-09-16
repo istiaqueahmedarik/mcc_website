@@ -29,12 +29,10 @@ export default async function Page() {
   if (user?.result.length === 0) {
     redirect('/login')
   }
-  console.log(user)
   if (user?.result[0].admin === false) {
     redirect('/')
   }
   const pendingU = await pendingUsers()
-  console.log(pendingU)
   return (
     <div className="min-h-screen w-full py-12 px-4 flex justify-center bg-background">
       {pendingU && pendingU.length > 0 ? (
