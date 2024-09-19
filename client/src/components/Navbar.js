@@ -36,7 +36,7 @@ import ThemeChanger from './ThemeChanger'
 const Navbar = async () => {
   const navItems = [
     { href: '/upcomingContest', icon: Calendar, label: 'Upcoming Contests' },
-    { href: '/course', icon: BookOpen, label: 'Course Details' },
+    { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/problems', icon: Code, label: 'Problems' },
     { href: '/resources', icon: FileText, label: 'Resources' },
   ]

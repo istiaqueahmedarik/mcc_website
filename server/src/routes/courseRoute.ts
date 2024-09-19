@@ -1,6 +1,14 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { deleteCourse, getAllCourses, getCourse, getCourseInstrucotrs, insertCourse } from '../controllers/courseController'
+import {
+  addCourseContent,
+  deleteCourse,
+  getAllCourses,
+  getContent,
+  getCourse,
+  getCourseInstrucotrs,
+  insertCourse,
+} from '../controllers/courseController'
 
 const route = new Hono()
 
@@ -11,10 +19,12 @@ route.use(
   }),
 )
 
+route.post('/insert/content', addCourseContent)
 route.post('/insert', insertCourse)
 route.get('/all', getAllCourses)
 route.post('/delete', deleteCourse)
 route.post('/get', getCourse)
 route.post('/getins', getCourseInstrucotrs)
+route.post('/getcontents', getContent)
 
 export default route

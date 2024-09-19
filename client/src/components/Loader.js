@@ -2,7 +2,7 @@ import Image from 'next/image'
 
 const Loader = () => {
   return (
-    <div className="flex justify-center items-center">
+    <div className="min-h-screen flex justify-center items-center">
       <Image
         src="/Loader.gif"
         alt="loading"

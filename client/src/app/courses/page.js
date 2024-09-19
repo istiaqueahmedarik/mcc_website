@@ -1,9 +1,13 @@
 import CourseCard from '@/components/courses/courseCard'
 import SearchCourse from '@/components/courses/searchCourse'
 import { getAllCourses } from '@/lib/action'
+import { redirect } from 'next/navigation'
 
 const Page = async () => {
   const allCourses = await getAllCourses()
+  if (allCourses.length === 0) {
+    redirect('/login')
+  }
   const firstColumn = allCourses.filter((_, index) => index % 3 === 0)
   const secondColumn = allCourses.filter((_, index) => index % 3 === 1)
   const thirdColumn = allCourses.filter((_, index) => index % 3 === 2)

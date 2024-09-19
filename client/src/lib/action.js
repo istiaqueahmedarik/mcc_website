@@ -285,7 +285,7 @@ export async function getAllCourses() {
 }
 
 export async function getCourse(course_id) {
-  const response = await post_with_token("course/get", {
+  const response = await post_with_token('course/get', {
     course_id,
   })
   if (response.error) return response.error
@@ -293,7 +293,7 @@ export async function getCourse(course_id) {
 }
 
 export async function getCourseIns(course_id) {
-  const response = await post_with_token("course/getins", {
+  const response = await post_with_token('course/getins', {
     course_id,
   })
   if (response.error) return response.error
@@ -309,4 +309,53 @@ export async function deleteCourse(course_id, formData) {
   } catch (error) {
     console.log(error)
   }
+}
+
+export async function addCourseContent(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  console.log(prevState)
+  
+  const course_id = prevState.course_id
+
+  const name = raw.name
+  const problem_link = raw.problem_link
+  const video_link = raw.video_link
+
+  let hints = []
+  const entries = Object.entries(raw)
+
+  entries.forEach(async ([key, value]) => {
+    if (key.startsWith('hint-') && value !== '') {
+      hints.push(value)
+    }
+  })
+
+  const response = await post_with_token('course/insert/content', {
+    course_id,
+    name,
+    problem_link,
+    video_link,
+    hints,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+      course_id,
+    }
+  revalidatePath(`/courses/${course_id}/contents`)
+  return {
+    success: true,
+    message: 'Course created successfully',
+    course_id,
+  }
+}
+
+export async function getCourseContents(course_id) {
+  const response = await post_with_token('course/getcontents', {
+    course_id,
+  })
+  if (response.error) return response.error
+  return response.result
 }
