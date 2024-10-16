@@ -41,7 +41,6 @@
     "three": "^0.168.0"
   },
   "devDependencies": {
-    "daisyui": "^4.12.10",
     "eslint": "^8",
     "eslint-config-next": "15.0.0-rc.0",
     "postcss": "^8",
