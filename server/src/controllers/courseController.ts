@@ -125,3 +125,36 @@ export const getCourseInstrucotrs = async (c: any) => {
     return c.json({ error: 'Course not found' }, 400)
   }
 }
+
+export const addCourseContent = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id, name, problem_link, video_link, hints } = await c.req.json()
+  try {
+    const result = await sql`insert into course_contents (course_id, name, problem_link, video_link, hints) 
+    values (${course_id}, ${name}, ${problem_link}, ${video_link}, ${hints}) returning *`
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'error' }, 400)
+  }
+}
+
+
+export const getContent = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id } = await c.req.json()
+  try {
+    const result = await sql`select * from course_contents where course_id = ${course_id}`
+
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'Course not found' }, 400)
+  }
+}

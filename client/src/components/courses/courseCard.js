@@ -31,7 +31,7 @@ const CourseCard = ({ course }) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem>
-              <form action={binded}>
+              <form action={binded} className='w-full'>
                 <button className="btn btn-sm w-full flex justify-start">
                   <Trash2
                     size={12}
