@@ -199,8 +199,9 @@ export const addBatchMembers = async (c: any) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   const { batch_id, members } = await c.req.json()
+  const members_data = JSON.parse(members);
   try {
-    for (const mem_id of members) {
+    for (const mem_id of members_data) {
       await sql`INSERT INTO batch_members (batch_id, mem_id)
       VALUES (${batch_id}, ${mem_id})`
     }
@@ -217,8 +218,9 @@ export const removeBatchMembers = async (c: any) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   const { batch_id, members } = await c.req.json()
+  const members_data = JSON.parse(members);
   try {
-    for (const mem_id of members) {
+    for (const mem_id of members_data) {
       await sql`delete from batch_members where batch_id = ${batch_id} and mem_id = ${mem_id}`
     }
     return c.json({ message: 'Members added successfully' })

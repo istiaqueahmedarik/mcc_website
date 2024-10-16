@@ -468,7 +468,8 @@ export async function getBatchUsers(batch_id, offset, limit) {
 }
 
 
-export async function addBatchMemebers(data) {
+export async function addBatchMemebers(st,formData) {
+ const data = Object.fromEntries(formData)
   const response = await post_with_token('batch/add_members', data)
 
   if (response.error)
@@ -477,11 +478,12 @@ export async function addBatchMemebers(data) {
     }
   revalidatePath(`/batches/edit/${data.batch_id}`)
   return {
-    message: `${data.members.length} ${data.members.length > 1 ? "members" : "member"} added successfully`,
+    message: `${JSON.parse(data.members).length} ${JSON.parse(data.members).length > 1 ? "members" : "member"} added successfully`,
   }
 }
 
-export async function removeBatchMemebers(data) {
+export async function removeBatchMemebers(st, formData) {
+  const data = Object.fromEntries(formData)
   const response = await post_with_token('batch/remove_members', data)
 
   if (response.error)
@@ -489,8 +491,9 @@ export async function removeBatchMemebers(data) {
       error: response.error,
     }
   revalidatePath(`/batches/edit/${data.batch_id}`)
+  const len = JSON.parse(data.members).length
   return {
-    message: `${data.members.length} ${data.members.length > 1 ? "members" : "member"} removed successfully`,
+    message: `${len} ${len> 1 ? "members" : "member"} removed successfully`,
   }
 }
 
