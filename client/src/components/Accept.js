@@ -1,12 +1,12 @@
-'use client'
-import { acceptUser } from '@/lib/action'
-import Image from 'next/image'
-import { useActionState } from 'react'
-import { IoCheckmarkCircleOutline } from 'react-icons/io5'
-import { Button } from './ui/button'
+"use client";
+import { acceptUser } from "@/lib/action";
+import Image from "next/image";
+import { useActionState } from "react";
+import { IoCheckmarkCircleOutline } from "react-icons/io5";
+import { Button } from "./ui/button";
 
 const Accept = ({ userId }) => {
-  const [state, formAction, pending] = useActionState(acceptUser, userId)
+  const [state, formAction, pending] = useActionState(acceptUser, userId);
   return (
     <form action={formAction}>
       <Button
@@ -14,17 +14,13 @@ const Accept = ({ userId }) => {
         className="bg-transparent text-yellowCus1-foreground hover:bg-primary/5 w-16 overflow-hidden"
       >
         {pending ? (
-          <Image
-            src="/Loader.gif"
-            width={30}
-            height={30}
-          />
+          <Image src="/Loader.gif" width={30} height={30} alt="Loader" />
         ) : (
           <IoCheckmarkCircleOutline size={20} />
         )}
       </Button>
     </form>
-  )
-}
+  );
+};
 
-export default Accept
+export default Accept;

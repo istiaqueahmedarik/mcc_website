@@ -5,15 +5,15 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command'
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import Link from 'next/link'
+} from "@/components/ui/dialog";
+import Link from "next/link";
 
 const SearchCourse = ({ courses }) => {
   return (
@@ -36,7 +36,7 @@ const SearchCourse = ({ courses }) => {
                   <CommandGroup heading="Suggestions">
                     {courses &&
                       courses.map((course) => (
-                        <Link href={`courses/${course.id}`}>
+                        <Link href={`courses/${course.id}`} key={course.id}>
                           <CommandItem
                             key={course.id}
                             className="cursor-pointer"
@@ -53,7 +53,7 @@ const SearchCourse = ({ courses }) => {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
+  );
+};
 
-export default SearchCourse
+export default SearchCourse;

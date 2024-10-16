@@ -29,7 +29,7 @@ export const post = cache(async (url, data) => {
     const json = await response.json()
     return json
   } catch (error) {
-    console.error('Error:', error)
+    console.error('JSON Error:', error)
     return {
       error: 'An error occurred',
     }
@@ -260,6 +260,7 @@ export async function createCourse(prevState, formData) {
       ins_emails.push(value)
     }
   })
+  ins_emails = [...new Set(ins_emails)]
 
   const response = await post_with_token('course/insert', {
     ins_emails,
@@ -315,7 +316,7 @@ export async function addCourseContent(prevState, formData) {
   let raw = Object.fromEntries(formData)
 
   console.log(prevState)
-  
+
   const course_id = prevState.course_id
 
   const name = raw.name
@@ -358,4 +359,148 @@ export async function getCourseContents(course_id) {
   })
   if (response.error) return response.error
   return response.result
+}
+
+export async function createBatch(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  const name = raw.name
+
+  let ins_emails = []
+  const entries = Object.entries(raw)
+
+  entries.forEach(async ([key, value]) => {
+    if (key.startsWith('instructor-') && value !== '') {
+      ins_emails.push(value)
+    }
+  })
+  ins_emails = [...new Set(ins_emails)]
+
+  const response = await post_with_token('batch/insert', {
+    ins_emails,
+    name,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+    }
+  revalidatePath('/batches')
+  return {
+    success: true,
+    message: 'Batch created successfully',
+  }
+}
+
+export async function getAllBatches() {
+  const response = await get_with_token('batch/all')
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getBatch(batch_id) {
+  const response = await post_with_token('batch/get_batch', {
+    batch_id,
+  })
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getBatchIns(batch_id) {
+  const response = await post_with_token('batch/get_ins', {
+    batch_id,
+  })
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function editBatch(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  const name = raw.name
+  const batch_id = prevState.batch_id
+
+  let ins_emails = []
+  const entries = Object.entries(raw)
+
+  entries.forEach(async ([key, value]) => {
+    if (key.startsWith('instructor-') && value !== '') {
+      ins_emails.push(value)
+    }
+  })
+  ins_emails = [...new Set(ins_emails)]
+
+  const response = await post_with_token('batch/edit', {
+    batch_id,
+    ins_emails,
+    name,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+    }
+  revalidatePath(`/batches/edit/${batch_id}`)
+  return {
+    success: true,
+    message: 'Batch edited successfully',
+  }
+}
+
+export async function getBatchNonUsers(batch_id, offset, limit) {
+  const response = await post_with_token('batch/get_batch_non_users', {
+    batch_id,
+    offset,
+    limit
+  })
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getBatchUsers(batch_id, offset, limit) {
+  const response = await post_with_token('batch/get_batch_users', {
+    batch_id,
+    offset,
+    limit
+  })
+  if (response.error) return response.error
+  return response.result
+}
+
+
+export async function addBatchMemebers(data) {
+  const response = await post_with_token('batch/add_members', data)
+
+  if (response.error)
+    return {
+      error: response.error,
+    }
+  revalidatePath(`/batches/edit/${data.batch_id}`)
+  return {
+    message: `${data.members.length} ${data.members.length > 1 ? "members" : "member"} added successfully`,
+  }
+}
+
+export async function removeBatchMemebers(data) {
+  const response = await post_with_token('batch/remove_members', data)
+
+  if (response.error)
+    return {
+      error: response.error,
+    }
+  revalidatePath(`/batches/edit/${data.batch_id}`)
+  return {
+    message: `${data.members.length} ${data.members.length > 1 ? "members" : "member"} removed successfully`,
+  }
+}
+
+export async function deleteBatch(batch_id, formData) {
+  try {
+    await post_with_token('batch/delete', {
+      batch_id,
+    })
+    revalidatePath('/courses')
+  } catch (error) {
+    console.log(error)
+  }
 }
