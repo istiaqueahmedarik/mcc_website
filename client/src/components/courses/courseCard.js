@@ -1,7 +1,6 @@
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -15,6 +14,7 @@ import {
 import { deleteCourse } from '@/lib/action'
 import { Copy, EllipsisVertical, Telescope, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { Button } from '../ui/button'
 
 const truncate = (text, length) => {
   return text.length > length ? text.slice(0, length) + '...' : text
@@ -31,8 +31,11 @@ const CourseCard = ({ course }) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuItem>
-              <form action={binded} className='w-full'>
-                <button className="btn btn-sm w-full flex justify-start">
+              <form
+                action={binded}
+                className="w-full"
+              >
+                <button className="w-full flex justify-start">
                   <Trash2
                     size={12}
                     className="mr-2"
@@ -42,7 +45,7 @@ const CourseCard = ({ course }) => {
               </form>
             </DropdownMenuItem>
             <DropdownMenuItem>
-              <button className="btn btn-sm w-full flex justify-start">
+              <button className="w-full flex justify-start">
                 <Copy
                   size={12}
                   className="mr-2"
@@ -56,15 +59,16 @@ const CourseCard = ({ course }) => {
       <CardHeader>
         <CardTitle>{course.title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <CardDescription>{truncate(course.description, 256)}</CardDescription>
-      </CardContent>
+      <CardContent></CardContent>
       <CardFooter>
-        <Link href={`/courses/${course.id}`} className='w-full'>
-          <button className="btn btn-primary w-full">
+        <Link
+          href={`/courses/${course.id}`}
+          className="w-full"
+        >
+          <Button className="w-full flex flex-row gap-4">
             <Telescope />
             Visit
-          </button>
+          </Button>
         </Link>
       </CardFooter>
     </Card>

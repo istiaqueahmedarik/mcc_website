@@ -249,23 +249,23 @@ export async function acceptUser(previousState, formData) {
 export async function createCourse(prevState, formData) {
   let raw = Object.fromEntries(formData)
 
+  console.log(raw)
+
   const title = raw.title
   const description = raw.description
+  const batchId = raw.batchId
 
-  let ins_emails = []
-  const entries = Object.entries(raw)
-
-  entries.forEach(async ([key, value]) => {
-    if (key.startsWith('instructor-') && value !== '') {
-      ins_emails.push(value)
+  if (!title || !description || !batchId) {
+    return {
+      success: false,
+      message: 'All fields are required',
     }
-  })
-  ins_emails = [...new Set(ins_emails)]
+  }
 
   const response = await post_with_token('course/insert', {
-    ins_emails,
     title,
     description,
+    batchId,
   })
   if (response.error)
     return {
@@ -293,8 +293,42 @@ export async function getCourse(course_id) {
   return response.result
 }
 
+export async function editCourse(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  const title = raw.title
+  const description = raw.description
+  const course_id = prevState.course_id
+
+  console.log('details : ', title, description, course_id)
+
+  const response = await post_with_token('course/edit', {
+    course_id,
+    title,
+    description,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+    }
+  revalidatePath(`/courses/edit/${course_id}`)
+  return {
+    success: true,
+    message: 'Course edited successfully',
+  }
+}
+
 export async function getCourseIns(course_id) {
   const response = await post_with_token('course/getins', {
+    course_id,
+  })
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getCourseMems(course_id) {
+  const response = await post_with_token('course/getmems', {
     course_id,
   })
   if (response.error) return response.error
@@ -312,6 +346,17 @@ export async function deleteCourse(course_id, formData) {
   }
 }
 
+export async function deleteCourseContent(data, formData) {
+  try {
+    await post_with_token('course/delete_content', {
+      content_id: data.content_id,
+    })
+    revalidatePath(`/courses/${data.course_id}/contents`)
+  } catch (error) {
+    console.log(error)
+  }
+}
+
 export async function addCourseContent(prevState, formData) {
   let raw = Object.fromEntries(formData)
 
@@ -322,6 +367,7 @@ export async function addCourseContent(prevState, formData) {
   const name = raw.name
   const problem_link = raw.problem_link
   const video_link = raw.video_link
+  const code = raw.code
 
   let hints = []
   const entries = Object.entries(raw)
@@ -337,6 +383,7 @@ export async function addCourseContent(prevState, formData) {
     name,
     problem_link,
     video_link,
+    code,
     hints,
   })
   if (response.error)
@@ -349,6 +396,51 @@ export async function addCourseContent(prevState, formData) {
   return {
     success: true,
     message: 'Course created successfully',
+    course_id,
+  }
+}
+
+export async function editCourseContent(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  console.log(prevState)
+
+  const course_id = prevState.course_id
+  const content_id = prevState.content_id
+
+  const name = raw.name
+  const problem_link = raw.problem_link
+  const video_link = raw.video_link
+  const code = raw.code
+
+  let hints = []
+  const entries = Object.entries(raw)
+
+  entries.forEach(async ([key, value]) => {
+    if (key.startsWith('hint-') && value !== '') {
+      hints.push(value)
+    }
+  })
+
+  const response = await post_with_token('course/edit/content', {
+    course_id,
+    content_id,
+    name,
+    problem_link,
+    video_link,
+    code,
+    hints,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+      course_id,
+    }
+  revalidatePath(`/courses/${course_id}/contents`)
+  return {
+    success: true,
+    message: 'Course edited successfully',
     course_id,
   }
 }
@@ -451,7 +543,7 @@ export async function getBatchNonUsers(batch_id, offset, limit) {
   const response = await post_with_token('batch/get_batch_non_users', {
     batch_id,
     offset,
-    limit
+    limit,
   })
   if (response.error) return response.error
   return response.result
@@ -461,15 +553,14 @@ export async function getBatchUsers(batch_id, offset, limit) {
   const response = await post_with_token('batch/get_batch_users', {
     batch_id,
     offset,
-    limit
+    limit,
   })
   if (response.error) return response.error
   return response.result
 }
 
-
-export async function addBatchMemebers(st,formData) {
- const data = Object.fromEntries(formData)
+export async function addBatchMemebers(st, formData) {
+  const data = Object.fromEntries(formData)
   const response = await post_with_token('batch/add_members', data)
 
   if (response.error)
@@ -478,7 +569,7 @@ export async function addBatchMemebers(st,formData) {
     }
   revalidatePath(`/batches/edit/${data.batch_id}`)
   return {
-    message: `${JSON.parse(data.members).length} ${JSON.parse(data.members).length > 1 ? "members" : "member"} added successfully`,
+    message: `${JSON.parse(data.members).length} ${JSON.parse(data.members).length > 1 ? 'members' : 'member'} added successfully`,
   }
 }
 
@@ -493,7 +584,7 @@ export async function removeBatchMemebers(st, formData) {
   revalidatePath(`/batches/edit/${data.batch_id}`)
   const len = JSON.parse(data.members).length
   return {
-    message: `${len} ${len> 1 ? "members" : "member"} removed successfully`,
+    message: `${len} ${len > 1 ? 'members' : 'member'} removed successfully`,
   }
 }
 

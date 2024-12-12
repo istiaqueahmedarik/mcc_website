@@ -115,11 +115,7 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    require('tailwindcss-animate'),
-    addVariablesForColors,
-    require('daisyui'),
-  ],
+  plugins: [require('tailwindcss-animate'), addVariablesForColors, require('@tailwindcss/typography')],
 }
 
 function addVariablesForColors({ addBase, theme }) {

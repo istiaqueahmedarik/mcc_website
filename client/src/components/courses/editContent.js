@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { addCourseContent } from '@/lib/action'
+import { editCourseContent } from '@/lib/action'
 import { useActionState, useState } from 'react'
 import { Textarea } from '../ui/textarea'
 
@@ -20,11 +20,16 @@ const initialState = {
   success: false,
 }
 
-export default function AddContent({ course_id }) {
+export default function EditContent({ course_id, content }) {
   initialState.course_id = course_id
-  const [Hints, setHints] = useState([''])
+  initialState.content_id = content.id
+  const [problemName, setProblemName] = useState(content.name)
+  const [problemLink, setProblemLink] = useState(content.problem_link)
+  const [videoLink, setVideoLink] = useState(content.video_link)
+  const [code, setCode] = useState(content.code)
+  const [Hints, setHints] = useState([...content.hints])
   const [state, formAction, pending] = useActionState(
-    addCourseContent,
+    editCourseContent,
     initialState,
   )
 
@@ -32,8 +37,8 @@ export default function AddContent({ course_id }) {
     <div className="">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Add Problem</CardTitle>
-          <CardDescription>Add a new problem in this course</CardDescription>
+          <CardTitle className="text-2xl font-bold">Edit Problem</CardTitle>
+          <CardDescription>Edit this problem</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -48,6 +53,8 @@ export default function AddContent({ course_id }) {
                   id="name"
                   name="name"
                   placeholder="Name of the problem"
+                  value={problemName}
+                  onChange={(e) => setProblemName(e.target.value)}
                 />
               </div>
             </div>
@@ -59,6 +66,8 @@ export default function AddContent({ course_id }) {
                 id="problem_link"
                 name="problem_link"
                 placeholder="URL of the problem"
+                value={problemLink}
+                onChange={(e) => setProblemLink(e.target.value)}
               />
             </div>
 
@@ -69,6 +78,8 @@ export default function AddContent({ course_id }) {
                 id="video_link"
                 name="video_link"
                 placeholder="Video URL"
+                value={videoLink}
+                onChange={(e) => setVideoLink(e.target.value)}
               />
             </div>
 
@@ -79,6 +90,8 @@ export default function AddContent({ course_id }) {
                 name="code"
                 placeholder="C++ code here"
                 className="min-h-[100px]"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
               />
             </div>
 
@@ -123,7 +136,7 @@ export default function AddContent({ course_id }) {
               className="w-full"
               disabled={pending}
             >
-              {pending ? 'Submitting...' : 'Add Problem'}
+              {pending ? 'Submitting...' : 'Edit Problem'}
             </Button>
           </form>
         </CardContent>

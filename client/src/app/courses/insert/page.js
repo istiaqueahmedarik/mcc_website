@@ -1,11 +1,13 @@
 import Insert from '@/components/courses/insert'
 import Loader from '@/components/Loader'
+import { getAllBatches } from '@/lib/action';
 import { Suspense } from 'react'
 
-const Page = () => {
+const Page = async () => {
+  const allBatches = await getAllBatches();
   return (
     <Suspense fallback={<Loader />}>
-        <Insert />
+        <Insert batches = {allBatches} />
     </Suspense>
   )
 }

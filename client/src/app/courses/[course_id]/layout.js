@@ -1,4 +1,5 @@
 import CopyCourseLink from '@/components/courses/copyLink'
+import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { deleteCourse } from '@/lib/action'
-import { ListFilter, Trash2 } from 'lucide-react'
+import { ListFilter, Pencil, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 const CourseLayout = ({ children, params }) => {
@@ -14,15 +15,15 @@ const CourseLayout = ({ children, params }) => {
   const binded = deleteCourse.bind(null, course_id)
   return (
     <div className="w-full flex flex-col items-center">
-      <div className="w-full max-w-7xl flex items-center justify-center">
+      <div className="w-full max-w-7xl flex items-center justify-center gap-2">
         <Link href={`/courses/${course_id}`}>
-          <button className="btn btn-ghost btn-sm">Details</button>
+          <Badge>Details</Badge>
         </Link>
         <Link href={`/courses/${course_id}/peoples`}>
-          <button className="btn btn-ghost btn-sm">Peoples</button>
+          <Badge>Peoples</Badge>
         </Link>
         <Link href={`/courses/${course_id}/contents`}>
-          <button className="btn btn-ghost btn-sm">Contents</button>
+          <Badge>Contents</Badge>
         </Link>
         <DropdownMenu>
           <DropdownMenuTrigger>
@@ -49,7 +50,15 @@ const CourseLayout = ({ children, params }) => {
                 domain={process.env.CLIENT_URL}
               />
             </DropdownMenuItem>
-            <DropdownMenuItem>Team</DropdownMenuItem>
+            <DropdownMenuItem>
+              <button className="btn btn-sm w-full flex justify-start">
+                <Pencil
+                  size={12}
+                  className="mr-2"
+                />
+                <Link href={`/courses/${course_id}/edit`}>Edit</Link>
+              </button>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

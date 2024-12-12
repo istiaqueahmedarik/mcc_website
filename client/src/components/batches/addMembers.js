@@ -35,6 +35,7 @@ export default function AddMembers({ batch, nonUsers = [] }) {
     )
   }, [nonUsers, searchTerm])
 
+
   const currentPageMembers = useMemo(() => {
     return filteredMembers.slice(offset, offset + ITEMS_PER_PAGE)
   }, [filteredMembers, offset])

@@ -1,6 +1,5 @@
 'use client'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -11,15 +10,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { createCourse } from '@/lib/action'
+import { editCourse } from '@/lib/action'
 import { Soup } from 'lucide-react'
 import { useActionState, useState } from 'react'
 
@@ -28,19 +20,19 @@ const initialState = {
   success: false,
 }
 
-export default function Insert({ batches }) {
-  const [insEmails, setInsEmails] = useState([''])
-  const [state, formAction, pending] = useActionState(
-    createCourse,
-    initialState,
-  )
+export default function Edit({ course }) {
+  const [title, setTitle] = useState(course.title)
+  const [description, setDescription] = useState(course.description)
+  console.log(course);
+  initialState.course_id = course.id
+  const [state, formAction, pending] = useActionState(editCourse, initialState)
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create Course</CardTitle>
-          <CardDescription>Create a course for a new batch</CardDescription>
+          <CardTitle className="text-2xl font-bold">Edit Course</CardTitle>
+          <CardDescription>Edit current course</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -57,6 +49,8 @@ export default function Insert({ batches }) {
                   name="title"
                   placeholder="Title of the course"
                   className="pl-10"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
             </div>
@@ -68,41 +62,17 @@ export default function Insert({ batches }) {
                 name="description"
                 placeholder="Description of the course"
                 className="min-h-[100px]"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
               />
             </div>
-
-            <Select
-              id="batchId"
-              name="batchId"
-            >
-              <SelectTrigger className="">
-                <SelectValue placeholder="Select Batch" />
-              </SelectTrigger>
-              <SelectContent>
-                {batches &&
-                  batches.map((batch, index) => (
-                    <SelectItem
-                      key={index}
-                      value={batch.id}
-                    >
-                      {batch.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-
-            {state?.message && (
-              <Alert variant={state?.success ? 'default' : 'destructive'}>
-                <AlertDescription>{state?.message}</AlertDescription>
-              </Alert>
-            )}
 
             <Button
               type="submit"
               className="w-full"
               disabled={pending}
             >
-              {pending ? 'Submitting...' : 'Create Course'}
+              {pending ? 'Submitting...' : 'Edit Course'}
             </Button>
           </form>
         </CardContent>

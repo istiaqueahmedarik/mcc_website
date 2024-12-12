@@ -1,3 +1,4 @@
+import MarkdownRender from '@/components/MarkdownRenderer'
 import { getCourse, getCourseIns } from '@/lib/action'
 import { redirect } from 'next/navigation'
 
@@ -16,17 +17,8 @@ const SingleCourse = async ({ params }) => {
           <h1 className="text-2xl uppercase font-extrabold text-center tracking-wider">
             {course.title}
           </h1>
-          <div className="flex justify-center">
-            <div className="text-muted-foreground max-w-md text-justify p-4">
-              {course.description.split('\n').map((line, index) => (
-                <p
-                  key={index}
-                  className="mb-4"
-                >
-                  {line}
-                </p>
-              ))}
-            </div>
+          <div className="text-lg leading-loose">
+            <MarkdownRender content={course.description} />
           </div>
         </div>
       </div>

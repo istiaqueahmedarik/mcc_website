@@ -28,7 +28,7 @@ const Page = async ({ params, searchParams }) => {
   }
 
   return (
-    <div className="w-full bg-red-500 flex md:flex-row flex-col">
+    <div className="w-full flex md:flex-row flex-col">
       <Suspense fallback={<Loader />}>
         <RemoveMembers
           batch={batch[0]}

@@ -1,32 +1,28 @@
-"use client";
+'use client'
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { createBatch } from "@/lib/action";
-import { Soup } from "lucide-react";
-import { useActionState, useState } from "react";
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { createBatch } from '@/lib/action'
+import { Soup } from 'lucide-react'
+import { useActionState, useState } from 'react'
 
 const initialState = {
-  message: "",
+  message: '',
   success: false,
-};
+}
 
 export default function Insert() {
-  const [insEmails, setInsEmails] = useState([""]);
-  const [state, formAction, pending] = useActionState(
-    createBatch,
-    initialState,
-  );
+  const [insEmails, setInsEmails] = useState([''])
+  const [state, formAction, pending] = useActionState(createBatch, initialState)
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
@@ -36,7 +32,10 @@ export default function Insert() {
           <CardDescription>Add a new batch</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form
+            action={formAction}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <div className="relative">
@@ -52,7 +51,10 @@ export default function Insert() {
             </div>
 
             {insEmails.map((email, index) => (
-              <div key={index} className="space-y-2">
+              <div
+                key={index}
+                className="space-y-2"
+              >
                 <Label htmlFor={`instructor-${index}`}>
                   Instructor {index + 1} Email
                 </Label>
@@ -62,9 +64,9 @@ export default function Insert() {
                   name={`instructor-${index}`}
                   value={email}
                   onChange={(e) => {
-                    const newEmails = [...insEmails];
-                    newEmails[index] = e.target.value;
-                    setInsEmails(newEmails);
+                    const newEmails = [...insEmails]
+                    newEmails[index] = e.target.value
+                    setInsEmails(newEmails)
                   }}
                 />
               </div>
@@ -72,26 +74,30 @@ export default function Insert() {
 
             <div className="w-full flex items-center justify-center">
               <Button
-                onClick={() => setInsEmails([...insEmails, ""])}
+                onClick={() => setInsEmails([...insEmails, ''])}
                 type="button"
               >
-                {" "}
+                {' '}
                 + Add Instructor
               </Button>
             </div>
 
             {state?.message && (
-              <Alert variant={state?.success ? "default" : "destructive"}>
+              <Alert variant={state?.success ? 'default' : 'destructive'}>
                 <AlertDescription>{state?.message}</AlertDescription>
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Submitting..." : "Create Batch"}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={pending}
+            >
+              {pending ? 'Submitting...' : 'Create Batch'}
             </Button>
           </form>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

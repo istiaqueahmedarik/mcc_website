@@ -28,13 +28,13 @@ export default function Page() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>
           <CardDescription>
-            Don't have an account?{' '}
+            Don't have an account?
             <Link
               href="/login"
               className="text-primary"
             >
               Create
-            </Link>{' '}
+            </Link>
             a new one.
           </CardDescription>
         </CardHeader>
