@@ -9,10 +9,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { editCourseContent } from '@/lib/action'
 import { useActionState, useState } from 'react'
+import MarkdownRender from '../MarkdownRenderer'
 import { Textarea } from '../ui/textarea'
 
 const initialState = {
@@ -94,6 +103,20 @@ export default function EditContent({ course_id, content }) {
                 onChange={(e) => setCode(e.target.value)}
               />
             </div>
+
+            <Dialog className="w-screen">
+              <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg">
+                Preview Code
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Preview</DialogTitle>
+                  <DialogDescription>
+                    <MarkdownRender content={code} />
+                  </DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
 
             {Hints.map((hint, index) => (
               <div

@@ -9,11 +9,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { addCourseContent } from '@/lib/action'
 import { useActionState, useState } from 'react'
 import { Textarea } from '../ui/textarea'
+import MarkdownRender from '../MarkdownRenderer'
 
 const initialState = {
   message: '',
@@ -23,6 +32,7 @@ const initialState = {
 export default function AddContent({ course_id }) {
   initialState.course_id = course_id
   const [Hints, setHints] = useState([''])
+  const [code, setCode] = useState('')  
   const [state, formAction, pending] = useActionState(
     addCourseContent,
     initialState,
@@ -79,8 +89,24 @@ export default function AddContent({ course_id }) {
                 name="code"
                 placeholder="C++ code here"
                 className="min-h-[100px]"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
               />
             </div>
+
+            <Dialog className="w-screen">
+              <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg">
+                Preview Code
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Preview</DialogTitle>
+                  <DialogDescription>
+                    <MarkdownRender content={code} />
+                  </DialogDescription>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
 
             {Hints.map((hint, index) => (
               <div

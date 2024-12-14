@@ -26,7 +26,7 @@ const CourseContents = async ({ params }) => {
             <DialogTrigger className="w-fit flex gap-2 align-baseline">
               <CirclePlus size={20} /> Add Problem
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="w-full max-w-md">
               <DialogHeader>
                 <AddContent course_id={course_id} />
               </DialogHeader>
@@ -37,7 +37,6 @@ const CourseContents = async ({ params }) => {
         <div className="flex flex-col gap-4">
           {courseConts.length > 0 &&
             courseConts.map((content, index) => {
-              console.log(content)
               const binded = deleteCourseContent.bind(null, {
                 content_id: content.id,
                 course_id: course_id,
@@ -49,13 +48,13 @@ const CourseContents = async ({ params }) => {
                       <CardTitle>{content.name}</CardTitle>
                     </div>
                   </CardHeader>
-                  <CardFooter className="gap-4">
+                  <CardFooter className="w-full gap-4 flex-wrap">
                     {content.hints.map((hint, index) => (
                       <Dialog key={index}>
                         <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg">
                           <Lightbulb /> {index}
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="w-full max-w-lg">
                           <DialogHeader>
                             <DialogTitle>Hint {index}</DialogTitle>
                             <DialogDescription>{hint}</DialogDescription>
@@ -82,11 +81,11 @@ const CourseContents = async ({ params }) => {
 
                     <Dialog>
                       <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg gap-2">
-                      <FileJson size={20} /> Code
+                        <FileJson size={20} /> Code
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                        <MarkdownRender content={content.code} />
+                          <MarkdownRender content={content.code} />
                         </DialogHeader>
                       </DialogContent>
                     </Dialog>
@@ -95,7 +94,7 @@ const CourseContents = async ({ params }) => {
                       <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg gap-2">
                         <Pencil size={20} /> Edit
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="w-full max-w-md">
                         <DialogHeader>
                           <EditContent
                             course_id={course_id}
@@ -107,7 +106,7 @@ const CourseContents = async ({ params }) => {
 
                     <form
                       action={binded}
-                      className="w-full"
+                      className=""
                     >
                       <Button variant="destructive">
                         <Trash2

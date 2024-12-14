@@ -35,7 +35,6 @@ export const editCourse = async (c: any) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   const { course_id, title, description } = await c.req.json()
-  console.log(course_id, title, description)
 
   try {
     const result =
@@ -189,7 +188,7 @@ export const addCourseContent = async (c: any) => {
   if (!id || !email) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { course_id, name, problem_link, video_link, hints, code} =
+  const { course_id, name, problem_link, video_link, hints, code } =
     await c.req.json()
   try {
     const result =

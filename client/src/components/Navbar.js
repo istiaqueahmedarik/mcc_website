@@ -19,6 +19,7 @@ import { get_with_token } from '@/lib/action'
 import {
   Award,
   BookOpen,
+  BrainCircuit,
   Calendar,
   Code,
   FileText,
@@ -44,6 +45,7 @@ const Navbar = async () => {
   const adminTools = [
     { href: '/grantuser', icon: UserCheck, label: 'Grant Users' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
+    { href: '/batches', icon: BrainCircuit, label: 'Batches' },
   ]
 
   const loggedIn = cookies().get('token')
