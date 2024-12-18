@@ -19,20 +19,28 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { addCourseContent } from '@/lib/action'
 import { useActionState, useState } from 'react'
-import { Textarea } from '../ui/textarea'
 import MarkdownRender from '../MarkdownRenderer'
+import { Textarea } from '../ui/textarea'
 
 const initialState = {
   message: '',
   success: false,
 }
 
-export default function AddContent({ course_id }) {
+export default function AddContent({ course_id, ojList, defaultName }) {
   initialState.course_id = course_id
+  const [problemName, setProblemName] = useState(defaultName)
   const [Hints, setHints] = useState([''])
-  const [code, setCode] = useState('')  
+  const [code, setCode] = useState('')
   const [state, formAction, pending] = useActionState(
     addCourseContent,
     initialState,
@@ -58,6 +66,8 @@ export default function AddContent({ course_id }) {
                   id="name"
                   name="name"
                   placeholder="Name of the problem"
+                  value={problemName}
+                  onChange={(e) => setProblemName(e.target.value)}
                 />
               </div>
             </div>
@@ -79,6 +89,41 @@ export default function AddContent({ course_id }) {
                 id="video_link"
                 name="video_link"
                 placeholder="Video URL"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="OJ">OJ (for Vjudge)</Label>
+              <Select
+                name="oj"
+                id="oj"
+              >
+                <SelectTrigger className="">
+                  <SelectValue placeholder="OJ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ojList.length > 0 ? (
+                    ojList.map((oj, index) => (
+                      <SelectItem
+                        key={index}
+                        value={oj}
+                      >
+                        {oj}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="No OJ found">No OJ found</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="Problem ID">Problem ID (for Vjudge)</Label>
+              <Input
+                id="problem_id"
+                name="problem_id"
+                placeholder="Problem ID"
               />
             </div>
 

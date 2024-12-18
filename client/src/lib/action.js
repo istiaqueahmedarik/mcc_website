@@ -246,6 +246,13 @@ export async function acceptUser(previousState, formData) {
   revalidatePath('/grantuser')
 }
 
+export async function getVjudgeID() {
+  const response = await get_with_token('user/get_vjudge_id')
+  console.log('Vjudge ID', response)
+  if (response.error) return response.error
+  return response
+}
+
 export async function createCourse(prevState, formData) {
   let raw = Object.fromEntries(formData)
 
@@ -360,6 +367,8 @@ export async function deleteCourseContent(data, formData) {
 export async function addCourseContent(prevState, formData) {
   let raw = Object.fromEntries(formData)
 
+  console.log('content', raw)
+
   console.log(prevState)
 
   const course_id = prevState.course_id
@@ -368,6 +377,8 @@ export async function addCourseContent(prevState, formData) {
   const problem_link = raw.problem_link
   const video_link = raw.video_link
   const code = raw.code
+  const oj = raw.oj
+  const problem_id = raw.problem_id
 
   let hints = []
   const entries = Object.entries(raw)
@@ -385,6 +396,8 @@ export async function addCourseContent(prevState, formData) {
     video_link,
     code,
     hints,
+    oj,
+    problem_id,
   })
   if (response.error)
     return {
@@ -596,5 +609,26 @@ export async function deleteBatch(batch_id, formData) {
     revalidatePath('/courses')
   } catch (error) {
     console.log(error)
+  }
+}
+
+export async function solveDetails(vjudge_id) {
+  const response = await fetch(
+    `https://vjudge.net/user/solveDetail/${vjudge_id}`,
+    {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    },
+  )
+  try {
+    const json = await response.json()
+    return json
+  } catch (error) {
+    console.error('JSON Error:', error)
+    return {
+      error: 'An error occurred',
+    }
   }
 }

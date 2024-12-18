@@ -188,12 +188,20 @@ export const addCourseContent = async (c: any) => {
   if (!id || !email) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { course_id, name, problem_link, video_link, hints, code } =
-    await c.req.json()
+  const {
+    course_id,
+    name,
+    problem_link,
+    video_link,
+    hints,
+    code,
+    oj,
+    problem_id,
+  } = await c.req.json()
   try {
     const result =
-      await sql`insert into course_contents (course_id, name, problem_link, video_link, hints, code)
-    values (${course_id}, ${name}, ${problem_link}, ${video_link}, ${hints}, ${code}) returning *`
+      await sql`insert into course_contents (course_id, name, problem_link, video_link, hints, code, oj, problem_id)
+    values (${course_id}, ${name}, ${problem_link}, ${video_link}, ${hints}, ${code}, ${oj}, ${problem_id}) returning *`
     return c.json({ result })
   } catch (error) {
     console.log(error)

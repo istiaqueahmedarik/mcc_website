@@ -65,6 +65,9 @@ module.exports = {
           DEFAULT: 'hsl(var(--yellowCus1))',
           foreground: 'hsl(var(--yellowCus1-foreground))',
         },
+        greenAC: {
+          DEFAULT: 'hsl(var(--greenAC))',
+        },
         card: {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
@@ -115,7 +118,11 @@ module.exports = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate'), addVariablesForColors, require('@tailwindcss/typography')],
+  plugins: [
+    require('tailwindcss-animate'),
+    addVariablesForColors,
+    require('@tailwindcss/typography'),
+  ],
 }
 
 function addVariablesForColors({ addBase, theme }) {
