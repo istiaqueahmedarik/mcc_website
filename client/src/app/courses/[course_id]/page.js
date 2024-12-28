@@ -1,5 +1,6 @@
+import ViewScheduleTable from '@/components/courses/viewScheduleTable'
 import MarkdownRender from '@/components/MarkdownRenderer'
-import { getCourse, getCourseIns } from '@/lib/action'
+import { getCourse, getSchedules } from '@/lib/action'
 import { redirect } from 'next/navigation'
 
 const SingleCourse = async ({ params }) => {
@@ -9,7 +10,7 @@ const SingleCourse = async ({ params }) => {
     redirect('/courses')
   }
   course = course[0]
-  let courseInstructors = await getCourseIns(course_id)
+  const schedules = await getSchedules(course_id)
   return (
     <div className="w-full min-h-screen flex flex-row justify-center">
       <div className="w-full max-w-7xl flex flex-col items-center mt-4">
@@ -17,6 +18,7 @@ const SingleCourse = async ({ params }) => {
           <h1 className="text-2xl uppercase font-extrabold text-center tracking-wider">
             {course.title}
           </h1>
+          <ViewScheduleTable schedules={schedules} />
           <div className="text-lg leading-loose">
             <MarkdownRender content={course.description} />
           </div>

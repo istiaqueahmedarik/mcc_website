@@ -286,8 +286,42 @@ export async function createCourse(prevState, formData) {
   }
 }
 
+export async function createSchedule(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+
+  console.log(raw, prevState)
+
+  const course_id = prevState.course_id
+  const name = raw.name
+  const date = raw.date
+
+  const response = await post_with_token('course/insert/schedule', {
+    course_id,
+    name,
+    date,
+  })
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+    }
+  revalidatePath(`/courses/${course_id}/add_schedule`)
+  return {
+    success: true,
+    message: 'Schedule created successfully',
+  }
+}
+
 export async function getAllCourses() {
   const response = await get_with_token('course/all')
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getSchedules(course_id) {
+  const response = await post_with_token('course/getschedules', {
+    course_id,
+  })
   if (response.error) return response.error
   return response.result
 }
@@ -346,6 +380,19 @@ export async function deleteCourse(course_id, formData) {
   try {
     await post_with_token('course/delete', {
       course_id,
+    })
+    revalidatePath('/courses')
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+export async function deleteSchedule(data, formData) {
+  try {
+    console.log('delete', data)
+    await post_with_token('course/delete/schedule', {
+      course_id: data.course_id,
+      schedule_id: data.schedule_id,
     })
     revalidatePath('/courses')
   } catch (error) {

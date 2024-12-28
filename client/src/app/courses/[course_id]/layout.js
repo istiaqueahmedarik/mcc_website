@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { deleteCourse } from '@/lib/action'
-import { ListFilter, Pencil, Trash2 } from 'lucide-react'
+import { Bell, ListFilter, Pencil, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 const CourseLayout = ({ children, params }) => {
@@ -57,6 +57,17 @@ const CourseLayout = ({ children, params }) => {
                   className="mr-2"
                 />
                 <Link href={`/courses/${course_id}/edit`}>Edit</Link>
+              </button>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <button className="btn btn-sm w-full flex justify-start">
+                <Bell
+                  size={12}
+                  className="mr-2"
+                />
+                <Link href={`/courses/${course_id}/add_schedule`}>
+                  Add Schedule
+                </Link>
               </button>
             </DropdownMenuItem>
           </DropdownMenuContent>

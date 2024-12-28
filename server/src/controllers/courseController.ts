@@ -242,3 +242,66 @@ export const getContent = async (c: any) => {
     return c.json({ error: 'Course not found' }, 400)
   }
 }
+
+export const addSchedule = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const user =
+    await sql`select * from users where id = ${id} and email = ${email} and admin = true`
+  if (user.length === 0) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id, name, date } = await c.req.json()
+
+  console.log(course_id, name, date)
+
+  try {
+    const result =
+      await sql`insert into schedule (course_id, event_name, time) values (${course_id}, ${name}, ${date}) returning *`
+
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ erro: 'error' }, 400)
+  }
+}
+
+export const getSchedules = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id } = await c.req.json()
+  try {
+    const result =
+      await sql`select id, created_at, course_id, event_name, time AT TIME ZONE 'UTC' as time from schedule where course_id = ${course_id} and Date(time) >= current_date order by time`
+
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'Something went wrong' }, 400)
+  }
+}
+
+export const deleteSchedule = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const user =
+    await sql`select * from users where id = ${id} and email = ${email} and admin = true`
+  if (user.length === 0) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id, schedule_id } = await c.req.json()
+  try {
+    const result =
+      await sql`delete from schedule where id = ${schedule_id} and course_id = ${course_id} returning *`
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'Something went wrong' }, 400)
+  }
+}
