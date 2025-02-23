@@ -1,5 +1,11 @@
 import ViewScheduleTable from '@/components/courses/viewScheduleTable'
 import MarkdownRender from '@/components/MarkdownRenderer'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { getCourse, getSchedules } from '@/lib/action'
 import { redirect } from 'next/navigation'
 
@@ -18,7 +24,18 @@ const SingleCourse = async ({ params }) => {
           <h1 className="text-2xl uppercase font-extrabold text-center tracking-wider">
             {course.title}
           </h1>
-          <ViewScheduleTable schedules={schedules} />
+          <Accordion
+            type="single"
+            collapsible
+          >
+            <AccordionItem value="item-1">
+              <AccordionTrigger>Schedules</AccordionTrigger>
+              <AccordionContent>
+                <ViewScheduleTable schedules={schedules} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+
           <div className="text-lg leading-loose">
             <MarkdownRender content={course.description} />
           </div>

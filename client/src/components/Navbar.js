@@ -18,6 +18,7 @@ import {
 import { get_with_token } from '@/lib/action'
 import {
   Award,
+  Backpack,
   BookOpen,
   BrainCircuit,
   Calendar,
@@ -40,6 +41,10 @@ const Navbar = async () => {
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/problems', icon: Code, label: 'Problems' },
     { href: '/resources', icon: FileText, label: 'Resources' },
+  ]
+
+  const userTools = [
+    { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
   ]
 
   const adminTools = [
@@ -81,6 +86,22 @@ const Navbar = async () => {
                 </Button>
               </Link>
             ))}
+            {loggedIn &&
+              userTools.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm font-medium"
+                  >
+                    <item.icon className="w-4 h-4 mr-2" />
+                    {item.label}
+                  </Button>
+                </Link>
+              ))}
             {user && user.result && user.result[0].admin && (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gpa-2">

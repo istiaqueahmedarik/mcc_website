@@ -253,13 +253,13 @@ export const addSchedule = async (c: any) => {
   if (user.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { course_id, name, date } = await c.req.json()
+  const { course_id, name, date, link } = await c.req.json()
 
-  console.log(course_id, name, date)
+  console.log(course_id, name, date, link)
 
   try {
     const result =
-      await sql`insert into schedule (course_id, event_name, time) values (${course_id}, ${name}, ${date}) returning *`
+      await sql`insert into schedule (course_id, event_name, time, link) values (${course_id}, ${name}, ${date}, ${link}) returning *`
 
     return c.json({ result })
   } catch (error) {
@@ -276,7 +276,7 @@ export const getSchedules = async (c: any) => {
   const { course_id } = await c.req.json()
   try {
     const result =
-      await sql`select id, created_at, course_id, event_name, time AT TIME ZONE 'UTC' as time from schedule where course_id = ${course_id} and Date(time) >= current_date order by time`
+      await sql`select id, created_at, course_id, event_name, time AT TIME ZONE 'UTC' as time, link from schedule where course_id = ${course_id} and Date(time) >= current_date order by time`
 
     return c.json({ result })
   } catch (error) {

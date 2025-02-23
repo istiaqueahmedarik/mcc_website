@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/popover'
 import { createSchedule } from '@/lib/action'
 import { add, format } from 'date-fns'
-import { Calendar as CalendarIcon, Soup } from 'lucide-react'
+import { Calendar as CalendarIcon, Link, Soup } from 'lucide-react'
 import { useActionState, useCallback, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -120,6 +120,17 @@ export default function AddNewSchedule({ course_id }) {
                 </div>
               </PopoverContent>
             </Popover>
+
+            <div className="relative">
+              <Link className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                id="link"
+                name="link"
+                placeholder="Link of the event"
+                className="pl-10"
+              />
+            </div>
 
             {state?.message && (
               <Alert variant={state?.success ? 'default' : 'destructive'}>

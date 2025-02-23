@@ -12,7 +12,7 @@ import { formatRelative } from 'date-fns'
 import { ExternalLink, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function ViewScheduleTable({ schedules }) {
+export default function ViewScheduleTableDash({ schedules }) {
   return (
     <div>
       <Table>
@@ -20,6 +20,8 @@ export default function ViewScheduleTable({ schedules }) {
         <TableHeader>
           <TableRow>
             <TableHead className="w-[100px]">SL</TableHead>
+            <TableHead>Batch Name</TableHead>
+            <TableHead>Course Title</TableHead>
             <TableHead>Event Name</TableHead>
             <TableHead>Time</TableHead>
             <TableHead>Link</TableHead>
@@ -39,6 +41,8 @@ export default function ViewScheduleTable({ schedules }) {
             return (
               <TableRow key={index}>
                 <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>{schedule.batch_name}</TableCell>
+                <TableCell>{schedule.course_title}</TableCell>
                 <TableCell>{schedule.event_name}</TableCell>
                 <TableCell>{fDate}</TableCell>
                 <TableCell>

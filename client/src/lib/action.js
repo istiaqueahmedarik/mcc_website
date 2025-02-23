@@ -294,11 +294,13 @@ export async function createSchedule(prevState, formData) {
   const course_id = prevState.course_id
   const name = raw.name
   const date = raw.date
+  const link = raw.link
 
   const response = await post_with_token('course/insert/schedule', {
     course_id,
     name,
     date,
+    link,
   })
   if (response.error)
     return {
@@ -629,7 +631,9 @@ export async function addBatchMemebers(st, formData) {
     }
   revalidatePath(`/batches/edit/${data.batch_id}`)
   return {
-    message: `${JSON.parse(data.members).length} ${JSON.parse(data.members).length > 1 ? 'members' : 'member'} added successfully`,
+    message: `${JSON.parse(data.members).length} ${
+      JSON.parse(data.members).length > 1 ? 'members' : 'member'
+    } added successfully`,
   }
 }
 
@@ -678,4 +682,10 @@ export async function solveDetails(vjudge_id) {
       error: 'An error occurred',
     }
   }
+}
+
+export async function getSchedulesDash() {
+  const response = await get_with_token('user/get_shchedules_dash')
+  if (response.error) return response.error
+  return response.result
 }
