@@ -22,7 +22,7 @@ import Image from 'next/image'
 import { redirect } from 'next/navigation'
 
 export default async function Page() {
-  if (!cookies().get('token')) {
+  if (!(await cookies()).get('token')) {
     redirect('/login')
   }
   const user = await get_with_token('auth/user/profile')

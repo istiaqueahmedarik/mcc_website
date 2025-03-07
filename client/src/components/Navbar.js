@@ -22,6 +22,7 @@ import {
   BookOpen,
   BrainCircuit,
   Calendar,
+  CalendarClock,
   Code,
   FileText,
   LogIn,
@@ -38,6 +39,7 @@ import ThemeChanger from './ThemeChanger'
 const Navbar = async () => {
   const navItems = [
     { href: '/upcomingContest', icon: Calendar, label: 'Upcoming Contests' },
+    { href: '/contest_reminders', icon: CalendarClock, label: 'Contest Reminders' },
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/problems', icon: Code, label: 'Problems' },
     { href: '/resources', icon: FileText, label: 'Resources' },
@@ -53,7 +55,7 @@ const Navbar = async () => {
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
   ]
 
-  const loggedIn = cookies().get('token')
+  const loggedIn = (await cookies()).get('token')
   const user = await get_with_token('auth/user/profile')
 
   return (

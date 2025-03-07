@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 
 const Page = async () => {
-  if (!cookies().get('token')) {
+  if (!(await cookies()).get('token')) {
     redirect('/login')
   }
   const user = await get_with_token('auth/user/profile')

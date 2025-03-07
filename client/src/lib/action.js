@@ -61,7 +61,7 @@ export const get = cache(async (url) => {
 })
 
 export const get_with_token = cache(async (url) => {
-  const token = cookies().get('token')
+  const token = (await cookies()).get('token')
   if (token === undefined)
     return {
       error: 'Unauthorized',
@@ -92,7 +92,7 @@ export const get_with_token = cache(async (url) => {
 })
 
 export const post_with_token = cache(async (url, data) => {
-  const token = cookies().get('token')
+  const token = (await cookies()).get('token')
   if (token === undefined)
     return {
       error: 'Unauthorized',
@@ -211,17 +211,19 @@ export async function signUp(prevState, formData) {
 
 export async function login(prevState, formData) {
   const response = await post('auth/login', Object.fromEntries(formData))
+  console.log('login response', response)
   if (response.error)
     return {
       success: false,
       message: response.error,
     }
-  cookies().set('token', response.token)
+      const cookieStore = await cookies()
+      cookieStore.set('token', response.token)
   redirect('/')
 }
 
 export async function logout() {
-  cookies().delete('token')
+  (await cookies()).delete('token')
   redirect('/')
 }
 
@@ -688,4 +690,17 @@ export async function getSchedulesDash() {
   const response = await get_with_token('user/get_shchedules_dash')
   if (response.error) return response.error
   return response.result
+}
+
+
+export async function getContests() {
+  try {
+    const res = await fetch(`${process.env.SERVER_URL}/getContests`)
+    const tophContests = await res.json();
+    return tophContests
+  }
+  catch (error) {
+    console.error('Error:', error)
+    return []
+  }
 }

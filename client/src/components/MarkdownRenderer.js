@@ -1,7 +1,7 @@
 import 'katex/dist/katex.min.css'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs/docco'
+import { docco } from 'react-syntax-highlighter/dist/cjs/styles/hljs'
 import rehypeKatex from 'rehype-katex'
 import rehypeRaw from 'rehype-raw'
 import remarkGfm from 'remark-gfm'
