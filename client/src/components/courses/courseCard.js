@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { deleteCourse } from '@/lib/action'
 import { Copy, EllipsisVertical, Telescope, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 import { Button } from '../ui/button'
 
 const truncate = (text, length) => {

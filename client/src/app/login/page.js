@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login } from '@/lib/action'
 import { AtSign, Lock } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 import { useActionState } from 'react'
 const initialState = {
   message: '',
@@ -28,14 +28,14 @@ export default function Page() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Login</CardTitle>
           <CardDescription>
-            Don't have an account?
+            Don&apos;t have an account?
             <Link
-              href="/login"
+              href="/signup"
               className="text-primary"
             >
-              Create
+              Sign Up
             </Link>
-            a new one.
+            
           </CardDescription>
         </CardHeader>
         <CardContent>

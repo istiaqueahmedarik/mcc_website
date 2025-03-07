@@ -18,6 +18,7 @@ const Reject = ({ userId }) => {
             src="/Loader.gif"
             width={30}
             height={30}
+            alt="loading"
           />
         ) : (
           <RxCrossCircled size={20} />

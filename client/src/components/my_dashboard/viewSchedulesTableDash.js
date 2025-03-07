@@ -10,7 +10,7 @@ import {
 import { deleteSchedule } from '@/lib/action'
 import { formatRelative } from 'date-fns'
 import { ExternalLink, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 
 export default function ViewScheduleTableDash({ schedules }) {
   return (

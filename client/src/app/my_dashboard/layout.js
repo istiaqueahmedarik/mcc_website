@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 
 const MyDashboardLayout = ({ children }) => {
   return (

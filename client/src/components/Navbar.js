@@ -31,7 +31,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import { cookies } from 'next/headers'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 import MccLogo from './IconChanger/MccLogo'
 import ThemeChanger from './ThemeChanger'
 

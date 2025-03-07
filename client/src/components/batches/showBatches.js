@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { deleteBatch, getAllBatches } from '@/lib/action'
 import { Ellipsis } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 
 export default async function ShowBatches() {
   const allBatches = await getAllBatches()

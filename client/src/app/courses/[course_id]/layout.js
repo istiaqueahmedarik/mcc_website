@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { deleteCourse } from '@/lib/action'
 import { Bell, ListFilter, Pencil, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 
 const CourseLayout = ({ children, params }) => {
   const { course_id } = params

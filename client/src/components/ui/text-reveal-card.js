@@ -1,8 +1,9 @@
 'use client'
-import React, { useEffect, useRef, useState, memo } from 'react'
+import React, { useEffect, useRef, useState, memo, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { twMerge } from 'tailwind-merge'
 import { cn } from '@/lib/utils'
+import dynamic from 'next/dynamic'
 
 export const TextRevealCard = ({ text, revealText, children, className }) => {
   const [widthPercentage, setWidthPercentage] = useState(0)
@@ -47,6 +48,10 @@ export const TextRevealCard = ({ text, revealText, children, className }) => {
   }
 
   const rotateDeg = (widthPercentage - 50) * 0.1
+  const MemoizedStars = dynamic(() => import('@/components/MemStars'), {
+    ssr: false,
+  })
+
   return (
     <div
       onMouseEnter={mouseEnterHandler}
@@ -103,7 +108,7 @@ export const TextRevealCard = ({ text, revealText, children, className }) => {
           <p className="text-base sm:text-[3rem] py-10 font-bold bg-clip-text text-transparent bg-[#323238]">
             {text}
           </p>
-          <MemoizedStars />
+            <MemoizedStars />
         </div>
       </div>
     </div>
@@ -124,41 +129,4 @@ export const TextRevealCardDescription = ({ children, className }) => {
   )
 }
 
-const Stars = () => {
-  const randomMove = () => Math.random() * 4 - 2
-  const randomOpacity = () => Math.random()
-  const random = () => Math.random()
-  return (
-    <div className="absolute inset-0">
-      {[...Array(80)].map((_, i) => (
-        <motion.span
-          key={`star-${i}`}
-          animate={{
-            top: `calc(${random() * 100}% + ${randomMove()}px)`,
-            left: `calc(${random() * 100}% + ${randomMove()}px)`,
-            opacity: randomOpacity(),
-            scale: [1, 1.2, 0],
-          }}
-          transition={{
-            duration: random() * 10 + 20,
-            repeat: Infinity,
-            ease: 'linear',
-          }}
-          style={{
-            position: 'absolute',
-            top: `${random() * 100}%`,
-            left: `${random() * 100}%`,
-            width: `2px`,
-            height: `2px`,
-            backgroundColor: 'white',
-            borderRadius: '50%',
-            zIndex: 1,
-          }}
-          className="inline-block"
-        ></motion.span>
-      ))}
-    </div>
-  )
-}
 
-export const MemoizedStars = memo(Stars)

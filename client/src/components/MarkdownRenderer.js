@@ -37,11 +37,12 @@ const MarkdownRender = ({ content }) => {
               <SyntaxHighlighter
                 {...rest}
                 PreTag="div"
-                children={String(children).replace(/\n$/, '')}
                 language={match[1]}
                 style={docco}
                 showLineNumbers={true}
-              />
+              >
+                {String(children).replace(/\n$/, '')}
+              </SyntaxHighlighter>
             ) : (
               <code
                 {...rest}

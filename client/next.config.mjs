@@ -14,13 +14,13 @@ const nextConfig = {
     ],
     dangerouslyAllowSVG: true,
 },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '5mb',
-    },
-    reactCompiler: true,
-    ppr: 'incremental',
-  },
+  // experimental: {
+  //   serverActions: {
+  //     bodySizeLimit: '5mb',
+  //   },
+  //   reactCompiler: true,
+  //   ppr: 'incremental',
+  // },
 }
 
 export default nextConfig

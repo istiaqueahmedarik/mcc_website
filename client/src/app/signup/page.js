@@ -22,7 +22,7 @@ import {
   UserPlus,
   UserRound,
 } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 import { useActionState } from 'react'
 const initialState = {
   message: '',

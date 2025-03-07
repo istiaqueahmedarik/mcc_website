@@ -19,7 +19,7 @@ import {
   solveDetails,
 } from '@/lib/action'
 import { CirclePlus, FileJson, Lightbulb, Pencil, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import {Link} from 'next-view-transitions'
 
 function getColumnName(n) {
   let result = ''
