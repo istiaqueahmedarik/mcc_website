@@ -14,15 +14,14 @@ import { Label } from '@/components/ui/label'
 import { signUp } from '@/lib/action'
 import {
   AtSign,
-  FileDigit,
+  CircleArrowOutUpRight,
   IdCard,
   Lock,
   LockKeyhole,
   Phone,
-  UserPlus,
   UserRound,
 } from 'lucide-react'
-import {Link} from 'next-view-transitions'
+import { Link } from 'next-view-transitions'
 import { useActionState } from 'react'
 const initialState = {
   message: '',
@@ -67,7 +66,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="profile_pic">Profile Picture</Label>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
                 <UserPlus />
@@ -80,9 +79,9 @@ export default function Page() {
                   required
                 />
               </div>
-            </div>
+            </div> */}
 
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="mist_id">MIST ID</Label>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
                 <FileDigit />
@@ -95,7 +94,7 @@ export default function Page() {
                   required
                 />
               </div>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
               <Label htmlFor="mist_id_card">MIST ID card</Label>
@@ -166,6 +165,66 @@ export default function Page() {
                   id="confirm_passowrd"
                   name="confirm_passowrd"
                   placeholder="Confirm your password"
+                  className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="vjudge_id">Vjudge ID</Label>
+              <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
+                <CircleArrowOutUpRight />
+                <Input
+                  type="text"
+                  id="vjudge_id"
+                  name="vjudge_id"
+                  placeholder="Enter your Vjudge ID"
+                  className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cf_id">Codeforces ID</Label>
+              <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
+                <CircleArrowOutUpRight />
+                <Input
+                  type="text"
+                  id="cf_id"
+                  name="cf_id"
+                  placeholder="Enter your Codeforces ID"
+                  className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="codechef_id">CodeChef ID</Label>
+              <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
+                <CircleArrowOutUpRight />
+                <Input
+                  type="text"
+                  id="codechef_id"
+                  name="codechef_id"
+                  placeholder="Enter your CodeChef ID"
+                  className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="atcoder_id">Atcoder ID</Label>
+              <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
+                <CircleArrowOutUpRight />
+                <Input
+                  type="text"
+                  id="atcoder_id"
+                  name="atcoder_id"
+                  placeholder="Enter your Atcoder ID"
                   className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
                   required
                 />

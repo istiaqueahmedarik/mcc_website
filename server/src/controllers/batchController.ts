@@ -176,7 +176,7 @@ export const getBatchUsers = async (c: any) => {
   }
   const { batch_id, offset, limit } = await c.req.json()
   try {
-    const result = await sql`select id, full_name, mist_id from users
+    const result = await sql`select id, full_name, mist_id, vjudge_id, cf_id, codechef_id, atcoder_id from users
       where id not in (select ins_id from batch_instructors
         where batch_id = ${batch_id}
       ) and
