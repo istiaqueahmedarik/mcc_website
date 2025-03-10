@@ -34,9 +34,14 @@ export default async function ShowBatches() {
                       <DropdownMenuItem>
                         <Link href={`/batches/edit/${batch.id}`}>Edit</Link>
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      {/* <DropdownMenuItem>
                         <Link href={`/batches/members/${batch.id}`}>
                           Add Members
+                        </Link>
+                      </DropdownMenuItem> */}
+                      <DropdownMenuItem>
+                        <Link href={`/batches/members_details/${batch.id}`}>
+                          Batch Details
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem>

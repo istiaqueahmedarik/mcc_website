@@ -1,78 +1,58 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { CalendarDays, CheckCircle, Code } from "lucide-react"
+"use client"
 
-export default function SubmissionStats({
-  stats
-}) {
-  const getRegularityColor = (status) => {
-    switch (status) {
-      case "Regular":
-        return "bg-green-500"
-      case "Needs Monitoring":
-        return "bg-yellow-500"
-      case "Irregular":
-        return "bg-red-500"
-      default:
-        return "bg-gray-500"
-    }
-  }
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CheckCircle, Clock, FileText, TrendingUp } from "lucide-react"
+
+export default function SubmissionStats({ stats }) {
+  const acceptanceRate =
+    stats.totalSubmissions > 0 ? Math.round((stats.acceptedSubmissions / stats.totalSubmissions) * 100) : 0
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Submission Stats</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+          <FileText className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Code className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Total</span>
-            </div>
-            <span className="text-2xl font-bold">{stats.totalSubmissions}</span>
-          </div>
-          <div className="flex justify-between items-center mt-2">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <span className="text-sm text-muted-foreground">Accepted</span>
-            </div>
-            <span className="text-xl font-semibold">{stats.acceptedSubmissions}</span>
-          </div>
+          <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
+          <p className="text-xs text-muted-foreground">{stats.submissionFrequency.toFixed(1)} submissions per day</p>
         </CardContent>
       </Card>
+
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Submission Frequency</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Accepted Solutions</CardTitle>
+          <CheckCircle className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center h-full">
-            <span className="text-3xl font-bold">{stats.submissionFrequency.toFixed(2)}</span>
-            <span className="text-sm text-muted-foreground">submissions per day</span>
-          </div>
+          <div className="text-2xl font-bold">{stats.acceptedSubmissions}</div>
+          <p className="text-xs text-muted-foreground">{acceptanceRate}% acceptance rate</p>
         </CardContent>
       </Card>
+
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">User Status</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Last Submission</CardTitle>
+          <Clock className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col space-y-3">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Last Submission</span>
-              </div>
-              <span className="text-sm font-medium">{stats.lastSubmissionDate}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Regularity</span>
-              <Badge className={getRegularityColor(stats.regularityStatus)}>{stats.regularityStatus}</Badge>
-            </div>
-          </div>
+          <div className="text-2xl font-bold">{stats.lastSubmissionDate}</div>
+          <p className="text-xs text-muted-foreground">Last active date</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Activity Status</CardTitle>
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stats.regularityStatus}</div>
+          <p className="text-xs text-muted-foreground">Based on submission frequency</p>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
 

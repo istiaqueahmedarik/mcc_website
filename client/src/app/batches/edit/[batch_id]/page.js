@@ -4,7 +4,7 @@ import { getBatch, getBatchIns } from '@/lib/action'
 import { Suspense } from 'react'
 
 const Page = async ({ params }) => {
-  const { batch_id } = params
+  const { batch_id } = await params
   const [batch, ins] = await Promise.all([
     getBatch(batch_id),
     getBatchIns(batch_id),

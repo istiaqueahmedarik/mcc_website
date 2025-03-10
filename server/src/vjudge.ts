@@ -1,21 +1,66 @@
-'use server'
 import { format, subDays } from "date-fns";
-import { cookies } from "next/headers";
 
+interface Submission {
+    time: number;
+    status: string;
+    userName: string;
+    run_id?: number;
+    [key: string]: any;
+}
 
+interface DailySubmissions {
+    date: string;
+    personalCount: number;
+    contestCount: number;
+}
 
-export async function fetchSubmissionData(username, contestId, days = 7, sessionId = "") {
+interface SubmissionStats {
+    totalSubmissions: number;
+    acceptedSubmissions: number;
+    lastSubmissionDate: string;
+    submissionFrequency: string;
+    regularityStatus: string;
+}
+
+interface User {
+    vjudge_id?: string;
+    full_name: string;
+}
+
+interface BatchStatsItem {
+    vjudge_id: string;
+    full_name: string;
+    totalSubmissions: number;
+    acceptedSubmissions: number;
+    acceptanceRate: number;
+    submissionFrequency: number;
+    lastSubmissionDate: string;
+    irregular: boolean;
+
+}
+
+export async function fetchSubmissionData(
+    username: string,
+    contestId: string,
+    days: number = 7,
+    sessionId: string = ""
+): Promise<{
+    dailySubmissions: DailySubmissions[];
+    stats: SubmissionStats;
+    personalSubmissions: Submission[];
+    contestSubmissions: Submission[];
+}> {
     const cutoffDate = subDays(new Date(), days).getTime();
-    console.log(cutoffDate.toLocaleString());
+    console.log(cutoffDate.toString());
     const personalSubmissions = await fetchAllPersonalSubmissions(username, cutoffDate, sessionId);
 
     const contestSubmissions = await fetchAllContestSubmissions(contestId, cutoffDate, sessionId);
     const userContestSubmissions = contestSubmissions.filter((submission) => submission.userName === username);
 
     const allSubmissions = [...personalSubmissions, ...userContestSubmissions];
-    
+
     const dailySubmissions = groupSubmissionsByDay(allSubmissions, personalSubmissions, userContestSubmissions);
-    console.log(days)
+    console.log(days);
     const stats = calculateStats(allSubmissions, personalSubmissions, userContestSubmissions, days);
 
     return {
@@ -26,8 +71,12 @@ export async function fetchSubmissionData(username, contestId, days = 7, session
     };
 }
 
-async function fetchAllPersonalSubmissions(username, cutoffDate, sessionId = "") {
-    let allSubmissions = [];
+async function fetchAllPersonalSubmissions(
+    username: string,
+    cutoffDate: number,
+    sessionId: string = ""
+): Promise<Submission[]> {
+    let allSubmissions: Submission[] = [];
     let start = 0;
     const length = 20;
     let hasMoreData = true;
@@ -36,7 +85,7 @@ async function fetchAllPersonalSubmissions(username, cutoffDate, sessionId = "")
         const url = `https://vjudge.net/status/data?draw=1&start=${start}&length=${length}&un=${username}&OJId=All&probNum=&res=1&language=&onlyFollowee=false&orderBy=run_id&_=${Date.now()}`;
 
         try {
-            const headers = {};
+            const headers: Record<string, string> = {};
             if (sessionId) {
                 headers["Cookie"] = sessionId;
             }
@@ -57,13 +106,14 @@ async function fetchAllPersonalSubmissions(username, cutoffDate, sessionId = "")
             }
 
             const validSubmissions = data.data.filter(
-                (submission) => submission && typeof submission.time === "number" && !isNaN(submission.time)
+                (submission: Submission) => submission && typeof submission.time === "number" && !isNaN(submission.time)
             );
-            validSubmissions.sort((a, b) => b.time - a.time);
+            validSubmissions.sort((a: Submission, b: Submission) => b.time - a.time);
+
             if (validSubmissions.length > 0) {
                 const oldestSubmissionTime = validSubmissions[validSubmissions.length - 1].time;
                 if (oldestSubmissionTime < cutoffDate) {
-                    const filteredBatch = validSubmissions.filter((submission) => submission.time >= cutoffDate);
+                    const filteredBatch = validSubmissions.filter((submission: Submission) => submission.time >= cutoffDate);
                     allSubmissions = [...allSubmissions, ...filteredBatch];
                     hasMoreData = false;
                     break;
@@ -86,8 +136,12 @@ async function fetchAllPersonalSubmissions(username, cutoffDate, sessionId = "")
     return allSubmissions;
 }
 
-async function fetchAllContestSubmissions(contestId, cutoffDate, sessionId = "") {
-    let allSubmissions = [];
+async function fetchAllContestSubmissions(
+    contestId: string,
+    cutoffDate: number,
+    sessionId: string = ""
+): Promise<Submission[]> {
+    let allSubmissions: Submission[] = [];
     let start = 0;
     const length = 20;
     let hasMoreData = true;
@@ -97,14 +151,13 @@ async function fetchAllContestSubmissions(contestId, cutoffDate, sessionId = "")
 
         try {
             const myHeaders = new Headers();
-            
+
             myHeaders.append("Cookie", "JSESSIONID=" + sessionId + ";");
-            (await cookies()).set("JSESSIONID", sessionId);
             const requestOptions = {
                 method: "GET",
                 headers: myHeaders,
-                credentials: "include",
-                redirect: "follow"
+                credentials: "include" as RequestCredentials,
+                redirect: "follow" as RequestRedirect
             };
             const response = await fetch(url, requestOptions);
             if (!response.ok) {
@@ -121,13 +174,13 @@ async function fetchAllContestSubmissions(contestId, cutoffDate, sessionId = "")
             }
 
             const validSubmissions = data.data.filter(
-                (submission) => submission && typeof submission.time === "number" && !isNaN(submission.time)
+                (submission: Submission) => submission && typeof submission.time === "number" && !isNaN(submission.time)
             );
-            
+
             if (validSubmissions.length > 0) {
                 const oldestSubmissionTime = validSubmissions[validSubmissions.length - 1].time;
                 if (oldestSubmissionTime < cutoffDate) {
-                    const filteredBatch = validSubmissions.filter((submission) => submission.time >= cutoffDate);
+                    const filteredBatch = validSubmissions.filter((submission: Submission) => submission.time >= cutoffDate);
                     allSubmissions = [...allSubmissions, ...filteredBatch];
                     hasMoreData = false;
                     break;
@@ -150,8 +203,12 @@ async function fetchAllContestSubmissions(contestId, cutoffDate, sessionId = "")
     return allSubmissions;
 }
 
-function groupSubmissionsByDay(allSubmissions, personalSubmissions, contestSubmissions) {
-    const submissionsByDay = {};
+function groupSubmissionsByDay(
+    allSubmissions: Submission[],
+    personalSubmissions: Submission[],
+    contestSubmissions: Submission[]
+): DailySubmissions[] {
+    const submissionsByDay: Record<string, { personalCount: number, contestCount: number }> = {};
 
     const today = new Date();
     for (let i = 0; i < 7; i++) {
@@ -214,7 +271,12 @@ function groupSubmissionsByDay(allSubmissions, personalSubmissions, contestSubmi
         });
 }
 
-function calculateStats(allSubmissions, personalSubmissions, contestSubmissions, tot_days) {
+function calculateStats(
+    allSubmissions: Submission[],
+    personalSubmissions: Submission[],
+    contestSubmissions: Submission[],
+    tot_days: number
+): SubmissionStats {
     const totalSubmissions = allSubmissions.length;
     const acceptedSubmissions = allSubmissions.filter((submission) => submission.status === "Accepted").length;
 
@@ -233,12 +295,12 @@ function calculateStats(allSubmissions, personalSubmissions, contestSubmissions,
     }
 
     const submissionFrequency = (totalSubmissions / tot_days).toFixed(1);
-    console.log(totalSubmissions, tot_days,submissionFrequency);
+    console.log(totalSubmissions, tot_days, submissionFrequency);
 
     let regularityStatus = "Irregular";
-    if (submissionFrequency >= 1) {
+    if (parseFloat(submissionFrequency) >= 1) {
         regularityStatus = "Regular";
-    } else if (submissionFrequency >= 0.5) {
+    } else if (parseFloat(submissionFrequency) >= 0.5) {
         regularityStatus = "Needs Monitoring";
     }
 
@@ -251,19 +313,24 @@ function calculateStats(allSubmissions, personalSubmissions, contestSubmissions,
     };
 }
 
-export async function fetchBatchStatistics(users, contestId, days = 7, sessionId = "") {
+export async function fetchBatchStatistics(
+    users: any[],
+    contestId: string,
+    days: number = 7,
+    sessionId: string = ""
+): Promise<BatchStatsItem[]> {
     console.log(days);
-    const cutoffDate = subDays(new Date(), days).getTime()
-    const batchStats = []
+    const cutoffDate = subDays(new Date(), days).getTime();
+    const batchStats: BatchStatsItem[] = [];
 
     for (const user of users) {
-        if (!user.vjudge_id) continue
+        if (!user.vjudge_id) continue;
 
         try {
-            const data = await fetchSubmissionData(user.vjudge_id, contestId, days, sessionId)
+            const data = await fetchSubmissionData(user.vjudge_id, contestId, days, sessionId);
 
-            const stats = data.stats
-            console.log(stats)
+            const stats = data.stats;
+            console.log(stats);
             batchStats.push({
                 vjudge_id: user.vjudge_id,
                 full_name: user.full_name,
@@ -272,9 +339,10 @@ export async function fetchBatchStatistics(users, contestId, days = 7, sessionId
                 acceptanceRate: (stats.acceptedSubmissions / stats.totalSubmissions) * 100 || 0,
                 submissionFrequency: parseFloat(stats.submissionFrequency),
                 lastSubmissionDate: stats.lastSubmissionDate,
-            })
+                irregular: stats.regularityStatus !== "Regular",
+            });
         } catch (error) {
-            console.error(`Error fetching data for user ${user.vjudge_id}:`, error)
+            console.error(`Error fetching data for user ${user.vjudge_id}:`, error);
             batchStats.push({
                 vjudge_id: user.vjudge_id,
                 full_name: user.full_name,
@@ -283,9 +351,10 @@ export async function fetchBatchStatistics(users, contestId, days = 7, sessionId
                 acceptanceRate: 0,
                 submissionFrequency: 0,
                 lastSubmissionDate: "N/A",
-            })
+                irregular: true,
+            });
         }
     }
 
-    return batchStats
+    return batchStats;
 }

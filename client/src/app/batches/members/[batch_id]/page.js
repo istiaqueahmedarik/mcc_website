@@ -5,11 +5,11 @@ import { getBatch, getBatchNonUsers, getBatchUsers } from '@/lib/action'
 import { Suspense } from 'react'
 
 const Page = async ({ params, searchParams }) => {
-  const offsetNonUsers = searchParams.offsetNonUsers
-    ? parseInt(searchParams.offsetNonUsers)
+  const offsetNonUsers = (await searchParams).offsetNonUsers
+    ? parseInt((await searchParams).offsetNonUsers)
     : 0
-  const offsetUsers = searchParams.offsetUsers
-    ? parseInt(searchParams.offsetUsers)
+  const offsetUsers = (await searchParams).offsetUsers
+    ? parseInt((await searchParams).offsetUsers)
     : 0
   const limit = 50
   const { batch_id } = params
@@ -18,7 +18,7 @@ const Page = async ({ params, searchParams }) => {
     getBatchNonUsers(batch_id, offsetNonUsers, limit),
     getBatchUsers(batch_id, offsetUsers, limit),
   ])
-  // console.log(users)
+  console.log(users)
   if (!Array.isArray(batch) || !Array.isArray(nonUsers) || batch.length === 0) {
     return (
       <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">

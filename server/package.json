@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0",
+    "date-fns": "^4.1.0",
     "hono": "^4.5.11",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.15",

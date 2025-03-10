@@ -6,111 +6,122 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
-import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
-
 
 export default function SubmissionList({ personalSubmissions, contestSubmissions }) {
-    const [searchTerm, setSearchTerm] = useState("")
+    const [page, setPage] = useState(1)
+    const pageSize = 10
 
-    const filterSubmissions = (submissions) => {
-        if (!searchTerm) return submissions
-
-        return submissions.filter(
-            (submission) =>
-                submission.probNum?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                submission.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                submission.oj?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                submission.language?.toLowerCase().includes(searchTerm.toLowerCase()),
-        )
+    const formatDate = (timestamp) => {
+        try {
+            return format(new Date(timestamp), "MMM dd, yyyy HH:mm:ss")
+        } catch (e) {
+            return "Invalid date"
+        }
     }
 
-    const filteredPersonal = filterSubmissions(personalSubmissions)
-    const filteredContest = filterSubmissions(contestSubmissions)
-
-    const getStatusColor = (status) => {
-        if (status === "Accepted") return "bg-green-500"
-        if (status.includes("Wrong")) return "bg-red-500"
-        if (status.includes("Time Limit")) return "bg-yellow-500"
-        if (status.includes("Memory Limit")) return "bg-orange-500"
-        if (status.includes("Compilation")) return "bg-purple-500"
-        return "bg-gray-500"
+    const getStatusBadge = (status) => {
+        if (status === "Accepted") {
+            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Accepted</Badge>
+        } else if (status === "Wrong Answer") {
+            return <Badge variant="destructive">Wrong Answer</Badge>
+        } else {
+            return <Badge variant="outline">{status}</Badge>
+        }
     }
 
     const renderSubmissionTable = (submissions) => {
-        if (!submissions || submissions.length === 0) {
-            return <div className="py-8 text-center text-muted-foreground">No submissions found</div>
-        }
+        const startIndex = (page - 1) * pageSize
+        const paginatedSubmissions = submissions.slice(startIndex, startIndex + pageSize)
 
         return (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Problem</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Language</TableHead>
-                        <TableHead>Runtime</TableHead>
-                        <TableHead>Memory</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {submissions.map((submission) => {
-                        // Ensure submission.time is valid
-                        const submissionTime = submission.time ? new Date(submission.time) : null
-                        const isValidTime = submissionTime && !isNaN(submissionTime.getTime())
-
-                        return (
-                            <TableRow key={submission.runId}>
-                                <TableCell>{isValidTime ? format(submissionTime, "MMM dd, yyyy HH:mm") : "Invalid date"}</TableCell>
-                                <TableCell>
-                                    <div className="font-medium">{submission.problemId}</div>
-                                    <div className="text-xs text-muted-foreground">{submission.oj}</div>
+            <div className="space-y-4">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Problem</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Language</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedSubmissions.length > 0 ? (
+                            paginatedSubmissions.map((submission) => (
+                                <TableRow key={submission.id}>
+                                    <TableCell>{formatDate(submission.time)}</TableCell>
+                                    <TableCell>
+                                        <a
+                                            href={submission.problemUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 hover:underline"
+                                        >
+                                            {submission.problemName || "Unknown Problem"}
+                                        </a>
+                                    </TableCell>
+                                    <TableCell>{getStatusBadge(submission.status)}</TableCell>
+                                    <TableCell>{submission.language}</TableCell>
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={4} className="text-center py-4">
+                                    No submissions found
                                 </TableCell>
-                                <TableCell>
-                                    <Badge className={getStatusColor(submission.status)}>{submission.status}</Badge>
-                                </TableCell>
-                                <TableCell>{submission.language || "Unknown"}</TableCell>
-                                <TableCell>{submission.runtime ? `${submission.runtime} ms` : "N/A"}</TableCell>
-                                <TableCell>{submission.memory ? `${submission.memory} KB` : "N/A"}</TableCell>
                             </TableRow>
-                        )
-                    })}
-                </TableBody>
-            </Table>
+                        )}
+                    </TableBody>
+                </Table>
+
+                {submissions.length > pageSize && (
+                    <div className="flex justify-center gap-2 mt-4">
+                        <button
+                            onClick={() => setPage(Math.max(1, page - 1))}
+                            disabled={page === 1}
+                            className="px-3 py-1 rounded border disabled:opacity-50"
+                        >
+                            Previous
+                        </button>
+                        <span className="px-3 py-1">
+                            Page {page} of {Math.ceil(submissions.length / pageSize)}
+                        </span>
+                        <button
+                            onClick={() => setPage(Math.min(Math.ceil(submissions.length / pageSize), page + 1))}
+                            disabled={page >= Math.ceil(submissions.length / pageSize)}
+                            className="px-3 py-1 rounded border disabled:opacity-50"
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
+            </div>
         )
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Submission List</CardTitle>
-                <CardDescription>View all submissions for the selected time period</CardDescription>
-                <div className="relative mt-2">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by problem, status, or language..."
-                        className="pl-8"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
+                <CardTitle>Recent Submissions</CardTitle>
+                <CardDescription>View your recent problem submissions</CardDescription>
             </CardHeader>
             <CardContent>
-                <Tabs defaultValue="all">
+                <Tabs defaultValue="all" onValueChange={() => setPage(1)}>
                     <TabsList className="mb-4">
-                        <TabsTrigger value="all">All ({personalSubmissions.length + contestSubmissions.length})</TabsTrigger>
-                        <TabsTrigger value="personal">Personal ({personalSubmissions.length})</TabsTrigger>
-                        <TabsTrigger value="contest">Contest ({contestSubmissions.length})</TabsTrigger>
+                        <TabsTrigger value="all">All Submissions</TabsTrigger>
+                        <TabsTrigger value="personal">Personal</TabsTrigger>
+                        <TabsTrigger value="contest">Contest</TabsTrigger>
                     </TabsList>
+
                     <TabsContent value="all">
-                        {renderSubmissionTable([...filteredPersonal, ...filteredContest].sort((a, b) => b.time - a.time))}
+                        {renderSubmissionTable([...personalSubmissions, ...contestSubmissions].sort((a, b) => b.time - a.time))}
                     </TabsContent>
+
                     <TabsContent value="personal">
-                        {renderSubmissionTable(filteredPersonal.sort((a, b) => b.time - a.time))}
+                        {renderSubmissionTable([...personalSubmissions].sort((a, b) => b.time - a.time))}
                     </TabsContent>
+
                     <TabsContent value="contest">
-                        {renderSubmissionTable(filteredContest.sort((a, b) => b.time - a.time))}
+                        {renderSubmissionTable([...contestSubmissions].sort((a, b) => b.time - a.time))}
                     </TabsContent>
                 </Tabs>
             </CardContent>

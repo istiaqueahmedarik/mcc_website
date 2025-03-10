@@ -49,9 +49,11 @@ export default function IUPCSection() {
 
                 const res = await getContests()
                 const tophContests = res
-
+                console.log(tophContests)
+               
 
                 const bapsojContests = convertBapsojContests(data.results)
+                
 
                 setAllIUPCContests([...tophContests, ...bapsojContests])
                 setIsLoading(false)
