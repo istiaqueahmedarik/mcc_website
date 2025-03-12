@@ -250,3 +250,4 @@ export const deleteBatch = async (c: any) => {
     return c.json({ error: 'Something went wrong' }, 400)
   }
 }
+

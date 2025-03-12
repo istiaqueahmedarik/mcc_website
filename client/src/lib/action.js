@@ -211,20 +211,24 @@ export async function signUp(prevState, formData) {
 
 export async function login(prevState, formData) {
   const response = await post('auth/login', Object.fromEntries(formData))
-  console.log('login response', response)
   if (response.error)
     return {
       success: false,
       message: response.error,
     }
-      const cookieStore = await cookies()
-      cookieStore.set('token', response.token)
+  const cookieStore = await cookies()
+  cookieStore.set('token', response.token)
   redirect('/')
 }
 
 export async function logout() {
-  (await cookies()).delete('token')
+  ;(await cookies()).delete('token')
   redirect('/')
+}
+
+export async function userProfile() {
+  const response = await get_with_token('auth/user/profile')
+  if (response.result) return response.result
 }
 
 export async function pendingUsers() {
@@ -692,15 +696,21 @@ export async function getSchedulesDash() {
   return response.result
 }
 
-
 export async function getContests() {
   try {
     const res = await fetch(`${process.env.SERVER_URL}/getContests`)
-    const tophContests = await res.json();
+    const tophContests = await res.json()
     return tophContests
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error:', error)
     return []
   }
+}
+
+export async function isCourseIns(course_id) {
+  const response = await post_with_token('course/is_course_ins', {
+    course_id,
+  })
+  if (response.error) return response.error
+  return response.result
 }

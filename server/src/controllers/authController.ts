@@ -14,13 +14,15 @@ export const signup = async (c: any) => {
   } = await c.req.json()
   try {
     const exists = await sql`select * from users where email = ${email}`
-    if(exists.length > 0) {
+    if (exists.length > 0) {
       return c.json({ error: 'This email already exists' }, 400)
     }
     const hash = await Bun.password.hash(password)
     const result =
       await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
-        VALUES (${full_name}, ${profile_pic}, ${Number(mist_id)}, ${mist_id_card}, ${email}, ${phone}, ${hash})
+        VALUES (${full_name}, ${profile_pic}, ${Number(
+        mist_id,
+      )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
         RETURNING *`
     return c.json({ result })
   } catch (error) {
@@ -58,6 +60,7 @@ export const getProfile = async (c: any) => {
   try {
     const result =
       await sql`select * from users where id = ${id} and email = ${email}`
+    console.log('result: ', result)
     return c.json({ result })
   } catch (error) {
     console.log(error)
@@ -123,5 +126,3 @@ export const acceptUser = async (c: any) => {
     return c.json({ error: 'error' }, 400)
   }
 }
-
-

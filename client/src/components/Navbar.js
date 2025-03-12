@@ -31,15 +31,19 @@ import {
   UserCheck,
   UserPlus,
 } from 'lucide-react'
+import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
-import {Link} from 'next-view-transitions'
 import MccLogo from './IconChanger/MccLogo'
 import ThemeChanger from './ThemeChanger'
 
 const Navbar = async () => {
   const navItems = [
     { href: '/upcomingContest', icon: Calendar, label: 'Upcoming Contests' },
-    { href: '/contest_reminders', icon: CalendarClock, label: 'Contest Reminders' },
+    {
+      href: '/contest_reminders',
+      icon: CalendarClock,
+      label: 'Contest Reminders',
+    },
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/problems', icon: Code, label: 'Problems' },
     { href: '/resources', icon: FileText, label: 'Resources' },

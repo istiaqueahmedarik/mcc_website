@@ -14,12 +14,14 @@ import {
 
 import {
   deleteCourseContent,
+  get_with_token,
   getCourseContents,
   getVjudgeID,
+  isCourseIns,
   solveDetails,
 } from '@/lib/action'
 import { CirclePlus, FileJson, Lightbulb, Pencil, Trash2 } from 'lucide-react'
-import {Link} from 'next-view-transitions'
+import { Link } from 'next-view-transitions'
 
 function getColumnName(n) {
   let result = ''
@@ -34,7 +36,16 @@ function getColumnName(n) {
 
 const CourseContents = async ({ params }) => {
   const { course_id } = params
-  const courseConts = await getCourseContents(course_id)
+  // const courseConts = await getCourseContents(course_id)
+  // const user = await get_with_token('auth/user/profile')
+
+  const [courseConts, user, isIns] = await Promise.all([
+    getCourseContents(course_id),
+    get_with_token('auth/user/profile'),
+    isCourseIns(course_id),
+  ])
+
+  console.log('isIns: ', isIns, user)
 
   let ojList = []
 
@@ -144,32 +155,36 @@ const CourseContents = async ({ params }) => {
                       </DialogContent>
                     </Dialog>
 
-                    <Dialog>
-                      <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg gap-2">
-                        <Pencil size={20} /> Edit
-                      </DialogTrigger>
-                      <DialogContent className="w-full max-w-md">
-                        <DialogHeader>
-                          <EditContent
-                            course_id={course_id}
-                            content={content}
-                          />
-                        </DialogHeader>
-                      </DialogContent>
-                    </Dialog>
+                    {user.result[0].admin && isIns[0].count > 0 && (
+                      <Dialog>
+                        <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg gap-2">
+                          <Pencil size={20} /> Edit
+                        </DialogTrigger>
+                        <DialogContent className="w-full max-w-md">
+                          <DialogHeader>
+                            <EditContent
+                              course_id={course_id}
+                              content={content}
+                            />
+                          </DialogHeader>
+                        </DialogContent>
+                      </Dialog>
+                    )}
 
-                    <form
-                      action={binded}
-                      className=""
-                    >
-                      <Button variant="destructive">
-                        <Trash2
-                          size={12}
-                          className="mr-2"
-                        />
-                        Delete
-                      </Button>
-                    </form>
+                    {user.result[0].admin && isIns[0].count > 0 && (
+                      <form
+                        action={binded}
+                        className=""
+                      >
+                        <Button variant="destructive">
+                          <Trash2
+                            size={12}
+                            className="mr-2"
+                          />
+                          Delete
+                        </Button>
+                      </form>
+                    )}
                   </CardFooter>
                 </Card>
               )
