@@ -127,9 +127,12 @@ export const post_with_token = cache(async (url, data) => {
 async function uploadImage(folder, uId, file, bucket) {
   const supabase = createClient()
   const fileName = Date.now() + '_' + file.name
-  const { data, error } = await supabase.storage
+  console.log('uploading', folder, uId, fileName)
+  const res = (await supabase).storage
     .from(bucket)
     .upload(folder + '/' + uId + '/' + fileName, file)
+  const { data, error } = await res;
+  console.log(data, await res);
   if (error) return { error }
   const url =
     process.env.SUPABASE_URL + `/storage/v1/object/public/` + data.fullPath
@@ -168,16 +171,19 @@ export async function createAchievement(prevState, formData) {
 
 export async function signUp(prevState, formData) {
   let raw = Object.fromEntries(formData)
-  if (raw.password !== raw.confirm_passowrd) {
+  console.log(raw)
+  if (raw.password !== raw.confirm_password) {
     return {
       success: false,
       message: 'Passwords do not match',
     }
   }
-  let { url, error } = await uploadImage(
-    'profile_pictures',
-    raw.full_name,
-    raw.profile_pic,
+  
+
+  const { url, error } = await uploadImage(
+    'mist_id_cards',
+    raw.mist_id,
+    raw.mist_id_card,
     'all_picture',
   )
   if (error) {
@@ -186,19 +192,7 @@ export async function signUp(prevState, formData) {
       message: 'Problem uploading image',
     }
   }
-  raw.profile_pic = url
-  ;({ url, error } = await uploadImage(
-    'mist_id_cards',
-    raw.full_name,
-    raw.mist_id_card,
-    'all_picture',
-  ))
-  if (error) {
-    return {
-      success: false,
-      message: 'Problem uploading image',
-    }
-  }
+  console.log(url)
   raw.mist_id_card = url
   const response = await post('auth/signup', raw)
   if (response.error)

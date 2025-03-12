@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^1.1.22",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-avatar": "^1.1.0",
     "@radix-ui/react-checkbox": "^1.1.2",
@@ -29,6 +30,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/typography": "^0.5.15",
     "@types/three": "^0.168.0",
+    "ai": "^4.1.58",
     "babel-plugin-react-compiler": "^0.0.0-experimental-fe484b5-20240911",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -57,7 +59,8 @@
     "sonner": "^2.0.1",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
-    "three": "^0.168.0"
+    "three": "^0.168.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "eslint": "^8",

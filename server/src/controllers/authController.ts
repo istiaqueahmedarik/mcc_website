@@ -7,14 +7,16 @@ export const signup = async (c: any) => {
     full_name,
     profile_pic,
     mist_id,
+    batch_details,
     mist_id_card,
     email,
     phone,
     password,
   } = await c.req.json()
+  console.log(full_name, profile_pic, mist_id, batch_details, mist_id_card, email, phone, password)
   try {
     const exists = await sql`select * from users where email = ${email}`
-    if(exists.length > 0) {
+    if (exists.length > 0) {
       return c.json({ error: 'This email already exists' }, 400)
     }
     const hash = await Bun.password.hash(password)
