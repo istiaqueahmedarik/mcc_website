@@ -110,10 +110,10 @@ app.get('/:cid', async (c) => {
     }
 });
 
-const loginToVJudge = async () => {
+const loginToVJudge = async (email: string, pass: string) => {
     try {
-        const username = process.env.VJUDGE_USERNAME || '';
-        const password = process.env.VJUDGE_PASSWORD || '';
+        const username = email || '';
+        const password = pass || '';
 
         console.log('Authenticating with VJudge...');
 
@@ -157,10 +157,13 @@ const createEmailBody = (irregular: any[]) => {
 }
 
 app.use('/cron/send', timeout(60000))
+
 app.get('/cron/send', async (c) => {
 
-
-    const jessionid = await loginToVJudge() || '';
+    const { email, password } = await c.req.json()
+    const jessionid = await loginToVJudge(email || '', password || '') || '';
+    if (jessionid === '')
+        return c.json({ error: 'error' }, 400)
     const combine: any = []
     const email_v_combines: Record<string, any[]> = {} //store irregulars for each email
     try {
