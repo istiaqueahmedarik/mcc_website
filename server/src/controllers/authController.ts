@@ -22,7 +22,9 @@ export const signup = async (c: any) => {
     const hash = await Bun.password.hash(password)
     const result =
       await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
-        VALUES (${full_name}, ${profile_pic}, ${Number(mist_id)}, ${mist_id_card}, ${email}, ${phone}, ${hash})
+        VALUES (${full_name}, ${profile_pic}, ${Number(
+        mist_id,
+      )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
         RETURNING *`
     return c.json({ result })
   } catch (error) {
@@ -60,6 +62,7 @@ export const getProfile = async (c: any) => {
   try {
     const result =
       await sql`select * from users where id = ${id} and email = ${email}`
+    console.log('result: ', result)
     return c.json({ result })
   } catch (error) {
     console.log(error)
@@ -125,5 +128,3 @@ export const acceptUser = async (c: any) => {
     return c.json({ error: 'error' }, 400)
   }
 }
-
-

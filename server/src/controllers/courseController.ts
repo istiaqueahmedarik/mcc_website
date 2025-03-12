@@ -53,12 +53,24 @@ export const getAllCourses = async (c: any) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
   const user =
-    await sql`select * from users where id = ${id} and email = ${email} and admin = true`
+    await sql`select * from users where id = ${id} and email = ${email}`
   if (user.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
+  const admin = user[0].admin
   try {
-    const result = await sql`select * from courses order by created_at desc`
+    let result: any[] = []
+    if (admin) result = await sql`select * from courses`
+    else
+      result = await sql`select * from courses
+where batch_id in (
+select batch_id from batch_members
+where mem_id = ${id}
+union 
+select batch_id from batch_instructors
+where ins_id = ${id}
+)
+order by created_at desc`
     return c.json({ result })
   } catch (error) {
     console.log(error)
@@ -299,6 +311,25 @@ export const deleteSchedule = async (c: any) => {
   try {
     const result =
       await sql`delete from schedule where id = ${schedule_id} and course_id = ${course_id} returning *`
+    return c.json({ result })
+  } catch (error) {
+    console.log(error)
+    return c.json({ error: 'Something went wrong' }, 400)
+  }
+}
+
+export const isCourseInstructor = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { course_id } = await c.req.json()
+  try {
+    const result = await sql`select count(*) from courses c 
+join batches b on c.batch_id = b.id
+join batch_instructors bi on bi.batch_id = b.id
+where c.id = ${course_id}
+and bi.ins_id = ${id}`
     return c.json({ result })
   } catch (error) {
     console.log(error)

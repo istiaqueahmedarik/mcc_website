@@ -15,6 +15,7 @@ import {
   getCourseMembers,
   getSchedules,
   insertCourse,
+  isCourseInstructor,
 } from '../controllers/courseController'
 
 const route = new Hono()
@@ -40,5 +41,6 @@ route.post('/getschedules', getSchedules)
 route.post('/edit', editCourse)
 route.post('delete_content', deleteCourseContent)
 route.post('delete/schedule', deleteSchedule)
+route.post('is_course_ins', isCourseInstructor)
 
 export default route
