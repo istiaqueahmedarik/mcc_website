@@ -437,7 +437,7 @@ export default function SubmissionDashboard({ users }) {
                             <AlertCircle className="h-8 w-8 text-muted-foreground" />
                             <p className="text-muted-foreground">No data available</p>
                             <p className="text-xs text-muted-foreground max-w-md text-center">
-                                If you're trying to access private contests or submissions, try adding your VJudge session ID in the
+                                If you&apos;re trying to access private contests or submissions, try adding your VJudge session ID in the
                                 settings.
                             </p>
                         </div>
