@@ -4,7 +4,7 @@ import { getAchievements } from '@/lib/action'
 export default async function Achievements() {
   const achievements = await getAchievements()
   if (!Array.isArray(achievements) || achievements.length === 0) {
-    return <EmptyPage />
+    return <></>
   }
 
   const firstColumn = achievements.filter((_, index) => index % 3 === 0)
