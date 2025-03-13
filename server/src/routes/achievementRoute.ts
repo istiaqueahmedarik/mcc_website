@@ -1,16 +1,17 @@
-import { Hono } from 'hono';
-import { insertAchievement } from '../controllers/achievementController';
-import { jwt } from 'hono/jwt';
+import { Hono } from 'hono'
+import { jwt } from 'hono/jwt'
+import { getAchievements, insertAchievement } from '../controllers/achievementController'
 
-const route = new Hono();
+const route = new Hono()
 
 route.use(
-    '/insert/*',
-    jwt({
-      secret: process.env.SECRET || '',
-    }),
-  )
+  '/insert/*',
+  jwt({
+    secret: process.env.SECRET || '',
+  }),
+)
 
-route.post('/insert', insertAchievement);
+route.post('/insert', insertAchievement)
+route.get('/get_achievement', getAchievements)
 
-export default route;
+export default route

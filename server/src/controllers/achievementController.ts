@@ -23,3 +23,12 @@ export const insertAchievement = async (c: any) => {
     return c.json({ erro: 'error' }, 400)
   }
 }
+
+export const getAchievements = async (c: any) => {
+  try {
+    const result = await sql`SELECT * FROM achievements`
+    return c.json({ result })
+  } catch (error) {
+    return c.json({ erro: 'error' }, 400)
+  }
+}
