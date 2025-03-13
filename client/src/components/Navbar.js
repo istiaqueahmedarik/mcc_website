@@ -38,7 +38,6 @@ import ThemeChanger from './ThemeChanger'
 
 const Navbar = async () => {
   const navItems = [
-    { href: '/upcomingContest', icon: Calendar, label: 'Upcoming Contests' },
     {
       href: '/contest_reminders',
       icon: CalendarClock,

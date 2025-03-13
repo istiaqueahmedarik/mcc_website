@@ -1,3 +1,4 @@
+
 import AchievementCard from '@/components/achievements/achievementCard'
 import { getAchievements } from '@/lib/action'
 

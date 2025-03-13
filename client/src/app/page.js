@@ -1,5 +1,6 @@
 'use client'
 
+import AchievementPage from '@/components/achievements/AchievmentPage'
 import MccLogo from '@/components/IconChanger/MccLogo'
 import { Button } from '@/components/ui/button'
 import {
@@ -104,7 +105,7 @@ export default function Home() {
       </section>
 
 
-      <section className="w-full max-w-7xl px-4 py-16 bg-secondary/10 rounded-lg">
+      {/* <section className="w-full max-w-7xl px-4 py-16 bg-secondary/10 rounded-lg">
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
           Upcoming Events
         </h2>
@@ -136,7 +137,7 @@ export default function Home() {
 
           </div>
         </div>
-      </section>
+      </section> */}
 
       <section className="w-full max-w-7xl px-4 py-16">
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
@@ -169,7 +170,7 @@ export default function Home() {
           />
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        {/* <div className="grid md:grid-cols-3 gap-8">
           <Card className="md:col-span-2 bg-background/60 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Test Test Test</CardTitle>
@@ -199,7 +200,7 @@ export default function Home() {
             </CardFooter>
           </Card>
 
-        </div>
+        </div> */}
       </section>
 
 
@@ -207,13 +208,13 @@ export default function Home() {
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
           Our Achievements
         </h2>
-
         <div className="flex flex-col items-center">
-          <InfiniteMovingCards
+          <AchievementPage/>
+          {/* <InfiniteMovingCards
             items={testimonials}
             direction="right"
             speed="slow"
-          />
+          /> */}
         </div>
 
       </section>
