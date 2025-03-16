@@ -62,7 +62,6 @@ export const getProfile = async (c: any) => {
   try {
     const result =
       await sql`select * from users where id = ${id} and email = ${email}`
-    console.log('result: ', result)
     return c.json({ result })
   } catch (error) {
     console.log(error)

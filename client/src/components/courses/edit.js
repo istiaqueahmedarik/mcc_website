@@ -21,8 +21,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { editCourse } from '@/lib/action'
 import { Soup } from 'lucide-react'
+import { EditorContent } from 'novel'
 import { useActionState, useState } from 'react'
 import MarkdownRender from '../MarkdownRenderer'
+import NovelEditor from '../novelEditor/editor'
 
 const initialState = {
   message: '',
@@ -32,7 +34,7 @@ const initialState = {
 export default function Edit({ course }) {
   const [title, setTitle] = useState(course.title)
   const [description, setDescription] = useState(course.description)
-  console.log(course);
+  console.log(course)
   initialState.course_id = course.id
   const [state, formAction, pending] = useActionState(editCourse, initialState)
 
@@ -95,7 +97,7 @@ export default function Edit({ course }) {
               className="w-full"
               disabled={pending}
             >
-              {pending ? 'Submitting...' : 'Edit Course'}
+              {pending ? 'Submitting...' : 'Confirm Edit'}
             </Button>
           </form>
         </CardContent>

@@ -15,12 +15,15 @@ export const insertAchievement = async (c: any) => {
   try {
     const result =
       await sql`INSERT INTO achievements (title, image, description, date)
-      VALUES (${title}, ${image}, ${description}, ${new Date(date).toISOString()})
+      VALUES (${title}, ${image}, ${description}, ${new Date(
+        date,
+      ).toISOString()})
       RETURNING *`
 
     return c.json({ result })
   } catch (error) {
-    return c.json({ erro: 'error' }, 400)
+    console.log('error: ', error)
+    return c.json({ error: 'error' }, 400)
   }
 }
 
@@ -29,6 +32,20 @@ export const getAchievements = async (c: any) => {
     const result = await sql`SELECT * FROM achievements`
     return c.json({ result })
   } catch (error) {
-    return c.json({ erro: 'error' }, 400)
+    console.log('error: ', error)
+    return c.json({ error: 'error' }, 400)
+  }
+}
+
+export const getAchievement = async (c: any) => {
+  const { id } = await c.req.json()
+  console.log("id: ", id)
+  try {
+    const result = await sql`SELECT * FROM achievements WHERE id = ${id}`
+    console.log('result: ', result)
+    return c.json({ result })
+  } catch (error) {
+    console.log('error: ', error)
+    return c.json({ error: 'error' }, 400)
   }
 }

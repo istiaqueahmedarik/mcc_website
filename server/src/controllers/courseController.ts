@@ -60,7 +60,9 @@ export const getAllCourses = async (c: any) => {
   const admin = user[0].admin
   try {
     let result: any[] = []
-    if (admin) result = await sql`select * from courses`
+    if (admin)
+      result = await sql`select * from courses
+    order by created_at desc`
     else
       result = await sql`select * from courses
 where batch_id in (

@@ -710,7 +710,15 @@ export async function isCourseIns(course_id) {
 }
 
 export async function getAchievements() {
-  const response = await get('achieve/get_achievement')
+  const response = await get('achieve/get_achievements')
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getAchievement( id ) {
+  const response = await post('achieve/get_achievement', {
+    id
+  })
   if (response.error) return response.error
   return response.result
 }

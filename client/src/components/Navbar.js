@@ -21,9 +21,9 @@ import {
   Backpack,
   BookOpen,
   BrainCircuit,
-  Calendar,
   CalendarClock,
   Code,
+  Coffee,
   FileText,
   LogIn,
   Menu,
@@ -56,6 +56,7 @@ const Navbar = async () => {
     { href: '/grantuser', icon: UserCheck, label: 'Grant Users' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
+    { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
   ]
 
   const loggedIn = (await cookies()).get('token')

@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { getAchievements, insertAchievement } from '../controllers/achievementController'
+import { getAchievement, getAchievements, insertAchievement } from '../controllers/achievementController'
 
 const route = new Hono()
 
@@ -12,6 +12,7 @@ route.use(
 )
 
 route.post('/insert', insertAchievement)
-route.get('/get_achievement', getAchievements)
+route.get('/get_achievements', getAchievements)
+route.post('/get_achievement', getAchievement)
 
 export default route

@@ -88,7 +88,7 @@ export default function Edit({ batch, ins }) {
             )}
 
             <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Submitting..." : "Edit Batch"}
+              {pending ? "Submitting..." : "Confirm Edit"}
             </Button>
           </form>
         </CardContent>
