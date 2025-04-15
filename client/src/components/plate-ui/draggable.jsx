@@ -1,3 +1,4 @@
+/* eslint-disable react/display-name */
 'use client';
 
 import React, { useMemo } from 'react';
@@ -232,3 +233,9 @@ const DropLine = React.memo(React.forwardRef(({ className, ...props }, ref) => {
       )} />
   );
 }));
+
+DraggableAboveNodes.displayName = "DraggableAboveNodes";
+Draggable.displayName = "Draggable";
+Gutter.displayName = "Gutter";
+DragHandle.displayName = "DragHandle";
+DropLine.displayName = "DropLine";

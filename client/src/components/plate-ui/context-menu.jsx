@@ -1,3 +1,5 @@
+/* eslint-disable react/display-name */
+
 'use client';
 
 import * as React from 'react';
@@ -10,6 +12,7 @@ const ContextMenu = ContextMenuPrimitive.Root;
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 
+// eslint-disable-next-line react/display-name
 const ContextMenuGroup = React.forwardRef(({ label, ...props }, ref) => {
   return (
     <>

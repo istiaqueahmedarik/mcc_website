@@ -1,3 +1,4 @@
+/* eslint-disable react/display-name */
 'use client';
 
 import { cn } from '@udecode/cn';

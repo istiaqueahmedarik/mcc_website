@@ -71,6 +71,7 @@ export const ColumnElement = withHOC(ResizableProvider, withRef(({ children, cla
   );
 }));
 
+// eslint-disable-next-line react/display-name
 const ColumnDragHandle = React.memo(() => {
   return (
     <TooltipProvider>
@@ -107,3 +108,4 @@ const DropLine = React.forwardRef(({ className, ...props }, ref) => {
         'inset-y-0 right-[-11px] w-1 group-last/column:-right-1', className)} />
   );
 });
+DropLine.displayName = 'DropLine';

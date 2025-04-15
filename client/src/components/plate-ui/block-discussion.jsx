@@ -180,7 +180,7 @@ export const BlockDiscussion = (props) => {
     return;
   }
 
-  return (props) => (
+  const BlockDiscussionInner = (props) => (
     <BlockCommentsContent
       blockPath={blockPath}
       commentNodes={commentNodes}
@@ -188,7 +188,11 @@ export const BlockDiscussion = (props) => {
       suggestionNodes={suggestionNodes}
       {...props} />
   );
+  BlockDiscussionInner.displayName = "BlockDiscussionInner";
+  return BlockDiscussionInner;
 };
+
+
 
 const BlockCommentsContent = ({
   blockPath,

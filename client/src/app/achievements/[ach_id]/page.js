@@ -1,11 +1,11 @@
-import { getAchievement } from '@/lib/action'
+import { getAchievements } from '@/lib/action'
 import { formatRelative } from 'date-fns'
 import { CalendarArrowUp } from 'lucide-react'
 import Image from 'next/image'
 
 export default async function SingleAchievement({ params }) {
   const { ach_id } = params
-  const achievementArr = await getAchievement(ach_id)
+  const achievementArr = await getAchievements(ach_id)
   const achievement = achievementArr[0]
   console.log('ach: ', achievement)
   return (

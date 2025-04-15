@@ -41,6 +41,7 @@ export const DropdownMenuGroup = React.forwardRef(({ label, ...props }, ref) => 
     </>
   );
 });
+DropdownMenuGroup.displayName = "DropdownMenuGroup";
 
 export const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 
@@ -68,6 +69,7 @@ export const DropdownMenuRadioGroup = React.forwardRef(({ label, ...props }, ref
     </>
   );
 });
+DropdownMenuRadioGroup.displayName = "DropdownMenuRadioGroup";
 
 export const DropdownMenuSubTrigger = withRef(({ children, className, inset, ...props }, ref) => (
   <DropdownMenuPrimitive.SubTrigger
