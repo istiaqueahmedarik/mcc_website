@@ -57,6 +57,7 @@ const Navbar = async () => {
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
+    { href: '/contests_report',icon: Code, label: "Generate Contest Report" },
   ]
 
   const loggedIn = (await cookies()).get('token')
