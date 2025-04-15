@@ -141,6 +141,8 @@ const loginToVJudge = async (email: string, pass: string) => {
     }
 };
 
+
+
 const createEmailBody = (irregular: any[]) => {
     let email = '<h1>Irregulars</h1>';
     irregular.forEach((irr) => {

@@ -1,5 +1,5 @@
 import ViewScheduleTable from '@/components/courses/viewScheduleTable'
-import MarkdownRender from '@/components/MarkdownRenderer'
+import PlateVal from '@/components/PlateVal'
 import {
   Accordion,
   AccordionContent,
@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/accordion'
 import { getCourse, getSchedules } from '@/lib/action'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 
 const SingleCourse = async ({ params }) => {
   const { course_id } = params
@@ -17,6 +18,7 @@ const SingleCourse = async ({ params }) => {
   }
   course = course[0]
   const schedules = await getSchedules(course_id)
+  
   return (
     <div className="w-full min-h-screen flex flex-row justify-center">
       <div className="w-full max-w-7xl flex flex-col items-center mt-4">
@@ -37,7 +39,10 @@ const SingleCourse = async ({ params }) => {
           </Accordion>
 
           <div className="text-lg leading-loose">
-            <MarkdownRender content={course.description} />
+            {/* <MarkdownRender content={course.description} /> */}
+            <Suspense fallback={<div>Loading...</div>}>
+              <PlateVal value={course.description} />
+            </Suspense>
           </div>
         </div>
       </div>

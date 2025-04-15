@@ -19,7 +19,7 @@ import {
   Loader2,
   CheckCircle2,
 } from "lucide-react"
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 import { useActionState } from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"

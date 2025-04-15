@@ -10,7 +10,7 @@ import { Spotlight } from '@/components/ui/Spotlight'
 import {
   TextRevealCard,
   TextRevealCardTitle,
-} from '@/components/ui/text-reveal-card'
+} from '@/components/ui/TextReveal'
 
 import { TextGenerateEffect } from '@/components/ui/TextGenEffect'
 import {

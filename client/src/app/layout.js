@@ -2,8 +2,9 @@ import localFont from "next/font/local";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ViewTransitions } from "next-view-transitions";
-import { Toaster } from "@/components/ui/sonner"
+import { unstable_ViewTransition as ViewTransition } from 'react';
+
+import { Toaster } from "sonner";
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -25,7 +26,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <ViewTransitions>
+    <ViewTransition>
       <html lang="en" suppressHydrationWarning>
         <body className={`${geistSans.variable} ${geistMono.variable} ${Ubuntu_Medium.className} font-[--font-ubuntu-medium]`} cz-shortcut-listen="true">
         <Toaster />
@@ -40,6 +41,6 @@ export default function RootLayout({ children }) {
         </ThemeProvider>
       </body>
       </html>
-    </ViewTransitions>
+    </ViewTransition>
   );
 }

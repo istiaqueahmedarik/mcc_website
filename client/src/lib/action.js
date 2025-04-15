@@ -710,15 +710,57 @@ export async function isCourseIns(course_id) {
 }
 
 export async function getAchievements() {
-  const response = await get('achieve/get_achievements')
+  const response = await get('achieve/get_achievement')
   if (response.error) return response.error
   return response.result
 }
 
-export async function getAchievement( id ) {
-  const response = await post('achieve/get_achievement', {
-    id
-  })
-  if (response.error) return response.error
-  return response.result
+export async function getContestResults(contestId, sessionId) {
+
+  if (!contestId || isNaN(Number(contestId))) {
+    throw new Error("Invalid contest ID");
+  }
+  console.log("Fetching contest results for contest ID:", contestId, "with session ID:", sessionId);
+  if (!sessionId) {
+    throw new Error("Invalid session ID");
+  }
+  // const myHeaders = new Headers();
+  // myHeaders.append("Cookie", "JSESSIONID=" + sessionId + ";");
+  // myHeaders.append("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+  // const requestOptions = {
+  //   method: "GET",
+  //   headers: myHeaders,
+  //   credentials: "include",
+  //   redirect: "follow",
+  // };
+  // const response = await fetch(
+  //   `https://vjudge.net/contest/rank/single/${contestId}`,
+  //   requestOptions
+  // );
+  // if (!response.ok) {
+  //   throw new Error("Failed to fetch contest results");
+  // }
+  const myHeaders = new Headers();
+  myHeaders.append("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+  myHeaders.append("accept-language", "en-BD,en-US;q=0.9,en;q=0.8,bn;q=0.7");
+  myHeaders.append("cache-control", "max-age=0");
+  myHeaders.append("priority", "u=0, i");
+  myHeaders.append("sec-fetch-dest", "document");
+  myHeaders.append("sec-fetch-mode", "navigate");
+  myHeaders.append("sec-fetch-site", "same-origin");
+  myHeaders.append("sec-fetch-user", "?1");
+  myHeaders.append("upgrade-insecure-requests", "1");
+  myHeaders.append("Cookie", "JSESSIONID=" + sessionId + ";");
+
+
+  const requestOptions = {
+    method: "GET",
+    headers: myHeaders,
+    redirect: "follow"
+  };
+
+  const htm = await fetch("https://vjudge.net/contest/707325", requestOptions)
+    .then((response) => response.text())
+  console.log(htm);
+  return htm;
 }

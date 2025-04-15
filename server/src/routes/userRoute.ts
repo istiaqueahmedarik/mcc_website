@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { getSchedulesDash, getVjudgeId } from '../controllers/userController'
+import { getSchedulesDash, getVjudgeId, loginToVJudgeRoute } from '../controllers/userController'
 
 const route = new Hono()
 
@@ -13,5 +13,6 @@ route.use(
 
 route.get('/get_vjudge_id', getVjudgeId)
 route.get('/get_shchedules_dash', getSchedulesDash)
+route.post('/vjudge_login', loginToVJudgeRoute)
 
 export default route

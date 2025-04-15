@@ -32,7 +32,11 @@
     --yellowCus1: 55, 69%, 81%;
     --yellowCus1-foreground: 20, 31%, 31%;
     --greenAC: 121, 99%, 77%;
+    --brand: 213.3 93.9% 67.8%;
+    --highlight: 48 96% 53%;
+    --radius: 0.5rem;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -61,17 +65,14 @@
     --yellowCus1: 20, 31%, 31%;
     --yellowCus1-foreground: 55, 69%, 81%;
     --greenAC: 120, 100%, 25%;
+    --brand: 217.2 91.2% 59.8%;
+    --highlight: 47.9 95.8% 53.1%;
+    --radius: 0.5rem;
   }
+
+
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
 
 
 
@@ -79,7 +80,62 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+
+
+
+
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+
+
+  }
+
+  body {
+    @apply bg-background text-foreground;
+
+
+  }
+
+
+}
+
+
+@keyframes zoom-out {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(0.5);
+  }
+}
+
+@keyframes zoom-in {
+  0% {
+    transform: scale(0.5);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+::view-transition-old(page) {
+  animation: zoom-out 0.5s ease-in-out;
+}
+
+::view-transition-new(page) {
+  animation: zoom-in 0.5s ease-in-out;
 }

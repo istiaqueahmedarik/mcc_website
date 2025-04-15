@@ -21,6 +21,52 @@ export const getVjudgeId = async (c: any) => {
   }
 }
 
+export const loginToVJudgeRoute = async (c: any) => {
+  const { id, email } = c.get('jwtPayload')
+  if (!id || !email) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  const { vj_email, pass } = await c.req.json();
+  console.log('Login to VJudge:', email, pass);
+  if (!vj_email || !pass) {
+    return c.json({ error: 'Missing email or password' }, 400);
+  }
+  const JSESSIONID = await loginToVJudge(vj_email, pass);
+  if (JSESSIONID) {
+    return c.json({ JSESSIONID })
+  }
+  return c.json({ error: 'Authentication failed' }, 401);
+};
+
+const loginToVJudge = async (email: string, pass: string) => {
+  try {
+    const username = email || '';
+    const password = pass || '';
+
+    console.log('Authenticating with VJudge...');
+
+    const response = await fetch('https://vjudge.net/user/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: new URLSearchParams({
+        username,
+        password
+      }),
+      credentials: 'include'
+    });
+
+    const cookie = response.headers.get('set-cookie');
+    let JSESSIONID = cookie?.split(';')[0].split('=')[1];
+    return JSESSIONID;
+  } catch (error) {
+    console.error('Error during VJudge authentication:', error);
+    return "";
+  }
+};
+
 export const getSchedulesDash = async (c: any) => {
   const { id, email } = c.get('jwtPayload')
   if (!id || !email) {

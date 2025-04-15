@@ -10,7 +10,15 @@ const nextConfig = {
             protocol: 'https',
             hostname: 'placehold.co',
 
-        },
+      },
+      {
+        protocol: 'https',
+        hostname: 'cravatar.cn',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.vjudge.net.cn',
+      }
     ],
     dangerouslyAllowSVG: true,
 },
@@ -21,6 +29,10 @@ const nextConfig = {
   //   reactCompiler: true,
   //   ppr: 'incremental',
   // },
+  experimental: {
+    viewTransition: true,
+    //   ppr: 'incremental',
+  }
 }
 
 export default nextConfig

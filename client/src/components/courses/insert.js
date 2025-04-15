@@ -26,11 +26,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { HTML5Backend } from 'react-dnd-html5-backend';
+
 import { Textarea } from '@/components/ui/textarea'
 import { createCourse } from '@/lib/action'
 import { Lightbulb, Soup } from 'lucide-react'
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import debounce from 'lodash/debounce';
 import MarkdownRender from '../MarkdownRenderer'
+import { PlateEditor } from '@/components/editor/plate-editor';
+import { DndProvider } from 'react-dnd'
+import { Plate } from '@udecode/plate/react';
+import { Editor, EditorContainer } from '@/components/plate-ui/editor';
+import { useCreateEditor } from '../editor/use-create-editor'
 
 const initialState = {
   message: '',
@@ -44,19 +52,23 @@ export default function Insert({ batches }) {
     createCourse,
     initialState,
   )
+  const editor = useCreateEditor();
+  
+  const debouncedEditorChange = useMemo(() => 
+    debounce((newValue) => {
+      setDescription(JSON.stringify(newValue.value))
+    }, 400)
+  , []);
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-8xl">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Create Course</CardTitle>
           <CardDescription>Create a course for a new batch</CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            action={formAction}
-            className="space-y-4"
-          >
+          <form action={formAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="title">Title</Label>
               <div className="relative">
@@ -73,44 +85,33 @@ export default function Insert({ batches }) {
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
+              <Input
                 id="description"
                 name="description"
                 placeholder="Description of the course"
                 className="min-h-[100px]"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                type="hidden"
               />
+              <DndProvider backend={HTML5Backend}>
+                <Plate editor={editor} onChange={debouncedEditorChange}>
+                  <EditorContainer>
+                    <Editor variant="default" />
+                  </EditorContainer>
+                </Plate>
+              </DndProvider>
             </div>
+            
 
-            <Dialog className="w-screen">
-              <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg">
-                Preview Description
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Preview</DialogTitle>
-                  <DialogDescription>
-                    <MarkdownRender content={description} />
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
 
-            <Select
-              id="batchId"
-              name="batchId"
-            >
+            <Select id="batchId" name="batchId">
               <SelectTrigger className="">
                 <SelectValue placeholder="Select Batch" />
               </SelectTrigger>
               <SelectContent>
                 {batches &&
                   batches.map((batch, index) => (
-                    <SelectItem
-                      key={index}
-                      value={batch.id}
-                    >
+                    <SelectItem key={index} value={batch.id}>
                       {batch.name}
                     </SelectItem>
                   ))}
@@ -123,11 +124,7 @@ export default function Insert({ batches }) {
               </Alert>
             )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={pending}
-            >
+            <Button type="submit" className="w-full" disabled={pending}>
               {pending ? 'Submitting...' : 'Create Course'}
             </Button>
           </form>
