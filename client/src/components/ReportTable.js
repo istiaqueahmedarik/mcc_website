@@ -61,7 +61,6 @@ function ReportTable({ merged }) {
             }
 
             if (removeWorstCount > 0 && attendedContests.length > 0) {
-                // Sort: lowest solved first, then highest penalty
                 const sortedContests = [...attendedContests].sort((a, b) => {
                     if ((a[1]?.solved || 0) !== (b[1]?.solved || 0)) return (a[1]?.solved || 0) - (b[1]?.solved || 0)
                     return (b[1]?.penalty || 0) - (a[1]?.penalty || 0)
