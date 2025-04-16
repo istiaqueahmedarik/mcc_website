@@ -18,7 +18,6 @@ export default async function LoginPage() {
         if (session) {
             redirect("/contests_report/details");
         }
-        // Optionally: handle error (not shown here)
     }
 
     return (

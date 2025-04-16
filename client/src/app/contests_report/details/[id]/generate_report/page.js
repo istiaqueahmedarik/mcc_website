@@ -41,11 +41,17 @@ function mergeResultsByUser(results, contestIdToWeight = {}) {
   for (const user of Object.values(userMap)) {
     for (const cid of contestIds) {
       if (!user.contests[cid]) {
-        user.contests[cid] = null;
+        user.contests[cid] = {
+          solved: 0,
+          penalty: 0,
+          finalScore: 0,
+          submissions: [],
+          contestId: cid,
+          contestTitle: contestIdToTitle[cid],
+        };
       }
     }
   }
-  // Sort users: totalScore desc, totalSolved desc, totalPenalty asc
   const sortedUsers = Object.values(userMap).sort((a, b) => {
     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
     if (b.totalSolved !== a.totalSolved) return b.totalSolved - a.totalSolved;
@@ -62,12 +68,10 @@ async function page({ params, searchParams }) {
   let usedFallback = false;
   let contestIdToWeight = {};
 
-  // Try to use the id from searchParams first
   if (searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)) {
     const res = await getContestStructuredRank(searchParamsBox.id);
     if (res && res.status !== 'error') {
       results.push(res);
-      // If single contest, try to get weight from searchParams or default to 1
       contestIdToWeight[searchParamsBox.id] = searchParamsBox.weight ? Number(searchParamsBox.weight) : 1;
     } else {
       usedFallback = true;
@@ -76,14 +80,11 @@ async function page({ params, searchParams }) {
     usedFallback = true;
   }
 
-  // If fallback needed, use params.id to get all contest ids for the room
   if (usedFallback) {
     const roomId = params.id;
     const roomRes = await getContestRoomContestById(roomId);
-    // roomRes.result is an array of contest-room-contest objects
     if (roomRes && roomRes.result && Array.isArray(roomRes.result)) {
       contestIds = roomRes.result.map(x => x.contest_id);
-      // Build contestIdToWeight from fetched contests
       for (const c of roomRes.result) {
         contestIdToWeight[c.contest_id] = c.weight ?? 1;
       }
@@ -97,7 +98,7 @@ async function page({ params, searchParams }) {
   }
 
   const merged = mergeResultsByUser(results, contestIdToWeight);
-
+  console.log(merged)
   return (
     <div>
       <ReportTable merged={merged} />

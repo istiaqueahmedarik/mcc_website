@@ -8,7 +8,7 @@ import { X, AlertCircle, Search, Filter, SlidersHorizontal } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
-// import { saveAs } from "file-saver"
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 
 function ReportTable({ merged }) {
     const [searchText, setSearchText] = useState("")
@@ -24,7 +24,6 @@ function ReportTable({ merged }) {
     })
     const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
 
-    // Toggle opt-out for a specific contest
     const toggleOptOut = (contestId) => {
         setOptOutContests((prev) => ({
             ...prev,
@@ -32,7 +31,6 @@ function ReportTable({ merged }) {
         }))
     }
 
-    // Update advanced filters
     const updateFilter = (key, value) => {
         setAdvancedFilters((prev) => ({
             ...prev,
@@ -41,7 +39,6 @@ function ReportTable({ merged }) {
     }
 
     const users = useMemo(() => {
-        // Filter users based on search text
         let filtered = merged.users.filter(
             (u) =>
                 !searchText ||
@@ -49,15 +46,11 @@ function ReportTable({ merged }) {
                 (u.realName && u.realName.toLowerCase().includes(searchText.toLowerCase())),
         )
 
-        // Process each user
         filtered = filtered.map((u) => {
-            // Get contests this user attended
-            const attendedContests = Object.entries(u.contests).filter(([_, v]) => v)
-
-            // Calculate total contests attended
-            const totalContestsAttended = attendedContests.length
-
-            // Deep copy of user to avoid mutations
+            const attendedContests = Object.entries(u.contests).filter(
+                ([_, v]) => v && (v.solved > 0 || (v.submissions && v.submissions.length > 0))
+            );
+            const totalContestsAttended = attendedContests.length;
             const processedUser = {
                 ...u,
                 totalContestsAttended,
@@ -68,15 +61,12 @@ function ReportTable({ merged }) {
                 effectiveTotalScore: u.totalScore,
             }
 
-            // Find worst contests if remove worst is enabled
             if (removeWorstCount > 0 && attendedContests.length > 0) {
-                // Sort by solved (ascending) then by penalty (descending)
                 const sortedContests = [...attendedContests].sort((a, b) => {
                     if (a[1].solved !== b[1].solved) return a[1].solved - b[1].solved
                     return b[1].penalty - a[1].penalty
                 })
 
-                // Take only up to removeWorstCount or all attended contests, whichever is smaller
                 const worstToRemove = Math.min(removeWorstCount, attendedContests.length)
 
                 for (let i = 0; i < worstToRemove; i++) {
@@ -88,7 +78,6 @@ function ReportTable({ merged }) {
                 }
             }
 
-            // Handle opted out contests
             Object.keys(optOutContests).forEach((contestId) => {
                 if (optOutContests[contestId] && u.contests[contestId]) {
                     if (!processedUser.worstContests.includes(contestId)) {
@@ -103,17 +92,13 @@ function ReportTable({ merged }) {
             return processedUser
         })
 
-        // Apply advanced filters
         filtered = filtered.filter((u) => {
-            // Min/Max solved problems
             if (u.effectiveTotalSolved < advancedFilters.minSolved) return false
             if (advancedFilters.maxSolved !== Number.POSITIVE_INFINITY && u.effectiveTotalSolved > advancedFilters.maxSolved)
                 return false
 
-            // Minimum contests attended
             if (u.totalContestsAttended < advancedFilters.minContests) return false
 
-            // Performance in specific contest
             if (advancedFilters.performanceFilter) {
                 const [contestId, minSolved] = advancedFilters.performanceFilter.split("|")
                 const performance = u.contests[contestId]
@@ -123,7 +108,6 @@ function ReportTable({ merged }) {
             return true
         })
 
-        // Sort users
         filtered.sort((a, b) => {
             const direction = advancedFilters.sortDirection === "asc" ? 1 : -1
 
@@ -133,7 +117,6 @@ function ReportTable({ merged }) {
                 case "totalSolved":
                     if (a.effectiveTotalSolved !== b.effectiveTotalSolved)
                         return direction * (a.effectiveTotalSolved - b.effectiveTotalSolved)
-                    // If tied on solved, sort by score, then penalty
                     if (a.effectiveTotalScore !== b.effectiveTotalScore)
                         return direction * (a.effectiveTotalScore - b.effectiveTotalScore)
                     return direction * -1 * (a.effectiveTotalPenalty - b.effectiveTotalPenalty)
@@ -148,7 +131,6 @@ function ReportTable({ merged }) {
                 case "contestsAttended":
                     return direction * (a.totalContestsAttended - b.totalContestsAttended)
                 default:
-                    // Default sorting: by score, then solved, then penalty, then contests attended
                     if (a.effectiveTotalScore !== b.effectiveTotalScore) return b.effectiveTotalScore - a.effectiveTotalScore
                     if (a.effectiveTotalSolved !== b.effectiveTotalSolved) return b.effectiveTotalSolved - a.effectiveTotalSolved
                     if (a.effectiveTotalPenalty !== b.effectiveTotalPenalty)
@@ -160,14 +142,11 @@ function ReportTable({ merged }) {
         return filtered
     }, [merged.users, searchText, removeWorstCount, optOutContests, advancedFilters])
 
-    // Get max solved problems for slider
     const maxPossibleSolved = useMemo(() => {
         return Math.max(...merged.users.map((u) => u.totalSolved), 0)
     }, [merged.users])
 
-    // CSV export helper
     const exportToCSV = () => {
-        // Table headers
         const headers = [
             "Rank",
             "Username",
@@ -179,10 +158,9 @@ function ReportTable({ merged }) {
             ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
         ]
 
-        // Table rows
         const rows = users.map((u, idx) => {
             const base = [
-                idx + 1, // Rank
+                idx + 1, 
                 u.username,
                 u.realName,
                 u.effectiveTotalScore.toFixed(2),
@@ -192,16 +170,20 @@ function ReportTable({ merged }) {
             ]
             const contestData = merged.contestIds.map(cid => {
                 const perf = u.contests[cid]
-                if (!perf) return "Not attended"
+                const isWorst = u.worstContests.includes(cid)
+                const isOptedOut = u.optedOutContests.includes(cid)
+                if (!perf || isWorst || isOptedOut) {
+                    let status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : "";
+                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`;
+                }
                 let status = ""
-                if (u.worstContests.includes(cid)) status = "Worst (removed)"
-                else if (u.optedOutContests.includes(cid)) status = "Opted out"
-                return `${status ? status + ": " : ""}Solved: ${perf.solved}, Penalty: ${perf.penalty.toFixed(2)}, Score: ${perf.finalScore.toFixed(2) }`
+                if (isWorst) status = "Worst (removed)"
+                else if (isOptedOut) status = "Opted out"
+                return `${status ? status + ": " : ""}Solved: ${perf.solved}, Penalty: ${perf.penalty.toFixed(2)}, Score: ${perf.finalScore.toFixed(2)}`
             })
             return [...base, ...contestData]
         })
 
-        // CSV string
         const csv = [headers, ...rows]
             .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
             .join("\n")
@@ -224,6 +206,97 @@ function ReportTable({ merged }) {
             }
         }
     }
+
+    const exportToPDF = async () => {
+        const headers = [
+            "Rank",
+            "Username",
+            "Real Name",
+            "Total Score",
+            "Total Solved",
+            "Total Penalty",
+            "Contests Attended",
+            ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
+        ];
+        const rows = users.map((u, idx) => {
+            const base = [
+                idx + 1,
+                u.username,
+                u.realName,
+                u.effectiveTotalScore.toFixed(2),
+                u.effectiveTotalSolved,
+                u.effectiveTotalPenalty.toFixed(2),
+                u.totalContestsAttended
+            ];
+            const contestData = merged.contestIds.map(cid => {
+                const perf = u.contests[cid];
+                const isWorst = u.worstContests.includes(cid);
+                const isOptedOut = u.optedOutContests.includes(cid);
+                if (!perf || isWorst || isOptedOut) {
+                    let status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : "";
+                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`;
+                }
+                let status = "";
+                if (isWorst) status = "Worst (removed)";
+                else if (isOptedOut) status = "Opted out";
+                return `${status ? status + ": " : ""}Solved: ${perf.solved}, Penalty: ${perf.penalty.toFixed(2)}, Score: ${perf.finalScore.toFixed(2)}`;
+            });
+            return [...base, ...contestData];
+        });
+
+        const pdfDoc = await PDFDocument.create();
+        let page = pdfDoc.addPage();
+        const font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+        const fontSize = 10;
+        const margin = 30;
+        const rowHeight = 18;
+        const colWidth = 120;
+        let y = page.getHeight() - margin;
+
+        // Draw headers
+        headers.forEach((header, i) => {
+            page.drawText(header, {
+                x: margin + i * colWidth,
+                y: y,
+                size: fontSize,
+                font,
+                color: rgb(0, 0, 0.7),
+            });
+        });
+        y -= rowHeight;
+
+        // Draw rows
+        rows.forEach((row) => {
+            row.forEach((cell, i) => {
+                page.drawText(String(cell), {
+                    x: margin + i * colWidth,
+                    y: y,
+                    size: fontSize,
+                    font,
+                    color: rgb(0, 0, 0),
+                });
+            });
+            y -= rowHeight;
+            if (y < margin) {
+                y = page.getHeight() - margin;
+                page = pdfDoc.addPage();
+            }
+        });
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const filename = `report_${new Date().toISOString().slice(0, 10)}.pdf`;
+        if (window.navigator.msSaveOrOpenBlob) {
+            window.navigator.msSaveOrOpenBlob(blob, filename);
+        } else {
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
 
     return (
         <div className="space-y-4">
@@ -262,7 +335,10 @@ function ReportTable({ merged }) {
                     </Button>
                     <div className="flex items-center justify-end mr-2">
                         <Button size="sm" variant="secondary" onClick={exportToCSV}>
-                            Export to CSV 
+                            Export to CSV
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={exportToPDF} className="ml-2">
+                            Export to PDF
                         </Button>
                     </div>
                 </div>
@@ -468,11 +544,27 @@ function ReportTable({ merged }) {
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 {merged.contestIds.map((cid) => {
                                     const perf = u.contests[cid]
-
-                                    if (!perf) {
+                                    const isWorst = u.worstContests.includes(cid)
+                                    const isOptedOut = u.optedOutContests.includes(cid)
+                                    // If not attended, or removed as worst/opted out, show 0s
+                                    if (!perf || isWorst || isOptedOut) {
+                                        let cellClassName = ""
+                                        let statusText = null
+                                        if (isWorst) {
+                                            cellClassName = "bg-foreground"
+                                            statusText = "Worst (removed)"
+                                        } else if (isOptedOut) {
+                                            cellClassName = "bg-red-100"
+                                            statusText = "Opted out"
+                                        }
                                         return (
-                                            <TableCell key={cid} className="text-muted-foreground text-sm">
-                                                Not attended
+                                            <TableCell key={cid} className={cellClassName + " text-muted-foreground text-sm"}>
+                                                {statusText && (
+                                                    <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
+                                                )}
+                                                <div>Solved: 0</div>
+                                                <div>Penalty: 0.00</div>
+                                                <div>Score: 0.00</div>
                                             </TableCell>
                                         )
                                     }
@@ -480,15 +572,13 @@ function ReportTable({ merged }) {
                                     // Determine cell styling based on contest status
                                     let cellClassName = ""
                                     let statusText = null
-
-                                    if (u.worstContests.includes(cid)) {
-                                        cellClassName = "bg-foreground" // More visible amber/yellow
+                                    if (isWorst) {
+                                        cellClassName = "bg-foreground"
                                         statusText = "Worst (removed)"
-                                    } else if (u.optedOutContests.includes(cid)) {
+                                    } else if (isOptedOut) {
                                         cellClassName = "bg-red-100"
                                         statusText = "Opted out"
                                     }
-
                                     return (
                                         <TableCell key={cid} className={cellClassName}>
                                             <div className="text-sm">

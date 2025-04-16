@@ -9,9 +9,9 @@ export const insertContestRoomContest = async (c: any) => {
     if (user.length === 0) {
         return c.json({ error: 'Unauthorized' }, 401)
     }
-    const { room_id, contest_id, name } = await c.req.json()
+    const { room_id, contest_id } = await c.req.json()
     try {
-        const result = await sql`INSERT INTO "Contest_room_contests" (room_id, contest_id, contest_name) VALUES (${room_id}, ${contest_id},${name}) RETURNING *`
+        const result = await sql`INSERT INTO "Contest_room_contests" (room_id, contest_id) VALUES (${room_id}, ${contest_id}) RETURNING *`
         return c.json({ result, success: true })
     } catch (error) {
         console.log(error)

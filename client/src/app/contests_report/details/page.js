@@ -1,4 +1,4 @@
-import { getAllContestRooms } from "@/actions/contest_details"
+import { getAllContestRooms, revalidateVJudgeSession } from "@/actions/contest_details"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlusCircle, Calendar, Users, Clock, ChevronRight } from "lucide-react"
@@ -7,7 +7,7 @@ import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 
 export default async function ContestRoomsPage() {
-
+    // await revalidateVJudgeSession();
 
     const res = await getAllContestRooms()
     if (res.error) {

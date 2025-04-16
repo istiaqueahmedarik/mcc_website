@@ -12,10 +12,11 @@ import { Separator } from "@/components/ui/separator"
 
 async function handleAddContest(formData, paramsBox) {
     "use server"
-    const contestId = formData.get("room-name")
+    const contestId = formData.get("contest-id")
+    const contestName = formData.get("contest-name")
     const roomId = paramsBox
 
-    const res = await insertContestRoomContest(roomId, contestId)
+    const res = await insertContestRoomContest(roomId, contestId,contestName)
     if (res && (res.status === "success" || res.success)) {
         redirect(`/contests_report/details/${roomId}`)
     } else {
@@ -122,6 +123,9 @@ async function page({ params, searchParams }) {
                             <CardContent className="pt-8 pb-4 px-6">
                                 <div className="space-y-4 mt-2">
                                     <div className="grid grid-cols-[1fr,auto] gap-y-3 text-sm">
+                                        <span className="font-medium text-muted-foreground">Name</span>
+                                        <span className="font-bold text-right">{contest?.contest_name}</span>
+
                                         <span className="font-medium text-muted-foreground">ID</span>
                                         <span className="font-mono text-right">{contest.id.substring(0, 8)}...</span>
 
@@ -143,7 +147,6 @@ async function page({ params, searchParams }) {
                             <Separator className="mx-6 bg-border dark:bg-border" />
 
                             <CardFooter className="flex flex-col gap-4 pt-4 pb-6 px-6">
-                                {/* Action buttons with improved styling */}
                                 <div className="flex w-full gap-3">
                                     <form
                                         action={async (formData) => {
@@ -195,8 +198,8 @@ async function page({ params, searchParams }) {
                                         <Input
                                             type="number"
                                             name="weight"
-                                            min="1"
-                                            step="1"
+                                            min="0"
+                                            step="0.1"
                                             placeholder="Weight"
                                             defaultValue={contest.weight}
                                             className="pl-10 h-9 rounded-full border-slate-200 dark:border-slate-800"
@@ -256,13 +259,24 @@ async function Modal({ paramsBox }) {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <label
-                                htmlFor="room-name"
+                                htmlFor="contest-id"
                                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                             >
                                 Contest Id
                             </label>
-                            <Input id="room-name" name="room-name" placeholder="Enter Contest Id..." className="w-full" required />
+                            <Input id="contest-id" name="contest-id" placeholder="Enter Contest Id..." className="w-full" required />
                         </div>
+
+                        <div className="space-y-2">
+                            <label
+                                htmlFor="contest-name"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                            >
+                                Contest Name
+                            </label>
+                            <Input id="contest-name" name="contest-name" placeholder="Enter Contest Name..." className="w-full" required />
+                        </div>
+                        
                         <button
                             type="submit"
                             className="w-full rounded-md bg-black px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-black/80"

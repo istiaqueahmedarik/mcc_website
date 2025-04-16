@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { get_with_token, post_with_token } from '@/lib/action';
+import { get_with_token, login, post_with_token } from '@/lib/action';
 
 function processVjudgeRankData(rawData, problemWeights) {
     if (!rawData || typeof rawData !== 'object') {
@@ -98,7 +98,7 @@ function processVjudgeRankData(rawData, problemWeights) {
                         if (s === firstAC) break;
                         if (s.status !== 1) failCount++;
                     }
-                    const penalty = (failCount * 20 + (firstAC.timeSeconds)/60);
+                    const penalty = (failCount * 20 + (firstAC.timeSeconds) / 60);
                     totalPenalty += Math.round(penalty * 100) / 100;
                 }
             }
@@ -139,14 +139,16 @@ export async function loginToVJudge(email, pass) {
             }),
             credentials: 'include'
         });
-
+        console.log(response.headers.get('set-cookie'));
         const setCookie = response.headers.get('set-cookie');
         let JSESSIONID = '';
         if (setCookie) {
             const match = setCookie.match(/JSESSIONID=([^;]+)/);
             if (match) {
                 JSESSIONID = match[1];
-                cookies().set('vj_session', JSESSIONID, { httpOnly: true, path: '/', sameSite: 'lax' });
+                (await cookies()).set('vj_session', JSESSIONID, { httpOnly: true, path: '/', sameSite: 'lax' });
+                (await cookies()).set('vj_session_username', username, { httpOnly: true, path: '/', sameSite: 'lax' });
+                (await cookies()).set('vj_session_password', password, { httpOnly: true, path: '/', sameSite: 'lax' });
             }
         }
         return JSESSIONID;
@@ -154,6 +156,20 @@ export async function loginToVJudge(email, pass) {
         console.error('Error during VJudge authentication:', error);
         return "";
     }
+}
+
+export async function revalidateVJudgeSession() {
+    const vjSession = (await cookies()).get('vj_session')?.value;
+    if (!vjSession) {
+        return {
+            status: 'error'
+        }
+    }
+    const username = cookies().get('vj_session_username')?.value;
+    const password = cookies().get('vj_session_password')?.value;
+    if (!username || !password) return { status: 'error' }
+    await loginToVJudge(username, password);
+    return { status: 'success' }
 }
 
 export async function getContestStructuredRank(contestId, problemWeights) {
@@ -170,7 +186,7 @@ export async function getContestStructuredRank(contestId, problemWeights) {
     const vjudgeUrl = `https://vjudge.net/contest/rank/single/${contestId}`;
     console.log(`Fetching data from ${vjudgeUrl}`);
 
-    let vjSession = cookies().get('vj_session')?.value;
+    let vjSession = (await cookies()).get('vj_session')?.value;
     if (!vjSession) {
         return {
             status: 'error',
@@ -202,11 +218,23 @@ export async function getContestStructuredRank(contestId, problemWeights) {
                 vjudge_url: vjudgeUrl
             };
         }
+        console.log(`Vjudge response status: ${response.status}`);
+        if (response.status === 403) {
+            console.error('Vjudge Error 403: Forbidden');
+            return {
+                status: 'error',
+                message: 'Vjudge API returned 403 Forbidden. Please check your session.',
+                vjudge_url: vjudgeUrl
+            };
+        }
+        // console.log(await response.text());
 
         const contentType = response.headers.get('content-type');
+        console.log("Content-Type:", contentType);
         if (!contentType || !contentType.includes('application/json')) {
             console.warn(`Vjudge response for ${contestId} was not JSON:`, contentType);
             const textData = await response.text();
+            console.log(textData);
             return {
                 status: 'error',
                 message: 'Vjudge returned non-JSON response',
@@ -273,8 +301,8 @@ export async function deleteContestRoom(roomId) {
     return ret;
 }
 
-export async function insertContestRoomContest(roomId, contestId) {
-    const ret = await post_with_token('contest-room-contests/insert', { room_id: roomId, contest_id: contestId });
+export async function insertContestRoomContest(roomId, contestId,contestName) {
+    const ret = await post_with_token('contest-room-contests/insert', { room_id: roomId, contest_id: contestId, name: contestName });
     console.log(ret);
     return ret;
 }
