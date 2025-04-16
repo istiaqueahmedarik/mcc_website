@@ -47,10 +47,9 @@ function ReportTable({ merged }) {
         )
 
         filtered = filtered.map((u) => {
-            const attendedContests = Object.entries(u.contests).filter(
-                ([_, v]) => v && (v.solved > 0 || (v.submissions && v.submissions.length > 0))
-            );
-            const totalContestsAttended = attendedContests.length;
+            const allContestIds = Object.keys(u.contests).filter(cid => !optOutContests[cid]);
+            const attendedContests = allContestIds.map(cid => [cid, u.contests[cid]]);
+            const totalContestsAttended = attendedContests.filter(([_, v]) => v && (v.solved > 0 || (v.submissions && v.submissions.length > 0))).length;
             const processedUser = {
                 ...u,
                 totalContestsAttended,
@@ -62,19 +61,20 @@ function ReportTable({ merged }) {
             }
 
             if (removeWorstCount > 0 && attendedContests.length > 0) {
+                // Sort: lowest solved first, then highest penalty
                 const sortedContests = [...attendedContests].sort((a, b) => {
-                    if (a[1].solved !== b[1].solved) return a[1].solved - b[1].solved
-                    return b[1].penalty - a[1].penalty
+                    if ((a[1]?.solved || 0) !== (b[1]?.solved || 0)) return (a[1]?.solved || 0) - (b[1]?.solved || 0)
+                    return (b[1]?.penalty || 0) - (a[1]?.penalty || 0)
                 })
 
                 const worstToRemove = Math.min(removeWorstCount, attendedContests.length)
 
                 for (let i = 0; i < worstToRemove; i++) {
-                    const [worstContestId] = sortedContests[i]
+                    const [worstContestId, perf] = sortedContests[i]
                     processedUser.worstContests.push(worstContestId)
-                    processedUser.effectiveTotalSolved -= u.contests[worstContestId].solved
-                    processedUser.effectiveTotalPenalty -= u.contests[worstContestId].penalty
-                    processedUser.effectiveTotalScore -= u.contests[worstContestId].finalScore
+                    processedUser.effectiveTotalSolved -= perf?.solved || 0
+                    processedUser.effectiveTotalPenalty -= perf?.penalty || 0
+                    processedUser.effectiveTotalScore -= perf?.finalScore || 0
                 }
             }
 
