@@ -546,11 +546,13 @@ function ReportTable({ merged }) {
                                     const perf = u.contests[cid]
                                     const isWorst = u.worstContests.includes(cid)
                                     const isOptedOut = u.optedOutContests.includes(cid)
-                                    // If not attended, or removed as worst/opted out, show 0s
                                     if (!perf || isWorst || isOptedOut) {
                                         let cellClassName = ""
                                         let statusText = null
-                                        if (isWorst) {
+                                        let extraTextClass = ""
+                                        if (!perf) {
+                                            extraTextClass = "text-blue-500"
+                                        } else if (isWorst) {
                                             cellClassName = "bg-foreground"
                                             statusText = "Worst (removed)"
                                         } else if (isOptedOut) {
@@ -558,7 +560,7 @@ function ReportTable({ merged }) {
                                             statusText = "Opted out"
                                         }
                                         return (
-                                            <TableCell key={cid} className={cellClassName + " text-muted-foreground text-sm"}>
+                                            <TableCell key={cid} className={cellClassName + " text-muted-foreground text-sm " + extraTextClass}>
                                                 {statusText && (
                                                     <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                                                 )}
@@ -569,7 +571,6 @@ function ReportTable({ merged }) {
                                         )
                                     }
 
-                                    // Determine cell styling based on contest status
                                     let cellClassName = ""
                                     let statusText = null
                                     if (isWorst) {
@@ -588,6 +589,7 @@ function ReportTable({ merged }) {
                                                 <div>Solved: {perf.solved}</div>
                                                 <div>Penalty: {perf.penalty.toFixed(2)}</div>
                                                 <div>Score: {perf.finalScore.toFixed(2)}</div>
+                                                
                                             </div>
                                         </TableCell>
                                     )
