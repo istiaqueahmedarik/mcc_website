@@ -36,9 +36,9 @@ function ReportTable({ merged, lastUpdated }) {
                                 <TableHead className="w-[60px] text-[hsl(var(--foreground))]">Rank</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Username</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Real Name</TableHead>
+                                <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Effective Score</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Std Dev</TableHead>
-                                <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
                                 {merged.contestIds.map((cid) => (
                                     <TableHead key={cid} className="min-w-[140px] text-[hsl(var(--foreground))]">
                                         <TooltipProvider>
@@ -85,10 +85,17 @@ function ReportTable({ merged, lastUpdated }) {
                                     </TableCell>
                                     <TableCell className="text-center font-medium">
                                         <Badge
-                                            variant={index < 12 ? "default" : "outline"}
+                                            variant="default"
                                             className={cn(
-                                                "min-w-[32px] transition-all duration-200",
-                                                "group-hover:shadow-sm"
+                                                "min-w-[32px] transition-all duration-200 group-hover:shadow-sm",
+                                                index < 12 &&
+                                                    (index < 3
+                                                        ? "bg-yellow-500 text-white"
+                                                        : index < 6
+                                                        ? "bg-gray-400 text-white"
+                                                        : index < 9
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-blue-500 text-white")
                                             )}
                                         >
                                             {index + 1}
@@ -98,6 +105,14 @@ function ReportTable({ merged, lastUpdated }) {
                                         <span className="transition-all duration-200 group-hover:font-bold">{u.username}</span>
                                     </TableCell>
                                     <TableCell className="text-[hsl(var(--muted-foreground))]">{u.realName || "—"}</TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge
+                                            variant="outline"
+                                            className="min-w-[32px] border-[hsl(var(--primary)/0.3)] bg-[hsl(var(--background))] font-semibold text-[hsl(var(--primary))] transition-all duration-200 group-hover:border-[hsl(var(--primary))] group-hover:shadow-sm"
+                                        >
+                                            {u.totalContestsAttended}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell>
                                         <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
                                             <p className="flex items-center gap-1 text-sm">
@@ -128,14 +143,7 @@ function ReportTable({ merged, lastUpdated }) {
                                             </p>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge
-                                            variant="outline"
-                                            className="min-w-[32px] border-[hsl(var(--primary)/0.3)] bg-[hsl(var(--background))] font-semibold text-[hsl(var(--primary))] transition-all duration-200 group-hover:border-[hsl(var(--primary))] group-hover:shadow-sm"
-                                        >
-                                            {u.totalContestsAttended}
-                                        </Badge>
-                                    </TableCell>
+                                    
                                     {merged.contestIds.map((cid) => {
                                         const perf = u.contests[cid]
                                         const isWorst = u.worstContests?.includes(cid)

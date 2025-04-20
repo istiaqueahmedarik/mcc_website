@@ -449,9 +449,9 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <TableHead>Rank</TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Real Name</TableHead>
+                            <TableHead>Contests</TableHead>
                             <TableHead>Effective Score</TableHead>
                             <TableHead>Std Dev</TableHead>
-                            <TableHead>Contests</TableHead>
                             {merged.contestIds.map((cid) => (
                                 <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
                                     <div className="max-w-[120px] truncate">
@@ -478,9 +478,28 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                         className="rounded-full"
                                     />
                                 </TableCell>
-                                <TableCell>{index + 1}</TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="default"
+                                    className={`min-w-[32px] transition-all duration-200 ${
+                                      index < 12
+                                        ? index < 3
+                                          ? "bg-yellow-500 text-white"
+                                          : index < 6
+                                          ? "bg-gray-500 text-white"
+                                          : index < 9
+                                          ? "bg-orange-500 text-white"
+                                          : "bg-blue-500 text-white"
+                                        : ""
+                                    }`}
+                                  >
+                                    {index + 1}
+                                  </Badge>
+                                </TableCell>
                                 <TableCell className="font-medium">{u.username}</TableCell>
                                 <TableCell>{u.realName}</TableCell>
+                                <TableCell>{u.totalContestsAttended}</TableCell>
+
                                 <TableCell>
                                     <p>
                                         Solved - {u.effectiveTotalSolved.toFixed(2)}
@@ -499,7 +518,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                     <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
                                     <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
                                 </TableCell>
-                                <TableCell>{u.totalContestsAttended}</TableCell>
                                 {merged.contestIds.map((cid) => {
                                     const perf = u.contests[cid]
                                     const isWorst = u.worstContests.includes(cid)
