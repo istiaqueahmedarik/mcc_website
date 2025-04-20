@@ -31,8 +31,8 @@ async function layout({ children, params }) {
     return (
         <div className=''>
             
-            <div className='grid grid-cols-[2fr_1fr] p-4'>
-                <div className='m-auto text-4xl font-bold text-center uppercase'>
+            <div className='flex m-auto p-4'>
+                <div className='m-auto w-full text-4xl font-bold text-center uppercase'>
                     {roomRes?.name}
                 </div>
                 <div className='flex justify-end'>

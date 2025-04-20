@@ -9,6 +9,7 @@ import { revalidateVJudgeSession } from '@/actions/contest_details'
 
 
 
+
 async function layout({ children }) {
     const cookieStore = await cookies()
     const vjudgeCookie = cookieStore.get("vj_session")
@@ -33,7 +34,7 @@ async function layout({ children }) {
     }
     return (
         <div className=''>
-          
+            
             {children}
         </div>
     )
