@@ -471,11 +471,12 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <TableRow key={u.username} className={index % 2 === 0 ? "bg-muted/20" : ""}>
                                 <TableCell>
                                     <Image
-                                        src={u.avatarUrl || "/placeholder.svg"}
+                                        src={u.avatarUrl || "/vercel.svg"}
                                         alt="avatar"
                                         width={32}
                                         height={32}
                                         className="rounded-full"
+                                        quality={20}
                                     />
                                 </TableCell>
                                 <TableCell>

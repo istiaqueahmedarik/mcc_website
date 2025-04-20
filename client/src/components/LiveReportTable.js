@@ -74,11 +74,13 @@ function ReportTable({ merged, lastUpdated }) {
                                             "group-hover:border-[hsl(var(--primary))] group-hover:shadow-md"
                                         )}>
                                             <Image
-                                                src={u.avatarUrl || "/placeholder.svg?height=40&width=40"}
+                                                src={u.avatarUrl || "/vercel.svg?height=40&width=40"}
                                                 alt={`${u.username}'s avatar`}
                                                 width={40}
                                                 height={40}
                                                 className="object-cover"
+                                                quality={20}
+
                                             />
                                            
                                         </div>
