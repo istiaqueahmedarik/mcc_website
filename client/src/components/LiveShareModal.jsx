@@ -76,7 +76,7 @@ export default function LiveShareModal({ reportData, reportId }) {
                 .then(data => {
                 console.log(data)
                 const found = data?.success && data.result.length>0
-                if (found) { setExistingReport(found); setIsSharing(true);  setLastUpdated(data.result[0].updated_at) }
+                  if (found) { setExistingReport(found); setIsSharing(true); setLastUpdated(new Date(data.result[0].Updated_at).toLocaleDateString()) }
                 else { setExistingReport(null); setIsSharing(false) }
             })
             .catch(console.error)
@@ -84,8 +84,16 @@ export default function LiveShareModal({ reportData, reportId }) {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
+  if (apiLoading)
+    return <>
+      <div className="flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+      <div className="text-center text-gray-500">Loading...</div>
+      
+    </>
     return (
-        <div className="flex items-center justify-center p-4">
+        <div className="flex items-center justify-center ">
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogTrigger asChild>
                     <Button variant="outline" className="gap-2">

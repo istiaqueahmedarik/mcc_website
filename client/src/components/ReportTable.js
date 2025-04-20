@@ -4,25 +4,24 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
 import Image from "next/image"
-import { X, AlertCircle, Search, Filter, SlidersHorizontal, Share2 } from "lucide-react"
+import { X, AlertCircle, Search, Users2, CheckCheck } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import LiveShareModal from "./LiveShareModal"
 
-function ReportTable({ merged, report_id, partial, liveReportId,name }) {
+function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const [searchText, setSearchText] = useState("")
-    const [removeWorstCount, setRemoveWorstCount] = useState(0)
+    const [removeWorstCount, setRemoveWorstCount] = useState(1)
     const [optOutContests, setOptOutContests] = useState({})
     const [advancedFilters, setAdvancedFilters] = useState({
-     minSolved: 0,
-     maxSolved: Number.POSITIVE_INFINITY,
-     minContests: 0,
-     performanceFilter: null,
-     sortBy: "effectiveTotalSolved", // Default sort by effective solved
-     sortDirection: "desc",
- })
+        minSolved: 0,
+        maxSolved: Number.POSITIVE_INFINITY,
+        minContests: 0,
+        performanceFilter: null,
+        sortBy: "effectiveTotalSolved", // Default sort by effective solved
+        sortDirection: "desc",
+    })
     const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
     const [liveModal, setLiveModal] = useState(false)
 
@@ -49,9 +48,11 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
         )
 
         filtered = filtered.map((u) => {
-            const allContestIds = Object.keys(u.contests).filter(cid => !optOutContests[cid]);
-            const attendedContests = allContestIds.map(cid => [cid, u.contests[cid]]);
-            const totalContestsAttended = attendedContests.filter(([_, v]) => v && (v.solved > 0 || (v.submissions && v.submissions.length > 0))).length;
+            const allContestIds = Object.keys(u.contests).filter((cid) => !optOutContests[cid])
+            const attendedContests = allContestIds.map((cid) => [cid, u.contests[cid]])
+            const totalContestsAttended = attendedContests.filter(
+                ([_, v]) => v && (v.solved > 0 || (v.submissions && v.submissions.length > 0)),
+            ).length
             const processedUser = {
                 ...u,
                 totalContestsAttended,
@@ -154,26 +155,26 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
             "Effective Solved",
             "Effective Penalty",
             "Contests Attended",
-            ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
+            ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
         ]
 
         const rows = users.map((u, idx) => {
             const base = [
-                idx + 1, 
+                idx + 1,
                 u.username,
                 u.realName,
                 u.effectiveTotalScore.toFixed(2),
                 u.effectiveTotalSolved,
                 u.effectiveTotalPenalty.toFixed(2),
-                u.totalContestsAttended
+                u.totalContestsAttended,
             ]
-            const contestData = merged.contestIds.map(cid => {
+            const contestData = merged.contestIds.map((cid) => {
                 const perf = u.contests[cid]
                 const isWorst = u.worstContests.includes(cid)
                 const isOptedOut = u.optedOutContests.includes(cid)
                 if (!perf || isWorst || isOptedOut) {
-                    let status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : "";
-                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`;
+                    const status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : ""
+                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`
                 }
                 let status = ""
                 if (isWorst) status = "Worst (removed)"
@@ -184,7 +185,7 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
         })
 
         const csv = [headers, ...rows]
-            .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","))
+            .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(","))
             .join("\n")
 
         // Download
@@ -215,8 +216,8 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
             "Effective Solved",
             "Effective Penalty",
             "Contests Attended",
-            ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
-        ];
+            ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
+        ]
         const rows = users.map((u, idx) => {
             const base = [
                 idx + 1,
@@ -225,32 +226,32 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                 u.effectiveTotalScore.toFixed(2),
                 u.effectiveTotalSolved,
                 u.effectiveTotalPenalty.toFixed(2),
-                u.totalContestsAttended
-            ];
-            const contestData = merged.contestIds.map(cid => {
-                const perf = u.contests[cid];
-                const isWorst = u.worstContests.includes(cid);
-                const isOptedOut = u.optedOutContests.includes(cid);
+                u.totalContestsAttended,
+            ]
+            const contestData = merged.contestIds.map((cid) => {
+                const perf = u.contests[cid]
+                const isWorst = u.worstContests.includes(cid)
+                const isOptedOut = u.optedOutContests.includes(cid)
                 if (!perf || isWorst || isOptedOut) {
-                    let status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : "";
-                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`;
+                    const status = isWorst ? "Worst (removed)" : isOptedOut ? "Opted out" : ""
+                    return `${status ? status + ": " : ""}Solved: 0, Penalty: 0.00, Score: 0.00`
                 }
-                let status = "";
-                if (isWorst) status = "Worst (removed)";
-                else if (isOptedOut) status = "Opted out";
-                return `${status ? status + ": " : ""}Solved: ${perf.solved}, Penalty: ${perf.penalty.toFixed(2)}, Score: ${perf.finalScore.toFixed(2)}`;
-            });
-            return [...base, ...contestData];
-        });
+                let status = ""
+                if (isWorst) status = "Worst (removed)"
+                else if (isOptedOut) status = "Opted out"
+                return `${status ? status + ": " : ""}Solved: ${perf.solved}, Penalty: ${perf.penalty.toFixed(2)}, Score: ${perf.finalScore.toFixed(2)}`
+            })
+            return [...base, ...contestData]
+        })
 
-        const pdfDoc = await PDFDocument.create();
-        let page = pdfDoc.addPage();
-        const font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-        const fontSize = 10;
-        const margin = 30;
-        const rowHeight = 18;
-        const colWidth = 120;
-        let y = page.getHeight() - margin;
+        const pdfDoc = await PDFDocument.create()
+        let page = pdfDoc.addPage()
+        const font = await pdfDoc.embedFont(StandardFonts.TimesRoman)
+        const fontSize = 10
+        const margin = 30
+        const rowHeight = 18
+        const colWidth = 120
+        let y = page.getHeight() - margin
 
         // Draw headers
         headers.forEach((header, i) => {
@@ -260,9 +261,9 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                 size: fontSize,
                 font,
                 color: rgb(0, 0, 0.7),
-            });
-        });
-        y -= rowHeight;
+            })
+        })
+        y -= rowHeight
 
         // Draw rows
         rows.forEach((row) => {
@@ -273,207 +274,140 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                     size: fontSize,
                     font,
                     color: rgb(0, 0, 0),
-                });
-            });
-            y -= rowHeight;
+                })
+            })
+            y -= rowHeight
             if (y < margin) {
-                y = page.getHeight() - margin;
-                page = pdfDoc.addPage();
+                y = page.getHeight() - margin
+                page = pdfDoc.addPage()
             }
-        });
+        })
 
-        const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
-        const filename = `report_${new Date().toISOString().slice(0, 10)}.pdf`;
+        const pdfBytes = await pdfDoc.save()
+        const blob = new Blob([pdfBytes], { type: "application/pdf" })
+        const filename = `report_${new Date().toISOString().slice(0, 10)}.pdf`
         if (window.navigator.msSaveOrOpenBlob) {
-            window.navigator.msSaveOrOpenBlob(blob, filename);
+            window.navigator.msSaveOrOpenBlob(blob, filename)
         } else {
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const link = document.createElement("a")
+            link.href = URL.createObjectURL(blob)
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
         }
-    };
+    }
 
-    const liveReportData = useMemo(() => ({
-        ...merged,
-        users,
-        name
-    }), [merged, users, name])
-
+    const liveReportData = useMemo(
+        () => ({
+            ...merged,
+            users,
+            name,
+        }),
+        [merged, users, name],
+    )
 
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-4 mb-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="relative flex-1 max-w-xs">
-                        <Input
-                            placeholder="Search username or real name"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            className="pl-9"
-                        />
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    </div>
+                <div className="bg-card rounded-lg p-4 border shadow-sm">
+                    <h2 className="text-lg font-semibold mb-4">Report Settings</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Search Participants</label>
+                            <div className="relative">
+                                <Input
+                                    placeholder="Search username or real name"
+                                    value={searchText}
+                                    onChange={(e) => setSearchText(e.target.value)}
+                                    className="pl-9"
+                                />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                        <Input
-                            type="number"
-                            min={0}
-                            max={merged.contestIds.length - 1}
-                            value={removeWorstCount}
-                            onChange={(e) => setRemoveWorstCount(Number(e.target.value))}
-                            className="w-16"
-                        />
-                        <label className="text-sm">Remove worst contests</label>
-                    </div>
-{/* extra feauture - pore  valo kore kaj krbo, not sure about reliability /}
-                    {/* <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                        className="sm:ml-auto"
-                    >
-                        <SlidersHorizontal className="h-4 w-4 mr-2" />
-                        {showAdvancedSearch ? "Hide" : "Show"} Advanced Search
-                    </Button> */}
-                    <div className="sm:ml-auto">
-                        <LiveShareModal reportData={(liveReportData)} reportId={liveReportId} />
-                    </div>
-                    <div className="flex items-center justify-end mr-2">
-                        <Button size="sm" variant="secondary" onClick={exportToCSV}>
-                            Export to CSV
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={exportToPDF} className="ml-2">
-                            Export to PDF
-                        </Button>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Remove Worst Contests</label>
+                            <div className="flex items-center gap-2">
+                                <Select
+                                    value={removeWorstCount.toString()}
+                                    onValueChange={(value) => setRemoveWorstCount(Number(value))}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Select number" defaultValue={1} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Array.from({ length: merged.contestIds.length }, (_, i) => (
+                                            <SelectItem key={i} value={i.toString()}>
+                                                {i}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setRemoveWorstCount(removeWorstCount)}
+                                    className="whitespace-nowrap"
+                                >
+                                    Apply
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Actions</label>
+                            <div className="flex flex-wrap gap-2">
+                                <LiveShareModal reportData={liveReportData} reportId={liveReportId} />
+                                <Button size="sm" variant="outline" onClick={exportToCSV} className="flex items-center gap-1">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="lucide lucide-file-text"
+                                    >
+                                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="16" x2="8" y1="13" y2="13" />
+                                        <line x1="16" x2="8" y1="17" y2="17" />
+                                        <line x1="10" x2="8" y1="9" y2="9" />
+                                    </svg>
+                                    CSV
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={exportToPDF} className="flex items-center gap-1">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        className="lucide lucide-file-type"
+                                    >
+                                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <path d="M9 13v-1h6v1" />
+                                        <path d="M11 18h2" />
+                                        <path d="M12 12v6" />
+                                    </svg>
+                                    PDF
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                {showAdvancedSearch && (
-                    <div className="border rounded-md p-4 bg-muted/20">
-                        <Accordion type="single" collapsible defaultValue="filters">
-                            <AccordionItem value="filters">
-                                <AccordionTrigger>
-                                    <div className="flex items-center">
-                                        <Filter className="h-4 w-4 mr-2" />
-                                        Advanced Filters
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Solved Problems Range</label>
-                                            <div className="flex items-center gap-4">
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={maxPossibleSolved}
-                                                    value={advancedFilters.minSolved}
-                                                    onChange={(e) => updateFilter("minSolved", Number(e.target.value))}
-                                                    className="w-20"
-                                                />
-                                                <span className="text-sm">to</span>
-                                                <Input
-                                                    type="number"
-                                                    min={0}
-                                                    max={maxPossibleSolved}
-                                                    value={
-                                                        advancedFilters.maxSolved === Number.POSITIVE_INFINITY
-                                                            ? maxPossibleSolved
-                                                            : advancedFilters.maxSolved
-                                                    }
-                                                    onChange={(e) =>
-                                                        updateFilter("maxSolved", Number(e.target.value) || Number.POSITIVE_INFINITY)
-                                                    }
-                                                    className="w-20"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Minimum Contests Attended</label>
-                                            <Input
-                                                type="number"
-                                                min={0}
-                                                max={merged.contestIds.length}
-                                                value={advancedFilters.minContests}
-                                                onChange={(e) => updateFilter("minContests", Number(e.target.value))}
-                                                className="w-20"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Performance in Specific Contest</label>
-                                            <Select
-                                                value={advancedFilters.performanceFilter}
-                                                onValueChange={(value) => updateFilter("performanceFilter", value)}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a contest" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value={null}>Any performance</SelectItem>
-                                                    {merged.contestIds.map((cid,idx) => (
-                                                        <div key={idx}>
-                                                            <SelectItem key={`${cid}|1`} value={`${cid}|1`}>
-                                                                {merged.contestIdToTitle[cid]} (≥ 1 solved)
-                                                            </SelectItem>
-                                                            <SelectItem key={`${cid}|2`} value={`${cid}|2`}>
-                                                                {merged.contestIdToTitle[cid]} (≥ 2 solved)
-                                                            </SelectItem>
-                                                            <SelectItem key={`${cid}|3`} value={`${cid}|3`}>
-                                                                {merged.contestIdToTitle[cid]} (≥ 3 solved)
-                                                            </SelectItem>
-                                                        </div>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Sort By</label>
-                                            <div className="flex gap-2">
-                                                <Select value={advancedFilters.sortBy} onValueChange={(value) => updateFilter("sortBy", value)}>
-                                                    <SelectTrigger className="flex-1">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="effectiveTotalSolved">Effective Solved</SelectItem>
-                                                        <SelectItem value="effectiveTotalPenalty">Effective Penalty</SelectItem>
-                                                        <SelectItem value="effectiveTotalScore">Effective Score</SelectItem>
-                                                        <SelectItem value="contestsAttended">Contests Attended</SelectItem>
-                                                        <SelectItem value="username">Username</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-
-                                                <Select
-                                                    value={advancedFilters.sortDirection}
-                                                    onValueChange={(value) => updateFilter("sortDirection", value)}
-                                                >
-                                                    <SelectTrigger className="w-32">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="desc">Descending</SelectItem>
-                                                        <SelectItem value="asc">Ascending</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </AccordionContent>
-                            </AccordionItem>
-                        </Accordion>
-                    </div>
-                )}
-                
             </div>
 
-            <div className="mb-4">
-                <h3 className="text-sm font-medium mb-2">Remove specific contests:</h3>
+            <div className="mb-4 bg-card rounded-lg p-4 border shadow-sm">
+                <h3 className="text-sm font-medium mb-3">Exclude Specific Contests</h3>
                 <div className="flex flex-wrap gap-2">
                     {merged.contestIds.map((cid) => (
                         <Button
@@ -481,9 +415,13 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                             variant={optOutContests[cid] ? "destructive" : "outline"}
                             size="sm"
                             onClick={() => toggleOptOut(cid)}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 transition-all"
                         >
-                            {optOutContests[cid] && <X className="h-3 w-3" />}
+                            {optOutContests[cid] ? (
+                                <X className="h-3 w-3 mr-1" />
+                            ) : (
+                               <CheckCheck className="h-3 w-3 mr-1" />
+                            )}
                             <span className="text-xs">{merged.contestIdToTitle[cid]}</span>
                         </Button>
                     ))}
@@ -491,11 +429,17 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
             </div>
 
             <div>
-                Showing <Badge variant="outline">{users.length}</Badge> participants
-
-           </div>
-
-            
+                <div className="flex items-center gap-2 bg-card p-3 rounded-lg border shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <Users2 className="h-5 w-5 text-muted-foreground" />
+                        <span className="font-medium">Showing</span>
+                        <Badge variant="secondary" className="px-2 py-1 text-sm font-semibold">
+                            {users.length}
+                        </Badge>
+                        <span className="font-medium">participants</span>
+                    </div>
+                </div>
+            </div>
 
             <div className="overflow-x-auto border rounded-md">
                 <Table>
@@ -506,14 +450,14 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                             <TableHead>Username</TableHead>
                             <TableHead>Real Name</TableHead>
                             <TableHead>Effective Score</TableHead>
-<TableHead>Std Dev</TableHead>
+                            <TableHead>Std Dev</TableHead>
                             <TableHead>Contests</TableHead>
                             {merged.contestIds.map((cid) => (
-                                <TableHead key={cid} className={optOutContests[cid] ? "bg-red-100" : ""}>
+                                <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
                                     <div className="max-w-[120px] truncate">
                                         {merged.contestIdToTitle[cid]}
                                         {optOutContests[cid] && (
-                                            <span className="ml-1 text-red-500">
+                                            <span className="ml-1 text-destructive">
                                                 <AlertCircle className="inline h-3 w-3" />
                                             </span>
                                         )}
@@ -551,10 +495,10 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                                         )}
                                     </p>
                                 </TableCell>
-                               <TableCell>
-                                   <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
-                                   <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
-                               </TableCell>
+                                <TableCell>
+                                    <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
+                                    <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
+                                </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 {merged.contestIds.map((cid) => {
                                     const perf = u.contests[cid]
@@ -565,16 +509,19 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                                         let statusText = null
                                         let extraTextClass = ""
                                         if (!perf) {
-                                            extraTextClass = "text-blue-500"
+                                            extraTextClass = "text-primary"
                                         } else if (isWorst) {
-                                            cellClassName = "bg-foreground"
+                                            cellClassName = "bg-muted"
                                             statusText = "Worst (removed)"
                                         } else if (isOptedOut) {
-                                            cellClassName = "bg-red-100"
+                                            cellClassName = "bg-destructive/10"
                                             statusText = "Opted out"
                                         }
                                         return (
-                                            <TableCell key={cid} className={cellClassName + " text-muted-foreground text-sm " + extraTextClass}>
+                                            <TableCell
+                                                key={cid}
+                                                className={cellClassName + " text-muted-foreground text-sm " + extraTextClass}
+                                            >
                                                 {statusText && (
                                                     <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                                                 )}
@@ -588,10 +535,10 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                                     let cellClassName = ""
                                     let statusText = null
                                     if (isWorst) {
-                                        cellClassName = "bg-foreground"
+                                        cellClassName = "bg-muted"
                                         statusText = "Worst (removed)"
                                     } else if (isOptedOut) {
-                                        cellClassName = "bg-red-100"
+                                        cellClassName = "bg-destructive/10"
                                         statusText = "Opted out"
                                     }
                                     return (
@@ -603,7 +550,6 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                                                 <div>Solved: {perf.solved}</div>
                                                 <div>Penalty: {perf.penalty.toFixed(2)}</div>
                                                 <div>Score: {perf.finalScore.toFixed(2)}</div>
-                                                
                                             </div>
                                         </TableCell>
                                     )
@@ -613,8 +559,6 @@ function ReportTable({ merged, report_id, partial, liveReportId,name }) {
                     </TableBody>
                 </Table>
             </div>
-
-        
         </div>
     )
 }
