@@ -20,7 +20,7 @@ function ReportTable({ merged, lastUpdated }) {
     return (
         <Card className="overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-lg">
             <CardHeader className="bg-gradient-to-r from-[hsl(var(--primary)/0.1)] to-[hsl(var(--primary)/0.05)] pb-2">
-                <CardTitle className="text-center text-3xl font-bold tracking-tight text-[hsl(var(--primary))]">
+                <CardTitle className="text-center text-3xl font-bold tracking-tight text-[hsl(var(--primary))] uppercase">
                     {merged.name}
                 </CardTitle>
                 <CardDescription className="text-center text-sm font-medium text-[hsl(var(--muted-foreground))]">
