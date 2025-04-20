@@ -47,6 +47,7 @@ function processVjudgeRankData(rawData, problemWeights) {
         submissions.sort((a, b) => a[3] - b[3]);
         for (const sub of submissions) {
             const [teamId, problemIndex, status, timeSeconds, cumulativeScore, unknownVal] = sub;
+            if(timeSeconds>(contestInfo.length)/1000)continue;
             if (participantMap.has(teamId)) {
                 const team = participantMap.get(teamId);
                 team.submissions.push({
