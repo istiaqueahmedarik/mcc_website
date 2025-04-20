@@ -44,9 +44,8 @@ export default async function ContestRoomsPage() {
     const contestRooms = res.result || []
 
     return (
-        
         <div className="min-h-screen bg-background">
-            <div className='flex justify-end p-4'>
+            <div className="flex justify-end p-4">
                 <form action={handleLogout} className="flex justify-end p-4">
                     <Button type="submit" variant="outline" size="sm">
                         <DoorOpenIcon className="w-2 h-2 text-destructive" />
@@ -102,11 +101,14 @@ export default async function ContestRoomsPage() {
                                             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mr-4">
                                                 <Users className="w-6 h-6 text-primary" />
                                             </div>
-                                            <div className="flex-1">
-                                                <CardTitle className="text-xl font-semibold text-foreground truncate">
+                                            <div className="flex-1 min-w-0">
+                                                <CardTitle
+                                                    className="text-xl font-semibold text-foreground truncate"
+                                                    title={room["Room Name"]}
+                                                >
                                                     {room["Room Name"]}
                                                 </CardTitle>
-                                                <CardDescription className="flex items-center mt-1">
+                                                <CardDescription className="flex items-center mt-1 truncate">
                                                     <Clock className="w-4 h-4 mr-1" />
                                                     <span>Created {formatDistanceToNow(new Date(room.created_at), { addSuffix: true })}</span>
                                                 </CardDescription>
