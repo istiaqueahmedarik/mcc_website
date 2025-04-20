@@ -7,14 +7,14 @@ import { loginToVJudge } from "@/actions/contest_details";
 export default async function LoginPage() {
     const cookieStore = await cookies();
     const vjudgeCookie = cookieStore.get("vj_session");
-    if (vjudgeCookie) 
+    if (vjudgeCookie)
         redirect("/contests_report/details");
 
     async function handleLogin(formData) {
         "use server";
         const username = formData.get("username");
         const password = formData.get("password");
-        const session = await loginToVJudge( username, password);
+        const session = await loginToVJudge(username, password);
         if (session) {
             redirect("/contests_report/details");
         }
@@ -27,7 +27,7 @@ export default async function LoginPage() {
                     <h1 className="mb-2 text-4xl font-bold" style={{ color: "var(--foreground)" }}>
                         Login With Vjudge ID!
                     </h1>
-                    
+
 
                     <form className="space-y-4" action={handleLogin}>
                         <div>
@@ -55,9 +55,9 @@ export default async function LoginPage() {
                                     borderColor: "var(--border)"
                                 }}
                             />
-                           
+
                         </div>
-                       
+
                         <button
                             type="submit"
                             className="w-full rounded-full bg-black py-3 font-medium text-white hover:bg-gray-800"

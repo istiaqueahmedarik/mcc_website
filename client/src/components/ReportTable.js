@@ -4,25 +4,27 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
 import Image from "next/image"
-import { X, AlertCircle, Search, Filter, SlidersHorizontal } from "lucide-react"
+import { X, AlertCircle, Search, Filter, SlidersHorizontal, Share2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
+import LiveShareModal from "./LiveShareModal"
 
-function ReportTable({ merged }) {
+function ReportTable({ merged, report_id, partial, liveReportId,name }) {
     const [searchText, setSearchText] = useState("")
     const [removeWorstCount, setRemoveWorstCount] = useState(0)
     const [optOutContests, setOptOutContests] = useState({})
     const [advancedFilters, setAdvancedFilters] = useState({
-        minSolved: 0,
-        maxSolved: Number.POSITIVE_INFINITY,
-        minContests: 0,
-        performanceFilter: null,
-        sortBy: "totalSolved", // Default sort
-        sortDirection: "desc",
-    })
+     minSolved: 0,
+     maxSolved: Number.POSITIVE_INFINITY,
+     minContests: 0,
+     performanceFilter: null,
+     sortBy: "effectiveTotalSolved", // Default sort by effective solved
+     sortDirection: "desc",
+ })
     const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+    const [liveModal, setLiveModal] = useState(false)
 
     const toggleOptOut = (contestId) => {
         setOptOutContests((prev) => ({
@@ -55,9 +57,9 @@ function ReportTable({ merged }) {
                 totalContestsAttended,
                 worstContests: [],
                 optedOutContests: [],
-                effectiveTotalSolved: u.totalSolved,
-                effectiveTotalPenalty: u.totalPenalty,
-                effectiveTotalScore: u.totalScore,
+                effectiveTotalSolved: u.effectiveSolved,
+                effectiveTotalPenalty: u.effectivePenalty,
+                effectiveTotalScore: u.effectiveSolved,
             }
 
             if (removeWorstCount > 0 && attendedContests.length > 0) {
@@ -113,19 +115,17 @@ function ReportTable({ merged }) {
             switch (advancedFilters.sortBy) {
                 case "username":
                     return direction * a.username.localeCompare(b.username)
-                case "totalSolved":
+                case "effectiveTotalSolved":
                     if (a.effectiveTotalSolved !== b.effectiveTotalSolved)
                         return direction * (a.effectiveTotalSolved - b.effectiveTotalSolved)
+                    if (a.effectiveTotalPenalty !== b.effectiveTotalPenalty)
+                        return direction * -1 * (a.effectiveTotalPenalty - b.effectiveTotalPenalty)
+                    return b.totalContestsAttended - a.totalContestsAttended
+                case "effectiveTotalScore":
                     if (a.effectiveTotalScore !== b.effectiveTotalScore)
                         return direction * (a.effectiveTotalScore - b.effectiveTotalScore)
-                    return direction * -1 * (a.effectiveTotalPenalty - b.effectiveTotalPenalty)
-                case "totalScore":
-                    if (a.effectiveTotalScore !== b.effectiveTotalScore)
-                        return direction * (a.effectiveTotalScore - b.effectiveTotalScore)
-                    if (a.effectiveTotalSolved !== b.effectiveTotalSolved)
-                        return direction * (a.effectiveTotalSolved - b.effectiveTotalSolved)
-                    return direction * -1 * (a.effectiveTotalPenalty - b.effectiveTotalPenalty)
-                case "totalPenalty":
+                    return direction * (a.effectiveTotalSolved - b.effectiveTotalSolved)
+                case "effectiveTotalPenalty":
                     return direction * (a.effectiveTotalPenalty - b.effectiveTotalPenalty)
                 case "contestsAttended":
                     return direction * (a.totalContestsAttended - b.totalContestsAttended)
@@ -150,9 +150,9 @@ function ReportTable({ merged }) {
             "Rank",
             "Username",
             "Real Name",
-            "Total Score",
-            "Total Solved",
-            "Total Penalty",
+            "Effective Score",
+            "Effective Solved",
+            "Effective Penalty",
             "Contests Attended",
             ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
         ]
@@ -211,9 +211,9 @@ function ReportTable({ merged }) {
             "Rank",
             "Username",
             "Real Name",
-            "Total Score",
-            "Total Solved",
-            "Total Penalty",
+            "Effective Score",
+            "Effective Solved",
+            "Effective Penalty",
             "Contests Attended",
             ...merged.contestIds.map(cid => merged.contestIdToTitle[cid])
         ];
@@ -297,6 +297,13 @@ function ReportTable({ merged }) {
         }
     };
 
+    const liveReportData = useMemo(() => ({
+        ...merged,
+        users,
+        name
+    }), [merged, users, name])
+
+
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-4 mb-4">
@@ -322,8 +329,8 @@ function ReportTable({ merged }) {
                         />
                         <label className="text-sm">Remove worst contests</label>
                     </div>
-
-                    <Button
+{/* extra feauture - pore  valo kore kaj krbo, not sure about reliability /}
+                    {/* <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
@@ -331,7 +338,10 @@ function ReportTable({ merged }) {
                     >
                         <SlidersHorizontal className="h-4 w-4 mr-2" />
                         {showAdvancedSearch ? "Hide" : "Show"} Advanced Search
-                    </Button>
+                    </Button> */}
+                    <div className="sm:ml-auto">
+                        <LiveShareModal reportData={(liveReportData)} reportId={liveReportId} />
+                    </div>
                     <div className="flex items-center justify-end mr-2">
                         <Button size="sm" variant="secondary" onClick={exportToCSV}>
                             Export to CSV
@@ -406,8 +416,8 @@ function ReportTable({ merged }) {
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value={null}>Any performance</SelectItem>
-                                                    {merged.contestIds.map((cid) => (
-                                                        <>
+                                                    {merged.contestIds.map((cid,idx) => (
+                                                        <div key={idx}>
                                                             <SelectItem key={`${cid}|1`} value={`${cid}|1`}>
                                                                 {merged.contestIdToTitle[cid]} (≥ 1 solved)
                                                             </SelectItem>
@@ -417,7 +427,7 @@ function ReportTable({ merged }) {
                                                             <SelectItem key={`${cid}|3`} value={`${cid}|3`}>
                                                                 {merged.contestIdToTitle[cid]} (≥ 3 solved)
                                                             </SelectItem>
-                                                        </>
+                                                        </div>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -431,8 +441,9 @@ function ReportTable({ merged }) {
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="totalSolved">Total Solved</SelectItem>
-                                                        <SelectItem value="totalPenalty">Total Penalty</SelectItem>
+                                                        <SelectItem value="effectiveTotalSolved">Effective Solved</SelectItem>
+                                                        <SelectItem value="effectiveTotalPenalty">Effective Penalty</SelectItem>
+                                                        <SelectItem value="effectiveTotalScore">Effective Score</SelectItem>
                                                         <SelectItem value="contestsAttended">Contests Attended</SelectItem>
                                                         <SelectItem value="username">Username</SelectItem>
                                                     </SelectContent>
@@ -490,13 +501,12 @@ function ReportTable({ merged }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-12">Avatar</TableHead>
+                            <TableHead>Avatar</TableHead>
                             <TableHead>Rank</TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Real Name</TableHead>
-                            <TableHead>Total Score</TableHead>
-                            <TableHead>Total Solved</TableHead>
-                            <TableHead>Total Penalty</TableHead>
+                            <TableHead>Effective Score</TableHead>
+<TableHead>Std Dev</TableHead>
                             <TableHead>Contests</TableHead>
                             {merged.contestIds.map((cid) => (
                                 <TableHead key={cid} className={optOutContests[cid] ? "bg-red-100" : ""}>
@@ -527,19 +537,24 @@ function ReportTable({ merged }) {
                                 <TableCell>{index + 1}</TableCell>
                                 <TableCell className="font-medium">{u.username}</TableCell>
                                 <TableCell>{u.realName}</TableCell>
-                                <TableCell>{u.effectiveTotalScore.toFixed(2)}</TableCell>
                                 <TableCell>
-                                    {u.effectiveTotalSolved}
-                                    {u.effectiveTotalSolved !== u.totalSolved && (
-                                        <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
-                                    )}
+                                    <p>
+                                        Solved - {u.effectiveTotalSolved.toFixed(2)}
+                                        {u.effectiveTotalSolved !== u.totalSolved && (
+                                            <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
+                                        )}
+                                    </p>
+                                    <p>
+                                        Penalty - {u.effectiveTotalPenalty.toFixed(2)}
+                                        {u.effectiveTotalPenalty !== u.totalPenalty && (
+                                            <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
+                                        )}
+                                    </p>
                                 </TableCell>
-                                <TableCell>
-                                    {u.effectiveTotalPenalty.toFixed(2)}
-                                    {u.effectiveTotalPenalty !== u.totalPenalty && (
-                                        <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
-                                    )}
-                                </TableCell>
+                               <TableCell>
+                                   <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
+                                   <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
+                               </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 {merged.contestIds.map((cid) => {
                                     const perf = u.contests[cid]

@@ -44,8 +44,13 @@ export const getContestRoomContest = async (c: any) => {
     }
     const { contest_room_contest_id } = await c.req.json()
     try {
+        const room_res = await sql`SELECT * FROM "Contest_report_room" WHERE id = ${contest_room_contest_id}`
+        if (room_res.length === 0) {
+            return c.json({ error: 'Room not found' }, 400)
+        }
+        const name = room_res[0]['Room Name']
         const result = await sql`SELECT * FROM "Contest_room_contests" WHERE room_id = ${contest_room_contest_id}`
-        return c.json({ result, success: true })
+        return c.json({ result, success: true, name })
     } catch (error) {
         console.log(error)
         return c.json({ error: 'Not found' }, 400)

@@ -1,5 +1,6 @@
 import { getContestStructuredRank, getContestRoomContestById, getAllContestRoomContests } from '@/actions/contest_details';
 import ReportTable from '@/components/ReportTable';
+import { Button } from '@/components/ui/button';
 import React from 'react'
 
 
@@ -51,11 +52,20 @@ function mergeResultsByUser(results, contestIdToWeight = {}) {
         };
       }
     }
+    const scores = contestIds.map(cid => user.contests[cid].finalScore);
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const variance = scores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / scores.length;
+    const totPen = contestIds.map(cid => user.contests[cid].penalty);
+    const meanPen = totPen.reduce((a, b) => a + b, 0) / totPen.length;
+    const variancePen = totPen.reduce((sum, val) => sum + Math.pow(val - meanPen, 2), 0) / totPen.length;
+    user.stdDeviationPen = Math.sqrt(variancePen);
+    user.stdDeviationScore = Math.sqrt(variance);
+    user.effectiveSolved = user.totalScore - user.stdDeviationScore;
+    user.effectivePenalty = user.totalPenalty + user.stdDeviationPen;
   }
   const sortedUsers = Object.values(userMap).sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-    if (b.totalSolved !== a.totalSolved) return b.totalSolved - a.totalSolved;
-    if (a.totalPenalty !== b.totalPenalty) return a.totalPenalty - b.totalPenalty;
+    if (b.effectiveSolved !== a.effectiveSolved) return b.effectiveSolved - a.effectiveSolved;
+    if (a.effectivePenalty !== b.effectivePenalty) return a.effectivePenalty - b.effectivePenalty;
     return b.attended - a.attended;
   });
   return { users: sortedUsers, contestIds, contestIdToTitle };
@@ -64,6 +74,7 @@ function mergeResultsByUser(results, contestIdToWeight = {}) {
 async function page({ params, searchParams }) {
   const searchParamsBox = await searchParams;
   let contestIds = [];
+  let name = ""
   let results = [];
   let usedFallback = false;
   let contestIdToWeight = {};
@@ -81,9 +92,11 @@ async function page({ params, searchParams }) {
   }
 
   if (usedFallback) {
-    const roomId = params.id;
+    const roomId = (await params).id;
     const roomRes = await getContestRoomContestById(roomId);
+    console.log(roomRes);
     if (roomRes && roomRes.result && Array.isArray(roomRes.result)) {
+      name = roomRes.name;
       contestIds = roomRes.result.map(x => x.contest_id);
       for (const c of roomRes.result) {
         contestIdToWeight[c.contest_id] = c.weight ?? 1;
@@ -99,9 +112,10 @@ async function page({ params, searchParams }) {
 
   const merged = mergeResultsByUser(results, contestIdToWeight);
   console.log(merged)
+  const liveReportId = (await params).id + (searchParamsBox.id ? `_${searchParamsBox.id}` : '');
   return (
     <div>
-      <ReportTable merged={merged} />
+      <ReportTable merged={merged} liveReportId={liveReportId} report_id={(await params).id} partial={searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)} name={name} />
     </div>
   )
 }
