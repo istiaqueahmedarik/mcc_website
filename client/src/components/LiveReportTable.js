@@ -38,7 +38,7 @@ function ReportTable({ merged, lastUpdated }) {
                                 <TableHead className="text-[hsl(var(--foreground))]">Real Name</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Effective Score</TableHead>
-                                <TableHead className="text-[hsl(var(--foreground))]">Std Dev</TableHead>
+                                <TableHead className="text-[hsl(var(--foreground))]">Standard Deviation</TableHead>
                                 {merged.contestIds.map((cid) => (
                                     <TableHead key={cid} className="min-w-[140px] text-[hsl(var(--foreground))]">
                                         <TooltipProvider>

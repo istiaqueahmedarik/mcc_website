@@ -451,7 +451,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <TableHead>Real Name</TableHead>
                             <TableHead>Contests</TableHead>
                             <TableHead>Effective Score</TableHead>
-                            <TableHead>Std Dev</TableHead>
+                            <TableHead>Standard Deviation</TableHead>
                             {merged.contestIds.map((cid) => (
                                 <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
                                     <div className="max-w-[120px] truncate">
