@@ -22,7 +22,7 @@ const SingleCourse = async ({ params }) => {
   const schedules = await getSchedules(course_id)
   
   return (
-    <div className="w-full min-h-screen flex flex-row justify-center">
+    <div className="w-full min-h-screen flex flex-row  m-auto justify-center">
       <div className="w-full flex flex-col items-center mt-4">
         <div className="flex flex-col gap-12 mt-4 w-full max-w-3xl">
           <h1 className="text-2xl uppercase font-extrabold text-center tracking-wider">

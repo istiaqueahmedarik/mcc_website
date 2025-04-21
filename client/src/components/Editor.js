@@ -2,19 +2,29 @@
 import React, { memo } from 'react';
 import { MarkdownEditorView, MarkupString, useMarkdownEditor } from '@gravity-ui/markdown-editor';
 import { Button } from '@gravity-ui/uikit';
+import { transform as transformHTML } from '@diplodoc/html-extension';
+import { useYfmHtmlBlockStyles } from '../hooks/useYfmHtmlBlockStyles';
+import { wYfmHtmlBlockItemData } from '@gravity-ui/markdown-editor';
 
 
 export const Editor = memo(({ onChange, value }) => {
     console.log(value)
+    const yfmHtmlBlockStyles = useYfmHtmlBlockStyles();
+
     const editor = useMarkdownEditor({
         md: {
-            html: false,
-
+            html: true,
+            plugins: [
+                transformHTML({ bundle: false }),
+            ],
         },
         initialValue: value,
         initial: {
             markup: value,
-        }
+        },
+        extensionOptions: {
+            commandMenu: { actions: [wYfmHtmlBlockItemData] },
+        },
     });
 
     React.useEffect(() => {
@@ -27,7 +37,7 @@ export const Editor = memo(({ onChange, value }) => {
         return () => {
             editor.off('change', changeHandler);
         };
-    }, [onChange]);
+    }, [onChange, editor]);
 
     return (
         <>

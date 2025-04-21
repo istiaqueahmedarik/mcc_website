@@ -12,6 +12,7 @@
     "@ai-sdk/google": "^1.1.22",
     "@ai-sdk/openai": "^1.2.5",
     "@ariakit/react": "^0.4.15",
+    "@diplodoc/html-extension": "^2.8.0",
     "@diplodoc/transform": "^4.54.0",
     "@emoji-mart/data": "^1.2.1",
     "@faker-js/faker": "^9.6.0",

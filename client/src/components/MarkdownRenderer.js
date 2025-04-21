@@ -24,7 +24,7 @@ const Iframe = ({ node, ...props }) => {
 
 const MarkdownRender = ({ content }) => {
   return (
-    <div className="prose dark:prose-invert w-[90vw] max-w-5xl">
+    <div className="prose dark:prose-invert w-[90vw] max-w-3xl">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeKatex]} // Add rehypeRaw for raw HTML
