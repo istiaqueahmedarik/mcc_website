@@ -8,23 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { editCourse } from '@/lib/action'
 import { Soup } from 'lucide-react'
-import { EditorContent } from 'novel'
-import { useActionState, useState } from 'react'
-import MarkdownRender from '../MarkdownRenderer'
-import NovelEditor from '../novelEditor/editor'
+import { useActionState, useCallback, useState } from 'react'
+import EditorWrapper from '../EditorWrapper'
 
 const initialState = {
   message: '',
@@ -37,10 +27,15 @@ export default function Edit({ course }) {
   console.log(course)
   initialState.course_id = course.id
   const [state, formAction, pending] = useActionState(editCourse, initialState)
+  const handleDescriptionChange = useCallback((newValue) => {
+    setDescription((prev) => newValue)
+
+  }, []);
+
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-5xl">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Edit Course</CardTitle>
           <CardDescription>Edit current course</CardDescription>
@@ -68,29 +63,12 @@ export default function Edit({ course }) {
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Description of the course"
-                className="min-h-[100px]"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              
+              <EditorWrapper value={description} handleChange={handleDescriptionChange} />
+              <input type="hidden" name="description" value={description} />
             </div>
 
-            <Dialog className="w-screen">
-              <DialogTrigger className="flex p-2 border border-yellowCus1-foreground rounded-lg">
-                Preview Description
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Preview</DialogTitle>
-                  <DialogDescription>
-                    <MarkdownRender content={description} />
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
+            
 
             <Button
               type="submit"

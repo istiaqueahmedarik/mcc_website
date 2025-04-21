@@ -9,14 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
+
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -26,19 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { HTML5Backend } from 'react-dnd-html5-backend';
 
-import { Textarea } from '@/components/ui/textarea'
 import { createCourse } from '@/lib/action'
 import { Lightbulb, Soup } from 'lucide-react'
 import { useActionState, useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import debounce from 'lodash/debounce';
-import MarkdownRender from '../MarkdownRenderer'
-import { PlateEditor } from '@/components/editor/plate-editor';
-import { DndProvider } from 'react-dnd'
-import { Plate } from '@udecode/plate/react';
-import { Editor, EditorContainer } from '@/components/plate-ui/editor';
-import { useCreateEditor } from '../editor/use-create-editor'
+
+import EditorWrapper from '../EditorWrapper'
 
 const initialState = {
   message: '',
@@ -52,13 +38,10 @@ export default function Insert({ batches }) {
     createCourse,
     initialState,
   )
-  const editor = useCreateEditor();
-  
-  const debouncedEditorChange = useMemo(() => 
-    debounce((newValue) => {
-      setDescription(JSON.stringify(newValue.value))
-    }, 400)
-  , []);
+  const handleDescriptionChange = useCallback((newValue) => {
+    setDescription((prev) => newValue)
+
+  }, []);
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
@@ -93,13 +76,8 @@ export default function Insert({ batches }) {
                 value={description}
                 type="hidden"
               />
-              <DndProvider backend={HTML5Backend}>
-                <Plate editor={editor} onChange={debouncedEditorChange}>
-                  <EditorContainer>
-                    <Editor variant="default" />
-                  </EditorContainer>
-                </Plate>
-              </DndProvider>
+             <EditorWrapper value={description} handleChange={handleDescriptionChange} />
+                           <input type="hidden" name="description" value={description} />
             </div>
             
 

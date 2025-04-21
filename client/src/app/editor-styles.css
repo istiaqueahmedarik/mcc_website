@@ -1,0 +1,3 @@
+/* pulls in UIKit’s entire CSS bundle */
+@import "@gravity-ui/uikit/styles/fonts.css";
+@import "@gravity-ui/uikit/styles/styles.css";

@@ -73,7 +73,9 @@
 
 }
 
-
+.arik {
+  @apply rounded-xl p-4
+}
 
 
 @layer base {

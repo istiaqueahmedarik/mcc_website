@@ -1,5 +1,7 @@
 import ViewScheduleTable from '@/components/courses/viewScheduleTable'
-import PlateVal from '@/components/PlateVal'
+import Editor from '@/components/Editor'
+import EditorWrapper from '@/components/EditorWrapper'
+import MarkdownRender from '@/components/MarkdownRenderer'
 import {
   Accordion,
   AccordionContent,
@@ -21,8 +23,8 @@ const SingleCourse = async ({ params }) => {
   
   return (
     <div className="w-full min-h-screen flex flex-row justify-center">
-      <div className="w-full max-w-7xl flex flex-col items-center mt-4">
-        <div className="flex flex-col gap-12 mt-4">
+      <div className="w-full flex flex-col items-center mt-4">
+        <div className="flex flex-col gap-12 mt-4 w-full max-w-3xl">
           <h1 className="text-2xl uppercase font-extrabold text-center tracking-wider">
             {course.title}
           </h1>
@@ -36,13 +38,10 @@ const SingleCourse = async ({ params }) => {
                 <ViewScheduleTable schedules={schedules} />
               </AccordionContent>
             </AccordionItem>
-          </Accordion>
+        </Accordion>
 
           <div className="text-lg leading-loose">
-            {/* <MarkdownRender content={course.description} /> */}
-            <Suspense fallback={<div>Loading...</div>}>
-              <PlateVal value={course.description} />
-            </Suspense>
+            <MarkdownRender content={course.description} />
           </div>
         </div>
       </div>

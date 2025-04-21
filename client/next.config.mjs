@@ -31,8 +31,14 @@ const nextConfig = {
   // },
   experimental: {
     viewTransition: true,
+    
     //   ppr: 'incremental',
-  }
+  },
+  turbopack: {
+    resolveAlias: {
+      fs: './stubs/fs.js',
+    },
+  },
 }
 
 export default nextConfig
