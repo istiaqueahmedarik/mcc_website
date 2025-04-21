@@ -39,6 +39,15 @@ const nextConfig = {
       fs: './stubs/fs.js',
     },
   },
+  reactStrictMode: true,
+  webpack: (config) => {
+    // Provide fallbacks for Node.js modules
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+    };
+    return config;
+  },
 }
 
 export default nextConfig
