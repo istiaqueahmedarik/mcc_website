@@ -1,12 +1,16 @@
 import CourseCard from "@/components/courses/courseCard"
 import SearchCourse from "@/components/courses/searchCourse"
-import { getAllCourses } from "@/lib/action"
+import { getAllCourses, deleteCourse } from "@/lib/action" // <-- import deleteCourse
 import { redirect } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { cookies } from "next/headers"
 
-const CourseCardWithImage = ({ course }) => {
+const CourseCardC = ({ course, cookieStore }) => {
+  const isAdmin = cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
+  console.log("Admin cookie:", isAdmin)
   return (
     <div className="relative h-64 w-full rounded-2xl overflow-hidden group shadow-md">
       <Image
@@ -17,6 +21,26 @@ const CourseCardWithImage = ({ course }) => {
         priority
       />
       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all" />
+      {isAdmin && (
+        <form
+          className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+          action={async () => {
+            "use server"
+            await deleteCourse(course.id)
+          }}
+        >
+          <button
+            type="submit"
+            className="inline-flex items-center justify-center rounded-full bg-destructive px-3 py-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors shadow"
+          >
+            <Trash2
+              size={12}
+              className=""
+            />
+
+          </button>
+        </form>
+      )}
       <div className="absolute inset-0 flex flex-col justify-between p-4 z-10">
         <div>
           <h2 className="text-4xl font-bold text-white drop-shadow mb-2 truncate">{course.title}</h2>
@@ -43,6 +67,10 @@ const Page = async () => {
     redirect("/login")
   }
 
+  const cookieStore = await cookies();
+  const isAdmin = cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
+
+
   return (
     <div className="w-full min-h-screen flex flex-col items-center bg-gradient-to-b from-background to-muted/50">
       <div className="w-full max-w-7xl flex flex-col items-center justify-center px-4 py-12">
@@ -53,7 +81,20 @@ const Page = async () => {
               Explore Courses
             </h1>
             <div className="h-1.5 w-24 bg-primary/80 rounded-full mt-4 mb-8"></div>
-            
+            <div>
+              <p className="text-lg text-muted-foreground text-center max-w-2xl">
+                
+                {isAdmin && (
+                  <Link
+                    href="/courses/insert"
+                    className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow my-4"
+                  >
+                    Create Course
+                  </Link>
+                )}
+                </p>
+                  
+            </div>
             <div className="w-full max-w-2xl m-auto">
               <SearchCourse courses={allCourses} />
             </div>
@@ -101,7 +142,7 @@ const Page = async () => {
                         isFeatured ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card",
                       )}
                     >
-                      <CourseCardWithImage course={course} />
+                      <CourseCardC course={course} cookieStore={cookieStore} />
                     </div>
                   </div>
                 )

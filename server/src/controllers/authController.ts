@@ -50,7 +50,7 @@ export const login = async (c: any) => {
       return c.json({ error: 'Internal server error' }, 500)
     }
     const token = await JwtSign({ email, id: result[0].id }, secret)
-    return c.json({ result, token })
+    return c.json({ result, token, admin: result[0].admin })
   } catch (error) {
     console.log(error)
     return c.json({ error: 'Something went wrong' }, 400)

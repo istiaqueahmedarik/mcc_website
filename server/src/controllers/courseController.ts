@@ -10,11 +10,11 @@ export const insertCourse = async (c: any) => {
   if (user.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { batchId, title, description } = await c.req.json()
+  const { batchId, title, description, imageUrl } = await c.req.json()
 
   try {
-    const result = await sql`INSERT INTO courses (title, description, batch_id)
-      VALUES (${title}, ${description}, ${batchId})
+    const result = await sql`INSERT INTO courses (title, description, batch_id,image)
+      VALUES (${title}, ${description}, ${batchId} , ${imageUrl})
       RETURNING *`
 
     return c.json({ result })

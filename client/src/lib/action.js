@@ -212,6 +212,7 @@ export async function login(prevState, formData) {
     }
   const cookieStore = await cookies()
   cookieStore.set('token', response.token)
+  cookieStore.set('admin', response.admin);
   redirect('/')
 }
 
@@ -261,6 +262,7 @@ export async function createCourse(prevState, formData) {
   const title = raw.title
   const description = raw.description
   const batchId = raw.batchId
+  const image = raw.image
 
   if (!title || !description || !batchId) {
     return {
@@ -269,10 +271,24 @@ export async function createCourse(prevState, formData) {
     }
   }
 
+  const imageUrl = await uploadImage(
+    'courses',
+    title,
+    image,
+    'all_picture',
+  )
+  if (imageUrl.error) {
+    return {
+      success: false,
+      message: 'Problem uploading image',
+    }
+  }
+
   const response = await post_with_token('course/insert', {
     title,
     description,
     batchId,
+    imageUrl: imageUrl.url,
   })
   if (response.error)
     return {

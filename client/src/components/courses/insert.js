@@ -79,8 +79,16 @@ export default function Insert({ batches }) {
              <EditorWrapper value={description} handleChange={handleDescriptionChange} />
                            <input type="hidden" name="description" value={description} />
             </div>
-            
 
+            <div className="space-y-2">
+              <Label htmlFor="image">Course Image</Label>
+              <Input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/*"
+              />
+            </div>
 
             <Select id="batchId" name="batchId">
               <SelectTrigger className="">
