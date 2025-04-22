@@ -11,7 +11,6 @@ import Image from "next/image"
 
 
 export default async function page() {
-
   const res = await get_with_token("auth/user/profile")
   const user = res.result[0];
 
