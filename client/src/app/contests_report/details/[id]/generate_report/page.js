@@ -108,6 +108,7 @@ async function page({ params, searchParams }) {
       for (const cid of contestIds) {
         if (/^\d+$/.test(cid.id)) {
           let r = await getContestStructuredRank(cid.id);
+          if(r.status && r.status === 'error')  continue;
           console.log(r,cid.title)
           if(cid.title) r.contestInfo.title = cid.title;
           if (r && r.status !== 'error') results.push(r);
