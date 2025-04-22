@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import LiveShareModal from "./LiveShareModal"
+import { ScrollArea } from "./ui/scroll-area"
 
 function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const [searchText, setSearchText] = useState("")
@@ -441,14 +442,13 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                 </div>
             </div>
 
-            <div className="overflow-x-auto border rounded-md">
+            <ScrollArea className="w-full whitespace-nowrap rounded-md border">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Avatar</TableHead>
                             <TableHead>Rank</TableHead>
+                            <TableHead>Name</TableHead>
                             <TableHead>Username</TableHead>
-                            <TableHead>Real Name</TableHead>
                             <TableHead>Contests</TableHead>
                             <TableHead>Effective Score</TableHead>
                             <TableHead>Standard Deviation</TableHead>
@@ -470,37 +470,40 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                         {users.map((u, index) => (
                             <TableRow key={u.username} className={index % 2 === 0 ? "bg-muted/20" : ""}>
                                 <TableCell>
-                                    <Image
-                                        src={u.avatarUrl || "/vercel.svg"}
-                                        alt="avatar"
-                                        width={32}
-                                        height={32}
-                                        className="rounded-full"
-                                        quality={20}
-                                    />
+                                    <Badge
+                                        variant="default"
+                                        className={`min-w-[32px] transition-all duration-200 ${
+                                            index < 12
+                                                ? index < 3
+                                                    ? "bg-yellow-500 text-white"
+                                                    : index < 6
+                                                    ? "bg-gray-500 text-white"
+                                                    : index < 9
+                                                    ? "bg-orange-500 text-white"
+                                                    : "bg-blue-500 text-white"
+                                                : ""
+                                        }`}
+                                    >
+                                        {index + 1}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>
-                                  <Badge
-                                    variant="default"
-                                    className={`min-w-[32px] transition-all duration-200 ${
-                                      index < 12
-                                        ? index < 3
-                                          ? "bg-yellow-500 text-white"
-                                          : index < 6
-                                          ? "bg-gray-500 text-white"
-                                          : index < 9
-                                          ? "bg-orange-500 text-white"
-                                          : "bg-blue-500 text-white"
-                                        : ""
-                                    }`}
-                                  >
-                                    {index + 1}
-                                  </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Image
+                                            src={u.avatarUrl || "/vercel.svg"}
+                                            alt={u.realName || u.username}
+                                            width={32}
+                                            height={32}
+                                            className="rounded-full object-cover"
+                                            quality={20}
+                                        />
+                                        <span className="font-medium">{u.realName || "—"}</span>
+                                    </div>
                                 </TableCell>
-                                <TableCell className="font-medium">{u.username}</TableCell>
-                                <TableCell>{u.realName}</TableCell>
+                                <TableCell className="font-medium text-[hsl(var(--primary))]">
+                                    <span className="transition-all duration-200 group-hover:font-bold">{u.username}</span>
+                                </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
-
                                 <TableCell>
                                     <p>
                                         Solved - {u.effectiveTotalSolved.toFixed(2)}
@@ -550,7 +553,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                             </TableCell>
                                         )
                                     }
-
                                     let cellClassName = ""
                                     let statusText = null
                                     if (isWorst) {
@@ -577,7 +579,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                         ))}
                     </TableBody>
                 </Table>
-            </div>
+            </ScrollArea>
         </div>
     )
 }

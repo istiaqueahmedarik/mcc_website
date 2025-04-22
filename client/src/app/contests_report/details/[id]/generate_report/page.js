@@ -97,13 +97,19 @@ async function page({ params, searchParams }) {
     console.log(roomRes);
     if (roomRes && roomRes.result && Array.isArray(roomRes.result)) {
       name = roomRes.name;
-      contestIds = roomRes.result.map(x => x.contest_id);
+      contestIds = roomRes.result.map(x => ({
+        id: x.contest_id,
+        title: x.contest_name
+      }));
+      console.log(contestIds);
       for (const c of roomRes.result) {
         contestIdToWeight[c.contest_id] = c.weight ?? 1;
       }
       for (const cid of contestIds) {
-        if (/^\d+$/.test(cid)) {
-          const r = await getContestStructuredRank(cid);
+        if (/^\d+$/.test(cid.id)) {
+          let r = await getContestStructuredRank(cid.id);
+          console.log(r,cid.title)
+          if(cid.title) r.contestInfo.title = cid.title;
           if (r && r.status !== 'error') results.push(r);
         }
       }

@@ -14,7 +14,7 @@ async function page({ params }) {
   const lastUpdatedDate = new Date(lastUpdated).toLocaleString();
     const merged = JSON.parse(res);
     return (
-      <div>
+      <div className="w-full overflow-hidden border rounded-lg">
         <LiveReportTable merged={merged} lastUpdated={lastUpdatedDate} />
       </div>
     )

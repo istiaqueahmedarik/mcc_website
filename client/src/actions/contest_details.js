@@ -4,6 +4,10 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { get_with_token, login, post_with_token } from '@/lib/action';
 
+function contest_alias_title(id, title) {
+    return title;
+}
+
 function processVjudgeRankData(rawData, problemWeights) {
     if (!rawData || typeof rawData !== 'object') {
         return {
@@ -13,6 +17,8 @@ function processVjudgeRankData(rawData, problemWeights) {
     }
 
     const { id, title, begin, length, participants, submissions } = rawData;
+
+    let alias_title
 
     const contestInfo = {
         id,

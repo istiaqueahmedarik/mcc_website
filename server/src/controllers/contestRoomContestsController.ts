@@ -57,6 +57,8 @@ export const getContestRoomContest = async (c: any) => {
     }
 }
 
+// export const getContestDetal
+
 export const updateContestRoomContest = async (c: any) => {
     const { id, email } = c.get('jwtPayload')
     if (!id || !email) {

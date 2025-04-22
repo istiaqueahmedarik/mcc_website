@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Trophy, Medal, Award, Star, AlertCircle } from 'lucide-react'
+import { ScrollArea } from "./ui/scroll-area"
 
 function ReportTable({ merged, lastUpdated }) {
     const users = useMemo(() => {
@@ -28,14 +29,14 @@ function ReportTable({ merged, lastUpdated }) {
                 </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+
                     <Table>
                         <TableHeader className="bg-[hsl(var(--muted)/0.5)]">
                             <TableRow className="hover:bg-[hsl(var(--muted)/0.6)] transition-colors">
-                                <TableHead className="w-[60px] text-[hsl(var(--foreground))]">Avatar</TableHead>
                                 <TableHead className="w-[60px] text-[hsl(var(--foreground))]">Rank</TableHead>
+                                <TableHead className="text-[hsl(var(--foreground))]">Name</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Username</TableHead>
-                                <TableHead className="text-[hsl(var(--foreground))]">Real Name</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Effective Score</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Standard Deviation</TableHead>
@@ -65,26 +66,7 @@ function ReportTable({ merged, lastUpdated }) {
                                         index < 3 && "bg-[hsl(var(--primary)/0.05)]"
                                     )}
                                 >
-                                    <TableCell className="p-2">
-                                        <div className={cn(
-                                            "relative h-10 w-10 overflow-hidden rounded-full border-2 transition-all duration-200",
-                                            index < 3
-                                                ? `border-[hsl(var(--${index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze'}))]`
-                                                : "border-[hsl(var(--border))]",
-                                            "group-hover:border-[hsl(var(--primary))] group-hover:shadow-md"
-                                        )}>
-                                            <Image
-                                                src={u.avatarUrl || "/vercel.svg?height=40&width=40"}
-                                                alt={`${u.username}'s avatar`}
-                                                width={40}
-                                                height={40}
-                                                className="object-cover"
-                                                quality={20}
-
-                                            />
-                                           
-                                        </div>
-                                    </TableCell>
+                                    {/* Rank */}
                                     <TableCell className="text-center font-medium">
                                         <Badge
                                             variant="default"
@@ -103,10 +85,22 @@ function ReportTable({ merged, lastUpdated }) {
                                             {index + 1}
                                         </Badge>
                                     </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Image
+                                                src={u.avatarUrl || "/vercel.svg"}
+                                                alt={u.realName || u.username}
+                                                width={32}
+                                                height={32}
+                                                className="rounded-full object-cover"
+                                                quality={20}
+                                            />
+                                            <span className="font-medium">{u.realName || "—"}</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="font-medium text-[hsl(var(--primary))]">
                                         <span className="transition-all duration-200 group-hover:font-bold">{u.username}</span>
                                     </TableCell>
-                                    <TableCell className="text-[hsl(var(--muted-foreground))]">{u.realName || "—"}</TableCell>
                                     <TableCell className="text-center">
                                         <Badge
                                             variant="outline"
@@ -219,7 +213,7 @@ function ReportTable({ merged, lastUpdated }) {
                             ))}
                         </TableBody>
                     </Table>
-                </div>
+                </ScrollArea>
             </CardContent>
         </Card>
     )
