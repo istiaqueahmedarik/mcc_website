@@ -61,10 +61,10 @@ export const getAllCourses = async (c: any) => {
   try {
     let result: any[] = []
     if (admin)
-      result = await sql`select * from courses
+      result = await sql`select c.*, b.name batch_name from courses c join batches b on c.batch_id = b.id
     order by created_at desc`
     else
-      result = await sql`select * from courses
+      result = await sql`select c.*, b.name batch_name from courses c join batches b on c.batch_id = b.id
 where batch_id in (
 select batch_id from batch_members
 where mem_id = ${id}

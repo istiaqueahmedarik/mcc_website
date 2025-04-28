@@ -22,9 +22,9 @@ import {
   BookOpen,
   BrainCircuit,
   CalendarClock,
+  ChartNoAxesCombined,
   Code,
   Coffee,
-  FileText,
   LogIn,
   Menu,
   ShieldHalf,
@@ -44,8 +44,7 @@ const Navbar = async () => {
       label: 'Contest Reminders',
     },
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
-    { href: '/problems', icon: Code, label: 'Problems' },
-    { href: '/resources', icon: FileText, label: 'Resources' },
+    { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
   ]
 
   const userTools = [
@@ -57,7 +56,7 @@ const Navbar = async () => {
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
-    { href: '/contests_report',icon: Code, label: "Generate Contest Report" },
+    { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
   ]
 
   const loggedIn = (await cookies()).get('token')
