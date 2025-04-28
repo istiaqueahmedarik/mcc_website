@@ -432,9 +432,10 @@ export async function getCourseMems(course_id) {
 }
 
 export async function deleteCourse(data, formData) {
+  let raw = Object.fromEntries(formData)
   try {
     await post_with_token('course/delete', {
-      course_id: data.id,
+      course_id: raw.id,
     })
     revalidatePath('/courses')
   } catch (error) {
@@ -443,9 +444,10 @@ export async function deleteCourse(data, formData) {
 }
 
 export async function deleteAchievement(data, formData) {
+  let raw = Object.fromEntries(formData)
   try {
     await post_with_token('achieve/insert/delete', {
-      ach_id: data.id,
+      ach_id: raw.id,
     })
     revalidatePath('/achievements')
   } catch (error) {

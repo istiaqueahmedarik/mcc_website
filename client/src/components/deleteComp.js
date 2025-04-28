@@ -1,7 +1,7 @@
 'use client'
 
 import { Loader, Trash2 } from 'lucide-react'
-import { useActionState } from 'react'
+import { useActionState, useCallback } from 'react'
 
 const initialState = {
   message: '',
@@ -9,12 +9,19 @@ const initialState = {
 }
 
 export default function DeleteComp({ delFunc, content }) {
-  initialState.id = content.id
-  const [state, formAction, pending] = useActionState(delFunc, initialState)
+  const [state, formAction, pending] = useActionState(delFunc, {})
+
+  const handleSubmit = useCallback(
+    (formData) => {
+      formData.append('id', content.id)
+      formAction(formData)
+    },
+    [formAction, content],
+  )
   return (
     <form
       className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
-      action={formAction}
+      action={handleSubmit}
     >
       <button
         type="submit"
