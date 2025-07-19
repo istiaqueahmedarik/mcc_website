@@ -131,8 +131,8 @@ async function uploadImage(folder, uId, file, bucket) {
   const res = (await supabase).storage
     .from(bucket)
     .upload(folder + '/' + uId + '/' + fileName, file)
-  const { data, error } = await res;
-  console.log(data, await res);
+  const { data, error } = await res
+  console.log(data, await res)
   if (error) return { error }
   const url =
     process.env.SUPABASE_URL + `/storage/v1/object/public/` + data.fullPath
@@ -169,6 +169,49 @@ export async function createAchievement(prevState, formData) {
   }
 }
 
+export async function updateAchievement(prevState, formData) {
+  let raw = Object.fromEntries(formData)
+  console.log('raw h123: ', raw)
+  raw.ach_id = prevState.ach_id
+  if (raw.image.size > 0) {
+    const { url, error } = await uploadImage(
+      'achievements',
+      raw.title,
+      raw.image,
+      'all_picture',
+    )
+    if (error) {
+      return {
+        success: false,
+        message: 'Problem uploading image',
+      }
+    }
+    raw.image = url
+  } else {
+    raw.image = prevState.imgurl
+  }
+
+  console.log('raw: ', raw)
+  // console.log('raw image: ', raw.image)
+  // console.log('imgurl: ', prevState.imgurl)
+
+  // return {}
+
+  const response = await post_with_token('achieve/insert/update', raw)
+  if (response.error)
+    return {
+      success: false,
+      message: response.error,
+    }
+  revalidatePath(`/achievements/${raw.id}/edit`)
+  return {
+    success: true,
+    message: 'Achievement created successfully',
+    id: raw.ach_id,
+    imageurl: raw.image,
+  }
+}
+
 export async function signUp(prevState, formData) {
   let raw = Object.fromEntries(formData)
   console.log(raw)
@@ -178,7 +221,6 @@ export async function signUp(prevState, formData) {
       message: 'Passwords do not match',
     }
   }
-  
 
   const { url, error } = await uploadImage(
     'mist_id_cards',
@@ -212,7 +254,7 @@ export async function login(prevState, formData) {
     }
   const cookieStore = await cookies()
   cookieStore.set('token', response.token)
-  cookieStore.set('admin', response.admin);
+  cookieStore.set('admin', response.admin)
   redirect('/')
 }
 
@@ -271,12 +313,7 @@ export async function createCourse(prevState, formData) {
     }
   }
 
-  const imageUrl = await uploadImage(
-    'courses',
-    title,
-    image,
-    'all_picture',
-  )
+  const imageUrl = await uploadImage('courses', title, image, 'all_picture')
   if (imageUrl.error) {
     return {
       success: false,
@@ -394,12 +431,25 @@ export async function getCourseMems(course_id) {
   return response.result
 }
 
-export async function deleteCourse(course_id, formData) {
+export async function deleteCourse(data, formData) {
+  let raw = Object.fromEntries(formData)
   try {
     await post_with_token('course/delete', {
-      course_id,
+      course_id: raw.id,
     })
     revalidatePath('/courses')
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+export async function deleteAchievement(data, formData) {
+  let raw = Object.fromEntries(formData)
+  try {
+    await post_with_token('achieve/insert/delete', {
+      ach_id: raw.id,
+    })
+    revalidatePath('/achievements')
   } catch (error) {
     console.log(error)
   }
@@ -726,19 +776,31 @@ export async function isCourseIns(course_id) {
 }
 
 export async function getAchievements() {
-  const response = await get('achieve/get_achievement')
+  const response = await get('achieve/get_achievements')
+  if (response.error) return response.error
+  return response.result
+}
+
+export async function getAchievementsById(ach_id) {
+  const response = await post('achieve/get_achievement', {
+    id: ach_id,
+  })
   if (response.error) return response.error
   return response.result
 }
 
 export async function getContestResults(contestId, sessionId) {
-
   if (!contestId || isNaN(Number(contestId))) {
-    throw new Error("Invalid contest ID");
+    throw new Error('Invalid contest ID')
   }
-  console.log("Fetching contest results for contest ID:", contestId, "with session ID:", sessionId);
+  console.log(
+    'Fetching contest results for contest ID:',
+    contestId,
+    'with session ID:',
+    sessionId,
+  )
   if (!sessionId) {
-    throw new Error("Invalid session ID");
+    throw new Error('Invalid session ID')
   }
   // const myHeaders = new Headers();
   // myHeaders.append("Cookie", "JSESSIONID=" + sessionId + ";");
@@ -756,27 +818,31 @@ export async function getContestResults(contestId, sessionId) {
   // if (!response.ok) {
   //   throw new Error("Failed to fetch contest results");
   // }
-  const myHeaders = new Headers();
-  myHeaders.append("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
-  myHeaders.append("accept-language", "en-BD,en-US;q=0.9,en;q=0.8,bn;q=0.7");
-  myHeaders.append("cache-control", "max-age=0");
-  myHeaders.append("priority", "u=0, i");
-  myHeaders.append("sec-fetch-dest", "document");
-  myHeaders.append("sec-fetch-mode", "navigate");
-  myHeaders.append("sec-fetch-site", "same-origin");
-  myHeaders.append("sec-fetch-user", "?1");
-  myHeaders.append("upgrade-insecure-requests", "1");
-  myHeaders.append("Cookie", "JSESSIONID=" + sessionId + ";");
-
+  const myHeaders = new Headers()
+  myHeaders.append(
+    'accept',
+    'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+  )
+  myHeaders.append('accept-language', 'en-BD,en-US;q=0.9,en;q=0.8,bn;q=0.7')
+  myHeaders.append('cache-control', 'max-age=0')
+  myHeaders.append('priority', 'u=0, i')
+  myHeaders.append('sec-fetch-dest', 'document')
+  myHeaders.append('sec-fetch-mode', 'navigate')
+  myHeaders.append('sec-fetch-site', 'same-origin')
+  myHeaders.append('sec-fetch-user', '?1')
+  myHeaders.append('upgrade-insecure-requests', '1')
+  myHeaders.append('Cookie', 'JSESSIONID=' + sessionId + ';')
 
   const requestOptions = {
-    method: "GET",
+    method: 'GET',
     headers: myHeaders,
-    redirect: "follow"
-  };
+    redirect: 'follow',
+  }
 
-  const htm = await fetch("https://vjudge.net/contest/707325", requestOptions)
-    .then((response) => response.text())
-  console.log(htm);
-  return htm;
+  const htm = await fetch(
+    'https://vjudge.net/contest/707325',
+    requestOptions,
+  ).then((response) => response.text())
+  console.log(htm)
+  return htm
 }

@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createAchievement } from '@/lib/action'
+import { updateAchievement } from '@/lib/action'
+import { format } from 'date-fns'
 import { CalendarIcon, ImageIcon, TrophyIcon } from 'lucide-react'
 import { useActionState, useCallback, useState } from 'react'
 import EditorWrapper from '../EditorWrapper'
@@ -21,12 +22,17 @@ const initialState = {
   success: false,
 }
 
-export default function Insert() {
+export default function Edit({ achievement }) {
+  const [title, setTitle] = useState(achievement.title)
+  const [description, setDescription] = useState(achievement.description)
+  const ach_date = format(achievement.date, 'yyyy-MM-dd')
+  const [date, setDate] = useState(ach_date)
+  initialState.ach_id = achievement.id
+  initialState.imgurl = achievement.image
   const [state, formAction, pending] = useActionState(
-    createAchievement,
+    updateAchievement,
     initialState,
   )
-  const [description, setDescription] = useState('')
   const handleDescriptionChange = useCallback((newValue) => {
     setDescription((prev) => newValue)
   }, [])
@@ -48,7 +54,7 @@ export default function Insert() {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Update Title</Label>
               <div className="relative">
                 <TrophyIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -57,12 +63,16 @@ export default function Insert() {
                   name="title"
                   placeholder="Title of the achievement"
                   className="pl-10"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image">Image</Label>
+              <Label htmlFor="image">
+                Update Image (Don't need existed image)
+              </Label>
               <div className="relative">
                 <ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -76,7 +86,7 @@ export default function Insert() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Update Description</Label>
               <EditorWrapper
                 value={description}
                 handleChange={handleDescriptionChange}
@@ -89,7 +99,7 @@ export default function Insert() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">Update Date</Label>
               <div className="relative">
                 <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -97,6 +107,8 @@ export default function Insert() {
                   id="date"
                   name="date"
                   className="pl-10"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
                 />
               </div>
             </div>

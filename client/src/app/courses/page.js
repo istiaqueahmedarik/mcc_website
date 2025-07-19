@@ -1,49 +1,38 @@
-import CourseCard from "@/components/courses/courseCard"
-import SearchCourse from "@/components/courses/searchCourse"
-import { getAllCourses, deleteCourse } from "@/lib/action" // <-- import deleteCourse
-import { redirect } from "next/navigation"
-import { cn } from "@/lib/utils"
-import { Trash2 } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { cookies } from "next/headers"
+import SearchCourse from '@/components/courses/searchCourse'
+import DeleteComp from '@/components/deleteComp'
+import { deleteCourse, getAllCourses } from '@/lib/action' // <-- import deleteCourse
+import { cn } from '@/lib/utils'
+import { cookies } from 'next/headers'
+import Image from 'next/image'
+import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 const CourseCardC = ({ course, cookieStore }) => {
-  const isAdmin = cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
-  console.log("Admin cookie:", isAdmin)
+  const isAdmin =
+    cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
+
   return (
     <div className="relative h-64 w-full rounded-2xl overflow-hidden group shadow-md">
       <Image
-        src={course.image || "/vjudge_cover.png"}
-        alt={course.title || "Course cover"}
+        src={course.image || '/vjudge_cover.png'}
+        alt={course.title || 'Course cover'}
         fill
         className="object-cover w-full h-full"
         priority
       />
       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all" />
       {isAdmin && (
-        <form
-          className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
-          action={async () => {
-            "use server"
-            await deleteCourse(course.id)
-          }}
-        >
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-full bg-destructive px-3 py-3 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors shadow"
-          >
-            <Trash2
-              size={12}
-              className=""
-            />
-
-          </button>
-        </form>
+        <DeleteComp
+          delFunc={deleteCourse}
+          content={course}
+        />
       )}
       <div className="absolute inset-0 flex flex-col justify-between p-4 z-10">
         <div>
-          <h2 className="text-4xl font-bold text-white drop-shadow mb-2 truncate">{course.title}</h2>
+          <h2 className="text-4xl font-bold text-white drop-shadow mb-2 truncate">
+            {course.title}
+          </h2>
+          <h4 className="drop-shadow mb-2 truncate">{course.batch_name}</h4>
         </div>
         <div className="flex justify-end">
           <Link
@@ -60,16 +49,17 @@ const CourseCardC = ({ course, cookieStore }) => {
 
 const Page = async () => {
   const allCourses = await getAllCourses()
+
   if (!Array.isArray(allCourses)) {
-    redirect("/login")
+    redirect('/login')
   }
   if (allCourses.length === 0) {
-    redirect("/login")
+    redirect('/login')
   }
 
-  const cookieStore = await cookies();
-  const isAdmin = cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
-
+  const cookieStore = await cookies()
+  const isAdmin =
+    cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
 
   return (
     <div className="w-full min-h-screen flex flex-col items-center bg-gradient-to-b from-background to-muted/50">
@@ -83,7 +73,6 @@ const Page = async () => {
             <div className="h-1.5 w-24 bg-primary/80 rounded-full mt-4 mb-8"></div>
             <div>
               <p className="text-lg text-muted-foreground text-center max-w-2xl">
-                
                 {isAdmin && (
                   <Link
                     href="/courses/insert"
@@ -92,8 +81,7 @@ const Page = async () => {
                     Create Course
                   </Link>
                 )}
-                </p>
-                  
+              </p>
             </div>
             <div className="w-full max-w-2xl m-auto">
               <SearchCourse courses={allCourses} />
@@ -114,7 +102,7 @@ const Page = async () => {
           <div className="w-full">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
               {allCourses.map((course, index) => {
-                let sizeClass = ""
+                let sizeClass = ''
                 const position = index % 8
                 switch (position) {
                   case 0:
@@ -122,27 +110,35 @@ const Page = async () => {
                   case 5:
                   case 6:
                   case 7:
-                    sizeClass = "col-span-1 md:col-span-6 lg:col-span-6"
+                    sizeClass = 'col-span-1 md:col-span-6 lg:col-span-6'
                     break
                   case 2:
                   case 3:
                   case 4:
                   default:
-                    sizeClass = "col-span-1 md:col-span-4 lg:col-span-4"
+                    sizeClass = 'col-span-1 md:col-span-4 lg:col-span-4'
                 }
                 const isFeatured = index % 8 === 0
                 return (
                   <div
                     key={course.id}
-                    className={cn(sizeClass, "transition-all duration-300 hover:scale-[1.02] group")}
+                    className={cn(
+                      sizeClass,
+                      'transition-all duration-300 hover:scale-[1.02] group',
+                    )}
                   >
                     <div
                       className={cn(
-                        "h-full rounded-2xl overflow-hidden shadow-md",
-                        isFeatured ? "bg-primary/5 ring-1 ring-primary/20" : "bg-card",
+                        'h-full rounded-2xl overflow-hidden shadow-md',
+                        isFeatured
+                          ? 'bg-primary/5 ring-1 ring-primary/20'
+                          : 'bg-card',
                       )}
                     >
-                      <CourseCardC course={course} cookieStore={cookieStore} />
+                      <CourseCardC
+                        course={course}
+                        cookieStore={cookieStore}
+                      />
                     </div>
                   </div>
                 )
