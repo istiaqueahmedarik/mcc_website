@@ -234,24 +234,42 @@ export async function getContestStructuredRank(contestId, problemWeights) {
                 vjudge_url: vjudgeUrl
             };
         }
-        // console.log(await response.text());
+
+        const textData = await response.text();
+
+        console.log("Vjudge response body:", textData.substring(0, 500));
 
         const contentType = response.headers.get('content-type');
         console.log("Content-Type:", contentType);
+
         if (!contentType || !contentType.includes('application/json')) {
             console.warn(`Vjudge response for ${contestId} was not JSON:`, contentType);
-            const textData = await response.text();
             console.log(textData);
-            return {
-                status: 'error',
-                message: 'Vjudge returned non-JSON response',
-                vjudge_url: vjudgeUrl,
-                data_received: textData.substring(0, 500)
-            };
+            // Attempt to parse as JSON anyway, as content-type might be wrong
+            try {
+                const rawData = JSON.parse(textData);
+                const structuredData = processVjudgeRankData(rawData, problemWeights);
+                if (structuredData.error) {
+                    return {
+                        status: 'error',
+                        message: 'Failed to process data received from Vjudge.',
+                        details: structuredData.error,
+                        vjudge_url: vjudgeUrl,
+                    };
+                }
+                return structuredData;
+            } catch (e) {
+                return {
+                    status: 'error',
+                    message: 'Vjudge returned non-JSON response and parsing failed.',
+                    vjudge_url: vjudgeUrl,
+                    data_received: textData.substring(0, 500)
+                };
+            }
         }
 
         console.log(`Processing JSON data for Contest ID: ${contestId}`);
-        const rawData = await response.json();
+        const rawData = JSON.parse(textData);
         const structuredData = processVjudgeRankData(rawData, problemWeights);
 
         if (structuredData.error) {
