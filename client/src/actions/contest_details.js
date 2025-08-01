@@ -138,13 +138,14 @@ export async function loginToVJudge(email, pass) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://vjudge.net/user/login'
             },
             body: new URLSearchParams({
                 username,
                 password
-            }),
-            credentials: 'include'
+            })
         });
         console.log(response.headers.get('set-cookie'));
         const setCookie = response.headers.get('set-cookie');
@@ -207,12 +208,9 @@ export async function getContestStructuredRank(contestId, problemWeights) {
             headers: {
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'X-Requested-With': 'XMLHttpRequest',
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Referer': `https://vjudge.net/contest/${contestId}`,
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
                 'Cookie': `JSESSIONID=${vjSession}`
             },
         });
