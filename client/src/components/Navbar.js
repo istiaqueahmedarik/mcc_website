@@ -30,6 +30,7 @@ import {
   ShieldHalf,
   UserCheck,
   UserPlus,
+  AlertTriangle,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -57,6 +58,7 @@ const Navbar = async () => {
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
+    { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
   ]
 
   const loggedIn = (await cookies()).get('token')

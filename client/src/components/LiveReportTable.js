@@ -40,6 +40,7 @@ function ReportTable({ merged, lastUpdated }) {
                                 <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Effective Score</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Standard Deviation</TableHead>
+                                <TableHead className="text-[hsl(var(--foreground))]">Total Demerits</TableHead>
                                 {merged.contestIds.map((cid) => (
                                     <TableHead key={cid} className="min-w-[140px] text-[hsl(var(--foreground))]">
                                         <TooltipProvider>
@@ -137,6 +138,32 @@ function ReportTable({ merged, lastUpdated }) {
                                                 <span className="font-medium text-[hsl(var(--foreground))]">Penalty:</span>
                                                 <span className="font-semibold">{u.stdDeviationPen.toFixed(2)}</span>
                                             </p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
+                                            {u.totalDemeritPoints > 0 ? (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Badge variant="destructive" className="cursor-help">
+                                                                -{u.totalDemeritPoints}
+                                                            </Badge>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs">
+                                                            <div className="space-y-1">
+                                                                {Object.values(u.demerits || {}).flat().map((demerit, idx) => (
+                                                                    <div key={idx} className="text-sm">
+                                                                        <strong>Contest {demerit.contest_id}:</strong> -{demerit.demerit_point} points - {demerit.reason}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            ) : (
+                                                <span className="text-[hsl(var(--muted-foreground))]">—</span>
+                                            )}
                                         </div>
                                     </TableCell>
                                     

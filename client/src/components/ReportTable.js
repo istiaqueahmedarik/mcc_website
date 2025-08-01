@@ -452,6 +452,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <TableHead>Contests</TableHead>
                             <TableHead>Effective Score</TableHead>
                             <TableHead>Standard Deviation</TableHead>
+                            <TableHead>Total Demerits</TableHead>
                             {merged.contestIds.map((cid) => (
                                 <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
                                     <div className="max-w-[120px] truncate">
@@ -521,6 +522,41 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                 <TableCell>
                                     <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
                                     <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
+                                </TableCell>
+                                <TableCell>
+                                    {u.totalDemeritPoints > 0 ? (
+                                        <div
+                                            className="relative"
+                                            onMouseEnter={(e) => {
+                                                // Create tooltip showing all demerit reasons
+                                                const allDemerits = Object.values(u.demerits).flat();
+                                                if (allDemerits.length > 0) {
+                                                    const tooltip = document.createElement('div');
+                                                    tooltip.className = 'absolute z-50 p-2 bg-black text-white text-xs rounded shadow-lg max-w-xs';
+                                                    tooltip.style.left = '0px';
+                                                    tooltip.style.top = '-10px';
+                                                    tooltip.style.transform = 'translateY(-100%)';
+                                                    tooltip.innerHTML = allDemerits.map(d => 
+                                                        `<div class="mb-1"><strong>Contest ${d.contest_id}:</strong> -${d.demerit_point} points - ${d.reason}</div>`
+                                                    ).join('');
+                                                    e.target.appendChild(tooltip);
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                // Remove tooltip
+                                                const tooltip = e.target.querySelector('.absolute.z-50');
+                                                if (tooltip) {
+                                                    tooltip.remove();
+                                                }
+                                            }}
+                                        >
+                                            <Badge variant="destructive" className="cursor-help">
+                                                -{u.totalDemeritPoints}
+                                            </Badge>
+                                        </div>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
                                 </TableCell>
                                 {merged.contestIds.map((cid) => {
                                     const perf = u.contests[cid]

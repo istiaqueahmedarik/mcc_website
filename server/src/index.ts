@@ -9,6 +9,7 @@ import batchRoute from './routes/batchRoute'
 import contestRoomContestsRoute from './routes/contestRoomContestsRoute'
 import contestRoomRoute from './routes/contestRoomRoute'
 import courseRoute from './routes/courseRoute'
+import demeritRoute from './routes/demeritRoute'
 import userRoute from './routes/userRoute'
 import getContests from './contests/getContests'
 import publicContestReportRoute from './routes/publicContestReportRoute'
@@ -27,6 +28,7 @@ app.route('/user', userRoute)
 app.route('/getContests', getContests)
 app.route('/contest-room', contestRoomRoute)
 app.route('/contest-room-contests', contestRoomContestsRoute)
+app.route('/demerit', demeritRoute)
 app.route('/public-contest-report', publicContestReportRoute)
 app.route('/vjudge', vjudgeRoute)
 

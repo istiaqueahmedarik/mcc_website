@@ -5,129 +5,6 @@ import { post_with_token, get_with_token } from '@/lib/action';
 
 const API_URL = process.env.SERVER_URL || 'http://localhost:5000';
 
-function contest_alias_title(id, title) {
-    return title;
-}
-
-function processVjudgeRankData(rawData, problemWeights) {
-    if (!rawData || typeof rawData !== 'object') {
-        return {
-            error: "Invalid or non-JSON data received from Vjudge",
-            dataReceived: rawData
-        };
-    }
-
-    const { id, title, begin, length, participants, submissions } = rawData;
-
-    let alias_title
-
-    const contestInfo = {
-        id,
-        title,
-        begin,
-        length,
-        end: begin + length
-    };
-
-    const participantMap = new Map();
-    let totalTeams = 0;
-    if (participants) {
-        for (const teamId in participants) {
-            if (Object.hasOwnProperty.call(participants, teamId)) {
-                const teamData = participants[teamId];
-                participantMap.set(parseInt(teamId, 10), {
-                    teamId: parseInt(teamId, 10),
-                    username: teamData[0],
-                    realName: teamData[1] || teamData[0],
-                    avatarUrl: teamData[2],
-                    submissions: [],
-                    solvedCount: 0,
-                    penalty: 0
-                });
-                totalTeams++;
-            }
-        }
-    }
-
-    let maxProblemIndex = -1;
-    if (submissions && Array.isArray(submissions)) {
-        submissions.sort((a, b) => a[3] - b[3]);
-        for (const sub of submissions) {
-            const [teamId, problemIndex, status, timeSeconds, cumulativeScore, unknownVal] = sub;
-            if(timeSeconds>(contestInfo.length)/1000)continue;
-            if (participantMap.has(teamId)) {
-                const team = participantMap.get(teamId);
-                team.submissions.push({
-                    problemIndex: problemIndex,
-                    status: status,
-                    timeSeconds: timeSeconds,
-                    cumulativeScore: cumulativeScore,
-                });
-                if (problemIndex > maxProblemIndex) {
-                    maxProblemIndex = problemIndex;
-                }
-            }
-        }
-    }
-
-    const totalProblems = maxProblemIndex >= 0 ? maxProblemIndex + 1 : 0;
-
-    let weights = [];
-    if (Array.isArray(problemWeights) && problemWeights.length === totalProblems) {
-        weights = problemWeights;
-    } else {
-        weights = Array(totalProblems).fill(1);
-    }
-
-    const teamsData = Array.from(participantMap.values());
-
-    teamsData.forEach(team => {
-        if (team.submissions.length > 0) {
-            const solvedProblems = new Set();
-            const problemSubs = {};
-            team.submissions.forEach(s => {
-                if (!problemSubs[s.problemIndex]) problemSubs[s.problemIndex] = [];
-                problemSubs[s.problemIndex].push(s);
-                if (s.status === 1) {
-                    solvedProblems.add(s.problemIndex);
-                }
-            });
-            team.solvedCount = solvedProblems.size;
-            team.finalScore = Array.from(solvedProblems).reduce(
-                (sum, idx) => sum + (weights[idx] || 1), 0
-            );
-            let totalPenalty = 0;
-            for (const pIdx of solvedProblems) {
-                const subs = problemSubs[pIdx];
-                let firstAC = subs.find(s => s.status === 1);
-                if (firstAC) {
-                    let failCount = 0;
-                    for (const s of subs) {
-                        if (s === firstAC) break;
-                        if (s.status !== 1) failCount++;
-                    }
-                    const penalty = (failCount * 20 + (firstAC.timeSeconds) / 60);
-                    totalPenalty += Math.round(penalty * 100) / 100;
-                }
-            }
-            team.penalty = totalPenalty;
-        } else {
-            team.finalScore = 0;
-            team.solvedCount = 0;
-            team.penalty = 0;
-        }
-        team.submissions.sort((a, b) => a.timeSeconds - b.timeSeconds);
-    });
-
-    return {
-        contestInfo,
-        totalTeams,
-        totalProblems,
-        problemWeights: weights,
-        teams: teamsData
-    };
-}
-
 export async function loginToVJudge(email, pass) {
     try {
         const response = await fetch(`${API_URL}/vjudge/login`, {
@@ -219,6 +96,111 @@ export async function getContestStructuredRank(contestId, problemWeights) {
     }
 }
 
+export async function getContestStructuredRankWithDemerits(contestId, problemWeights) {
+    const vjSession = cookies().get('vj_session')?.value;
+    if (!vjSession) {
+        return {
+            status: 'error',
+            message: 'VJudge login required. Please login first.',
+            code: 'NO_VJUDGE_SESSION'
+        };
+    }
+
+    try {
+        // Fetch VJudge contest data (already processed by server)
+        const response = await fetch(`${API_URL}/vjudge/contest-rank/${contestId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-VJudge-Session': vjSession,
+            },
+            body: JSON.stringify({ problemWeights }),
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                await revalidateVJudgeSession();
+                const newVjSession = cookies().get('vj_session')?.value;
+                const retryResponse = await fetch(`${API_URL}/vjudge/contest-rank/${contestId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-VJudge-Session': newVjSession,
+                    },
+                    body: JSON.stringify({ problemWeights }),
+                });
+                if (!retryResponse.ok) {
+                    const errorData = await retryResponse.json();
+                    return { status: 'error', ...errorData };
+                }
+                const contestData = await retryResponse.json();
+                
+                // Fetch demerits and apply them to the contest data
+                return await applyDemeritsToContestData(contestData, contestId);
+            }
+            const errorData = await response.json();
+            return { status: 'error', ...errorData };
+        }
+
+        const contestData = await response.json();
+        
+        // Fetch demerits and apply them to the contest data
+        return await applyDemeritsToContestData(contestData, contestId);
+        
+    } catch (error) {
+        console.error(`Error fetching/processing data for Contest ID ${contestId}:`, error.message);
+        return {
+            status: 'error',
+            message: 'Error fetching or processing contest data',
+            error_details: error.message,
+        };
+    }
+}
+
+async function applyDemeritsToContestData(contestData, contestId) {
+    try {
+        // Add defensive check for contest data structure
+        if (!contestData || contestData.status === 'error' || !contestData.teams) {
+            console.warn('Invalid contest data structure:', contestData);
+            return contestData;
+        }
+        
+        // Fetch demerits for this contest
+        const demeritsResponse = await getDemeritsByContestId(contestId);
+        const demerits = demeritsResponse.success ? demeritsResponse.data : [];
+        
+        // Create a map for quick demerit lookup by username
+        const demeritMap = new Map();
+        if (Array.isArray(demerits)) {
+            demerits.forEach(demerit => {
+                const username = demerit.vjudge_id;
+                if (!demeritMap.has(username)) {
+                    demeritMap.set(username, 0);
+                }
+                demeritMap.set(username, demeritMap.get(username) + (demerit.demerit_point || 0));
+            });
+        }
+        
+        // Apply demerits to each team
+        if (contestData.teams && Array.isArray(contestData.teams)) {
+            contestData.teams.forEach(team => {
+                const teamDemeritPoints = demeritMap.get(team.username) || 0;
+                team.demeritPoints = teamDemeritPoints;
+                
+                // Subtract demerit points from score and add penalty
+                team.finalScore = Math.max(0, (team.finalScore || 0) - teamDemeritPoints);
+                team.penalty = (team.penalty || 0) + (teamDemeritPoints * 100);
+            });
+        }
+        
+        return contestData;
+    } catch (error) {
+        console.error('Error applying demerits to contest data:', error);
+        // If demerit application fails, return the original contest data
+        return contestData;
+    }
+}
+
 export async function insertContestRoom(roomName) {
     const ret = await post_with_token('contest-room/insert', { room_name: roomName });
     console.log(ret);
@@ -286,6 +268,57 @@ export async function updateContestRoomContestWithWeight(contestRoomContestId, r
         contest_id: contestId,
         weight: weight
     });
+    console.log(ret);
+    return ret;
+}
+
+// Demerit management functions
+export async function createDemerit(contestId, vjudgeId, demeritPoint, reason) {
+    const ret = await post_with_token('demerit/admin/create', {
+        contest_id: contestId,
+        vjudge_id: vjudgeId,
+        demerit_point: parseInt(demeritPoint, 10),
+        reason: reason
+    });
+    console.log(ret);
+    return ret;
+}
+
+export async function getDemeritsByContestId(contestId) {
+    const ret = await post_with_token('demerit/by-contest', { contest_id: contestId });
+    console.log(ret);
+    return ret;
+}
+
+export async function getDemeritsByVjudgeAndContest(vjudgeId, contestId) {
+    const ret = await post_with_token('demerit/by-vjudge-contest', { 
+        vjudge_id: vjudgeId, 
+        contest_id: contestId 
+    });
+    console.log(ret);
+    return ret;
+}
+
+export async function updateDemerit(demeritId, contestId, vjudgeId, demeritPoint, reason) {
+    const ret = await post_with_token('demerit/admin/update', {
+        demerit_id: demeritId,
+        contest_id: contestId,
+        vjudge_id: vjudgeId,
+        demerit_point: parseInt(demeritPoint, 10),
+        reason: reason
+    });
+    console.log(ret);
+    return ret;
+}
+
+export async function deleteDemerit(demeritId) {
+    const ret = await post_with_token('demerit/admin/delete', { demerit_id: demeritId });
+    console.log(ret);
+    return ret;
+}
+
+export async function getAllDemerits() {
+    const ret = await get_with_token('demerit/admin/all');
     console.log(ret);
     return ret;
 }
