@@ -140,7 +140,16 @@ export async function loginToVJudge(email, pass) {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                 'X-Requested-With': 'XMLHttpRequest',
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://vjudge.net/user/login'
+                'Referer': 'https://vjudge.net/user/login',
+                'Accept': '*/*',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Connection': 'keep-alive',
+                'Host': 'vjudge.net',
+                'Origin': 'https://vjudge.net',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
             },
             body: new URLSearchParams({
                 username,
@@ -211,7 +220,13 @@ export async function getContestStructuredRank(contestId, problemWeights) {
                 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept-Language': 'en-US,en;q=0.9',
                 'Referer': `https://vjudge.net/contest/${contestId}`,
-                'Cookie': `JSESSIONID=${vjSession}`
+                'Cookie': `JSESSIONID=${vjSession}`,
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Host': 'vjudge.net',
+                'Sec-Fetch-Dest': 'empty',
+                'Sec-Fetch-Mode': 'cors',
+                'Sec-Fetch-Site': 'same-origin',
             },
         });
 
