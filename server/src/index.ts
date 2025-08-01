@@ -12,6 +12,7 @@ import courseRoute from './routes/courseRoute'
 import userRoute from './routes/userRoute'
 import getContests from './contests/getContests'
 import publicContestReportRoute from './routes/publicContestReportRoute'
+import vjudgeRoute from './routes/vjudgeRoute'
 
 const app = new Hono<{ Variables: JwtVariables }>()
 
@@ -27,6 +28,7 @@ app.route('/getContests', getContests)
 app.route('/contest-room', contestRoomRoute)
 app.route('/contest-room-contests', contestRoomContestsRoute)
 app.route('/public-contest-report', publicContestReportRoute)
+app.route('/vjudge', vjudgeRoute)
 
 export default {
   port: process.env.PORT || 5000,

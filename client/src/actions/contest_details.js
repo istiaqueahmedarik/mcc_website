@@ -1,8 +1,9 @@
 'use server'
 
 import { cookies } from 'next/headers';
-import { revalidatePath } from 'next/cache';
-import { get_with_token, login, post_with_token } from '@/lib/action';
+import { post_with_token, get_with_token } from '@/lib/action';
+
+const API_URL = process.env.SERVER_URL || 'http://localhost:5000';
 
 function contest_alias_title(id, title) {
     return title;
@@ -129,46 +130,28 @@ function processVjudgeRankData(rawData, problemWeights) {
 
 export async function loginToVJudge(email, pass) {
     try {
-        const username = email || '';
-        const password = pass || '';
-
-        console.log('Authenticating with VJudge...');
-
-        const response = await fetch('https://vjudge.net/user/login', {
+        const response = await fetch(`${API_URL}/vjudge/login`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'X-Requested-With': 'XMLHttpRequest',
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://vjudge.net/user/login',
-                'Accept': '*/*',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Connection': 'keep-alive',
-                'Host': 'vjudge.net',
-                'Origin': 'https://vjudge.net',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
+                'Content-Type': 'application/json',
             },
-            body: new URLSearchParams({
-                username,
-                password
-            })
+            body: JSON.stringify({ username: email, password: pass }),
         });
-        console.log(response.headers.get('set-cookie'));
-        const setCookie = response.headers.get('set-cookie');
-        let JSESSIONID = '';
-        if (setCookie) {
-            const match = setCookie.match(/JSESSIONID=([^;]+)/);
-            if (match) {
-                JSESSIONID = match[1];
-                (await cookies()).set('vj_session', JSESSIONID, { httpOnly: true, path: '/', sameSite: 'lax' });
-                (await cookies()).set('vj_session_username', username, { httpOnly: true, path: '/', sameSite: 'lax' });
-                (await cookies()).set('vj_session_password', password, { httpOnly: true, path: '/', sameSite: 'lax' });
-            }
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
         }
-        return JSESSIONID;
+
+        const data = await response.json();
+        const { jsessionid } = data;
+
+        if (jsessionid) {
+            cookies().set('vj_session', jsessionid, { httpOnly: true, path: '/', sameSite: 'lax' });
+            cookies().set('vj_session_username', email, { httpOnly: true, path: '/', sameSite: 'lax' });
+            cookies().set('vj_session_password', pass, { httpOnly: true, path: '/', sameSite: 'lax' });
+            return jsessionid;
+        }
+        return "";
     } catch (error) {
         console.error('Error during VJudge authentication:', error);
         return "";
@@ -176,12 +159,6 @@ export async function loginToVJudge(email, pass) {
 }
 
 export async function revalidateVJudgeSession() {
-    const vjSession = (await cookies()).get('vj_session')?.value;
-    if (!vjSession) {
-        return {
-            status: 'error'
-        }
-    }
     const username = cookies().get('vj_session_username')?.value;
     const password = cookies().get('vj_session_password')?.value;
     if (!username || !password) return { status: 'error' }
@@ -190,20 +167,7 @@ export async function revalidateVJudgeSession() {
 }
 
 export async function getContestStructuredRank(contestId, problemWeights) {
-    console.log(`Processing contest ID: ${contestId}`);
-
-    if (!/^\d+$/.test(contestId)) {
-        return {
-            status: 'error',
-            message: 'Invalid Contest ID format. Must be numeric.',
-            contestId: contestId,
-        };
-    }
-
-    const vjudgeUrl = `https://vjudge.net/contest/rank/single/${contestId}`;
-    console.log(`Fetching data from ${vjudgeUrl}`);
-
-    let vjSession = (await cookies()).get('vj_session')?.value;
+    const vjSession = cookies().get('vj_session')?.value;
     if (!vjSession) {
         return {
             status: 'error',
@@ -213,98 +177,44 @@ export async function getContestStructuredRank(contestId, problemWeights) {
     }
 
     try {
-        const response = await fetch(vjudgeUrl, {
+        const response = await fetch(`${API_URL}/vjudge/contest-rank/${contestId}`, {
+            method: 'POST',
             headers: {
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'X-Requested-With': 'XMLHttpRequest',
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': `https://vjudge.net/contest/${contestId}`,
-                'Cookie': `JSESSIONID=${vjSession}`,
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Host': 'vjudge.net',
-                'Sec-Fetch-Dest': 'empty',
-                'Sec-Fetch-Mode': 'cors',
-                'Sec-Fetch-Site': 'same-origin',
+                'Content-Type': 'application/json',
+                'X-VJudge-Session': vjSession,
             },
+            body: JSON.stringify({ problemWeights }),
         });
 
         if (!response.ok) {
-            console.error('Vjudge Error Status:', response.status);
-            return {
-                status: 'error',
-                message: `Vjudge API returned status ${response.status}`,
-                vjudge_url: vjudgeUrl
-            };
-        }
-        console.log(`Vjudge response status: ${response.status}`);
-        if (response.status === 403) {
-            console.error('Vjudge Error 403: Forbidden');
-            return {
-                status: 'error',
-                message: 'Vjudge API returned 403 Forbidden. Please check your session.',
-                vjudge_url: vjudgeUrl
-            };
-        }
-
-        const textData = await response.text();
-
-        console.log("Vjudge response body:", textData.substring(0, 500));
-
-        const contentType = response.headers.get('content-type');
-        console.log("Content-Type:", contentType);
-
-        if (!contentType || !contentType.includes('application/json')) {
-            console.warn(`Vjudge response for ${contestId} was not JSON:`, contentType);
-            console.log(textData);
-            // Attempt to parse as JSON anyway, as content-type might be wrong
-            try {
-                const rawData = JSON.parse(textData);
-                const structuredData = processVjudgeRankData(rawData, problemWeights);
-                if (structuredData.error) {
-                    return {
-                        status: 'error',
-                        message: 'Failed to process data received from Vjudge.',
-                        details: structuredData.error,
-                        vjudge_url: vjudgeUrl,
-                    };
+            if (response.status === 401) {
+                await revalidateVJudgeSession();
+                 const newVjSession = cookies().get('vj_session')?.value;
+                 const retryResponse = await fetch(`${API_URL}/vjudge/contest-rank/${contestId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-VJudge-Session': newVjSession,
+                    },
+                    body: JSON.stringify({ problemWeights }),
+                });
+                if(!retryResponse.ok) {
+                    const errorData = await retryResponse.json();
+                    return { status: 'error', ...errorData };
                 }
-                return structuredData;
-            } catch (e) {
-                return {
-                    status: 'error',
-                    message: 'Vjudge returned non-JSON response and parsing failed.',
-                    vjudge_url: vjudgeUrl,
-                    data_received: textData.substring(0, 500)
-                };
+                return await retryResponse.json();
             }
+            const errorData = await response.json();
+            return { status: 'error', ...errorData };
         }
 
-        console.log(`Processing JSON data for Contest ID: ${contestId}`);
-        const rawData = JSON.parse(textData);
-        const structuredData = processVjudgeRankData(rawData, problemWeights);
-
-        if (structuredData.error) {
-            return {
-                status: 'error',
-                message: 'Failed to process data received from Vjudge.',
-                details: structuredData.error,
-                vjudge_url: vjudgeUrl,
-            };
-        }
-
-        console.log(`Successfully fetched and structured data for Contest ID: ${contestId}`);
-        return structuredData;
-
+        return await response.json();
     } catch (error) {
         console.error(`Error fetching/processing data for Contest ID ${contestId}:`, error.message);
-
         return {
             status: 'error',
             message: 'Error fetching or processing contest data',
             error_details: error.message,
-            vjudge_url: vjudgeUrl,
         };
     }
 }
