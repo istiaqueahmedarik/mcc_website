@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { unstable_ViewTransition as ViewTransition } from 'react';
 
 import { Toaster } from "sonner";
+import Footer from '@/components/Footer'
+
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -38,6 +40,7 @@ export default function RootLayout({ children }) {
         >
         <Navbar />
         {children}
+        <Footer />
         </ThemeProvider>
       </body>
       </html>

@@ -31,6 +31,7 @@ import {
   UserCheck,
   UserPlus,
   AlertTriangle,
+  SheetIcon,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -45,6 +46,7 @@ const Navbar = async () => {
       label: 'Contest Reminders',
     },
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
+    { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
   ]
 
@@ -53,6 +55,8 @@ const Navbar = async () => {
   ]
 
   const adminTools = [
+    { href: '/admin', icon: SheetIcon, label: 'CMS' },
+
     { href: '/grantuser', icon: UserCheck, label: 'Grant Users' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     { href: '/batches', icon: BrainCircuit, label: 'Batches' },
