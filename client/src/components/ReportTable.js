@@ -340,7 +340,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                                 <ul className="list-disc list-inside space-y-1">
                                                     <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
                                                     <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
-                                                    <li><strong>Total Score</strong>: Sum of each contest's finalScore × weight.</li>
+                                                    <li><strong>Total Score</strong>: Sum of each contest's finalScore x weight.</li>
                                                 </ul>
                                             </div>
                                             <div>
@@ -370,9 +370,9 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                             </div>
                                             <div>
                                                 <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
-                                                <p>If you remove worst contests or opt-out specific contests, their solved / penalty / score contributions are subtracted before effective metrics are computed for display & export.</p>
+                                                <p>1 worst contest (generally) opt out. </p>
                                             </div>
-                                            <div className="text-xs text-muted-foreground">This help dialog reflects the current implementation in code (mergeResultsByUser & ReportTable). Adjust wording if logic changes.</div>
+                                            
                                         </div>
                                     </DialogDescription>
                                 </DialogHeader>
