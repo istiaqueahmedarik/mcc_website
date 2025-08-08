@@ -846,3 +846,51 @@ export async function getContestResults(contestId, sessionId) {
   console.log(htm)
   return htm
 }
+
+export async function getActiveCustomContests(){
+  try {
+    const res = await fetch(`${process.env.SERVER_URL}/custom-contests/active`, { cache: 'no-store' })
+    const json = await res.json();
+    return json.result || []
+  } catch (e){
+    console.error(e);return []
+  }
+}
+
+export async function getAllCustomContests(){
+  try {
+    const res = await get_with_token('custom-contests/all')
+    if(res.error) return []
+    return res.result || []
+  } catch(e){console.error(e);return []}
+}
+
+export async function createCustomContestAction(prevState, formData){
+  try {
+    const data = Object.fromEntries(formData)
+    const res = await post_with_token('custom-contests/create', data)
+    if(res.error) return { error: res.error }
+    revalidatePath('/admin/custom-contests')
+    return { success: true }
+  } catch(e){console.error(e);return { error: 'Something went wrong' }}
+}
+
+export async function updateCustomContestAction(prevState, formData){
+  try {
+    const data = Object.fromEntries(formData)
+    const res = await post_with_token('custom-contests/update', data)
+    if(res.error) return { error: res.error }
+    revalidatePath('/admin/custom-contests')
+    return { success: true }
+  } catch(e){console.error(e);return { error: 'Something went wrong' }}
+}
+
+export async function deleteCustomContestAction(prevState, formData){
+  try {
+    const data = Object.fromEntries(formData)
+    const res = await post_with_token('custom-contests/delete', data)
+    if(res.error) return { error: res.error }
+    revalidatePath('/admin/custom-contests')
+    return { success: true }
+  } catch(e){console.error(e);return { error: 'Something went wrong' }}
+}

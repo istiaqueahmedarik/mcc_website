@@ -59,6 +59,7 @@ const Navbar = async () => {
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
     { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
+    { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
   ]
 
   const loggedIn = (await cookies()).get('token')

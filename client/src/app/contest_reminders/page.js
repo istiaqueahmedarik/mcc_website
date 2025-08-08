@@ -1,11 +1,13 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import IUPCSection from "@/components/iupc-section"
 import ContestList from "@/components/contest-list"
+import CustomContestDisplay from "@/components/custom-contest-display"
 
 export default function Page() {
     return (
         <div className="min-h-screen bg-white dark:bg-zinc-900">
-            <div className="container mx-auto px-4 py-8">
+            <div className="container mx-auto px-4 py-8 space-y-10">
+                <CustomContestDisplay />
                 <Tabs defaultValue="iupc" className="w-full">
                     <div className="flex justify-center mb-8">
                         <TabsList className="grid w-full max-w-md grid-cols-2 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-800">
