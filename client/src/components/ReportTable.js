@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import LiveShareModal from "./LiveShareModal"
 import { ScrollArea } from "./ui/scroll-area"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Info } from "lucide-react"
 
 function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const [searchText, setSearchText] = useState("")
@@ -312,8 +314,72 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         <div className="space-y-4">
             <div className="flex flex-col gap-4 mb-4">
                 <div className="bg-card rounded-lg p-4 border shadow-sm">
-                    <h2 className="text-lg font-semibold mb-4">Report Settings</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex items-start justify-between">
+                        <h2 className="text-lg font-semibold mb-4">Report Settings</h2>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 ml-2" title="How ranking & effective score are calculated">
+                                    <Info className="h-4 w-4" />
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
+                                    <DialogDescription asChild>
+                                        <div className="space-y-4 text-sm leading-relaxed mt-2">
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    <li><strong>Solved</strong>: Number of accepted problems.</li>
+                                                    <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
+                                                    <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
+                                                    <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
+                                                    <li><strong>Total Score</strong>: Sum of each contest's finalScore × weight.</li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
+                                                <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    <li><strong>Score SD</strong>: SD of per-contest scores.</li>
+                                                    <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
+                                                </ul>
+                                                <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Effective Metrics</h4>
+                                                <ul className="list-disc list-inside space-y-1">
+                                                    <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
+                                                    <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
+                                                    <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Ranking Order</h4>
+                                                <ol className="list-decimal list-inside space-y-1">
+                                                    <li>Higher <strong>Effective Solved / Score</strong></li>
+                                                    <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
+                                                    <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
+                                                </ol>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
+                                                <p>If you remove worst contests or opt-out specific contests, their solved / penalty / score contributions are subtracted before effective metrics are computed for display & export.</p>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">This help dialog reflects the current implementation in code (mergeResultsByUser & ReportTable). Adjust wording if logic changes.</div>
+                                        </div>
+                                    </DialogDescription>
+                                </DialogHeader>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Search Participants</label>
                             <div className="relative">
