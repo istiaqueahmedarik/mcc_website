@@ -340,7 +340,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                                 <ul className="list-disc list-inside space-y-1">
                                                     <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
                                                     <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
-                                                    <li><strong>Total Score</strong>: Sum of each contest's finalScore x weight.</li>
+                                                    <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
                                                 </ul>
                                             </div>
                                             <div>

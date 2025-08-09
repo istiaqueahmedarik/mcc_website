@@ -111,7 +111,7 @@ export default function AlumniClient({ initialBatches, loadError }){
           <div className='relative flex-1 space-y-4'>
             <h3 className='text-2xl md:text-3xl font-bold leading-tight'>Inspiring the Next Generation</h3>
             <p className='text-sm md:text-base text-muted-foreground max-w-lg'>Have a story or update to share? Help us keep the legacy timeline alive & motivate future innovators.</p>
-            <button className='px-5 py-2 rounded-md text-sm font-medium bg-[hsl(var(--alumni-gold))] text-black hover:brightness-110 transition'>Submit Update</button>
+            <button className='px-5 py-2 rounded-md text-sm font-medium bg-[hsl(var(--alumni-gold))] text-black hover:brightness-110 transition'>Contact us</button>
           </div>
           <div className='relative'>
             <MccLogo w={160} h={160} />
