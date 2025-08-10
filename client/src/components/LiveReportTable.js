@@ -7,7 +7,9 @@ import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, Star, AlertCircle } from 'lucide-react'
+import { Trophy, Medal, Award, Star, AlertCircle, Info } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from "./ui/scroll-area"
 
 function ReportTable({ merged, lastUpdated }) {
@@ -20,13 +22,78 @@ function ReportTable({ merged, lastUpdated }) {
 
     return (
         <Card className="overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-[hsl(var(--primary)/0.1)] to-[hsl(var(--primary)/0.05)] pb-2">
-                <CardTitle className="text-center text-3xl font-bold tracking-tight text-[hsl(var(--primary))] uppercase">
-                    {merged.name}
-                </CardTitle>
-                <CardDescription className="text-center text-sm font-medium text-[hsl(var(--muted-foreground))]">
-                    Last updated: {lastUpdated}
-                </CardDescription>
+            <CardHeader className="relative bg-gradient-to-r from-[hsl(var(--primary)/0.1)] to-[hsl(var(--primary)/0.05)] pb-2">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <CardTitle className="text-center text-3xl font-bold tracking-tight text-[hsl(var(--primary))] uppercase">
+                            {merged.name}
+                        </CardTitle>
+                        <CardDescription className="text-center text-sm font-medium text-[hsl(var(--muted-foreground))]">
+                            Last updated: {lastUpdated}
+                        </CardDescription>
+                    </div>
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8 mt-1" title="How ranking & effective score are calculated">
+                                <Info className="h-4 w-4" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                                <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
+                                <DialogDescription asChild>
+                                    <div className="space-y-4 text-sm leading-relaxed mt-2">
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                <li><strong>Solved</strong>: Number of accepted problems.</li>
+                                                <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
+                                                <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
+                                                <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
+                                                <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
+                                            <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                <li><strong>Score SD</strong>: SD of per-contest scores.</li>
+                                                <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
+                                            </ul>
+                                            <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Effective Metrics</h4>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
+                                                <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
+                                                <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Ranking Order</h4>
+                                            <ol className="list-decimal list-inside space-y-1">
+                                                <li>Higher <strong>Effective Solved / Score</strong></li>
+                                                <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
+                                                <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
+                                            </ol>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
+                                            <p>1 worst contest (generally) opt out.</p>
+                                        </div>
+                                    </div>
+                                </DialogDescription>
+                            </DialogHeader>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </CardHeader>
             <CardContent className="p-0">
                 <ScrollArea className="w-full whitespace-nowrap rounded-md border">
