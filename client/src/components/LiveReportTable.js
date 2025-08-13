@@ -7,7 +7,7 @@ import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, Star, AlertCircle, Info } from 'lucide-react'
+import { Trophy, Medal, Award, Star, AlertCircle, Info, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from "./ui/scroll-area"
@@ -18,6 +18,60 @@ function ReportTable({ merged, lastUpdated }) {
         return filtered
     }, [merged.users])
 
+    // Build per-contest ranking maps and per-user progress vs previous attended contest
+    const { contestRanks, progressByUser } = useMemo(() => {
+        const contestRanks = {}
+
+        const comparePerf = (aPerf, bPerf) => {
+            const aScore = aPerf?.finalScore ?? 0
+            const bScore = bPerf?.finalScore ?? 0
+            if (aScore !== bScore) return bScore - aScore
+            const aSolved = aPerf?.solved ?? 0
+            const bSolved = bPerf?.solved ?? 0
+            if (aSolved !== bSolved) return bSolved - aSolved
+            const aPen = aPerf?.penalty ?? Number.POSITIVE_INFINITY
+            const bPen = bPerf?.penalty ?? Number.POSITIVE_INFINITY
+            return aPen - bPen
+        }
+
+        // For each contest, compute rank per username (1 is best)
+        merged.contestIds.forEach((cid) => {
+            const participants = merged.users
+                .filter((u) => u.contests && u.contests[cid])
+                .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]))
+            const rankMap = {}
+            participants.forEach((u, idx) => {
+                rankMap[u.username] = idx + 1
+            })
+            contestRanks[cid] = rankMap
+        })
+
+        const lastId = merged.contestIds[merged.contestIds.length - 1]
+        const progressByUser = {}
+        merged.users.forEach((u) => {
+            const lastRank = contestRanks[lastId]?.[u.username]
+            // find the most recent previous contest the user attended
+            let prevRank = undefined
+            for (let i = merged.contestIds.length - 2; i >= 0; i--) {
+                const cid = merged.contestIds[i]
+                if (u.contests && u.contests[cid]) {
+                    prevRank = contestRanks[cid]?.[u.username]
+                    if (prevRank !== undefined) break
+                }
+            }
+            let status = 'neutral'
+            let delta = 0
+            if (lastRank !== undefined && prevRank !== undefined) {
+                delta = prevRank - lastRank // positive means improved
+                if (delta >= 3) status = 'incredible'
+                else if (delta <= -1) status = 'down'
+                else status = 'neutral'
+            }
+            progressByUser[u.username] = { status, delta, lastRank, prevRank }
+        })
+
+        return { contestRanks, progressByUser }
+    }, [merged.users, merged.contestIds])
    
 
     return (
@@ -102,6 +156,7 @@ function ReportTable({ merged, lastUpdated }) {
                         <TableHeader className="bg-[hsl(var(--muted)/0.5)]">
                             <TableRow className="hover:bg-[hsl(var(--muted)/0.6)] transition-colors">
                                 <TableHead className="w-[60px] text-[hsl(var(--foreground))]">Rank</TableHead>
+                                <TableHead className="text-[hsl(var(--foreground))]">Progress</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Name</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Username</TableHead>
                                 <TableHead className="text-[hsl(var(--foreground))]">Contests</TableHead>
@@ -152,6 +207,44 @@ function ReportTable({ merged, lastUpdated }) {
                                         >
                                             {index + 1}
                                         </Badge>
+                                    </TableCell>
+                                    {/* Progress */}
+                                    <TableCell className="min-w-[90px]">
+                                        {(() => {
+                                            const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
+                                            return (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <div className="flex items-center gap-1.5">
+                                                                {p.status === 'incredible' && (
+                                                                    <div className="flex items-center text-green-600">
+                                                                        <ArrowUp className="h-3.5 w-3.5" />
+                                                                        <ArrowUp className="h-3.5 w-3.5 -mx-0.5" />
+                                                                        <ArrowUp className="h-3.5 w-3.5" />
+                                                                    </div>
+                                                                )}
+                                                                {p.status === 'down' && (
+                                                                    <ArrowDown className="h-4 w-4 text-red-600" />
+                                                                )}
+                                                                {p.status === 'neutral' && (
+                                                                    <Minus className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                                                                )}
+                                                            </div>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            {p.lastRank !== undefined && p.prevRank !== undefined ? (
+                                                                <p>
+                                                                    Rank change: {p.prevRank} → {p.lastRank} ({p.delta >= 0 ? '+' : ''}{p.delta})
+                                                                </p>
+                                                            ) : (
+                                                                <p>No prior contest to compare</p>
+                                                            )}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )
+                                        })()}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">

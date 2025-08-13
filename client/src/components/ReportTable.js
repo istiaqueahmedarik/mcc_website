@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
 import Image from "next/image"
-import { X, AlertCircle, Search, Users2, CheckCheck } from "lucide-react"
+import { X, AlertCircle, Search, Users2, CheckCheck, ArrowUp, ArrowDown, Minus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
@@ -148,6 +148,55 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const maxPossibleSolved = useMemo(() => {
         return Math.max(...merged.users.map((u) => u.totalSolved), 0)
     }, [merged.users])
+
+    // Progress: build per-contest ranking and compute last vs previous attended
+    const { contestRanks, progressByUser } = useMemo(() => {
+        const contestRanks = {}
+        const comparePerf = (aPerf, bPerf) => {
+            const aScore = aPerf?.finalScore ?? 0
+            const bScore = bPerf?.finalScore ?? 0
+            if (aScore !== bScore) return bScore - aScore
+            const aSolved = aPerf?.solved ?? 0
+            const bSolved = bPerf?.solved ?? 0
+            if (aSolved !== bSolved) return bSolved - aSolved
+            const aPen = aPerf?.penalty ?? Number.POSITIVE_INFINITY
+            const bPen = bPerf?.penalty ?? Number.POSITIVE_INFINITY
+            return aPen - bPen
+        }
+        merged.contestIds.forEach((cid) => {
+            const participants = merged.users
+                .filter((u) => u.contests && u.contests[cid])
+                .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]))
+            const rankMap = {}
+            participants.forEach((u, idx) => {
+                rankMap[u.username] = idx + 1
+            })
+            contestRanks[cid] = rankMap
+        })
+        const lastId = merged.contestIds[merged.contestIds.length - 1]
+        const progressByUser = {}
+        merged.users.forEach((u) => {
+            const lastRank = contestRanks[lastId]?.[u.username]
+            let prevRank
+            for (let i = merged.contestIds.length - 2; i >= 0; i--) {
+                const cid = merged.contestIds[i]
+                if (u.contests && u.contests[cid]) {
+                    prevRank = contestRanks[cid]?.[u.username]
+                    if (prevRank !== undefined) break
+                }
+            }
+            let status = 'neutral'
+            let delta = 0
+            if (lastRank !== undefined && prevRank !== undefined) {
+                delta = prevRank - lastRank
+                if (delta >= 3) status = 'incredible'
+                else if (delta <= -1) status = 'down'
+                else status = 'neutral'
+            }
+            progressByUser[u.username] = { status, delta, lastRank, prevRank }
+        })
+        return { contestRanks, progressByUser }
+    }, [merged.users, merged.contestIds])
 
     const exportToCSV = () => {
         const headers = [
@@ -513,6 +562,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Rank</TableHead>
+                            <TableHead>Progress</TableHead>
                             <TableHead>Name</TableHead>
                             <TableHead>Username</TableHead>
                             <TableHead>Contests</TableHead>
@@ -553,6 +603,29 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                     >
                                         {index + 1}
                                     </Badge>
+                                </TableCell>
+                                {/* Progress */}
+                                <TableCell>
+                                    {(() => {
+                                        const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
+                                        return (
+                                            <div className="flex items-center gap-1.5">
+                                                {p.status === 'incredible' && (
+                                                    <div className="flex items-center text-green-600">
+                                                        <ArrowUp className="h-3.5 w-3.5" />
+                                                        <ArrowUp className="h-3.5 w-3.5 -mx-0.5" />
+                                                        <ArrowUp className="h-3.5 w-3.5" />
+                                                    </div>
+                                                )}
+                                                {p.status === 'down' && (
+                                                    <ArrowDown className="h-4 w-4 text-red-600" />
+                                                )}
+                                                {p.status === 'neutral' && (
+                                                    <Minus className="h-4 w-4 text-muted-foreground" />
+                                                )}
+                                            </div>
+                                        )
+                                    })()}
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">

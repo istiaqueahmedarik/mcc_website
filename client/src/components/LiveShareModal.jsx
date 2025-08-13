@@ -163,7 +163,7 @@ export default function LiveShareModal({ reportData, reportId }) {
                                     </div>
                                     <div>
                                       <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
-                                      <p>1 worst contest (generally) opt out. </p>
+                                      <p>2 worst contest (generally) opt out. </p>
                                     </div>
                                   </div>
                                 </DialogDescription>
