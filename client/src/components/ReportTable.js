@@ -676,11 +676,11 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                                 quality={20}
                                             />
                                         </div>
-                                        <span className={cn('font-medium', isTop && 'top-rank-name')} style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.realName || "—"}</span>
+                                        <span className={cn('font-bold', isTop && 'top-rank-name')} style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.realName || "—"}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className={cn('font-medium', isTop && 'top-rank-name')}>
-                                    <span className="transition-all duration-200 group-hover:font-bold" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
+                                <TableCell className={cn('font-bold', isTop && 'top-rank-name')}>
+                                    <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
                                 </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 <TableCell>
