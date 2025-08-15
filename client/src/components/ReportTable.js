@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
 import Image from "next/image"
 import { X, AlertCircle, Search, Users2, CheckCheck, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
