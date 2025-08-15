@@ -72,6 +72,39 @@ function ReportTable({ merged, lastUpdated }) {
 
         return { contestRanks, progressByUser }
     }, [merged.users, merged.contestIds])
+
+    const totalUsers = users.length
+    const getNameColor = (rank) => {
+        if (rank <= 3) {
+            // Gold gradient: brightest for 1
+            const golds = [
+                'hsl(47, 95%, 55%)', // bright gold
+                'hsl(47, 85%, 50%)',
+                'hsl(47, 75%, 45%)'
+            ]
+            return golds[rank - 1]
+        }
+        const hasAfter12 = totalUsers > 12
+        if (!hasAfter12) {
+            // Only middle group (green) after top3
+            const t = (rank - 4) / Math.max(1, (totalUsers - 4))
+            const light = 38 + t * 28 // 38% -> 66%
+            const sat = 72 - t * 22 // 72% -> 50%
+            return `hsl(140, ${sat}%, ${light}%)`
+        }
+        if (rank <= 12) {
+            // Middle green group 4..12
+            const t = (rank - 4) / 8 // 0..1
+            const light = 40 + t * 22 // 40 -> 62
+            const sat = 70 - t * 20 // 70 -> 50
+            return `hsl(140, ${sat}%, ${light}%)`
+        }
+        // Red group >12
+        const t = (rank - 13) / Math.max(1, (totalUsers - 13))
+        const light = 60 - t * 30 // 60 -> 30
+        const sat = 65 + t * 25 // 65 -> 90
+        return `hsl(0, ${sat}%, ${light}%)`
+    }
    
 
     return (
@@ -180,33 +213,39 @@ function ReportTable({ merged, lastUpdated }) {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {users.map((u, index) => (
+                            {users.map((u, index) => {
+                                const isTop = index === 0
+                                return (
                                 <TableRow
                                     key={u.username}
                                     className={cn(
-                                        "group transition-all duration-200 hover:bg-[hsl(var(--accent)/0.3)]",
+                                        "group transition-all duration-200 hover:bg-[hsl(var(--accent)/0.25)]",
                                         index % 2 === 0 ? "bg-[hsl(var(--background))]" : "bg-[hsl(var(--muted)/0.2)]",
-                                        index < 3 && "bg-[hsl(var(--primary)/0.05)]"
+                                        index < 3 && "bg-[hsl(var(--primary)/0.05)]",
+                                        isTop && 'top-rank-wrapper'
                                     )}
                                 >
                                     {/* Rank */}
                                     <TableCell className="text-center font-medium">
-                                        <Badge
-                                            variant="default"
-                                            className={cn(
-                                                "min-w-[32px] transition-all duration-200 group-hover:shadow-sm",
-                                                index < 12 &&
-                                                    (index < 3
-                                                        ? "bg-yellow-500 text-white"
-                                                        : index < 6
-                                                        ? "bg-gray-400 text-white"
-                                                        : index < 9
-                                                        ? "bg-orange-500 text-white"
-                                                        : "bg-blue-500 text-white")
-                                            )}
-                                        >
-                                            {index + 1}
-                                        </Badge>
+                                        <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
+                                            <Badge
+                                                variant="default"
+                                                className={cn(
+                                                    "min-w-[32px] transition-all duration-200 group-hover:shadow-sm",
+                                                    index < 12 &&
+                                                        (index < 3
+                                                            ? "bg-yellow-500 text-white"
+                                                            : index < 6
+                                                            ? "bg-gray-400 text-white"
+                                                            : index < 9
+                                                            ? "bg-orange-500 text-white"
+                                                            : "bg-blue-500 text-white"),
+                                                    isTop && 'bg-transparent text-[hsl(var(--alumni-gold))] font-bold shadow-none'
+                                                )}
+                                            >
+                                                {index + 1}
+                                            </Badge>
+                                        </div>
                                     </TableCell>
                                     {/* Progress */}
                                     <TableCell className="min-w-[90px]">
@@ -249,19 +288,21 @@ function ReportTable({ merged, lastUpdated }) {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <Image
-                                                src={u.avatarUrl || "/vercel.svg"}
-                                                alt={u.realName || u.username}
-                                                width={32}
-                                                height={32}
-                                                className="rounded-full object-cover"
-                                                quality={20}
-                                            />
-                                            <span className="font-medium">{u.realName || "—"}</span>
+                                            <div className={cn('relative w-8 h-8 flex-shrink-0', isTop && 'rounded-full')}>
+                                                <Image
+                                                    src={u.avatarUrl || "/vercel.svg"}
+                                                    alt={u.realName || u.username}
+                                                    width={32}
+                                                    height={32}
+                                                    className={cn("rounded-full object-cover w-8 h-8", isTop && 'ring-2 ring-[hsl(var(--alumni-gold))]/70 shadow-md')}
+                                                    quality={20}
+                                                />
+                                            </div>
+                                            <span className={cn('font-medium', isTop && 'top-rank-name')} style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.realName || "—"}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell className="font-medium text-[hsl(var(--primary))]">
-                                        <span className="transition-all duration-200 group-hover:font-bold">{u.username}</span>
+                                    <TableCell className={cn('font-medium', isTop && 'top-rank-name')}>
+                                        <span className="transition-all duration-200 group-hover:font-bold" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
                                     </TableCell>
                                     <TableCell className="text-center">
                                         <Badge
@@ -397,8 +438,7 @@ function ReportTable({ merged, lastUpdated }) {
                                             </TableCell>
                                         )
                                     })}
-                                </TableRow>
-                            ))}
+                                </TableRow>)})}
                         </TableBody>
                     </Table>
                 </ScrollArea>

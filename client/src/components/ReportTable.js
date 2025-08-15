@@ -198,6 +198,35 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         return { contestRanks, progressByUser }
     }, [merged.users, merged.contestIds])
 
+    const totalUsers = users.length
+    const getNameColor = (rank) => {
+        if (rank <= 3) {
+            const golds = [
+                'hsl(47, 95%, 55%)',
+                'hsl(47, 85%, 50%)',
+                'hsl(47, 75%, 45%)'
+            ]
+            return golds[rank - 1]
+        }
+        const hasAfter12 = totalUsers > 12
+        if (!hasAfter12) {
+            const t = (rank - 4) / Math.max(1, (totalUsers - 4))
+            const light = 38 + t * 28
+            const sat = 72 - t * 22
+            return `hsl(140, ${sat}%, ${light}%)`
+        }
+        if (rank <= 12) {
+            const t = (rank - 4) / 8
+            const light = 40 + t * 22
+            const sat = 70 - t * 20
+            return `hsl(140, ${sat}%, ${light}%)`
+        }
+        const t = (rank - 13) / Math.max(1, (totalUsers - 13))
+        const light = 60 - t * 30
+        const sat = 65 + t * 25
+        return `hsl(0, ${sat}%, ${light}%)`
+    }
+
     const exportToCSV = () => {
         const headers = [
             "Rank",
@@ -584,25 +613,29 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((u, index) => (
-                            <TableRow key={u.username} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                        {users.map((u, index) => {
+                            const isTop = index === 0
+                            return (
+                            <TableRow key={u.username} className={cn(index % 2 === 0 ? "bg-muted/20" : "", isTop && 'top-rank-wrapper')}> 
                                 <TableCell>
-                                    <Badge
-                                        variant="default"
-                                        className={`min-w-[32px] transition-all duration-200 ${
-                                            index < 12
-                                                ? index < 3
-                                                    ? "bg-yellow-500 text-white"
-                                                    : index < 6
-                                                    ? "bg-gray-500 text-white"
-                                                    : index < 9
-                                                    ? "bg-orange-500 text-white"
-                                                    : "bg-blue-500 text-white"
-                                                : ""
-                                        }`}
-                                    >
-                                        {index + 1}
-                                    </Badge>
+                                    <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
+                                        <Badge
+                                            variant="default"
+                                            className={`min-w-[32px] transition-all duration-200 ${
+                                                index < 12
+                                                    ? index < 3
+                                                        ? "bg-yellow-500 text-white"
+                                                        : index < 6
+                                                        ? "bg-gray-500 text-white"
+                                                        : index < 9
+                                                        ? "bg-orange-500 text-white"
+                                                        : "bg-blue-500 text-white"
+                                                    : ""
+                                            } ${isTop ? 'bg-transparent text-[hsl(var(--alumni-gold))] font-bold shadow-none' : ''}`}
+                                        >
+                                            {index + 1}
+                                        </Badge>
+                                    </div>
                                 </TableCell>
                                 {/* Progress */}
                                 <TableCell className="min-w-[90px]">
@@ -632,19 +665,21 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">
-                                        <Image
-                                            src={u.avatarUrl || "/vercel.svg"}
-                                            alt={u.realName || u.username}
-                                            width={32}
-                                            height={32}
-                                            className="rounded-full object-cover"
-                                            quality={20}
-                                        />
-                                        <span className="font-medium">{u.realName || "—"}</span>
+                                        <div className={cn('relative', isTop && 'ring-2 ring-[hsl(var(--alumni-gold))]/70 rounded-full p-[2px]')}>
+                                            <Image
+                                                src={u.avatarUrl || "/vercel.svg"}
+                                                alt={u.realName || u.username}
+                                                width={32}
+                                                height={32}
+                                                className={cn("rounded-full object-cover", isTop && 'shadow-lg shadow-[hsl(var(--alumni-gold)/0.4)]')}
+                                                quality={20}
+                                            />
+                                        </div>
+                                        <span className={cn('font-medium', isTop && 'top-rank-name')} style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.realName || "—"}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="font-medium text-[hsl(var(--primary))]">
-                                    <span className="transition-all duration-200 group-hover:font-bold">{u.username}</span>
+                                <TableCell className={cn('font-medium', isTop && 'top-rank-name')}>
+                                    <span className="transition-all duration-200 group-hover:font-bold" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
                                 </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 <TableCell>
@@ -753,8 +788,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                         </TableCell>
                                     )
                                 })}
-                            </TableRow>
-                        ))}
+                            </TableRow>)})}
                     </TableBody>
                 </Table>
             </ScrollArea>
