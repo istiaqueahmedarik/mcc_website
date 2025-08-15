@@ -7,7 +7,7 @@ import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, Star, AlertCircle, Info, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { Trophy, Medal, Award, Star, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { ScrollArea } from "./ui/scroll-area"
@@ -212,31 +212,32 @@ function ReportTable({ merged, lastUpdated }) {
                                     <TableCell className="min-w-[90px]">
                                         {(() => {
                                             const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
+                                            const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
+                                            const improvement = p.delta > 0
+                                            const decline = p.delta < 0
+                                            const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
                                             return (
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <div className="flex items-center gap-1.5">
-                                                                {p.status === 'incredible' && (
-                                                                    <div className="flex items-center text-green-600">
-                                                                        <ArrowUp className="h-3.5 w-3.5" />
-                                                                        <ArrowUp className="h-3.5 w-3.5 -mx-0.5" />
-                                                                        <ArrowUp className="h-3.5 w-3.5" />
-                                                                    </div>
-                                                                )}
-                                                                {p.status === 'down' && (
-                                                                    <ArrowDown className="h-4 w-4 text-red-600" />
-                                                                )}
-                                                                {p.status === 'neutral' && (
-                                                                    <Minus className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                                                            <div className="flex items-center gap-1.5 cursor-default">
+                                                                <Icon className={cn('h-4 w-4', improvement && 'text-green-600', decline && 'text-red-600', !improvement && !decline && 'text-muted-foreground')} />
+                                                                {hasComparison ? (
+                                                                    improvement ? (
+                                                                        <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
+                                                                    ) : decline ? (
+                                                                        <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                                                                    ) : (
+                                                                        <span className="text-[10px] font-medium text-muted-foreground">0</span>
+                                                                    )
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground">—</span>
                                                                 )}
                                                             </div>
                                                         </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            {p.lastRank !== undefined && p.prevRank !== undefined ? (
-                                                                <p>
-                                                                    Rank change: {p.prevRank} → {p.lastRank} ({p.delta >= 0 ? '+' : ''}{p.delta})
-                                                                </p>
+                                                        <TooltipContent className="text-xs">
+                                                            {hasComparison ? (
+                                                                <p>Prev: {p.prevRank} → Now: {p.lastRank}</p>
                                                             ) : (
                                                                 <p>No prior contest to compare</p>
                                                             )}

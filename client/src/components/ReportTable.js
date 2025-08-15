@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useState, useMemo } from "react"
 import Image from "next/image"
-import { X, AlertCircle, Search, Users2, CheckCheck, ArrowUp, ArrowDown, Minus } from "lucide-react"
+import { X, AlertCircle, Search, Users2, CheckCheck, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
@@ -605,23 +605,26 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                     </Badge>
                                 </TableCell>
                                 {/* Progress */}
-                                <TableCell>
+                                <TableCell className="min-w-[90px]">
                                     {(() => {
                                         const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
+                                        const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
+                                        const improvement = p.delta > 0
+                                        const decline = p.delta < 0
+                                        const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
                                         return (
                                             <div className="flex items-center gap-1.5">
-                                                {p.status === 'incredible' && (
-                                                    <div className="flex items-center text-green-600">
-                                                        <ArrowUp className="h-3.5 w-3.5" />
-                                                        <ArrowUp className="h-3.5 w-3.5 -mx-0.5" />
-                                                        <ArrowUp className="h-3.5 w-3.5" />
-                                                    </div>
-                                                )}
-                                                {p.status === 'down' && (
-                                                    <ArrowDown className="h-4 w-4 text-red-600" />
-                                                )}
-                                                {p.status === 'neutral' && (
-                                                    <Minus className="h-4 w-4 text-muted-foreground" />
+                                                <Icon className={`${improvement ? 'text-green-600' : decline ? 'text-red-600' : 'text-muted-foreground'} h-4 w-4`} />
+                                                {hasComparison ? (
+                                                    improvement ? (
+                                                        <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
+                                                    ) : decline ? (
+                                                        <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                                                    ) : (
+                                                        <span className="text-[10px] font-medium text-muted-foreground">0</span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground">—</span>
                                                 )}
                                             </div>
                                         )
