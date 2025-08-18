@@ -119,31 +119,6 @@ export default function Home() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,hsl(var(--secondary))/40%,transparent_70%)]" />
         </div>
 
-        {/* Floating Code Elements */}
-        <div className="absolute inset-0 -z-5 pointer-events-none">
-          {[
-            { text: '{ }', x: '10%', y: '20%', delay: 0 },
-            { text: '<>', x: '85%', y: '15%', delay: 2 },
-            { text: '[]', x: '15%', y: '80%', delay: 1 },
-            { text: 'for', x: '80%', y: '75%', delay: 3 },
-            { text: 'if', x: '90%', y: '45%', delay: 1.5 },
-            { text: 'dp', x: '5%', y: '60%', delay: 2.5 }
-          ].map((element, idx) => (
-            <div
-              key={idx}
-              className="absolute text-primary/10 text-lg font-mono animate-pulse opacity-30"
-              style={{
-                left: element.x,
-                top: element.y,
-                animationDelay: `${element.delay}s`,
-                animationDuration: '4s'
-              }}
-            >
-              {element.text}
-            </div>
-          ))}
-        </div>
-
         <div className="flex justify-center items-center flex-col max-w-3xl gap-8 text-center relative z-10">
           <TextGenerateEffect
             className="uppercase text-3xl md:text-5xl font-bold"
