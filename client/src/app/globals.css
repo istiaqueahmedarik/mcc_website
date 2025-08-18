@@ -131,6 +131,16 @@
   }
 }
 
+@keyframes feature-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 ::view-transition-old(page) {
   animation: zoom-out 0.5s ease-in-out;
 }

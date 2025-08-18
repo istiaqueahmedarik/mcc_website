@@ -22,6 +22,7 @@ module.exports = {
 				spotlight: 'spotlight 2s ease .75s 1 forwards',
 				appear: 'appear 8s ease-in-out',
 				shimmer: 'shimmer 2s linear infinite',
+				'feature-shimmer': 'feature-shimmer 2s linear infinite',
 				scroll: 'scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite',
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
@@ -43,6 +44,14 @@ module.exports = {
 					},
 					'100%': {
 						opacity: '1'
+					}
+				},
+				'feature-shimmer': {
+					'0%': {
+						backgroundPosition: '200% 0'
+					},
+					'100%': {
+						backgroundPosition: '-200% 0'
 					}
 				},
 				shimmer: {

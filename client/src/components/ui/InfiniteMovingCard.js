@@ -84,14 +84,27 @@ export const InfiniteMovingCards = ({
             <figure className="relative h-full rounded-2xl bg-background/70 backdrop-blur-md border border-border/60 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col gap-4 px-5 py-6 transition-all duration-300 group-hover:shadow-[0_6px_28px_-6px_rgba(0,0,0,0.4)] group-hover:-translate-y-1">
               <div className="flex items-center gap-4">
                 {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="h-12 w-12 rounded-full border border-border/70 object-contain bg-gradient-to-br from-secondary/40 to-background p-1 shadow-inner"
-                    loading="lazy"
-                  />
+                  <div className="h-12 w-12 rounded-lg border border-border/70 bg-white/95 flex items-center justify-center p-1.5 shadow-inner">
+                    <img
+                      src={item.image}
+                      alt={`${item.name} company logo`}
+                      className="max-h-full max-w-full object-contain"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div
+                      className="h-full w-full rounded-md bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary"
+                      style={{ display: 'none' }}
+                    >
+                      {item.name?.charAt(0) || '?'}
+                    </div>
+                  </div>
                 ) : (
-                  <div className="h-12 w-12 rounded-full border border-border/70 bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                  <div className="h-12 w-12 rounded-lg border border-border/70 bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
                     {item.name?.charAt(0) || '?'}
                   </div>
                 )}

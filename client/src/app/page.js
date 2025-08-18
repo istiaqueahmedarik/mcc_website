@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { motion, useScroll } from 'framer-motion'
 import AchievementPage from '@/components/achievements/AchievmentPage'
 import MccLogo from '@/components/IconChanger/MccLogo'
 import { Button } from '@/components/ui/button'
@@ -19,12 +20,21 @@ import {
   Landmark,
   MoveRight,
   Tv,
+  Target,
+  Database,
+  PlayCircle,
+  Trophy,
+  Users,
+  BarChart3,
+  Award,
+  Bell,
 } from 'lucide-react'
 import Link from 'next/link'
 import StatsCounter from '@/components/landing/StatsCounter'
 
 export default function Home() {
   const [cms, setCms] = React.useState(null)
+  const { scrollYProgress } = useScroll()
 
   // Function to scroll to stats section
   const scrollToStats = () => {
@@ -55,6 +65,18 @@ export default function Home() {
     { title: 'Achievements', desc: 'Celebrate milestones, badges & inter-club rankings.' },
     { title: 'Reminders', desc: 'Never miss a contest — instant multi-OJ notifications.' },
   ].map(f => ({ title: f.title, description: f.desc }))
+
+  // Feature icons mapping
+  const featureIcons = {
+    'Problem Tracker': <Target className="w-5 h-5" />,
+    'Problem Bank': <Database className="w-5 h-5" />,
+    'Class Videos': <PlayCircle className="w-5 h-5" />,
+    'Standings': <Trophy className="w-5 h-5" />,
+    'Live Share': <Users className="w-5 h-5" />,
+    'Reports': <BarChart3 className="w-5 h-5" />,
+    'Achievements': <Award className="w-5 h-5" />,
+    'Reminders': <Bell className="w-5 h-5" />
+  }
   const stats = cms?.stats || [
     { title: 'Active Members', value: 500, suffix: '+' },
     { title: 'Contests Hosted', value: 120, suffix: '+' },
@@ -68,34 +90,77 @@ export default function Home() {
     { year: '2024', title: 'Scaling Up', body: 'Hundreds of active members & cross‑university collabs.' },
   ]
   const alumni = cms?.alumni || [
-    { quote: 'Leadership & Platform Scaling', name: 'Ayesha Rahman', title: 'Former President (2019–2020) • Software Engineer @ Google', image: '/mccLogo.png' },
-    { quote: 'Problem Setting & Training', name: 'Mahmudul Hasan', title: 'Former Competitive Programming Lead • SDE @ Amazon', image: '/mccLogo.png' },
-    { quote: 'Curriculum & Mentorship', name: 'Farhan Ahmed', title: 'Former Education Coordinator • SWE @ Meta', image: '/mccLogo.png' },
-    { quote: 'AI Research & Innovation', name: 'Nusrat Jahan', title: 'Former Core Member • Research Engineer @ Microsoft', image: '/mccLogo.png' },
-    { quote: 'Automation & Tooling', name: 'Sakib Chowdhury', title: 'Former Contest Ops • Engineer @ DeepMind', image: '/mccLogo.png' },
+    { quote: 'Leadership & Platform Scaling', name: 'Ayesha Rahman', title: 'Former President (2019–2020) • Software Engineer @ Google', image: 'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png' },
+    { quote: 'Problem Setting & Training', name: 'Mahmudul Hasan', title: 'Former Competitive Programming Lead • SDE @ Amazon', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/1024px-Amazon_logo.svg.png' },
+    { quote: 'Curriculum & Mentorship', name: 'Farhan Ahmed', title: 'Former Education Coordinator • SWE @ Meta', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/2560px-Meta_Platforms_Inc._logo.svg.png' },
+    { quote: 'AI Research & Innovation', name: 'Nusrat Jahan', title: 'Former Core Member • Research Engineer @ Microsoft', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png' },
+    { quote: 'Automation & Tooling', name: 'Sakib Chowdhury', title: 'Former Contest Ops • Engineer @ DeepMind', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_DeepMind_logo.svg/2560px-Google_DeepMind_logo.svg.png' },
   ]
 
   return (
     <main className="scroll-smooth w-full flex flex-col gap-32 justify-center items-center overflow-x-hidden bg-background">
+      {/* Scroll Progress Indicator */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-highlight to-primary origin-left z-50"
+        style={{ scaleX: scrollYProgress }}
+      />
+
       <Spotlight
         className="-top-4 md:left-60 md:-top-20"
         fill="white"
       />
 
       {/* Hero */}
-      <section className="relative min-h-[90vh] w-full flex justify-center items-center px-4 pt-20">
-        <div className="flex justify-center items-center flex-col max-w-3xl gap-8 text-center">
+      <section className="relative min-h-[90vh] w-full flex justify-center items-center px-4 pt-20 overflow-hidden">
+        {/* Enhanced Background with Dynamic Pattern */}
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent_50%,hsl(var(--primary)/0.02)_50%)] bg-[size:60px_60px] animate-pulse" />
+          <div className="absolute inset-0 bg-[linear-gradient(0deg,transparent_50%,hsl(var(--highlight)/0.015)_50%)] bg-[size:40px_40px] animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,hsl(var(--secondary))/40%,transparent_70%)]" />
+        </div>
+
+        {/* Floating Code Elements */}
+        <div className="absolute inset-0 -z-5 pointer-events-none">
+          {[
+            { text: '{ }', x: '10%', y: '20%', delay: 0 },
+            { text: '<>', x: '85%', y: '15%', delay: 2 },
+            { text: '[]', x: '15%', y: '80%', delay: 1 },
+            { text: 'for', x: '80%', y: '75%', delay: 3 },
+            { text: 'if', x: '90%', y: '45%', delay: 1.5 },
+            { text: 'dp', x: '5%', y: '60%', delay: 2.5 }
+          ].map((element, idx) => (
+            <div
+              key={idx}
+              className="absolute text-primary/10 text-lg font-mono animate-pulse opacity-30"
+              style={{
+                left: element.x,
+                top: element.y,
+                animationDelay: `${element.delay}s`,
+                animationDuration: '4s'
+              }}
+            >
+              {element.text}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-center items-center flex-col max-w-3xl gap-8 text-center relative z-10">
           <TextGenerateEffect
             className="uppercase text-3xl md:text-5xl font-bold"
             words="Hello Programmer, Welcome To"
           />
-          <MccLogo
-            classes="animate-appear drop-shadow-xl"
-            w={260}
-            h={260}
-          />
-          <p className="text-muted-foreground max-w-xl leading-relaxed text-sm md:text-base">
+          <div className="relative">
+            <MccLogo
+              classes="animate-appear drop-shadow-xl hover:scale-105 transition-transform duration-300"
+              w={260}
+              h={260}
+            />
+            {/* Subtle glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-highlight/20 to-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
+          </div>
+          <p className="text-muted-foreground max-w-xl leading-relaxed text-sm md:text-base relative">
             A community for algorithms, problem solving & collaborative learning. Compete, learn, build & grow with peers pushing the same limits as you.
+            <div className="absolute -inset-4 bg-gradient-to-r from-transparent via-primary/5 to-transparent rounded-lg opacity-0 hover:opacity-100 transition-opacity duration-300 -z-10" />
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link href="/login">
@@ -103,17 +168,16 @@ export default function Home() {
                 title="Join Now"
                 position="right"
                 icon={<MoveRight className="ml-2" />}
-                otherClasses="hover:bg-primary hover:text-primary-foreground"
+                otherClasses="hover:bg-primary hover:text-primary-foreground transform hover:scale-105 transition-all duration-300"
               />
             </Link>
             <MagicButton
               title="Explore Platform"
               handleClick={scrollToStats}
-              otherClasses="hover:bg-secondary hover:text-secondary-foreground"
+              otherClasses="hover:bg-secondary hover:text-secondary-foreground transform hover:scale-105 transition-all duration-300"
             />
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_30%,hsl(var(--secondary))/40%,transparent_70%)]" />
       </section>
 
       {/* Stats */}
@@ -132,13 +196,37 @@ export default function Home() {
           What We Offer
         </h2>
         <div className="grid md:grid-cols-4 sm:grid-cols-2 grid-cols-1 gap-6 mb-16">
-          {features.map((f) => (
-            <div key={f.title} className="group relative rounded-xl border border-border/60 p-[1px] bg-gradient-to-br from-primary/10 via-background to-background hover:from-primary/30 transition-colors">
-              <div className="h-full rounded-[inherit] p-5 flex flex-col justify-between bg-background/80 backdrop-blur">
-                <div>
-                  <h3 className="font-semibold text-sm md:text-base tracking-wide mb-2 group-hover:text-primary transition-colors">{f.title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{f.description || f.desc}</p>
+          {features.map((f, index) => (
+            <div
+              key={f.title}
+              className="group relative rounded-xl border border-border/60 p-[1px] bg-gradient-to-br from-primary/10 via-background to-background hover:from-primary/30 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-primary/10"
+              style={{
+                animationDelay: `${index * 100}ms`
+              }}
+            >
+              <div className="h-full rounded-[inherit] p-5 flex flex-col justify-between bg-background/80 backdrop-blur relative overflow-hidden">
+                {/* Icon with gradient background */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-highlight/20 text-primary group-hover:from-primary/30 group-hover:to-highlight/30 transition-all duration-300 group-hover:scale-110">
+                    {featureIcons[f.title] || <Target className="w-5 h-5" />}
+                  </div>
+                  <h3 className="font-semibold text-sm md:text-base tracking-wide group-hover:text-primary transition-colors">{f.title}</h3>
                 </div>
+
+                <div>
+                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">{f.description || f.desc}</p>
+                </div>
+
+                {/* Hover effect overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-highlight/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-[inherit]" />
+
+                {/* Subtle animated border */}
+                <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-r from-primary via-highlight to-primary opacity-0 group-hover:opacity-20 transition-opacity duration-500"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent, hsl(var(--primary))/0.3, transparent)',
+                    backgroundSize: '200% 100%',
+                    animation: 'feature-shimmer 2s linear infinite'
+                  }} />
               </div>
             </div>
           ))}
@@ -163,16 +251,32 @@ export default function Home() {
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-10 text-center">
           About The Club
         </h2>
-        <div className="relative pl-4 before:content-[''] before:absolute before:left-1 before:top-0 before:bottom-0 before:w-px before:bg-border/60">
+        <div className="relative pl-8 before:content-[''] before:absolute before:left-2 before:top-0 before:bottom-0 before:w-px before:bg-gradient-to-b before:from-primary before:via-highlight before:to-primary before:opacity-60">
           {timeline.map((item, idx) => (
-            <div key={item.year + idx} className="relative mb-10 last:mb-0">
-              <div className="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-gradient-to-br from-primary to-highlight shadow ring-2 ring-background" />
-              <div className="ml-4 p-4 rounded-lg border bg-card/80 backdrop-blur-sm hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="text-xs font-bold tracking-wider text-primary uppercase">{item.year}</span>
-                  <h3 className="font-semibold text-base md:text-lg">{item.title}</h3>
+            <div key={item.year + idx} className="group relative mb-12 last:mb-0">
+              {/* Enhanced card with hover effects */}
+              <div className="ml-6 p-6 rounded-lg border bg-card/80 backdrop-blur-sm hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 group-hover:scale-105 group-hover:bg-card/90 relative overflow-hidden">
+                {/* Background pattern on hover */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-highlight/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <div className="flex items-center gap-4 mb-2 relative z-10">
+                  <span className="text-xs font-bold tracking-wider text-primary uppercase px-3 py-1 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                    {item.year}
+                  </span>
+                  <h3 className="font-semibold text-base md:text-lg group-hover:text-primary transition-colors">
+                    {item.title}
+                  </h3>
                 </div>
-                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{item.body || item.text}</p>
+
+                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors relative z-10">
+                  {item.body || item.text}
+                </p>
+
+                {/* Subtle decorative elements */}
+                <div className="absolute top-2 right-2 w-20 h-20 bg-gradient-to-br from-primary/10 to-highlight/10 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                {/* Progress indicator for timeline */}
+                <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-primary to-highlight transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
               </div>
             </div>
           ))}
