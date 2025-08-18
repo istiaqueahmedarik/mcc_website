@@ -25,13 +25,22 @@ import StatsCounter from '@/components/landing/StatsCounter'
 
 export default function Home() {
   const [cms, setCms] = React.useState(null)
+
+  // Function to scroll to stats section
+  const scrollToStats = () => {
+    const statsSection = document.getElementById('stats-section')
+    if (statsSection) {
+      statsSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   React.useEffect(() => {
     async function load() {
       try {
         const res = await fetch(process.env.NEXT_PUBLIC_SERVER_URL + '/landing/public', { cache: 'no-store' })
         const json = await res.json()
-        if(!json.error) setCms(json)
-      } catch(e){console.error(e)}
+        if (!json.error) setCms(json)
+      } catch (e) { console.error(e) }
     }
     load()
   }, [])
@@ -89,14 +98,17 @@ export default function Home() {
             A community for algorithms, problem solving & collaborative learning. Compete, learn, build & grow with peers pushing the same limits as you.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <MagicButton
-              title="Join Now"
-              position="right"
-              icon={<MoveRight className="ml-2" />}
-              otherClasses="hover:bg-primary hover:text-primary-foreground"
-            />
+            <Link href="/login">
+              <MagicButton
+                title="Join Now"
+                position="right"
+                icon={<MoveRight className="ml-2" />}
+                otherClasses="hover:bg-primary hover:text-primary-foreground"
+              />
+            </Link>
             <MagicButton
               title="Explore Platform"
+              handleClick={scrollToStats}
               otherClasses="hover:bg-secondary hover:text-secondary-foreground"
             />
           </div>
@@ -105,7 +117,7 @@ export default function Home() {
       </section>
 
       {/* Stats */}
-      <section className="w-full max-w-7xl px-4">
+      <section id="stats-section" className="w-full max-w-7xl px-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           <StatsCounter value={stats[0]?.value || 0} suffix={stats[0]?.suffix || ''} title={stats[0]?.title || ''} />
           <StatsCounter value={stats[1]?.value || 0} suffix={stats[1]?.suffix || ''} title={stats[1]?.title || ''} />
