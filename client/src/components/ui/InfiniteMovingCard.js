@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 export const InfiniteMovingCards = ({
@@ -8,7 +9,7 @@ export const InfiniteMovingCards = ({
   direction = "left",
   speed = "fast",
   pauseOnHover = true,
-  className
+  className,
 }) => {
   const containerRef = React.useRef(null);
   const scrollerRef = React.useRef(null);
@@ -37,9 +38,15 @@ export const InfiniteMovingCards = ({
   const getDirection = () => {
     if (containerRef.current) {
       if (direction === "left") {
-        containerRef.current.style.setProperty("--animation-direction", "forwards");
+        containerRef.current.style.setProperty(
+          "--animation-direction",
+          "forwards"
+        );
       } else {
-        containerRef.current.style.setProperty("--animation-direction", "reverse");
+        containerRef.current.style.setProperty(
+          "--animation-direction",
+          "reverse"
+        );
       }
     }
   };
@@ -55,20 +62,22 @@ export const InfiniteMovingCards = ({
     }
   };
   return (
-    (<div
+    <div
       ref={containerRef}
       className={cn(
         // outer mask gradient for smooth fade edges
         "scroller relative z-20 max-w-7xl overflow-hidden [mask-image:linear-gradient(to_right,transparent,rgba(0,0,0,0.9)_15%,rgba(0,0,0,0.9)_85%,transparent)]",
         className
-      )}>
+      )}
+    >
       <ul
         ref={scrollerRef}
         className={cn(
           "flex min-w-full shrink-0 gap-6 py-6 w-max flex-nowrap",
           start && "animate-scroll",
           pauseOnHover && "hover:[animation-play-state:paused]"
-        )}>
+        )}
+      >
         {items.map((item, idx) => (
           <li
             key={idx}
@@ -92,12 +101,16 @@ export const InfiniteMovingCards = ({
                   />
                 ) : (
                   <div className="h-12 w-12 rounded-full border border-border/70 bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                    {item.name?.charAt(0) || '?'}
+                    {item.name?.charAt(0) || "?"}
                   </div>
                 )}
                 <div className="flex flex-col">
-                  <figcaption className="text-sm font-semibold tracking-wide text-foreground">{item.name}</figcaption>
-                  <span className="text-[11px] uppercase tracking-wider font-medium text-primary/80 group-hover:text-primary transition-colors">{item.title}</span>
+                  <figcaption className="text-sm font-semibold tracking-wide text-foreground">
+                    {item.name}
+                  </figcaption>
+                  <span className="text-[11px] uppercase tracking-wider font-medium text-primary/80 group-hover:text-primary transition-colors">
+                    {item.title}
+                  </span>
                 </div>
               </div>
               <blockquote className="relative pl-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
@@ -105,8 +118,12 @@ export const InfiniteMovingCards = ({
                 {item.quote}
               </blockquote>
               <div className="mt-auto flex items-center justify-between pt-2">
-                <span className="text-[10px] tracking-wider text-muted-foreground/70">ALUMNI</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary/80 font-medium group-hover:bg-primary/20 transition-colors">Mentor</span>
+                <span className="text-[10px] tracking-wider text-muted-foreground/70">
+                  ALUMNI
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary/80 font-medium group-hover:bg-primary/20 transition-colors">
+                  Mentor
+                </span>
               </div>
               {/* subtle decorative grid */}
               <div className="pointer-events-none absolute inset-0 rounded-2xl [background:radial-gradient(circle_at_80%_15%,hsl(var(--highlight)/0.15),transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -114,6 +131,6 @@ export const InfiniteMovingCards = ({
           </li>
         ))}
       </ul>
-    </div>)
+    </div>
   );
 };
