@@ -90,11 +90,46 @@ export default function Home() {
     { year: '2024', title: 'Scaling Up', body: 'Hundreds of active members & cross‑university collabs.' },
   ]
   const alumni = cms?.alumni || [
-    { quote: 'Leadership & Platform Scaling', name: 'Ayesha Rahman', title: 'Former President (2019–2020) • Software Engineer @ Google', image: 'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png' },
-    { quote: 'Problem Setting & Training', name: 'Mahmudul Hasan', title: 'Former Competitive Programming Lead • SDE @ Amazon', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/1024px-Amazon_logo.svg.png' },
-    { quote: 'Curriculum & Mentorship', name: 'Farhan Ahmed', title: 'Former Education Coordinator • SWE @ Meta', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/2560px-Meta_Platforms_Inc._logo.svg.png' },
-    { quote: 'AI Research & Innovation', name: 'Nusrat Jahan', title: 'Former Core Member • Research Engineer @ Microsoft', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png' },
-    { quote: 'Automation & Tooling', name: 'Sakib Chowdhury', title: 'Former Contest Ops • Engineer @ DeepMind', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Google_DeepMind_logo.svg/2560px-Google_DeepMind_logo.svg.png' },
+    {
+      quote: 'Leadership & Platform Scaling',
+      name: 'Ayesha Rahman',
+      title: 'Former President (2019–2020) • Software Engineer @ Google',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+      company: 'Google',
+      role: 'Software Engineer'
+    },
+    {
+      quote: 'Problem Setting & Training',
+      name: 'Mahmudul Hasan',
+      title: 'Former Competitive Programming Lead • SDE @ Amazon',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/1024px-Amazon_logo.svg.png',
+      company: 'Amazon',
+      role: 'Software Development Engineer'
+    },
+    {
+      quote: 'Curriculum & Mentorship',
+      name: 'Farhan Ahmed',
+      title: 'Former Education Coordinator • SWE @ Meta',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/2560px-Meta_Platforms_Inc._logo.svg.png',
+      company: 'Meta',
+      role: 'Software Engineer'
+    },
+    {
+      quote: 'AI Research & Innovation',
+      name: 'Nusrat Jahan',
+      title: 'Former Core Member • Research Engineer @ Microsoft',
+      image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png',
+      company: 'Microsoft',
+      role: 'Research Engineer'
+    },
+    {
+      quote: 'Automation & Tooling',
+      name: 'Sakib Chowdhury',
+      title: 'Former Contest Ops • Engineer @ DeepMind',
+      image: 'https://cdn.brandfetch.io/id9M89MUnI/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B',
+      company: 'DeepMind',
+      role: 'Software Engineer'
+    },
   ]
 
   return (
