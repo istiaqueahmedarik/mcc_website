@@ -14,11 +14,15 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'cravatar.cn',
+      },{
+        protocol: 'https',
+        hostname: 'cn.cravatar.com',
       },
       {
         protocol: 'https',
         hostname: 'cdn.vjudge.net.cn',
       }
+      
     ],
     dangerouslyAllowSVG: true,
 },
