@@ -28,6 +28,7 @@ import {
   BarChart3,
   Award,
   Bell,
+  LineChart,
 } from 'lucide-react'
 import Link from 'next/link'
 import StatsCounter from '@/components/landing/StatsCounter'
@@ -49,12 +50,21 @@ export default function Home() {
       try {
         const res = await fetch(process.env.NEXT_PUBLIC_SERVER_URL + '/landing/public', { cache: 'no-store' })
         const json = await res.json()
-        if (!json.error) setCms(json)
+        if (!json.error) {
+          // Ensure Problem Tracker is included in features
+          if (json.features && !json.features.some(f => f.title === 'Problem Tracker')) {
+            json.features = [
+              { title: 'Problem Tracker', desc: 'Track practice across platforms with smart streaks & heatmaps.' },
+              ...json.features
+            ];
+          }
+          setCms(json)
+        }
       } catch (e) { console.error(e) }
     }
     load()
   }, [])
-  // Fallbacks
+  // Fallbacks - Ensure all 8 features are included
   const features = cms?.features || [
     { title: 'Problem Tracker', desc: 'Track practice across platforms with smart streaks & heatmaps.' },
     { title: 'Problem Bank', desc: 'Curated topic wise sets from beginner to advanced.' },
@@ -68,7 +78,7 @@ export default function Home() {
 
   // Feature icons mapping
   const featureIcons = {
-    'Problem Tracker': <Target className="w-5 h-5" />,
+    'Problem Tracker': <LineChart className="w-5 h-5" />,
     'Problem Bank': <Database className="w-5 h-5" />,
     'Class Videos': <PlayCircle className="w-5 h-5" />,
     'Standings': <Trophy className="w-5 h-5" />,

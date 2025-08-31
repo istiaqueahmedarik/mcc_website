@@ -103,7 +103,7 @@ export default function StatsCounter({ value, suffix = '', duration = 2500, titl
           animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          {count.toLocaleString()}{count === value ? suffix : ''}
+          {count.toLocaleString()}{suffix}
         </motion.span>
 
         {/* Title */}
