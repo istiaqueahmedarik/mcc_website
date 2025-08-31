@@ -99,7 +99,37 @@ export default function Home() {
     { year: '2021', title: 'Platform Launch', body: 'Internal tools evolve into a full learning platform.' },
     { year: '2024', title: 'Scaling Up', body: 'Hundreds of active members & cross‑university collabs.' },
   ]
-  const alumni = cms?.alumni || [
+
+  // Parse alumni data from database or use fallback
+  const alumni = cms?.alumni ? cms.alumni.map(a => {
+    // Parse company and role from title if they don't exist as separate fields
+    let company = a.company;
+    let role = a.role;
+
+    // If company and role aren't available, extract from title
+    if (!company || !role) {
+      // Title format: "Former Position • Role @ Company"
+      const titleParts = a.title.split('•');
+      if (titleParts.length > 1) {
+        const rolePart = titleParts[1].trim();
+        const roleCompanyMatch = rolePart.match(/(.*)\s+@\s+(.*)$/);
+
+        if (roleCompanyMatch) {
+          role = role || roleCompanyMatch[1].trim();
+          company = company || roleCompanyMatch[2].trim();
+        }
+      }
+    }
+
+    return {
+      quote: a.quote,
+      name: a.name,
+      title: a.title,
+      image: a.image_url || a.image,
+      company: company || 'Unknown Company',
+      role: role || 'Software Engineer'
+    };
+  }) : [
     {
       quote: 'Leadership & Platform Scaling',
       name: 'Ayesha Rahman',
