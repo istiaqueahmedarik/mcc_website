@@ -2,30 +2,29 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-        {
-            protocol: 'https',
-            hostname: process.env.HOST_NAME,
-        },
-        {
-            protocol: 'https',
-            hostname: 'placehold.co',
-
+      {
+        protocol: "https",
+        hostname: process.env.HOST_NAME,
       },
       {
-        protocol: 'https',
-        hostname: 'cravatar.cn',
-      },{
-        protocol: 'https',
-        hostname: 'cn.cravatar.com',
+        protocol: "https",
+        hostname: "placehold.co",
       },
       {
-        protocol: 'https',
-        hostname: 'cdn.vjudge.net.cn',
-      }
-      
+        protocol: "https",
+        hostname: "cravatar.cn",
+      },
+      {
+        protocol: "https",
+        hostname: "cn.cravatar.com",
+      },
+      {
+        protocol: "https",
+        hostname: "cdn.vjudge.net.cn",
+      },
     ],
     dangerouslyAllowSVG: true,
-},
+  },
   // experimental: {
   //   serverActions: {
   //     bodySizeLimit: '5mb',
@@ -35,12 +34,12 @@ const nextConfig = {
   // },
   experimental: {
     viewTransition: true,
-    
+
     //   ppr: 'incremental',
   },
   turbopack: {
     resolveAlias: {
-      fs: './stubs/fs.js',
+      fs: "./stubs/fs.js",
     },
   },
   reactStrictMode: true,
@@ -52,6 +51,6 @@ const nextConfig = {
     };
     return config;
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
