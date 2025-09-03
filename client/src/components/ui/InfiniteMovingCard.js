@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 export const InfiniteMovingCards = ({
@@ -11,23 +10,23 @@ export const InfiniteMovingCards = ({
   pauseOnHover = true,
   className,
 }) => {
-  const containerRef = React.useRef(null);
-  const scrollerRef = React.useRef(null);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const scrollerRef = React.useRef<HTMLUListElement | null>(null);
+
+  const [start, setStart] = useState(false);
 
   useEffect(() => {
     addAnimation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [start, setStart] = useState(false);
+
   function addAnimation() {
     if (containerRef.current && scrollerRef.current) {
       const scrollerContent = Array.from(scrollerRef.current.children);
 
       scrollerContent.forEach((item) => {
         const duplicatedItem = item.cloneNode(true);
-        if (scrollerRef.current) {
-          scrollerRef.current.appendChild(duplicatedItem);
-        }
+        scrollerRef.current?.appendChild(duplicatedItem);
       });
 
       getDirection();
@@ -35,21 +34,16 @@ export const InfiniteMovingCards = ({
       setStart(true);
     }
   }
+
   const getDirection = () => {
     if (containerRef.current) {
-      if (direction === "left") {
-        containerRef.current.style.setProperty(
-          "--animation-direction",
-          "forwards"
-        );
-      } else {
-        containerRef.current.style.setProperty(
-          "--animation-direction",
-          "reverse"
-        );
-      }
+      containerRef.current.style.setProperty(
+        "--animation-direction",
+        direction === "left" ? "forwards" : "reverse"
+      );
     }
   };
+
   const getSpeed = () => {
     if (containerRef.current) {
       if (speed === "fast") {
@@ -61,11 +55,11 @@ export const InfiniteMovingCards = ({
       }
     }
   };
+
   return (
     <div
       ref={containerRef}
       className={cn(
-        // outer mask gradient for smooth fade edges
         "scroller relative z-20 max-w-7xl overflow-hidden [mask-image:linear-gradient(to_right,transparent,rgba(0,0,0,0.9)_15%,rgba(0,0,0,0.9)_85%,transparent)]",
         className
       )}
@@ -73,7 +67,7 @@ export const InfiniteMovingCards = ({
       <ul
         ref={scrollerRef}
         className={cn(
-          "flex min-w-full shrink-0 gap-6 py-6 w-max flex-nowrap",
+          "flex min-w-full shrink-0 gap-8 py-8 w-max flex-nowrap",
           start && "animate-scroll",
           pauseOnHover && "hover:[animation-play-state:paused]"
         )}
@@ -82,51 +76,76 @@ export const InfiniteMovingCards = ({
           <li
             key={idx}
             className={cn(
-              "group relative w-[300px] md:w-[400px] flex-shrink-0",
-              // perspective wrapper for subtle hover lift
-              "[transform-style:preserve-3d]"
+              "group relative w-[320px] md:w-[420px] flex-shrink-0",
+              "[transform-style:preserve-3d] perspective-1000"
             )}
           >
-            {/* gradient border frame */}
-            <div className="absolute inset-0 rounded-2xl p-[1px] bg-[linear-gradient(140deg,hsl(var(--primary))_0%,hsl(var(--highlight))_40%,transparent_80%)] opacity-60 group-hover:opacity-100 transition-opacity" />
-            {/* inner card */}
-            <figure className="relative h-full rounded-2xl bg-background/70 backdrop-blur-md border border-border/60 shadow-[0_4px_16px_-4px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col gap-4 px-5 py-6 transition-all duration-300 group-hover:shadow-[0_6px_28px_-6px_rgba(0,0,0,0.4)] group-hover:-translate-y-1">
-              <div className="flex items-center gap-4">
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="h-12 w-12 rounded-full border border-border/70 object-contain bg-gradient-to-br from-secondary/40 to-background p-1 shadow-inner"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-full border border-border/70 bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-                    {item.name?.charAt(0) || "?"}
+            {/* Animated gradient border */}
+            <div className="absolute inset-0 rounded-3xl p-[2px] bg-[linear-gradient(140deg,hsl(var(--primary))_0%,hsl(var(--highlight))_40%,transparent_90%)] opacity-60 group-hover:opacity-100 transition-all duration-500" />
+
+            {/* Main card */}
+            <figure className="relative h-full rounded-3xl bg-gradient-to-br from-card/95 via-card/90 to-card/95 backdrop-blur-md border border-border/50 shadow-xl overflow-hidden transition-all duration-500 group-hover:shadow-2xl group-hover:-translate-y-1">
+              <div className="flex items-start gap-6 mb-6 px-6 pt-6">
+                {/* Logo or avatar */}
+                <div className="relative">
+                  {item.image ? (
+                    <img
+                      src={item.image}
+                      alt={item.company || item.name}
+                      className="h-14 w-14 rounded-2xl border border-border/70 object-contain bg-white/90 p-2 shadow-inner group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/70 to-highlight/50 flex items-center justify-center text-lg font-bold text-white">
+                      {item.company?.charAt(0) || item.name?.charAt(0) || "?"}
+                    </div>
+                  )}
+
+                  {/* Verified badge */}
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full border-2 border-card shadow-sm flex items-center justify-center">
+                    <svg
+                      className="w-2.5 h-2.5 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 
+                          01-1.414 0l-4-4a1 1 0 011.414-1.414L8 
+                          12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
                   </div>
-                )}
-                <div className="flex flex-col">
-                  <figcaption className="text-sm font-semibold tracking-wide text-foreground">
+                </div>
+
+                {/* Name + Role + Company */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-bold text-foreground mb-1 truncate group-hover:text-primary transition-colors">
                     {item.name}
-                  </figcaption>
-                  <span className="text-[11px] uppercase tracking-wider font-medium text-primary/80 group-hover:text-primary transition-colors">
-                    {item.title}
-                  </span>
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    {item.role || item.title || "Engineer"}
+                  </p>
+                  {item.company && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-primary/80 font-semibold">@</span>
+                      <span className="font-bold text-primary group-hover:text-highlight transition-colors">
+                        {item.company}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <blockquote className="relative pl-3 text-xs md:text-sm text-muted-foreground leading-relaxed">
-                <span className="absolute left-0 top-0 h-full w-px bg-gradient-to-b from-primary/60 via-border to-transparent" />
+
+              {/* Quote */}
+              <blockquote className="relative px-6 pb-6 text-sm md:text-base text-muted-foreground leading-relaxed">
+                <span className="absolute left-6 top-0 h-full w-px bg-gradient-to-b from-primary/60 via-border to-transparent" />
                 {item.quote}
               </blockquote>
-              <div className="mt-auto flex items-center justify-between pt-2">
-                <span className="text-[10px] tracking-wider text-muted-foreground/70">
-                  ALUMNI
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary/80 font-medium group-hover:bg-primary/20 transition-colors">
-                  Mentor
-                </span>
-              </div>
-              {/* subtle decorative grid */}
-              <div className="pointer-events-none absolute inset-0 rounded-2xl [background:radial-gradient(circle_at_80%_15%,hsl(var(--highlight)/0.15),transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity" />
+
+              {/* Decorative glow */}
+              <div className="pointer-events-none absolute inset-0 rounded-3xl [background:radial-gradient(circle_at_80%_15%,hsl(var(--highlight)/0.15),transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity" />
             </figure>
           </li>
         ))}
