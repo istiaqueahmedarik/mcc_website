@@ -2,23 +2,35 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-        {
+        ...(process.env.HOST_NAME ? [{
             protocol: 'https',
             hostname: process.env.HOST_NAME,
-        },
+        }] : []),
         {
             protocol: 'https',
             hostname: 'placehold.co',
-
-      },
+        },
       {
         protocol: 'https',
         hostname: 'cravatar.cn',
       },
       {
         protocol: 'https',
+        hostname: 'cn.cravatar.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'cdn.vjudge.net.cn',
+      },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.brandfetch.io',
       }
+      
     ],
     dangerouslyAllowSVG: true,
 },
