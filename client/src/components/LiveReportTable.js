@@ -1,15 +1,15 @@
 "use client"
 
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
-import { useMemo } from "react"
-import { cn } from "@/lib/utils"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Trophy, Medal, Award, Star, AlertCircle, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
+import { AlertCircle, Info, Minus, TrendingDown, TrendingUp } from 'lucide-react'
+import Image from "next/image"
+import { useMemo } from "react"
 import { ScrollArea } from "./ui/scroll-area"
 
 function ReportTable({ merged, lastUpdated }) {
@@ -125,7 +125,7 @@ function ReportTable({ merged, lastUpdated }) {
                                 <Info className="h-4 w-4" />
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="w-11/12 md:max-w-4xl">
                             <DialogHeader>
                                 <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
                                 <DialogDescription asChild>
@@ -231,7 +231,7 @@ function ReportTable({ merged, lastUpdated }) {
                                             <Badge
                                                 variant="default"
                                                 className={cn(
-                                                    "min-w-[32px] transition-all duration-200 group-hover:shadow-sm",
+                                                    "min-w-[32px] px-2.5 py-1.5 transition-all duration-200 group-hover:shadow-sm",
                                                     index < 12 &&
                                                         (index < 3
                                                             ? "bg-yellow-500 text-white"
@@ -286,6 +286,7 @@ function ReportTable({ merged, lastUpdated }) {
                                             )
                                         })()}
                                     </TableCell>
+                                    {/* Name & Avatar */}
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <div className={cn('relative w-8 h-8 flex-shrink-0', isTop && 'rounded-full')}>
@@ -301,9 +302,11 @@ function ReportTable({ merged, lastUpdated }) {
                                             <span className={cn('font-bold', isTop && 'top-rank-name')} style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.realName || "—"}</span>
                                         </div>
                                     </TableCell>
+                                    {/* Username */}
                                     <TableCell className={cn('font-bold', isTop && 'top-rank-name')}>
                                         <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
                                     </TableCell>
+                                    {/* Contests Attended */}
                                     <TableCell className="text-center">
                                         <Badge
                                             variant="outline"
@@ -312,6 +315,7 @@ function ReportTable({ merged, lastUpdated }) {
                                             {u.totalContestsAttended}
                                         </Badge>
                                     </TableCell>
+                                    {/* Solved */}
                                     <TableCell>
                                         <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
                                             <p className="flex items-center gap-1 text-sm">
@@ -343,7 +347,7 @@ function ReportTable({ merged, lastUpdated }) {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
+                                        <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm flex items-center justify-center">
                                             {u.totalDemeritPoints > 0 ? (
                                                 <TooltipProvider>
                                                     <Tooltip>
