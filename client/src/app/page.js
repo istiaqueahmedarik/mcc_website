@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import MagicButton from '@/components/ui/MagicButton'
 import MagicButton2 from '@/components/ui/MagicButton2'
 import { Spotlight } from '@/components/ui/Spotlight'
-import { InfiniteMovingCards } from '@/components/ui/InfiniteMovingCard'
 import {
   TextRevealCard,
   TextRevealCardTitle,
@@ -172,6 +171,49 @@ export default function Home() {
     },
   ]
 
+  // Inline, lightweight marquee to avoid ref error from InfiniteMovingCards
+  const AlumniMarquee = ({ items, speed = 0.5 }) => {
+    const trackRef = React.useRef(null)
+    React.useEffect(() => {
+      const el = trackRef.current
+      if (!el) return
+      let raf
+      let x = 0
+      const getHalfWidth = () => el.scrollWidth / 2
+      const step = () => {
+        x -= speed
+        const half = getHalfWidth()
+        if (-x >= half) x = 0
+        el.style.transform = `translateX(${x}px)`
+        raf = requestAnimationFrame(step)
+      }
+      raf = requestAnimationFrame(step)
+      return () => cancelAnimationFrame(raf)
+    }, [speed])
+
+    const Card = ({ item }) => (
+      <div className="min-w-[260px] rounded-lg border p-4 bg-card/80 backdrop-blur flex items-center gap-3">
+        <img src={item.image} alt={item.company || item.name} className="h-8 w-8 object-contain rounded-sm" />
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{item.name}</span>
+          <span className="text-xs text-muted-foreground">
+            {(item.role || '').trim()} {item.company ? `@ ${item.company}` : ''}
+          </span>
+        </div>
+      </div>
+    )
+
+    const list = React.useMemo(() => items.concat(items), [items])
+
+    return (
+      <div className="relative overflow-hidden">
+        <div ref={trackRef} className="flex gap-4 will-change-transform">
+          {list.map((it, idx) => <Card key={idx} item={it} />)}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <main className="scroll-smooth w-full flex flex-col gap-32 justify-center items-center overflow-x-hidden bg-background">
       {/* Scroll Progress Indicator */}
@@ -208,10 +250,13 @@ export default function Home() {
             {/* Subtle glow effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-highlight/20 to-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
           </div>
-          <p className="text-muted-foreground max-w-xl leading-relaxed text-sm md:text-base relative">
-            A community for algorithms, problem solving & collaborative learning. Compete, learn, build & grow with peers pushing the same limits as you.
+          
+          <div className="relative max-w-xl">
+            <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
+              A community for algorithms, problem solving & collaborative learning. Compete, learn, build & grow with peers pushing the same limits as you.
+            </p>
             <div className="absolute -inset-4 bg-gradient-to-r from-transparent via-primary/5 to-transparent rounded-lg opacity-0 hover:opacity-100 transition-opacity duration-300 -z-10" />
-          </p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link href="/login">
               <MagicButton
@@ -341,11 +386,8 @@ export default function Home() {
         <p className="text-center text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mb-8">
           They honed their skills here and now contribute at world‑class companies & research labs. Stay inspired by their journeys.
         </p>
-        <InfiniteMovingCards
-          items={alumni}
-          direction="right"
-          speed="slow"
-        />
+        {/* Replaced InfiniteMovingCards with inline marquee to avoid ref error */}
+        <AlumniMarquee items={alumni} speed={0.6} />
         <div className="flex justify-center mt-6">
           <Link href="/alumni">
             <Button variant="outline">See all Alumni</Button>
