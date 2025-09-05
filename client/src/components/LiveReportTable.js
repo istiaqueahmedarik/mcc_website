@@ -19,7 +19,6 @@ function ReportTable({ merged, lastUpdated }) {
         return filtered
     }, [merged.users])
 
-    // Build per-contest ranking maps and per-user progress vs previous attended contest
     const { contestRanks, progressByUser } = useMemo(() => {
         const contestRanks = {}
 
@@ -79,7 +78,7 @@ function ReportTable({ merged, lastUpdated }) {
     useEffect(() => {
         const load = async () => {
             try{
-                const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+                const base = process.env.SERVER_URL
                 const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
                 const json = await res.json()
                 setValidVjudgeIds(new Set(json?.result || []))
