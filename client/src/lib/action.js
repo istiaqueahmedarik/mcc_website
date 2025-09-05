@@ -851,6 +851,7 @@ export async function getActiveCustomContests(){
   try {
     const res = await fetch(`${process.env.SERVER_URL}/custom-contests/active`, { cache: 'no-store' })
     const json = await res.json();
+    console.log(json);
     return json.result || []
   } catch (e){
     console.error(e);return []
