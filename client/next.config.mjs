@@ -1,4 +1,10 @@
 /** @type {import('next').NextConfig} */
+const supHost = (() => {
+  try {
+    return process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).hostname : null
+  } catch { return null }
+})()
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -6,6 +12,7 @@ const nextConfig = {
             protocol: 'https',
             hostname: process.env.HOST_NAME,
         }] : []),
+        ...(supHost ? [{ protocol: 'https', hostname: supHost }] : []),
         {
             protocol: 'https',
             hostname: 'placehold.co',
@@ -34,14 +41,10 @@ const nextConfig = {
     ],
     dangerouslyAllowSVG: true,
 },
-  // experimental: {
-  //   serverActions: {
-  //     bodySizeLimit: '5mb',
-  //   },
-  //   reactCompiler: true,
-  //   ppr: 'incremental',
-  // },
   experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
     viewTransition: true,
     
     //   ppr: 'incremental',

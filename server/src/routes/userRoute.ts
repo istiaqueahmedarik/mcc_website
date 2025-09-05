@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { getSchedulesDash, getVjudgeId, loginToVJudgeRoute, verifyCodeforces, setVjudgeId, listVjudgePending, verifyVjudge, setTshirtSize } from '../controllers/userController'
+import { getSchedulesDash, getVjudgeId, loginToVJudgeRoute, verifyCodeforces, setVjudgeId, listVjudgePending, verifyVjudge, setTshirtSize, setProfilePic } from '../controllers/userController'
 
 const route = new Hono()
 
@@ -19,5 +19,6 @@ route.post('/vjudge/set', setVjudgeId)
 route.get('/vjudge/pending', listVjudgePending)
 route.post('/vjudge/verify', verifyVjudge)
 route.post('/tshirt/set', setTshirtSize)
+route.post('/profile-pic/set', setProfilePic)
 
 export default route

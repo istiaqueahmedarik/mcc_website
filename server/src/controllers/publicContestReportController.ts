@@ -27,7 +27,7 @@ export const insertPublicContestReport = async (c: any) => {
 export const getAllPublicContestReports = async (c: any) => {
 
     try {
-        const result = await sql`SELECT * FROM public."Public_contest_report" ORDER BY created_at DESC`
+        const result = await sql`SELECT * FROM public."Public_contest_report" ORDER BY created_at ASC`
         return c.json({ result, success: true })
     } catch (error) {
         console.log(error)
@@ -39,7 +39,7 @@ export const getPublicContestReport = async (c: any) => {
 
     const { report_id } = await c.req.json()
     try {
-        const result = await sql`SELECT * FROM public."Public_contest_report" WHERE "Shared_contest_id" = ${report_id}`
+        const result = await sql`SELECT * FROM public."Public_contest_report" WHERE "Shared_contest_id" = ${report_id} `
         return c.json({ result, success: true })
     } catch (error) {
         console.log(error)

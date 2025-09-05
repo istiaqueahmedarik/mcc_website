@@ -12,6 +12,7 @@ import { ExternalLink, LogOut, Shield, User, ZoomIn, CheckCircle2, XCircle } fro
 import Image from "next/image"
 import { redirect } from "next/navigation"
 import { post_with_token } from "@/lib/action"
+import { createClient } from "@/utils/supabase/server"
 
 
 
@@ -58,6 +59,10 @@ export default async function page({ searchParams }) {
                 <p className="text-sm text-muted-foreground mt-2">
                   Member since {new Date(user.created_at).toLocaleDateString()}
                 </p>
+                <form action={updateProfilePic} className="mt-4 flex flex-col sm:flex-row items-center gap-2">
+                  <Input type="file" name="image" accept="image/*" className="max-w-xs" />
+                  <Button type="submit" variant="outline">Update Photo</Button>
+                </form>
               </div>
               <form action={logout}>
                 <Button
@@ -352,6 +357,34 @@ async function saveTshirtSize(formData) {
   "use server"
   const val = formData.get('tshirt_size')?.toString().trim() || null
   await post_with_token('user/tshirt/set', { tshirt_size: val })
+  redirect('/profile')
+}
+
+async function updateProfilePic(formData){
+  "use server"
+  const file = formData.get('image')
+  if(!file || typeof file === 'string') return
+
+  // Get current user id/email
+  const prof = await get_with_token('auth/user/profile')
+  const me = prof?.result?.[0]
+  const userId = me?.id || 'me'
+
+  const supabase = await createClient()
+  const fileName = `${Date.now()}-${file.name}`
+  const path = `profile_pics/${userId}/${fileName}`
+
+  const { data, error } = await supabase.storage
+    .from('all_picture')
+    .upload(path, file)
+
+  if(error){
+    console.error('Upload error:', error)
+    redirect('/profile')
+  }
+
+  const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/${data.fullPath}`
+  await post_with_token('user/profile-pic/set', { profile_pic: url })
   redirect('/profile')
 }
 

@@ -277,3 +277,21 @@ export const setTshirtSize = async (c: any) => {
     return c.json({ error: 'Failed to set T-shirt size' }, 400)
   }
 }
+
+// Update profile picture URL
+export const setProfilePic = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { profile_pic } = await c.req.json()
+    if (!profile_pic || typeof profile_pic !== 'string') {
+      return c.json({ error: 'Invalid profile_pic' }, 400)
+    }
+    const rows = await sql`update users set profile_pic = ${profile_pic} where id = ${id} returning id, profile_pic`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to set profile picture' }, 400)
+  }
+}

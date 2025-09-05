@@ -49,7 +49,7 @@ export const getContestRoomContest = async (c: any) => {
             return c.json({ error: 'Room not found' }, 400)
         }
         const name = room_res[0]['Room Name']
-        const result = await sql`SELECT * FROM "Contest_room_contests" WHERE room_id = ${contest_room_contest_id}`
+        const result = await sql`SELECT * FROM "Contest_room_contests" WHERE room_id = ${contest_room_contest_id} ORDER BY created_at ASC`
         return c.json({ result, success: true, name })
     } catch (error) {
         console.log(error)
