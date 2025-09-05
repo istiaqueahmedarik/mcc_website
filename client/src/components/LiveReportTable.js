@@ -78,8 +78,9 @@ function ReportTable({ merged, lastUpdated }) {
     useEffect(() => {
         const load = async () => {
             try{
-                const base = process.env.SERVER_URL
-                const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
+                const base = process.env.SERVER_URL + "/auth/public/vjudge-ids";
+                console.log(base);
+                const res = await fetch(base, { cache: 'no-store' })
                 const json = await res.json()
                 setValidVjudgeIds(new Set(json?.result || []))
             } catch(e){ console.error('Failed to load vjudge ids', e) }
