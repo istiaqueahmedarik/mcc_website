@@ -79,6 +79,7 @@ function ReportTable({ merged, lastUpdated }) {
         const load = async () => {
             try{
                 const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+                console.log(base);
                 const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
                 const json = await res.json()
                 setValidVjudgeIds(new Set(json?.result || []))
