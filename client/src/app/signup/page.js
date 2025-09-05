@@ -7,18 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signUp } from "@/lib/action"
-import {
-  AtSign,
-  CircleArrowOutUpRight,
-  BadgeIcon as IdCard,
-  Lock,
-  LockKeyhole,
-  Phone,
-  UserRound,
-  Upload,
-  Loader2,
-  CheckCircle2,
-} from "lucide-react"
+import { AtSign, BadgeIcon as IdCard, Lock, LockKeyhole, Phone, UserRound, Upload, Loader2, CheckCircle2, Eye, EyeOff, Info } from "lucide-react"
 import Link from "next/link"
 import { useActionState } from "react"
 import { motion } from "framer-motion"
@@ -39,16 +28,56 @@ export default function Page() {
   const [isScanning, setIsScanning] = useState(false)
   const [scanResults, setScanResults] = useState(null)
   const fileInputRef = useRef(null)
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [agree, setAgree] = useState(false)
+  const [idError, setIdError] = useState("")
+
+  const maxIdSize = 5 * 1024 * 1024 // 5MB
+
+  const passwordStrength = (pw) => {
+    let score = 0
+    if (pw.length >= 8) score++
+    if (/[A-Z]/.test(pw)) score++
+    if (/[a-z]/.test(pw)) score++
+    if (/[0-9]/.test(pw)) score++
+    if (/[^A-Za-z0-9]/.test(pw)) score++
+    return Math.min(score, 4)
+  }
+
+  const handlePickedFile = (file) => {
+    if (!file) return
+    if (file.size > maxIdSize) {
+      setIdError("File too large. Max 5MB.")
+      return
+    }
+    setIdError("")
+    const reader = new FileReader()
+    reader.onload = () => {
+      setIdCardImage(reader.result)
+      processIdCard(reader.result)
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleIdCardUpload = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        setIdCardImage(reader.result)
-        processIdCard(reader.result)
-      }
-      reader.readAsDataURL(file)
+      handlePickedFile(file)
+    }
+  }
+
+  const onDropIdCard = (e) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      // set file onto the hidden input as well
+      const dt = new DataTransfer()
+      dt.items.add(file)
+      if (fileInputRef.current) fileInputRef.current.files = dt.files
+      handlePickedFile(file)
     }
   }
 
@@ -103,7 +132,7 @@ export default function Page() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-4xl"
       >
-        <Card className="shadow-lg border-primary/10">
+        <Card className="shadow-lg border-primary/10 overflow-hidden">
           <CardHeader className="space-y-1 pb-6 border-b">
             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
               <CardTitle className="text-3xl font-bold text-center">Create Your Account</CardTitle>
@@ -114,6 +143,10 @@ export default function Page() {
                 </Link>{" "}
                 instead.
               </CardDescription>
+              <div className="mt-3 flex items-center justify-center text-xs text-muted-foreground">
+                <Info className="h-3.5 w-3.5 mr-1" />
+                We’ll extract your basic details from your ID card image. You can link CP profiles later from your profile page.
+              </div>
             </motion.div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -178,14 +211,26 @@ export default function Page() {
                     <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
                       <Lock className="h-5 w-5 text-muted-foreground" />
                       <Input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         id="password"
                         name="password"
-                        placeholder="Enter a super secret password"
+                        placeholder="Enter a strong password"
                         className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
                         required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                      <button type="button" aria-label="Toggle password visibility" onClick={() => setShowPassword(v => !v)} className="text-muted-foreground hover:text-foreground">
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <div className="h-2 w-full bg-gray-200/60 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${passwordStrength(password) >= 1 ? 'bg-red-500' : 'bg-transparent'}`}
+                        style={{ width: `${(password ? (passwordStrength(password)+1) : 0) * 20}%` }}
                       />
                     </div>
+                    <div className="text-xs text-muted-foreground">Use at least 8 characters with a mix of uppercase, lowercase, numbers and symbols.</div>
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
@@ -195,14 +240,24 @@ export default function Page() {
                     <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
                       <LockKeyhole className="h-5 w-5 text-muted-foreground" />
                       <Input
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         id="confirm_password"
                         name="confirm_password"
                         placeholder="Confirm your password"
                         className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
                         required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                       />
+                      <button type="button" aria-label="Toggle confirm password visibility" onClick={() => setShowConfirmPassword(v => !v)} className="text-muted-foreground hover:text-foreground">
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
+                    {confirmPassword && (
+                      <div className={`text-xs ${confirmPassword === password ? 'text-green-600' : 'text-red-600'}`}>
+                        {confirmPassword === password ? 'Passwords match' : 'Passwords do not match'}
+                      </div>
+                    )}
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
@@ -217,6 +272,8 @@ export default function Page() {
                           : "border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5",
                       )}
                       onClick={() => fileInputRef.current?.click()}
+                      onDragOver={(e) => { e.preventDefault(); }}
+                      onDrop={onDropIdCard}
                     >
                       <input
                         ref={fileInputRef}
@@ -233,7 +290,7 @@ export default function Page() {
                         <div className="flex flex-col items-center text-center">
                           <IdCard className="h-10 w-10 text-muted-foreground mb-2" />
                           <p className="text-sm font-medium">Upload your MIST ID Card</p>
-                          <p className="text-xs text-muted-foreground mt-1">Click or drag and drop</p>
+                          <p className="text-xs text-muted-foreground mt-1">Click or drag & drop (JPG/PNG, max 5MB)</p>
                           <Button variant="outline" size="sm" className="mt-4">
                             <Upload className="h-4 w-4 mr-2" /> Select Image
                           </Button>
@@ -262,6 +319,7 @@ export default function Page() {
                           </Button>
                         </div>
                       )}
+                      {idError && <p className="text-xs text-red-600 mt-2">{idError}</p>}
                     </div>
                   </motion.div>
                   <input type="hidden" name="profile_pic" value={scanResults?.profilePicture || ""} />
@@ -276,8 +334,17 @@ export default function Page() {
                     </motion.div>
                   )}
 
+                  <motion.div variants={itemVariants} className="flex items-start gap-2">
+                    <input id="agree" type="checkbox" className="mt-1" checked={agree} onChange={e => setAgree(e.target.checked)} />
+                    <Label htmlFor="agree" className="text-sm text-muted-foreground">I agree to the Terms of Service and Privacy Policy</Label>
+                  </motion.div>
+
                   <motion.div variants={itemVariants} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button type="submit" className="w-full py-6 text-base" disabled={pending || isScanning}>
+                    <Button
+                      type="submit"
+                      className="w-full py-6 text-base"
+                      disabled={pending || isScanning || !agree || !password || password !== confirmPassword}
+                    >
                       {pending || isScanning ? (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center">
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -366,83 +433,6 @@ export default function Page() {
                       </p>
                     </div>
                   )}
-                </motion.div>
-
-                <motion.div variants={itemVariants} className="border rounded-xl p-4">
-                  <h3 className="font-medium text-lg mb-4 flex items-center">
-                    <CircleArrowOutUpRight className="mr-2 h-5 w-5" />
-                    Competitive Programming Profiles
-                  </h3>
-
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="vjudge_id" className="text-sm font-medium">
-                        Vjudge ID
-                      </Label>
-                      <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
-                        <CircleArrowOutUpRight className="h-5 w-5 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          id="vjudge_id"
-                          name="vjudge_id"
-                          placeholder="Enter your Vjudge ID"
-                          className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="cf_id" className="text-sm font-medium">
-                        Codeforces ID
-                      </Label>
-                      <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
-                        <CircleArrowOutUpRight className="h-5 w-5 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          id="cf_id"
-                          name="cf_id"
-                          placeholder="Enter your Codeforces ID"
-                          className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="codechef_id" className="text-sm font-medium">
-                        CodeChef ID
-                      </Label>
-                      <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
-                        <CircleArrowOutUpRight className="h-5 w-5 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          id="codechef_id"
-                          name="codechef_id"
-                          placeholder="Enter your CodeChef ID"
-                          className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="atcoder_id" className="text-sm font-medium">
-                        Atcoder ID
-                      </Label>
-                      <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
-                        <CircleArrowOutUpRight className="h-5 w-5 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          id="atcoder_id"
-                          name="atcoder_id"
-                          placeholder="Enter your Atcoder ID"
-                          className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
                 </motion.div>
               </motion.div>
             </div>

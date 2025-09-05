@@ -4,7 +4,6 @@ import { cookies } from "next/headers"
 import { redirect } from "next/navigation";
 import { loginToVJudge } from "@/actions/contest_details";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-
 export default async function LoginPage() {
     const cookieStore = await cookies();
     const vjudgeCookie = cookieStore.get("vj_session");

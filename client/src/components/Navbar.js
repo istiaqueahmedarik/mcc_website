@@ -32,6 +32,7 @@ import {
   UserPlus,
   AlertTriangle,
   SheetIcon,
+  LaptopMinimalIcon,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -64,6 +65,7 @@ const Navbar = async () => {
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
     { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
     { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
+    { href: '/admin/vjudge-verification', icon: LaptopMinimalIcon, label: 'VJudge Verification' },
   ]
 
   const loggedIn = (await cookies()).get('token')

@@ -3,14 +3,28 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { get_with_token, logout } from "@/lib/action"
-import { ExternalLink, LogOut, Shield, User, ZoomIn } from "lucide-react"
+import { ExternalLink, LogOut, Shield, User, ZoomIn, CheckCircle2, XCircle } from "lucide-react"
 import Image from "next/image"
+import { redirect } from "next/navigation"
+import { post_with_token } from "@/lib/action"
 
 
 
-export default async function page() {
+export default async function page({ searchParams }) {
+  if (searchParams?.code) {
+    const code = searchParams.code
+    const redirectUri = process.env.CF_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/profile`
+    try {
+      await post_with_token('user/cf/verify', { code, redirect_uri: redirectUri })
+    } catch (e) {}
+    redirect('/profile')
+  }
+
   const res = await get_with_token("auth/user/profile")
   const user = res.result[0];
 
@@ -68,11 +82,48 @@ export default async function page() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground">User ID</h3>
-              <p className="text-sm font-mono mt-1 break-all">{user.id}</p>
+            
+            <div className="pt-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">T-shirt Size <span className="text-amber-600">(highly recommended)</span></Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button size="sm" variant="outline">Size guide</Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 text-sm">
+                    <p className="mb-2 font-medium">Unisex sizes (Asian fit)</p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                      <li>XS: Chest 34-36in (86-91cm)</li>
+                      <li>S: Chest 36-38in (91-97cm)</li>
+                      <li>M: Chest 38-40in (97-102cm)</li>
+                      <li>L: Chest 40-42in (102-107cm)</li>
+                      <li>XL: Chest 42-44in (107-112cm)</li>
+                      <li>XXL: Chest 44-46in (112-117cm)</li>
+                      <li>3XL: Chest 46-48in (117-122cm)</li>
+                      <li>4XL: Chest 48-50in (122-127cm)</li>
+                    </ul>
+                    <p className="mt-2">Tip: If between sizes, choose the larger.</p>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <form action={saveTshirtSize} className="mt-2 flex items-center gap-2">
+                <select name="tshirt_size" defaultValue={user.tshirt_size || ''} className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none">
+                  <option value="" disabled>Select your size</option>
+                  <option value="XS">XS</option>
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                  <option value="XXL">XXL</option>
+                  <option value="3XL">3XL</option>
+                  <option value="4XL">4XL</option>
+                </select>
+                <Button type="submit" size="sm" variant="outline">Save</Button>
+              </form>
+              {user.tshirt_size && (
+                <p className="mt-1 text-xs text-muted-foreground">Current: {user.tshirt_size}</p>
+              )}
             </div>
-
             {user.mist_id && (
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground">MIST ID</h3>
@@ -113,6 +164,8 @@ export default async function page() {
                 </div>
               </div>
             )}
+
+           
           </CardContent>
         </Card>
 
@@ -142,6 +195,28 @@ export default async function page() {
                       {user.cf_id}
                       <ExternalLink className="h-3 w-3" />
                     </a>
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      {user.cf_verified ? (
+                        <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-4 w-4"/> Verified</span>
+                      ) : (
+                        <>
+                          <span className="text-amber-600 flex items-center gap-1"><XCircle className="h-4 w-4"/> Not verified</span>
+                          <CodeforcesVerifyButton />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!user.cf_id && (
+                <div className="flex items-start space-x-4">
+                  <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                    <span className="font-bold text-red-600 dark:text-red-400">CF</span>
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Codeforces</h3>
+                    <p className="text-sm text-muted-foreground">No handle saved</p>
+                    <CodeforcesVerifyButton />
                   </div>
                 </div>
               )}
@@ -202,6 +277,38 @@ export default async function page() {
                       {user.vjudge_id}
                       <ExternalLink className="h-3 w-3" />
                     </a>
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      {user.vjudge_verified ? (
+                        <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-4 w-4"/> Verified by admin</span>
+                      ) : (
+                        <span className="text-amber-600 flex items-center gap-1"><XCircle className="h-4 w-4"/> Pending admin verification</span>
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <form action={saveVjudge} className="flex items-center gap-2">
+                        <Label htmlFor="vjudge_id" className="text-sm">Change ID:</Label>
+                        <Input id="vjudge_id" name="vjudge_id" defaultValue={user.vjudge_id} placeholder="Enter VJudge ID" className="max-w-xs" />
+                        <Button type="submit" size="sm" variant="outline">Save</Button>
+                      </form>
+                      {!user.vjudge_verified && (<p className="mt-1 text-xs text-muted-foreground">Saving will reset verification.</p>)}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!user.vjudge_id && (
+                <div className="flex items-start space-x-4">
+                  <div className="h-10 w-10 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+                    <span className="font-bold text-purple-600 dark:text-purple-400">VJ</span>
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Virtual Judge</h3>
+                    <p className="text-sm text-muted-foreground">No VJudge ID saved</p>
+                    <form action={saveVjudge} className="mt-2 flex items-center gap-2">
+                      <Label htmlFor="vjudge_id_new" className="text-sm">Add ID:</Label>
+                      <Input id="vjudge_id_new" name="vjudge_id" placeholder="Enter VJudge ID" className="max-w-xs" />
+                      <Button type="submit" size="sm">Save</Button>
+                    </form>
+                    <p className="mt-1 text-xs text-muted-foreground">Admin will verify after you save.</p>
                   </div>
                 </div>
               )}
@@ -212,4 +319,40 @@ export default async function page() {
     </div>
   )
 }
+
+function CodeforcesVerifyButton() {
+  return (
+    <form action={startCfOauth}>
+      <Button type="submit" size="sm" className="mt-2">Verify with Codeforces</Button>
+    </form>
+  )
+}
+
+async function startCfOauth() {
+  "use server"
+  const clientId = process.env.CF_CLIENT_ID
+  const redirectUri = process.env.CF_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/profile`
+  const authUrl = new URL('https://codeforces.com/oauth/authorize')
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('scope', 'openid')
+  authUrl.searchParams.set('client_id', clientId || '')
+  authUrl.searchParams.set('redirect_uri', redirectUri)
+  redirect(authUrl.toString())
+}
+
+async function saveVjudge(formData) {
+  "use server"
+  const vjudge_id = formData.get('vjudge_id')?.toString().trim()
+  if (!vjudge_id) return
+  await post_with_token('user/vjudge/set', { vjudge_id })
+  redirect('/profile')
+}
+
+async function saveTshirtSize(formData) {
+  "use server"
+  const val = formData.get('tshirt_size')?.toString().trim() || null
+  await post_with_token('user/tshirt/set', { tshirt_size: val })
+  redirect('/profile')
+}
+
 
