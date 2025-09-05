@@ -8,6 +8,8 @@ import {
   pendingUser,
   rejectUser,
   signup,
+  getPublicProfileByVjudge,
+  listPublicVjudgeIds,
 } from '../controllers/authController'
 
 const route = new Hono()
@@ -53,5 +55,9 @@ route.post('/user/reject', rejectUser)
 route.post('/user/accept', acceptUser)
 route.get('/user/profile', getProfile)
 route.post('/profile', getProfilePost)
+
+// Public endpoints (no auth)
+route.get('/public/profile/vj/:vjudge', getPublicProfileByVjudge)
+route.get('/public/vjudge-ids', listPublicVjudgeIds)
 
 export default route

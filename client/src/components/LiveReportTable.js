@@ -9,7 +9,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils"
 import { AlertCircle, Info, Minus, TrendingDown, TrendingUp } from 'lucide-react'
 import Image from "next/image"
-import { useMemo } from "react"
+import Link from "next/link"
+import { useMemo, useEffect, useState } from "react"
 import { ScrollArea } from "./ui/scroll-area"
 
 function ReportTable({ merged, lastUpdated }) {
@@ -74,6 +75,18 @@ function ReportTable({ merged, lastUpdated }) {
     }, [merged.users, merged.contestIds])
 
     const totalUsers = users.length
+    const [validVjudgeIds, setValidVjudgeIds] = useState(null)
+    useEffect(() => {
+        const load = async () => {
+            try{
+                const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+                const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
+                const json = await res.json()
+                setValidVjudgeIds(new Set(json?.result || []))
+            } catch(e){ console.error('Failed to load vjudge ids', e) }
+        }
+        load()
+    }, [])
     const getNameColor = (rank) => {
         if (rank <= 3) {
             // Gold gradient: brightest for 1
@@ -304,7 +317,13 @@ function ReportTable({ merged, lastUpdated }) {
                                     </TableCell>
                                     {/* Username */}
                                     <TableCell className={cn('font-bold', isTop && 'top-rank-name')}>
-                                        <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
+                                        {validVjudgeIds?.has(String(u.username)) ? (
+                                            <Link href={`/profile/${encodeURIComponent(u.username)}`} className="underline-offset-2 hover:underline transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>
+                                                {u.username}
+                                            </Link>
+                                        ) : (
+                                            <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
+                                        )}
                                     </TableCell>
                                     {/* Contests Attended */}
                                     <TableCell className="text-center">

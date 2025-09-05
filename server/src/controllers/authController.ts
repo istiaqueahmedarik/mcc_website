@@ -81,6 +81,54 @@ export const getProfilePost = async (c: any) => {
   }
 }
 
+// Public profile by VJudge ID (no auth)
+export const getPublicProfileByVjudge = async (c: any) => {
+  const vjudge = c.req.param('vjudge')
+  if (!vjudge) return c.json({ error: 'Missing vjudge id' }, 400)
+  try {
+    const rows = await sql`
+      select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id
+      from users
+      where vjudge_id = ${vjudge}
+      limit 1
+    `
+    if (rows.length === 0) return c.json({ error: 'Not found' }, 404)
+    // Do not expose sensitive fields like password
+    const u = rows[0]
+    return c.json({
+      result: {
+        id: u.id,
+        full_name: u.full_name,
+        profile_pic: u.profile_pic,
+        email: u.email,
+        phone: u.phone,
+        created_at: u.created_at,
+        vjudge_id: u.vjudge_id,
+        vjudge_verified: u.vjudge_verified,
+        cf_id: u.cf_id,
+        cf_verified: u.cf_verified,
+        codechef_id: u.codechef_id,
+        atcoder_id: u.atcoder_id,
+      }
+    })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Something went wrong' }, 500)
+  }
+}
+
+// Public list of existing VJudge IDs (no auth)
+export const listPublicVjudgeIds = async (c: any) => {
+  try {
+    const rows = await sql`select vjudge_id from users where vjudge_id is not null and vjudge_id <> ''`
+    const ids = rows.map((r: any) => r.vjudge_id)
+    return c.json({ result: ids })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed' }, 500)
+  }
+}
+
 export const pendingUser = async (c: any) => {
   try {
     const result = await sql`select * from users where granted = false`
