@@ -33,6 +33,7 @@ import {
   AlertTriangle,
   SheetIcon,
   LaptopMinimalIcon,
+  Globe,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -49,6 +50,7 @@ const Navbar = async () => {
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
+    { href: '/contests_report/live', icon: Globe, label: 'Contests' },
   ]
 
   const userTools = [
