@@ -3,9 +3,9 @@ import CountdownTimer from '@/components/countdown-timer'
 import { PaginationControls } from '@/components/pagination-controls'
 import { SearchInput } from '@/components/search-input'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { getActiveCustomContests } from '@/lib/action'
-import { Clock, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export default function CustomContestDisplay(){
@@ -179,6 +179,12 @@ function MCCContestCard({ contest }) {
     })
   }
 
+  const formatDay = (timestamp) => {
+    return new Date(timestamp).toLocaleDateString("en-US", {
+      weekday: "long"
+    })
+  }
+
   const getDuration = () => {
     const durationMs = end - start
     const hours = Math.floor(durationMs / (1000 * 60 * 60))
@@ -186,72 +192,96 @@ function MCCContestCard({ contest }) {
   }
 
   return (
-    <Card className="overflow-hidden border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow">
-      <CardContent className="p-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  status === 'UPCOMING' ? 'bg-yellow-500' : 
-                  status === 'ONGOING' ? 'bg-green-500' : 'bg-red-500'
-                }`}
-              ></span>
-              <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-red-600 text-white tracking-wide">
-                MCC
+    <Card className="overflow-hidden border-dashed border border-zinc-200 dark:border-zinc-700 hover:border-red-500 dark:hover:border-red-500 transition-all duration-300">
+      <CardContent className="p-0">
+        {/* Header Section with Platform and Contest Info */}
+        <div className="p-4 relative">
+          {/* Platform name in right corner */}
+          {contest.platform && (
+            <div className="absolute top-3 right-3">
+              <span className="px-2 py-1 text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded uppercase">
+                {contest.platform}
               </span>
-              {contest.platform && (
-                <span className="text-xs uppercase text-zinc-500 dark:text-zinc-400">
-                  {contest.platform}
-                </span>
-              )}
             </div>
-            <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50 line-clamp-2">
-              {contest.name}
-            </h3>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          {contest.description && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-              {contest.description}
-            </p>
           )}
-
-          <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
-            <Clock className="mr-2 h-4 w-4" />
-            <span>Duration: {getDuration()} {getDuration() === 1 ? 'hour' : 'hours'}</span>
-          </div>
-
-          <div className="flex items-center text-sm text-zinc-500 dark:text-zinc-400">
-            <span>
-              {status === 'ENDED' ? 'Ended on: ' : 'Starts on: '}
-              {formatDate(status === 'ENDED' ? contest.end_time : contest.start_time)}
+          
+          {/* Status indicator */}
+          <div className="flex items-center space-x-2 mb-3">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                status === 'UPCOMING' ? 'bg-yellow-500' : 
+                status === 'ONGOING' ? 'bg-green-500' : 'bg-red-500'
+              }`}
+            ></span>
+            <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-red-600 text-white tracking-wide">
+              MCC
             </span>
           </div>
 
+          {/* Contest name and description on same line */}
+          <div className="pr-16">
+            <div className="flex items-start space-x-3">
+              <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-50 flex-shrink-0">
+                {contest.name}
+              </h3>
+              {contest.description && (
+                <span className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-1">
+                  — {contest.description}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Time Details Section with different background */}
+        <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 space-y-3">
+          {/* Start/End time and Duration */}
+          <div className="flex justify-between items-center">
+            <div className="space-y-1">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                {status === 'ENDED' ? 'Ended' : 'Starts'}
+              </div>
+              <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {formatDate(status === 'ENDED' ? contest.end_time : contest.start_time)}
+              </div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                {formatDay(contest.start_time)}
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                Duration
+              </div>
+              <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                {getDuration()} {getDuration() === 1 ? 'hour' : 'hours'}
+              </div>
+            </div>
+          </div>
+
+          {/* Countdown Timer for upcoming contests */}
           {status === 'UPCOMING' && (
-            <div className="mt-4">
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700">
               <CountdownTimer targetTime={start} />
+            </div>
+          )}
+
+          {/* Contest Link */}
+          {contest.link && (
+            <div className="pt-2">
+              <a href={normalizeUrl(contest.link)} target="_blank" rel="noopener noreferrer">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20 flex items-center justify-center gap-2"
+                >
+                  {status === 'UPCOMING' ? 'Register' : status === 'ONGOING' ? 'Join Now' : 'View Results'}
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </a>
             </div>
           )}
         </div>
       </CardContent>
-
-      <CardFooter className="p-0">
-        {contest.link && (
-          <a href={normalizeUrl(contest.link)} target="_blank" rel="noopener noreferrer" className="w-full">
-            <Button
-              variant="ghost"
-              className="w-full rounded-none h-12 text-red-600 hover:text-red-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center gap-2"
-            >
-              {status === 'UPCOMING' ? 'Register' : status === 'ONGOING' ? 'Join Now' : 'View Results'}
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </a>
-        )}
-      </CardFooter>
     </Card>
   )
 }

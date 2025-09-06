@@ -101,11 +101,25 @@ export default function CustomContestManager({ initialContests }){
       setEditing(null)
       setShowSuccess('update')
       setTimeout(() => setShowSuccess(null), 3000)
-      // Refresh the page to get updated data
+      
+      // Update the local state immediately with the updated contest data
+      if (updateState.contest) {
+        setContests(prev => prev.map(contest => 
+          contest.id === updateState.contest.id ? updateState.contest : contest
+        ))
+      } else {
+        // Fallback: if no contest data in response, refresh the page
+        setTimeout(() => {
+          setIsRefreshing(true)
+          router.refresh()
+        }, 500)
+      }
+      
+      // Optional: Still do a delayed refresh to ensure consistency
       setTimeout(() => {
         setIsRefreshing(true)
         router.refresh()
-      }, 1500)
+      }, 3000) // Increased delay since we update locally first
     }
     if (updateState?.error) {
       setUpdateLoading(false)
@@ -175,6 +189,19 @@ export default function CustomContestManager({ initialContests }){
     console.log('Duration in hours:', durationHours)
     
     return durationHours.toFixed(1) // Round to 1 decimal place
+  }
+
+  // Helper function to format date for datetime-local input
+  const formatDateForInput = (dateString) => {
+    const date = new Date(dateString)
+    // Get local time values
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}`
   }
 
   const handleRefresh = () => {
@@ -429,7 +456,7 @@ export default function CustomContestManager({ initialContests }){
                         id={`start-${c.id}`} 
                         name='start_time' 
                         type='datetime-local' 
-                        defaultValue={new Date(c.start_time).toISOString().slice(0,16)} 
+                        defaultValue={formatDateForInput(c.start_time)} 
                         required 
                         disabled={updateLoading}
                         className="transition-all duration-200 focus:ring-2 focus:ring-red-500"

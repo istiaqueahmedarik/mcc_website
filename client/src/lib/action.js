@@ -891,7 +891,7 @@ export async function updateCustomContestAction(prevState, formData){
     const res = await post_with_token('custom-contests/update', data)
     if(res.error) return { error: res.error }
     revalidatePath('/admin/custom-contests')
-    return { success: true }
+    return { success: true, contest: res.result }
   } catch(e){console.error(e);return { error: 'Something went wrong' }}
 }
 

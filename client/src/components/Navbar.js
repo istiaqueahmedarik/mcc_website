@@ -47,13 +47,13 @@ const Navbar = async () => {
       icon: CalendarClock,
       label: 'Contest Reminders',
     },
-    { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
-    { href: '/contests_report/live', icon: Globe, label: 'Contests' },
+    { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
   ]
-
+  
   const userTools = [
+    { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
   ]
 
