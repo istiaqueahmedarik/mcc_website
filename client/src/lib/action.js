@@ -215,6 +215,15 @@ export async function updateAchievement(prevState, formData) {
 export async function signUp(prevState, formData) {
   let raw = Object.fromEntries(formData)
   console.log(raw)
+  
+  // Validate password length
+  if (!raw.password || raw.password.length < 8) {
+    return {
+      success: false,
+      message: 'Password must be at least 8 characters long',
+    }
+  }
+  
   if (raw.password !== raw.confirm_password) {
     return {
       success: false,
@@ -894,4 +903,53 @@ export async function deleteCustomContestAction(prevState, formData){
     revalidatePath('/admin/custom-contests')
     return { success: true }
   } catch(e){console.error(e);return { error: 'Something went wrong' }}
+}
+
+// Password Reset Functions
+export async function sendResetOTP(email) {
+  try {
+    const response = await post('auth/reset-password/send-otp', { email })
+    return {
+      success: !response.error,
+      message: response.error || response.message || 'OTP sent successfully'
+    }
+  } catch (error) {
+    console.error('Send OTP Error:', error)
+    return {
+      success: false,
+      message: 'An error occurred while sending OTP'
+    }
+  }
+}
+
+export async function verifyOTP(email, otp) {
+  try {
+    const response = await post('auth/reset-password/verify-otp', { email, otp })
+    return {
+      success: !response.error,
+      message: response.error || response.message || 'OTP verified successfully'
+    }
+  } catch (error) {
+    console.error('Verify OTP Error:', error)
+    return {
+      success: false,
+      message: 'An error occurred while verifying OTP'
+    }
+  }
+}
+
+export async function resetPassword(email, otp, password) {
+  try {
+    const response = await post('auth/reset-password', { email, otp, password })
+    return {
+      success: !response.error,
+      message: response.error || response.message || 'Password reset successfully'
+    }
+  } catch (error) {
+    console.error('Reset Password Error:', error)
+    return {
+      success: false,
+      message: 'An error occurred while resetting password'
+    }
+  }
 }

@@ -1,21 +1,20 @@
 "use client"
 
-import { useState, useRef } from "react"
+import MccLogo from "@/components/IconChanger/MccLogo"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signUp } from "@/lib/action"
-import { AtSign, BadgeIcon as IdCard, Lock, LockKeyhole, Phone, UserRound, Upload, Loader2, CheckCircle2, Eye, EyeOff, Info } from "lucide-react"
-import Link from "next/link"
-import { useActionState } from "react"
-import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
-import Image from "next/image"
-import MccLogo from "@/components/IconChanger/MccLogo"
-import { OCRImage } from "@/lib/imageProcess"
 import { cropBase64Image } from "@/lib/imageCrop"
+import { OCRImage } from "@/lib/imageProcess"
+import { cn } from "@/lib/utils"
+import { motion } from "framer-motion"
+import { AtSign, CheckCircle2, Eye, EyeOff, BadgeIcon as IdCard, Info, Loader2, Lock, LockKeyhole, Phone, Upload, UserRound } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { useActionState, useRef, useState } from "react"
 
 const initialState = {
   message: "",
@@ -38,13 +37,8 @@ export default function Page() {
   const maxIdSize = 5 * 1024 * 1024 // 5MB
 
   const passwordStrength = (pw) => {
-    let score = 0
-    if (pw.length >= 8) score++
-    if (/[A-Z]/.test(pw)) score++
-    if (/[a-z]/.test(pw)) score++
-    if (/[0-9]/.test(pw)) score++
-    if (/[^A-Za-z0-9]/.test(pw)) score++
-    return Math.min(score, 4)
+    // Simple validation: just check if password is at least 8 characters
+    return pw.length >= 8 ? 1 : 0
   }
 
   const handlePickedFile = (file) => {
@@ -226,11 +220,23 @@ export default function Page() {
                     </div>
                     <div className="h-2 w-full bg-gray-200/60 dark:bg-gray-800 rounded-full overflow-hidden">
                       <div
-                        className={`h-full transition-all ${passwordStrength(password) >= 1 ? 'bg-red-500' : 'bg-transparent'}`}
-                        style={{ width: `${(password ? (passwordStrength(password)+1) : 0) * 20}%` }}
+                        className={`h-full transition-all ${password.length >= 8 ? 'bg-green-500' : password.length > 0 ? 'bg-red-500' : 'bg-transparent'}`}
+                        style={{ width: `${password.length >= 8 ? '100' : password.length > 0 ? '50' : '0'}%` }}
                       />
                     </div>
-                    <div className="text-xs text-muted-foreground">Use at least 8 characters with a mix of uppercase, lowercase, numbers and symbols.</div>
+                    <div className="text-xs text-muted-foreground">
+                      {password.length >= 8 ? (
+                        <span className="text-green-600 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Password meets requirements
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <Info className="h-3 w-3" />
+                          Password must be at least 8 characters long
+                        </span>
+                      )}
+                    </div>
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
