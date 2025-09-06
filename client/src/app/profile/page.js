@@ -17,8 +17,10 @@ import { createClient } from "@/utils/supabase/server"
 
 
 export default async function page({ searchParams }) {
-  if (searchParams?.code) {
-    const code = searchParams.code
+  const awaitedSearchParams = await searchParams;
+  const rawCode = awaitedSearchParams?.code;
+  const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+  if (code) {
     const redirectUri = process.env.CF_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/profile`
     try {
       await post_with_token('user/cf/verify', { code, redirect_uri: redirectUri })
