@@ -145,7 +145,7 @@ export default function CustomContestDisplay(){
 
       {searchQuery && filteredContests.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-zinc-500 dark:text-zinc-400">No MCC contests found matching "{searchQuery}"</p>
+          <p className="text-zinc-500 dark:text-zinc-400">No MCC contests found matching {searchQuery}</p>
         </div>
       )}
 
