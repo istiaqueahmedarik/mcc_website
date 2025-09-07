@@ -250,7 +250,7 @@ export default function Home() {
             {/* Subtle glow effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-highlight/20 to-primary/20 rounded-full blur-3xl opacity-30 animate-pulse" />
           </div>
-          
+
           <div className="relative max-w-xl">
             <p className="text-muted-foreground leading-relaxed text-sm md:text-base">
               A community for algorithms, problem solving & collaborative learning. Compete, learn, build & grow with peers pushing the same limits as you.
@@ -263,13 +263,13 @@ export default function Home() {
                 title="Join Now"
                 position="right"
                 icon={<MoveRight className="ml-2" />}
-                otherClasses="hover:bg-primary hover:text-primary-foreground transform hover:scale-105 transition-all duration-300"
+                otherClasses="transform hover:scale-105 transition-all duration-300"
               />
             </Link>
             <MagicButton
               title="Explore Platform"
               handleClick={scrollToStats}
-              otherClasses="hover:bg-secondary hover:text-secondary-foreground transform hover:scale-105 transition-all duration-300"
+              otherClasses="transform hover:scale-105 transition-all duration-300"
             />
           </div>
         </div>

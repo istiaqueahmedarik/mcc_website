@@ -34,11 +34,13 @@ import {
   SheetIcon,
   LaptopMinimalIcon,
   Globe,
+  Loader2,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
 import MccLogo from './IconChanger/MccLogo'
 import ThemeChanger from './ThemeChanger'
+import LoginSignupButtons from './LoginSignupButtons'
 
 const Navbar = async () => {
   const navItems = [
@@ -51,7 +53,7 @@ const Navbar = async () => {
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
     { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
   ]
-  
+
   const userTools = [
     { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
@@ -146,50 +148,26 @@ const Navbar = async () => {
         <div className="flex items-center space-x-4">
           <ThemeChanger />
           <div className="hidden md:flex items-center space-x-2">
-            <Link
-              href="/login"
-              className={`${loggedIn && 'hidden'}`}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Login
-              </Button>
-            </Link>
-            <Link
-              href="/signup"
-              className={`${loggedIn && 'hidden'}`}
-            >
-              <Button
-                variant="default"
-                size="sm"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                Sign Up
-              </Button>
-            </Link>
-            <Link
-              href="/profile"
-              className={`${!loggedIn && 'hidden'}`}
-            >
-              <Avatar className="w-8 h-8">
-                <AvatarImage
-                  src={user && user.result && user.result[0].profile_pic}
-                />
-                <AvatarFallback>
-                  {user && user.result && user.result[0].full_name[0]}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
+            <LoginSignupButtons loggedIn={!!loggedIn} />
+            {loggedIn && (
+              <Link href="/profile">
+                <Avatar className="w-8 h-8 transition-none">
+                  <AvatarImage
+                    src={user && user.result && user.result[0].profile_pic}
+                  />
+                  <AvatarFallback>
+                    {user && user.result && user.result[0].full_name[0]}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            )}
           </div>
           <Sheet>
             <SheetTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
-                className="lg:hidden"
+                className="lg:hidden transition-none"
               >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Open menu</span>
@@ -197,7 +175,7 @@ const Navbar = async () => {
             </SheetTrigger>
             <SheetContent
               side="right"
-              className="w-[300px] sm:w-[400px]"
+              className="w-[300px] sm:w-[400px] transition-transform duration-200 ease-in-out"
             >
               <SheetHeader>
                 <SheetTitle>Menu</SheetTitle>
@@ -205,91 +183,96 @@ const Navbar = async () => {
                   Navigate through our platform
                 </SheetDescription>
               </SheetHeader>
-              <SheetClose asChild>
-                <div className="mt-6 flex flex-col space-y-4">
-                  {navItems.map((item, index) => (
-                    <SheetClose
-                      asChild
-                      key={index}
+              <div className="mt-6 flex flex-col space-y-4">
+                {navItems.map((item, index) => (
+                  <SheetClose
+                    asChild
+                    key={index}
+                  >
+                    <Link
+                      key={item.href}
+                      href={item.href}
                     >
-                      <Link
-                        key={item.href}
-                        href={item.href}
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-lg transition-none"
                       >
-                        <Button
-                          variant="ghost"
-                          className="w-full justify-start text-lg"
-                        >
-                          <item.icon className="mr-2 h-5 w-5" />
-                          {item.label}
-                        </Button>
-                      </Link>
-                    </SheetClose>
-                  ))}
+                        <item.icon className="mr-2 h-5 w-5" />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  </SheetClose>
+                ))}
 
-                  <hr className="my-4" />
-                  {user &&
-                    user.result &&
-                    user.result[0].admin &&
-                    adminTools.map((item, index) => (
-                      <SheetClose
-                        asChild
-                        key={index}
+                {loggedIn && userTools.map((item, index) => (
+                  <SheetClose
+                    asChild
+                    key={`user-${index}`}
+                  >
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                    >
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-lg transition-none"
                       >
-                        <Link
-                          key={item.href}
-                          href={item.href}
+                        <item.icon className="mr-2 h-5 w-5" />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  </SheetClose>
+                ))}
+
+                {user &&
+                  user.result &&
+                  user.result[0].admin && (
+                    <>
+                      <hr className="my-4" />
+                      {adminTools.map((item, index) => (
+                        <SheetClose
+                          asChild
+                          key={`admin-${index}`}
                         >
-                          <Button
-                            variant="ghost"
-                            className="w-full justify-start text-lg"
+                          <Link
+                            key={item.href}
+                            href={item.href}
                           >
-                            <item.icon className="mr-2 h-5 w-5" />
-                            {item.label}
-                          </Button>
-                        </Link>
-                      </SheetClose>
-                    ))}
-                  <hr className="my-4" />
-                  <Link
-                    href="/login"
-                    className={`${loggedIn && 'hidden'}`}
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-lg"
-                    >
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Login
-                    </Button>
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className={`${loggedIn && 'hidden'}`}
-                  >
-                    <Button
-                      variant="default"
-                      className="w-full justify-start text-lg"
-                    >
-                      <UserPlus className="mr-2 h-5 w-5" />
-                      Sign Up
-                    </Button>
-                  </Link>
-                  <Link
-                    href="/profile"
-                    className={`${!loggedIn && 'hidden'}`}
-                  >
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage
-                        src={user && user.result && user.result[0].profile_pic}
-                      />
-                      <AvatarFallback>
-                        {user && user.result && user.result[0].full_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Link>
-                </div>
-              </SheetClose>
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start text-lg transition-none"
+                            >
+                              <item.icon className="mr-2 h-5 w-5" />
+                              {item.label}
+                            </Button>
+                          </Link>
+                        </SheetClose>
+                      ))}
+                    </>
+                  )}
+                <hr className="my-4" />
+                <LoginSignupButtons loggedIn={!!loggedIn} mobile={true} />
+                {loggedIn && (
+                  <SheetClose asChild>
+                    <Link href="/profile">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start text-lg transition-none"
+                      >
+                        <Avatar className="mr-2 w-5 h-5">
+                          <AvatarImage
+                            src={user && user.result && user.result[0].profile_pic}
+                          />
+                          <AvatarFallback className="text-xs">
+                            {user && user.result && user.result[0].full_name[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        Profile
+                      </Button>
+                    </Link>
+                  </SheetClose>
+                )}
+              </div>
             </SheetContent>
           </Sheet>
         </div>
