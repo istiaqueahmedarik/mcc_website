@@ -116,7 +116,7 @@ export default async function FinalizedTeamsByContestPage(){
                               )}
                               {mi === 0 && <TableCell rowSpan={t.members.length}>{scoreCell}</TableCell>}
                               <TableCell>
-                                <Link href={`/u/${encodeURIComponent(m)}`} className="flex items-center gap-2 hover:text-primary">
+                                <Link href={`/profile/${encodeURIComponent(m)}`} className="flex items-center gap-2 hover:text-primary">
                                   <span className="relative w-6 h-6 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
                                     {img ? <Image src={img} alt={display} fill sizes="24px" className="object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">{display.charAt(0).toUpperCase()}</span>}
                                   </span>
@@ -173,7 +173,7 @@ export default async function FinalizedTeamsByContestPage(){
                               </TableCell>
                             )}
                             <TableCell>
-                              <Link href={`/u/${encodeURIComponent(m)}`} className="flex items-center gap-2 hover:text-primary">
+                              <Link href={`/profile/${encodeURIComponent(m)}`} className="flex items-center gap-2 hover:text-primary">
                                 <span className="relative w-7 h-7 rounded-full overflow-hidden ring-2 ring-background/60">
                                   {img ? <Image src={img} alt={display} fill sizes="28px" className="object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">{display.charAt(0).toUpperCase()}</span>}
                                 </span>
@@ -188,7 +188,7 @@ export default async function FinalizedTeamsByContestPage(){
                               <>
                                 <TableCell rowSpan={t.members.length} className="align-top text-xs">
                                   {t.coach_vjudge_id ? (
-                                    <Link href={`/u/${encodeURIComponent(t.coach_vjudge_id)}`} className="underline underline-offset-2 hover:text-primary">{coachProfile.full_name || t.coach_vjudge_id}</Link>
+                                    <Link href={`/profile/${encodeURIComponent(t.coach_vjudge_id)}`} className="underline underline-offset-2 hover:text-primary">{coachProfile.full_name || t.coach_vjudge_id}</Link>
                                   ) : <span className="text-muted-foreground/60">—</span>}
                                 </TableCell>
                                 <TableCell rowSpan={t.members.length} className="align-top text-xs">{coachProfile.email || '-'}</TableCell>
