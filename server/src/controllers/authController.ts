@@ -88,6 +88,7 @@ export const getProfile = async (c: any) => {
 
 export const getProfilePost = async (c: any) => {
   const { email } = await c.req.json();
+  console.log(email);
   try {
     const result =
       await sql`select full_name, profile_pic, mist_id, phone from users where email = ${email}`;
@@ -104,7 +105,7 @@ export const getPublicProfileByVjudge = async (c: any) => {
   if (!vjudge) return c.json({ error: "Missing vjudge id" }, 400);
   try {
     const rows = await sql`
-      select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id,tshirt_size,mist_id_card
+  select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id, tshirt_size, mist_id_card, mist_id
       from users
       where vjudge_id = ${vjudge}
       limit 1
@@ -128,6 +129,7 @@ export const getPublicProfileByVjudge = async (c: any) => {
         atcoder_id: u.atcoder_id,
         tshirt_size: u.tshirt_size,
         mist_id_card: u.mist_id_card,
+        mist_id: u.mist_id,
       }
     })
   } catch (e) {

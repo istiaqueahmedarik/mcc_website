@@ -65,10 +65,9 @@ export default async function Page({ params }) {
       eligible = within
     }
   }
-  // Sizes (team of 3 enforced server-side; UI just restricts choices length)
   const UI_MIN = 2
   const UI_MAX = 5
-  const SUBMIT_MIN = 2
+  const SUBMIT_MIN = 5
   const SUBMIT_MAX = 5
 
   async function submit(formData) { "use server"; const title = formData.get("team_title"); const choices = (formData.get("choices") || "").split(",").map((s) => s.trim()).filter(Boolean); const min = SUBMIT_MIN; const max = SUBMIT_MAX; const out = await submitTeamChoices(token, title, choices, min, max); revalidatePath(`/team/${token}`); return out }
@@ -234,7 +233,6 @@ export default async function Page({ params }) {
           </div>
         )}
 
-        {/* Selection Form */}
         {phase === 2 && col.is_open && !col.finalized && isParticipant && (
           <TeamSelectForm
             submitAction={submit}

@@ -306,7 +306,7 @@ export default async function Page({ params }) {
                         </div>
                       </div>
 
-                      <details className="group/manage border border-border/40 rounded-xl bg-muted/10 overflow-hidden">
+                      <details className="group/manage border border-border/40 rounded-xl bg-muted/10">
                         <summary className="cursor-pointer list-none flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/40 transition-colors">
                           <span className="text-sm font-medium tracking-wide">Manage Team</span>
                           <span className="text-xs text-muted-foreground group-open/manage:hidden">expand</span>

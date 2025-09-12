@@ -128,6 +128,5 @@ export async function adminStartPhase2(collection_id){
 }
 
 export async function searchUsersClient(q){
-  // Authenticated GET search
   return await get_with_token(`user/search?q=${encodeURIComponent(q)}`)
 }

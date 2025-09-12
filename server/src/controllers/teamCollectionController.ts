@@ -920,6 +920,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
             team_title: t.team_title,
             members,
             combined_score,
+            coach_vjudge_id: t.coach_vjudge_id || null,
         })
     }
     // Sort teams inside each collection

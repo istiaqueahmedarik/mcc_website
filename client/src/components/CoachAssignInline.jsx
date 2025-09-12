@@ -38,6 +38,7 @@ export default function CoachAssignInline({ teamTitle, initialCoach, collectionI
       const { adminAssignCoach } = await import('@/actions/team_collection')
       await adminAssignCoach(collectionId, teamTitle, userIdentifier)
       setCoach(userIdentifier)
+      console.log(coach);
       setOpen(false)
       // Refresh server component page so coach label in list updates
       router.refresh()
