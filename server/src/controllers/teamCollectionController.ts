@@ -847,7 +847,7 @@ export const adminStartPhase2 = async (c: any) => {
     // send emails to participants (opted-in)
     try {
         const part = await sql`SELECT DISTINCT u.email, u.full_name, u.vjudge_id FROM public.team_collection_participation p JOIN public.users u ON u.id=p.user_id WHERE p.collection_id=${collection_id} AND p.will_participate=true AND u.email IS NOT NULL`
-        const clientUrl = process.env.CLIENT_URL || ''
+        const clientUrl = process.env.NEXT_PUBLIC_CLIENT_URL || ''
         await Promise.all(part.map(async (u: any) => {
             try {
                 const subject = `Team Selection Phase Started${col.title ? ': ' + col.title : ''}`
