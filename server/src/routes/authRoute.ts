@@ -1,25 +1,28 @@
-import { Hono } from 'hono'
-import { jwt } from 'hono/jwt'
+import { Hono } from "hono";
+import { jwt } from "hono/jwt";
 import {
   acceptUser,
   getProfile,
   getProfilePost,
+  getPublicProfileByVjudge,
+  listPublicVjudgeIds,
   login,
   pendingUser,
   rejectUser,
+  resetPassword,
+  sendResetOTP,
   signup,
-  getPublicProfileByVjudge,
-  listPublicVjudgeIds,
-} from '../controllers/authController'
+  verifyOTP,
+} from "../controllers/authController";
 
-const route = new Hono()
+const route = new Hono();
 
 route.use(
-  '/user/*',
+  "/user/*",
   jwt({
-    secret: process.env.SECRET || '',
-  }),
-)
+    secret: process.env.SECRET || "",
+  })
+);
 
 // route.use('/user/*', async (c, next) => {
 //   try {
@@ -48,16 +51,22 @@ route.use(
 //   }
 // })
 
-route.post('/signup', signup)
-route.post('/login', login)
-route.get('/user/pendings', pendingUser)
-route.post('/user/reject', rejectUser)
-route.post('/user/accept', acceptUser)
-route.get('/user/profile', getProfile)
-route.post('/profile', getProfilePost)
+route.post("/signup", signup);
+route.post("/login", login);
+
+// Password reset routes
+route.post("/reset-password/send-otp", sendResetOTP);
+route.post("/reset-password/verify-otp", verifyOTP);
+route.post("/reset-password", resetPassword);
+
+route.get("/user/pendings", pendingUser);
+route.post("/user/reject", rejectUser);
+route.post("/user/accept", acceptUser);
+route.get("/user/profile", getProfile);
+route.post("/profile", getProfilePost);
 
 // Public endpoints (no auth)
-route.get('/public/profile/vj/:vjudge', getPublicProfileByVjudge)
-route.get('/public/vjudge-ids', listPublicVjudgeIds)
+route.get("/public/profile/vj/:vjudge", getPublicProfileByVjudge);
+route.get("/public/vjudge-ids", listPublicVjudgeIds);
 
-export default route
+export default route;
