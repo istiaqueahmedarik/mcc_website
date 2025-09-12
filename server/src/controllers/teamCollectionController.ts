@@ -3,61 +3,7 @@ import sql from '../db'
 import { randomBytes } from 'crypto'
 import { sendEmail } from '../sendEmail'
 
-// Ensure required tables exist
-async function ensureTables() {
-    // // team_collections: room-wide collections (contest_id optional)
-    // await sql`
-    //     CREATE TABLE IF NOT EXISTS public.team_collections (
-    //         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    //         created_at timestamptz NOT NULL DEFAULT now(),
-    //         room_id uuid NOT NULL REFERENCES public."Contest_report_room"(id),
-    //         contest_id text,
-    //         token text UNIQUE NOT NULL,
-    //         title text,
-    //         is_open boolean NOT NULL DEFAULT true,
-    //         finalized boolean NOT NULL DEFAULT false,
-    //         finalized_at timestamptz,
-    //         allow_non_participants boolean NOT NULL DEFAULT true
-    //     )
-    // `
-    // // team_collection_choices: one per user per collection
-    // await sql`
-    //     CREATE TABLE IF NOT EXISTS public.team_collection_choices (
-    //         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    //         created_at timestamptz NOT NULL DEFAULT now(),
-    //         collection_id uuid NOT NULL REFERENCES public.team_collections(id) ON DELETE CASCADE,
-    //         user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-    //         vjudge_id text,
-    //         team_title text NOT NULL,
-    //         ordered_choices text[] NOT NULL DEFAULT '{}',
-    //         min_size int NOT NULL DEFAULT 2,
-    //         max_size int NOT NULL DEFAULT 5,
-    //         is_participant boolean NOT NULL DEFAULT false
-    //     )
-    // `
-    // // unique per collection per user
-    // await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_team_collection_choices_user ON public.team_collection_choices (collection_id, user_id)`
-    // // team_collection_teams: finalized/admin-approved teams
-    // await sql`
-    //     CREATE TABLE IF NOT EXISTS public.team_collection_teams (
-    //         id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    //         created_at timestamptz NOT NULL DEFAULT now(),
-    //         collection_id uuid NOT NULL REFERENCES public.team_collections(id) ON DELETE CASCADE,
-    //         team_title text NOT NULL,
-    //         member_vjudge_ids text[] NOT NULL DEFAULT '{}',
-    //         approved boolean NOT NULL DEFAULT false,
-    //         approved_by uuid REFERENCES public.users(id),
-    //         approved_at timestamptz
-    //     )
-    // `
-    // // unique team title within a collection
-    // await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_team_collection_teams_title ON public.team_collection_teams (collection_id, team_title)`
-}
 
-
-// function uid(n = 12) {
-//     return randomBytes(n).toString('hex')
-// }
 
 export const startCollection = async (c: any) => {
     const { id, email } = c.get('jwtPayload')
@@ -66,7 +12,6 @@ export const startCollection = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { room_id, title, allow_non_participants = true } = await c.req.json()
     if (!room_id) return c.json({ error: 'room_id required' }, 400)
-    await ensureTables()
     const token = uuidv7()
     try {
         const result = await sql`
@@ -88,7 +33,6 @@ export const stopCollection = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensureTables()
     try {
         const res = await sql`UPDATE public.team_collections SET is_open=false WHERE id=${collection_id} RETURNING *`
         if (res.length === 0) return c.json({ error: 'Not found' }, 404)
@@ -106,7 +50,7 @@ export const reopenCollection = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensureTables()
+
     try {
         const rows = await sql`SELECT id, finalized FROM public.team_collections WHERE id=${collection_id} LIMIT 1`
         if (rows.length === 0) return c.json({ error: 'Not found' }, 404)
@@ -125,7 +69,7 @@ export const adminListCollections = async (c: any) => {
     if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
     const user = await sql`select * from users where id=${id} and email=${email}`
     if (user.length === 0) return c.json({ error: 'Unauthorized' }, 401)
-    await ensureTables()
+
     // also ensure phase related columns for listing
     try {
         await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase integer NOT NULL DEFAULT 1`;
@@ -138,7 +82,7 @@ export const adminListCollections = async (c: any) => {
 export const getCollectionPublic = async (c: any) => {
     const { token } = await c.req.json()
     if (!token) return c.json({ error: 'token required' }, 400)
-    await ensureTables()
+
     const rows = await sql`SELECT * FROM public.team_collections WHERE token=${token} LIMIT 1`
     if (rows.length === 0) return c.json({ error: 'Not found' }, 404)
     const collection = rows[0]
@@ -215,7 +159,7 @@ export const submitChoices = async (c: any) => {
         return c.json({ error: 'Invalid payload' }, 400)
     }
 
-    await ensureTables()
+
     const crows = await sql`SELECT * FROM public.team_collections WHERE token=${token} LIMIT 1`
     if (crows.length === 0) return c.json({ error: 'Collection not found' }, 404)
     const collection = crows[0]
@@ -305,7 +249,7 @@ export const finalizeCollection = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensureTables()
+
     const rows = await sql`SELECT * FROM public.team_collections WHERE id=${collection_id} LIMIT 1`
     if (rows.length === 0) return c.json({ error: 'Not found' }, 404)
     const collection = rows[0]
@@ -460,7 +404,7 @@ export const approveManualTeam = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id, team_title, member_vjudge_ids } = await c.req.json()
     if (!collection_id || !team_title || !Array.isArray(member_vjudge_ids)) return c.json({ error: 'Invalid payload' }, 400)
-    await ensureTables()
+
     try {
         const res = await sql`
       INSERT INTO public.team_collection_teams (collection_id, team_title, member_vjudge_ids, approved, approved_by, approved_at)
@@ -483,7 +427,7 @@ export const deleteCollection = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensureTables()
+
     try {
         // Remove dependent rows first for safety
         await sql`DELETE FROM public.team_collection_teams WHERE collection_id=${collection_id}`
@@ -504,7 +448,7 @@ export const adminCreateAssignment = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id, vjudge_id, team_title } = await c.req.json()
     if (!collection_id || !vjudge_id || !team_title) return c.json({ error: 'Invalid payload' }, 400)
-    await ensureTables()
+
     try {
         // Upsert team and add member if not present
         const trows = await sql`SELECT * FROM public.team_collection_teams WHERE collection_id=${collection_id} AND team_title=${team_title} LIMIT 1`
@@ -530,7 +474,7 @@ export const getUserTeams = async (c: any) => {
     if (rows.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const vj = rows[0].vjudge_id as string | null
     if (!vj) return c.json({ success: true, result: [] })
-    await ensureTables()
+
     const teams = await sql`
     SELECT t.*, c.room_id, c.contest_id, c.title as collection_title
     FROM public.team_collection_teams t
@@ -544,7 +488,7 @@ export const getUserTeams = async (c: any) => {
 export const getTeamsByVjudgePublic = async (c: any) => {
     const { vjudge_id } = await c.req.json()
     if (!vjudge_id) return c.json({ error: 'vjudge_id required' }, 400)
-    await ensureTables()
+
     const teams = await sql`
     SELECT t.*, c.room_id, c.contest_id, c.title as collection_title
     FROM public.team_collection_teams t
@@ -558,7 +502,6 @@ export const getTeamsByVjudgePublic = async (c: any) => {
 export const getTeamsCoachedByVjudgePublic = async (c: any) => {
     const { vjudge_id } = await c.req.json()
     if (!vjudge_id) return c.json({ error: 'vjudge_id required' }, 400)
-    // If coach column not present yet, return empty list gracefully
     try {
         const col = await sql`SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='team_collection_teams' AND column_name='coach_vjudge_id'`
         if (col.length === 0) {
@@ -585,7 +528,7 @@ export const adminGetCollectionDetail = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensureTables()
+
     const coll = await sql`SELECT c.*, r."Room Name" as room_name FROM public.team_collections c JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.id=${collection_id}`
     if (coll.length === 0) return c.json({ error: 'Not found' }, 404)
     const collection = coll[0]
@@ -597,6 +540,16 @@ export const adminGetCollectionDetail = async (c: any) => {
             if (Array.isArray(merged?.users)) rankOrder = merged.users.map((u: any) => String(u.username))
         }
     } catch { }
+    try {
+
+        const parts = await sql`SELECT vjudge_id FROM public.team_collection_participation WHERE collection_id=${collection_id} AND will_participate=true AND vjudge_id IS NOT NULL`
+        if (parts.length > 0) {
+            const allowed = new Set(parts.map((p: any) => String(p.vjudge_id)))
+            rankOrder = rankOrder.filter(vj => allowed.has(vj))
+        }
+    } catch (e) {
+        console.error('Failed filtering non-participants for admin detail', e)
+    }
     const choices = await sql`
             SELECT ch.*, u.full_name, u.vjudge_id as user_vjudge_id
             FROM public.team_collection_choices ch
@@ -750,7 +703,7 @@ export const getMyChoice = async (c: any) => {
     if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
     const { token } = await c.req.json()
     if (!token) return c.json({ error: 'token required' }, 400)
-    await ensureTables()
+
     const crows = await sql`SELECT * FROM public.team_collections WHERE token=${token} LIMIT 1`
     if (crows.length === 0) return c.json({ error: 'Collection not found' }, 404)
     const collection = crows[0]
@@ -759,24 +712,7 @@ export const getMyChoice = async (c: any) => {
     return c.json({ success: true, result: rows[0] })
 }
 
-// ===== New Phase / Participation / Requests / Leaderboard Endpoints =====
 
-// Ensure new tables/columns (duplicated lightweight guards)
-async function ensurePhaseTables() {
-    try {
-        await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase integer NOT NULL DEFAULT 1`;
-    } catch { }
-    try { await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase1_deadline timestamptz`; } catch { }
-    try { await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase2_started_at timestamptz`; } catch { }
-    try { await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase2_email_sent boolean NOT NULL DEFAULT false`; } catch { }
-    try {
-        await sql`CREATE TABLE IF NOT EXISTS public.team_collection_participation (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz NOT NULL DEFAULT now(), collection_id uuid NOT NULL REFERENCES public.team_collections(id) ON DELETE CASCADE, user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE, vjudge_id text, will_participate boolean NOT NULL DEFAULT false, updated_at timestamptz NOT NULL DEFAULT now())`;
-        await sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_team_collection_participation_user ON public.team_collection_participation (collection_id, user_id)`
-    } catch { }
-    try {
-        await sql`CREATE TABLE IF NOT EXISTS public.team_collection_team_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz NOT NULL DEFAULT now(), collection_id uuid NOT NULL REFERENCES public.team_collections(id) ON DELETE CASCADE, user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE, vjudge_id text, proposed_team_title text, desired_member_vjudge_ids text[] NOT NULL DEFAULT '{}', note text, processed boolean NOT NULL DEFAULT false, processed_at timestamptz)`
-    } catch { }
-}
 
 export const setParticipation = async (c: any) => {
     const { id, email } = c.get('jwtPayload')
@@ -786,7 +722,7 @@ export const setParticipation = async (c: any) => {
     const user = urows[0]
     const { collection_id, will_participate } = await c.req.json()
     if (!collection_id || typeof will_participate !== 'boolean') return c.json({ error: 'Invalid payload' }, 400)
-    await ensurePhaseTables()
+
     const crows = await sql`SELECT id, phase, finalized, phase1_deadline FROM public.team_collections WHERE id=${collection_id} LIMIT 1`
     if (crows.length === 0) return c.json({ error: 'Collection not found' }, 404)
     const col = crows[0]
@@ -803,7 +739,7 @@ export const getParticipationState = async (c: any) => {
     if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensurePhaseTables()
+
     const rows = await sql`SELECT will_participate FROM public.team_collection_participation WHERE collection_id=${collection_id} AND user_id=${id} LIMIT 1`
     return c.json({ success: true, result: rows.length ? rows[0].will_participate : false })
 }
@@ -811,7 +747,7 @@ export const getParticipationState = async (c: any) => {
 export const listActiveParticipationCollections = async (c: any) => {
     const { id, email } = c.get('jwtPayload')
     if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
-    await ensurePhaseTables()
+
     const rows = await sql`SELECT c.*, r."Room Name" as room_name FROM public.team_collections c JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.phase=1 AND c.finalized=false ORDER BY c.created_at DESC`
     if (rows.length === 0) return c.json({ success: true, result: [] })
     const part = await sql`SELECT collection_id, will_participate FROM public.team_collection_participation WHERE user_id=${id} AND collection_id = ANY(${rows.map((r: any) => r.id)})`
@@ -826,7 +762,7 @@ export const adminSetPhase1Deadline = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id, phase1_deadline } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensurePhaseTables()
+
     await sql`UPDATE public.team_collections SET phase1_deadline=${phase1_deadline ? sql`${phase1_deadline}` : null} WHERE id=${collection_id}`
     return c.json({ success: true })
 }
@@ -838,7 +774,7 @@ export const adminStartPhase2 = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensurePhaseTables()
+
     const rows = await sql`SELECT * FROM public.team_collections WHERE id=${collection_id} LIMIT 1`
     if (rows.length === 0) return c.json({ error: 'Not found' }, 404)
     const col = rows[0]
@@ -870,7 +806,7 @@ export const submitTeamRequest = async (c: any) => {
     const user = urows[0]
     const { collection_id, proposed_team_title, desired_member_vjudge_ids, note } = await c.req.json()
     if (!collection_id || !Array.isArray(desired_member_vjudge_ids)) return c.json({ error: 'Invalid payload' }, 400)
-    await ensurePhaseTables()
+
     await sql`INSERT INTO public.team_collection_team_requests (collection_id, user_id, vjudge_id, proposed_team_title, desired_member_vjudge_ids, note) VALUES (${collection_id}, ${user.id}, ${user.vjudge_id}, ${proposed_team_title || null}, ${desired_member_vjudge_ids}, ${note || null})`
     return c.json({ success: true })
 }
@@ -882,7 +818,7 @@ export const adminListTeamRequests = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { collection_id } = await c.req.json()
     if (!collection_id) return c.json({ error: 'collection_id required' }, 400)
-    await ensurePhaseTables()
+
     const rows = await sql`SELECT * FROM public.team_collection_team_requests WHERE collection_id=${collection_id} ORDER BY created_at DESC`
     return c.json({ success: true, result: rows })
 }
@@ -894,14 +830,14 @@ export const adminProcessTeamRequest = async (c: any) => {
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
     const { request_id, processed } = await c.req.json()
     if (!request_id || typeof processed !== 'boolean') return c.json({ error: 'Invalid payload' }, 400)
-    await ensurePhaseTables()
+
     await sql`UPDATE public.team_collection_team_requests SET processed=${processed}, processed_at=now() WHERE id=${request_id}`
     return c.json({ success: true })
 }
 
 export const publicFinalizedTeamsLeaderboard = async (c: any) => {
     // returns teams with summed score (effectiveSolved fallback totalSolved)
-    await ensurePhaseTables()
+
     const teams = await sql`SELECT t.*, c.room_id, c.title as collection_title, r."Room Name" as room_name FROM public.team_collection_teams t JOIN public.team_collections c ON t.collection_id=c.id JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.finalized=true AND t.approved=true`
     if (teams.length === 0) return c.json({ success: true, result: [] })
     // group by room to fetch snapshots
@@ -943,7 +879,7 @@ export const publicFinalizedTeamsLeaderboard = async (c: any) => {
 
 // Group finalized teams by collection (contest) with participant-aware scoring (non-participants contribute 0)
 export const publicFinalizedTeamsByContest = async (c: any) => {
-    await ensurePhaseTables()
+
     // Load all approved teams for finalized collections
     const teams = await sql`SELECT t.*, c.room_id, c.title as collection_title, c.id as collection_id, r."Room Name" as room_name FROM public.team_collection_teams t JOIN public.team_collections c ON t.collection_id=c.id JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.finalized=true AND t.approved=true`;
     if (teams.length === 0) return c.json({ success: true, result: [] })
@@ -1004,7 +940,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
 export const getTeamPublic = async (c: any) => {
     const { team_id } = await c.req.json()
     if (!team_id) return c.json({ error: 'team_id required' }, 400)
-    await ensureTables()
+
     const rows = await sql`
         SELECT t.*, c.title as collection_title, c.room_id
         FROM public.team_collection_teams t

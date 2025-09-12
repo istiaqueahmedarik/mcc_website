@@ -50,7 +50,6 @@ export default function Home() {
         const res = await fetch(process.env.NEXT_PUBLIC_SERVER_URL + '/landing/public', { cache: 'no-store' })
         const json = await res.json()
         if (!json.error) {
-          // Ensure Problem Tracker is included in features
           if (json.features && !json.features.some(f => f.title === 'Problem Tracker')) {
             json.features = [
               { title: 'Problem Tracker', desc: 'Track practice across platforms with smart streaks & heatmaps.' },
@@ -63,7 +62,6 @@ export default function Home() {
     }
     load()
   }, [])
-  // Fallbacks - Ensure all 8 features are included
   const features = cms?.features || [
     { title: 'Problem Tracker', desc: 'Track practice across platforms with smart streaks & heatmaps.' },
     { title: 'Problem Bank', desc: 'Curated topic wise sets from beginner to advanced.' },
