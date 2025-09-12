@@ -70,11 +70,7 @@ export const adminListCollections = async (c: any) => {
     const user = await sql`select * from users where id=${id} and email=${email}`
     if (user.length === 0) return c.json({ error: 'Unauthorized' }, 401)
 
-    // also ensure phase related columns for listing
-    try {
-        await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase integer NOT NULL DEFAULT 1`;
-    } catch { }
-    try { await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase1_deadline timestamptz`; } catch { }
+
     const rows = await sql`SELECT c.*, r."Room Name" as room_name FROM public.team_collections c JOIN public."Contest_report_room" r ON c.room_id=r.id ORDER BY c.created_at DESC`
     return c.json({ success: true, result: rows })
 }
@@ -110,11 +106,9 @@ export const getCollectionPublic = async (c: any) => {
         }
     } catch (_) { }
 
-    // If we are in phase 2, filter to only opted-in participants
     if (collection.phase === 2) {
         try {
-            // Ensure phase tables/columns exist
-            try { await sql`ALTER TABLE public.team_collections ADD COLUMN IF NOT EXISTS phase integer NOT NULL DEFAULT 1`; } catch { }
+
             try { await sql`CREATE TABLE IF NOT EXISTS public.team_collection_participation (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz NOT NULL DEFAULT now(), collection_id uuid NOT NULL REFERENCES public.team_collections(id) ON DELETE CASCADE, user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE, vjudge_id text, will_participate boolean NOT NULL DEFAULT false, updated_at timestamptz NOT NULL DEFAULT now())`; } catch { }
             const opted = await sql`SELECT vjudge_id FROM public.team_collection_participation WHERE collection_id=${collection.id} AND will_participate=true AND vjudge_id IS NOT NULL`
             const set = new Set(opted.map((r: any) => String(r.vjudge_id)))
@@ -682,7 +676,7 @@ export const adminAssignCoach = async (c: any) => {
             WHERE table_schema='public' AND table_name='team_collection_teams' AND column_name='coach_vjudge_id'
         `
         if (colCheck.length === 0) {
-            await sql`ALTER TABLE public.team_collection_teams ADD COLUMN coach_vjudge_id text`
+
         }
     } catch (e) {
         console.error('coach_vjudge_id column ensure failed', e)
