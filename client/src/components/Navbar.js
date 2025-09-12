@@ -71,6 +71,7 @@ const Navbar = async () => {
     { href: '/admin/team-collection', icon: Users, label: 'Team Collections' },
     { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
     { href: '/admin/vjudge-verification', icon: LaptopMinimalIcon, label: 'VJudge Verification' },
+    { href: '/admin/cf-verification', icon: LaptopMinimalIcon, label: 'CF Verification' },
   ]
 
   const loggedIn = (await cookies()).get('token')

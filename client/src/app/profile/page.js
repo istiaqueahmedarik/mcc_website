@@ -20,16 +20,7 @@ import { ParticipationToggle } from "@/components/ParticipationToggle"
 
 
 export default async function page({ searchParams }) {
-  const awaitedSearchParams = await searchParams;
-  const rawCode = awaitedSearchParams?.code;
-  const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
-  if (code) {
-    const redirectUri = process.env.CF_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/profile`
-    try {
-      await post_with_token('user/cf/verify', { code, redirect_uri: redirectUri })
-    } catch (e) {}
-    redirect('/profile')
-  }
+  // Removed Codeforces OAuth code parameter handling
 
   const res = await get_with_token("auth/user/profile")
   const user = res.result[0];
@@ -238,11 +229,12 @@ export default async function page({ searchParams }) {
                       {user.cf_verified ? (
                         <span className="text-emerald-600 flex items-center gap-1 font-medium"><CheckCircle2 className="h-4 w-4"/> Verified</span>
                       ) : (
-                        <>
-                          <span className="text-amber-600 flex items-center gap-1 font-medium"><XCircle className="h-4 w-4"/> Not verified</span>
-                          <CodeforcesVerifyButton />
-                        </>
+                        <span className="text-amber-600 flex items-center gap-1 font-medium"><XCircle className="h-4 w-4"/> Pending admin verification</span>
                       )}
+                    </div>
+                    <div className="mt-3">
+                      <CodeforcesSetIdForm current={user.cf_id} />
+                      <p className="mt-1 text-xs text-muted-foreground">Changing your handle will reset verification.</p>
                     </div>
                   </div>
                 </div>
@@ -255,7 +247,7 @@ export default async function page({ searchParams }) {
                   <div>
                     <h3 className="font-medium tracking-tight text-base">Codeforces</h3>
                     <p className="text-sm text-muted-foreground font-medium">No handle saved</p>
-                    <CodeforcesVerifyButton />
+                    <CodeforcesSetIdForm current={user.cf_id} />
                   </div>
                 </div>
               )}
@@ -416,26 +408,22 @@ export default async function page({ searchParams }) {
   )
 }
 
-function CodeforcesVerifyButton() {
+function CodeforcesSetIdForm({ current }) {
   return (
-    <form action={startCfOauth}>
-      <Button type="submit" size="sm" className="mt-2 rounded-full px-5 bg-[linear-gradient(90deg,hsl(var(--profile-accent-solid)),hsl(var(--profile-accent-solid-alt)))] hover:brightness-110 text-white shadow">
-        Verify with Codeforces
-      </Button>
+    <form action={saveCodeforces} className="mt-2 flex items-center gap-2">
+      <Label htmlFor="cf_id" className="text-sm">{current ? 'Change handle:' : 'Add handle:'}</Label>
+      <Input id="cf_id" name="cf_id" defaultValue={current || ''} placeholder="Enter CF handle" className="max-w-xs rounded-xl" />
+      <Button type="submit" size="sm" variant="outline" className="rounded-full px-5">Save</Button>
     </form>
   )
 }
 
-async function startCfOauth() {
+async function saveCodeforces(formData){
   "use server"
-  const clientId = process.env.CF_CLIENT_ID
-  const redirectUri = process.env.CF_REDIRECT_URI || `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/profile`
-  const authUrl = new URL('https://codeforces.com/oauth/authorize')
-  authUrl.searchParams.set('response_type', 'code')
-  authUrl.searchParams.set('scope', 'openid')
-  authUrl.searchParams.set('client_id', clientId || '')
-  authUrl.searchParams.set('redirect_uri', redirectUri)
-  redirect(authUrl.toString())
+  const cf_id = formData.get('cf_id')?.toString().trim()
+  if(!cf_id) return
+  await post_with_token('user/cf/set', { cf_id })
+  redirect('/profile')
 }
 
 async function saveVjudge(formData) {
