@@ -46,16 +46,11 @@ export default async function FinalizedTeamsByContestPage(){
       </div>
       <div className="max-w-6xl mx-auto px-6 py-16 space-y-16">
         <header className="space-y-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-card/70 backdrop-blur-xl px-6 py-2 text-[10px] tracking-[0.15em] font-semibold uppercase text-muted-foreground shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            Finalized Team Rosters
-          </div>
+          
           <h1 className="text-5xl md:text-6xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground to-foreground/60">
             Our Current Teams
           </h1>
-          <p className="max-w-2xl mx-auto text-sm md:text-base text-muted-foreground leading-relaxed">
-            Balanced, curated, and performance-aware team compositions. Tap a team to explore detailed analytics and historical performance.
-          </p>
+        
         </header>
 
         {blocks.length === 0 && (
@@ -81,9 +76,7 @@ export default async function FinalizedTeamsByContestPage(){
                     <h2 id={`section-${block.collection_id}`} className="text-3xl font-semibold tracking-tight">
                       {block.collection_title || 'Untitled Collection'}
                     </h2>
-                    <p className="text-xs font-medium text-muted-foreground/70">
-                      Contest: <span className="text-foreground/80">{block.room_name}</span>
-                    </p>
+                
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-[10px] font-semibold tracking-wider uppercase px-4 py-1.5 rounded-full bg-gradient-to-br from-muted/70 to-muted/40 border border-border/60 backdrop-blur shadow-sm">
