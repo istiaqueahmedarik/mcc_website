@@ -87,7 +87,7 @@ export const getPublicProfileByVjudge = async (c: any) => {
   if (!vjudge) return c.json({ error: 'Missing vjudge id' }, 400)
   try {
     const rows = await sql`
-      select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id
+      select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id,tshirt_size,mist_id_card
       from users
       where vjudge_id = ${vjudge}
       limit 1
@@ -109,6 +109,8 @@ export const getPublicProfileByVjudge = async (c: any) => {
         cf_verified: u.cf_verified,
         codechef_id: u.codechef_id,
         atcoder_id: u.atcoder_id,
+        tshirt_size: u.tshirt_size,
+        mist_id_card: u.mist_id_card,
       }
     })
   } catch (e) {

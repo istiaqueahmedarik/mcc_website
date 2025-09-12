@@ -295,3 +295,28 @@ export const setProfilePic = async (c: any) => {
     return c.json({ error: 'Failed to set profile picture' }, 400)
   }
 }
+
+// Lightweight user search for admin tooling / coach assignment
+export const searchUsers = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  // Basic access: any authenticated user can search; restrict if needed by role
+  const { q } = c.req.query() as { q?: string }
+  const query = (q || '').trim()
+  if (!query) return c.json({ result: [] })
+  try {
+    // Search by full_name, email or vjudge_id (ILIKE partial)
+    const like = `%${query.replace(/%/g, '')}%`
+    const rows = await sql`
+      SELECT id, full_name, email, vjudge_id
+      FROM users
+      WHERE (full_name ILIKE ${like} OR email ILIKE ${like} OR vjudge_id ILIKE ${like})
+      ORDER BY full_name NULLS LAST
+      LIMIT 10
+    `
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Search failed' }, 500)
+  }
+}

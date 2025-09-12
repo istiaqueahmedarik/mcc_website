@@ -34,6 +34,7 @@ import {
   SheetIcon,
   LaptopMinimalIcon,
   Globe,
+  Users,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -66,6 +67,7 @@ const Navbar = async () => {
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
     { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
+    { href: '/admin/team-collection', icon: Users, label: 'Team Collections' },
     { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
     { href: '/admin/vjudge-verification', icon: LaptopMinimalIcon, label: 'VJudge Verification' },
   ]
