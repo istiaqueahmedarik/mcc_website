@@ -57,7 +57,6 @@ export default async function FinalizedTeamsByContestPage(){
       <div className="max-w-7xl mx-auto px-5 space-y-16">
         <header className="text-center space-y-2">
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">Finalized Teams</h1>
-          <p className="text-sm text-muted-foreground">Simple, information-rich listing powered by shadcn/ui table.</p>
           {isAdmin && (
             <p className="inline-flex items-center gap-2 text-xs bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">Admin View Enabled</p>
           )}
