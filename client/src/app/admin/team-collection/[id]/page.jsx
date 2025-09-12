@@ -7,6 +7,8 @@ import {
   adminDeleteTeam,
   adminRemoveMember,
   adminRenameTeam,
+  adminListTeamRequests,
+  adminProcessTeamRequest,
 } from "@/actions/team_collection"
 import { TeamActionForm } from "@/components/TeamActionForm"
 import CoachAssignInline from "@/components/CoachAssignInline"
@@ -16,11 +18,13 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Users, FileText, Settings, Plus, Trash2, Edit3, UserPlus, CheckCircle2, AlertCircle } from "lucide-react"
+import { Users, FileText, Settings, Plus, Trash2, Edit3, UserPlus, CheckCircle2, AlertCircle, Clock, FastForward, LinkIcon } from "lucide-react"
 import { revalidatePath } from "next/cache"
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { get_with_token } from '@/lib/action'
+import { adminSetPhase1Deadline, adminStartPhase2 } from '@/actions/team_collection'
+import Link from "next/link"
 
 export const dynamic = "force-dynamic"
 
@@ -49,6 +53,12 @@ export default async function Page({ params }) {
     )
 
   const { collection, rankOrder, choices, teams } = detail.result || {}
+  // Load manual team requests
+  let teamRequests = []
+  try {
+    const reqRes = await adminListTeamRequests(id)
+    if(reqRes?.success) teamRequests = reqRes.result || []
+  } catch {}
   const preview = await adminPreviewCollection(id)
   const manualTeams = preview?.result?.manualTeams || []
   const autoTeams = preview?.result?.autoTeams || []
@@ -103,12 +113,30 @@ export default async function Page({ params }) {
     await adminAssignCoach(id, team_title, coach_vjudge_id)
     revalidatePath(`/admin/team-collection/${id}`)
   }
+  async function setDeadline(formData){
+    "use server"
+    const deadline = formData.get('phase1_deadline')
+    await adminSetPhase1Deadline(id, deadline || null)
+    revalidatePath(`/admin/team-collection/${id}`)
+  }
+  async function startPhase2(){
+    "use server"
+    await adminStartPhase2(id)
+    revalidatePath(`/admin/team-collection/${id}`)
+  }
+  function formatLocalDateTime(isoOrDate){
+    try {
+      const d = new Date(isoOrDate)
+      const pad = (n)=>String(n).padStart(2,'0')
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    } catch { return '' }
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-6">
             <div className="space-y-1">
               <h1 className="text-3xl font-bold tracking-tight text-balance">Collection Management</h1>
               <div className="flex items-center gap-3 text-muted-foreground">
@@ -120,6 +148,21 @@ export default async function Page({ params }) {
                 </span>
               </div>
             </div>
+            {/* Copy Links */}
+            <div className="flex flex-col items-end gap-3">
+              {collection?.token && (
+                <div className="flex flex-col items-end text-[10px] font-mono text-muted-foreground leading-tight">
+                  <span className="uppercase tracking-wide text-[9px] font-semibold mb-1 text-foreground/60">Share Links</span>
+                  <Link href={`/team/${collection.token}`} className="underline break-all hover:text-primary/90 transition-colors">
+                    Team Choices 
+                    <LinkIcon className="inline-block w-3 h-3 mb-0.5" />
+                  </Link>
+                  <Link href={`/team/manual-request/${collection.token}`} className="underline break-all hover:text-primary/90 transition-colors">
+                    Manual Requests
+                    <LinkIcon className="inline-block w-3 h-3 mb-0.5" />
+                  </Link>
+                </div>
+              )}
             {collection?.finalized ? (
               <TeamActionForm action={unfinalize} pending="Unfinalizing..." success="Collection unfinalized" error="Failed to unfinalize">
                 <Button variant="outline" size="lg" className="gap-2 bg-transparent">
@@ -134,6 +177,36 @@ export default async function Page({ params }) {
                   Finalize Collection
                 </Button>
               </TeamActionForm>
+            )}
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col lg:flex-row gap-4 items-start">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium">Phase:</span>
+              <span className="px-2 py-0.5 rounded-md bg-muted border text-xs font-mono">{collection?.phase || 1}</span>
+            </div>
+            {collection?.phase === 1 && !collection?.finalized && (
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <TeamActionForm action={setDeadline} pending="Saving..." success="Deadline set" error="Failed">
+                  <input type="hidden" name="id" value={collection?.id} />
+                  <div className="flex items-center gap-2">
+                    <input type="datetime-local" name="phase1_deadline" defaultValue={collection?.phase1_deadline ? formatLocalDateTime(collection.phase1_deadline) : ''} className="px-2 py-1 rounded border bg-background/70" />
+                    <Button variant="outline" size="sm">Set Deadline</Button>
+                  </div>
+                </TeamActionForm>
+                <form action={startPhase2}>
+                  <Button type="submit" variant="outline" size="sm" className="gap-1 bg-accent hover:bg-accent/90  text-primary/90">
+                    <FastForward className="w-3 h-3" /> Start Phase 2
+                  </Button>
+                </form>
+                {collection?.phase1_deadline && (
+                  <span className="font-mono text-muted-foreground">Ends: {new Date(collection.phase1_deadline).toLocaleString()}</span>
+                )}
+              </div>
+            )}
+            {collection?.phase === 2 && (
+              <span className="text-xs font-semibold text-green-600">Phase 2 Active (Team Selection)</span>
             )}
           </div>
         </div>
@@ -421,6 +494,24 @@ export default async function Page({ params }) {
             </div>
           </CardContent>
         </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader className="bg-muted/30">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <FileText className="h-5 w-5 text-accent" />
+              Manual Team Requests
+              <Badge variant="secondary" className="ml-auto">{teamRequests.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            {teamRequests.map(req => (
+              <ManualRequestItem key={req.id} request={req} collectionId={id} />
+            ))}
+            {!teamRequests.length && (
+              <div className="text-center py-12 text-muted-foreground text-sm">No manual requests submitted.</div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
@@ -480,4 +571,45 @@ function AddMemberForm({ collectionId, teamTitle, rankOrder, existing }) {
     </TeamActionForm>
   )
 }
+
+function ManualRequestItem({ request, collectionId }){
+  async function toggleProcessed(){
+    "use server"
+    await adminProcessTeamRequest(request.id, !request.processed)
+    revalidatePath(`/admin/team-collection/${collectionId}`)
+  }
+  async function approveDirect(){
+    "use server"
+    const { adminApproveManualTeam } = await import("@/actions/team_collection")
+    const members = Array.isArray(request.desired_member_vjudge_ids) ? request.desired_member_vjudge_ids : []
+    await adminApproveManualTeam(collectionId, request.proposed_team_title || `Manual-${members.slice(0,3).join('-')}`, members)
+    await adminProcessTeamRequest(request.id, true)
+    revalidatePath(`/admin/team-collection/${collectionId}`)
+  }
+  return (
+    <div className="p-4 rounded-xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-0.5 rounded-md text-xs font-mono bg-accent/10 text-accent">{new Date(request.created_at).toLocaleString()}</span>
+            {request.processed && <span className="px-2 py-0.5 rounded-md text-xs bg-green-100 text-green-700 border border-green-300">Processed</span>}
+          </div>
+          <div className="text-sm font-medium">From: {request.vjudge_id || 'unknown'}</div>
+          <div className="text-sm">Proposed Title: <span className="font-semibold">{request.proposed_team_title || '—'}</span></div>
+          <div className="text-sm">Members: {Array.isArray(request.desired_member_vjudge_ids) ? request.desired_member_vjudge_ids.join(', ') : ''}</div>
+          {request.note && <div className="text-xs text-muted-foreground whitespace-pre-line border-l-2 border-accent/40 pl-3">{request.note}</div>}
+        </div>
+        <div className="flex gap-2 md:flex-col">
+          <form action={toggleProcessed}>
+            <button type="submit" className="px-3 py-2 rounded-lg text-xs font-medium border bg-background hover:bg-muted/40">{request.processed ? 'Mark Unprocessed' : 'Mark Processed'}</button>
+          </form>
+          <form action={approveDirect}>
+            <button type="submit" className="px-3 py-2 rounded-lg text-xs font-medium border bg-accent text-accent-foreground hover:opacity-90">Approve & Create Team</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 

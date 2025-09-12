@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronUp, ChevronDown, Plus, X, Users, Award } from "lucide-react"
 
@@ -11,12 +11,18 @@ export default function DragOrder({
   min = 2,
   initial = [],
   performance = {},
+  onChange,
 }) {
   const [available, setAvailable] = useState(() => candidates.filter((c) => !initial.includes(c)))
   const [selected, setSelected] = useState(() => initial.slice(0, max))
 
   const canAddMore = selected.length < max
   const canSubmit = selected.length >= min
+
+  // Notify parent after commits instead of during nested render/update cycles
+  useEffect(() => {
+    if (onChange) onChange(selected)
+  }, [selected, onChange])
 
   const memoizedPerformance = useMemo(() => performance, [performance])
 
@@ -26,7 +32,7 @@ export default function DragOrder({
       setSelected((prev) => [...prev, u])
       setAvailable((prev) => prev.filter((x) => x !== u))
     },
-    [canAddMore],
+    [canAddMore, onChange],
   )
 
   const removeItem = useCallback((u) => {
@@ -38,7 +44,7 @@ export default function DragOrder({
     if (index === 0) return
     setSelected((prev) => {
       const next = [...prev]
-        ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
       return next
     })
   }, [])
@@ -47,7 +53,7 @@ export default function DragOrder({
     setSelected((prev) => {
       if (index === prev.length - 1) return prev
       const next = [...prev]
-        ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
       return next
     })
   }, [])
@@ -79,7 +85,7 @@ export default function DragOrder({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
-      <input type="hidden" name={name} value={selected.join(",")} />
+  <input type="hidden" name={name} value={selected.join(",")} />
 
       <div className="text-center space-y-3">
         <div className="flex items-center justify-center gap-2 text-primary">

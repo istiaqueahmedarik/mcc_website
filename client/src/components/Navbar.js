@@ -51,6 +51,7 @@ const Navbar = async () => {
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
     { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
+    { href: '/finalized-teams', icon: Users, label: 'Teams' },
   ]
   
   const userTools = [
@@ -125,7 +126,7 @@ const Navbar = async () => {
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gpa-2">
                   {' '}
-                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin Tools
+                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {adminTools.map((item) => (

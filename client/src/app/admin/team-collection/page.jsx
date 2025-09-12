@@ -6,11 +6,13 @@ import {
   adminStartTeamCollection,
   adminStopTeamCollection,
   adminReopenTeamCollection,
+  adminSetPhase1Deadline,
+  adminStartPhase2,
 } from "@/actions/team_collection"
 import { TeamActionForm } from "@/components/TeamActionForm"
 import { getAllContestRooms } from "@/actions/contest_details"
 import Link from "next/link"
-import { Eye, Square, CheckCircle, Unlock, Trash2, Play } from "lucide-react"
+import { Eye, Square, CheckCircle, Unlock, Trash2, Play, Clock, FastForward } from "lucide-react"
 import { revalidatePath } from "next/cache"
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -36,6 +38,8 @@ export default async function Page() {
   async function finalize(formData) { "use server"; const id = formData.get("id"); await adminFinalizeTeamCollection(id); revalidatePath('/admin/team-collection') }
   async function unfinalize(formData) { "use server"; const id = formData.get("id"); await adminUnfinalizeTeamCollection(id); revalidatePath('/admin/team-collection') }
   async function del(formData) { "use server"; const id = formData.get("id"); await adminDeleteTeamCollection(id); revalidatePath('/admin/team-collection') }
+  async function setDeadline(formData) { "use server"; const id = formData.get("id"); const deadline = formData.get("phase1_deadline"); await adminSetPhase1Deadline(id, deadline || null); revalidatePath('/admin/team-collection') }
+  async function startPhase2(formData) { "use server"; const id = formData.get("id"); await adminStartPhase2(id); revalidatePath('/admin/team-collection') }
 
   return (
     <div className="min-h-screen bg-background">
@@ -72,6 +76,7 @@ export default async function Page() {
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground font-medium">Room:</span>
                         <span className="text-sm text-foreground font-semibold">{col.room_name}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted border border-border/60 font-mono">Phase {col.phase || 1}</span>
                       </div>
                     </div>
 
@@ -96,6 +101,51 @@ export default async function Page() {
                         </Link>
                       </div>
                     </div>
+
+                    {/* Phase 1 Deadline / Controls */}
+                    {(!col.finalized) && (
+                      <div className="mt-4 space-y-3">
+                        {/* Deadline viewer */}
+                        <div className="flex flex-wrap items-center gap-3 text-sm">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          {col.phase === 1 && (
+                            <>
+                              <span className="font-medium">Participation Deadline:</span>
+                              {col.phase1_deadline ? (
+                                <DeadlineCountdown iso={col.phase1_deadline} />
+                              ) : (
+                                <span className="text-muted-foreground">Not set</span>
+                              )}
+                            </>
+                          )}
+                          {col.phase === 2 && (
+                            <span className="text-green-600 font-medium">Phase 2 (Team Selection) Active</span>
+                          )}
+                        </div>
+                        {col.phase === 1 && (
+                          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                            <TeamActionForm action={setDeadline} pending="Saving..." success="Deadline set" error="Failed">
+                              <input type="hidden" name="id" value={col.id} />
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="datetime-local"
+                                  name="phase1_deadline"
+                                  defaultValue={col.phase1_deadline ? formatLocalDateTime(col.phase1_deadline) : ''}
+                                  className="px-3 py-2 rounded-md border border-border bg-background/60 text-sm"
+                                />
+                                <button className="px-4 py-2 rounded-md bg-muted hover:bg-muted/80 text-xs font-semibold">Set / Update</button>
+                              </div>
+                            </TeamActionForm>
+                            <TeamActionForm action={startPhase2} pending="Starting..." success="Phase 2 started" error="Failed to start">
+                              <input type="hidden" name="id" value={col.id} />
+                              <button className="px-4 py-2 rounded-md bg-accent hover:bg-accent/30 text-foreground text-xs font-semibold flex items-center gap-1">
+                                <FastForward className="w-4 h-4" /> Start Phase 2 Now
+                              </button>
+                            </TeamActionForm>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3">
@@ -228,4 +278,45 @@ export default async function Page() {
       </div>
     </div>
   )
+}
+
+// Lightweight server component that renders remaining time (static at render).
+// For simplicity (no client bundle), we just compute diff once on server.
+function DeadlineCountdown({ iso }) {
+  try {
+    const target = new Date(iso)
+    const now = new Date()
+    const diffMs = target.getTime() - now.getTime()
+    if (isNaN(diffMs)) return <span className="text-muted-foreground">Invalid date</span>
+    if (diffMs <= 0) return <span className="text-destructive font-semibold">Deadline passed</span>
+    const totalSec = Math.floor(diffMs / 1000)
+    const d = Math.floor(totalSec / 86400)
+    const h = Math.floor((totalSec % 86400) / 3600)
+    const m = Math.floor((totalSec % 3600) / 60)
+    const s = totalSec % 60
+    const parts = []
+    if (d) parts.push(`${d}d`)
+    if (h || d) parts.push(`${h}h`)
+    if (m || h || d) parts.push(`${m}m`)
+    parts.push(`${s}s`)
+    return <span className="font-mono text-foreground/80">{parts.join(' ')} remaining</span>
+  } catch {
+    return <span className="text-muted-foreground">Invalid</span>
+  }
+}
+
+// Format to local datetime-local input value (YYYY-MM-DDTHH:MM) without timezone shift
+function formatLocalDateTime(isoOrDate) {
+  try {
+    const d = new Date(isoOrDate)
+    const pad = (n) => String(n).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const mm = pad(d.getMonth() + 1)
+    const dd = pad(d.getDate())
+    const hh = pad(d.getHours())
+    const mi = pad(d.getMinutes())
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
+  } catch {
+    return ''
+  }
 }

@@ -1,11 +1,12 @@
 "use client";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { toast } from "sonner";
 import DragOrder from "@/components/drag-order";
 import { useRouter } from "next/navigation";
 
 export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible, performance, UI_MIN, UI_MAX, SUBMIT_MIN, SUBMIT_MAX, token }) {
   const [isPending, startTransition] = useTransition();
+  const [selectedCount, setSelectedCount] = useState(Array.isArray(myChoice?.ordered_choices) ? myChoice.ordered_choices.length : 0)
   const router = useRouter();
 
   return (
@@ -61,6 +62,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
                 max={UI_MAX}
                 initial={Array.isArray(myChoice?.ordered_choices) ? myChoice.ordered_choices.filter((x) => eligible.includes(x)) : []}
                 performance={performance}
+                onChange={(list)=> setSelectedCount(list.length)}
               />
             </div>
             <p className="text-xs text-muted-foreground bg-muted/30 px-4 py-2 rounded-xl">
@@ -86,12 +88,15 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
         <div className="pt-4">
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || (isParticipant && selectedCount < SUBMIT_MIN)}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-4 px-6 rounded-2xl transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           >
             {isPending ? (myChoice ? "Updating..." : "Submitting...") : myChoice ? "Update Selection" : "Submit Choices"}
           </button>
         </div>
+        {isParticipant && selectedCount < SUBMIT_MIN && (
+          <p className="text-center text-xs text-destructive font-medium mt-2">Select at least {SUBMIT_MIN} teammates before submitting.</p>
+        )}
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
           <p className="text-xs text-amber-800 leading-relaxed">
             ⚠️ <strong>Important:</strong> If insufficient members remain when your turn comes, you may not get a full team.

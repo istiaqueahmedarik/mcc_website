@@ -32,6 +32,36 @@ export async function renameMyTeam(team_id, new_title){
   return await post_with_token('team-collection/my-team/rename', { team_id, new_title })
 }
 
+// Participation Phase
+export async function listActiveParticipationCollections(){
+  return await get_with_token('team-collection/participation/active-collections')
+}
+export async function setParticipation(collection_id, will_participate){
+  return await post_with_token('team-collection/participation/set', { collection_id, will_participate })
+}
+export async function getParticipationState(collection_id){
+  return await post_with_token('team-collection/participation/get', { collection_id })
+}
+
+// Team Requests
+export async function submitTeamRequest(collection_id, proposed_team_title, desired_member_vjudge_ids, note){
+  return await post_with_token('team-collection/team-request/submit', { collection_id, proposed_team_title, desired_member_vjudge_ids, note })
+}
+export async function adminListTeamRequests(collection_id){
+  return await post_with_token('team-collection/admin/team-request/list', { collection_id })
+}
+export async function adminProcessTeamRequest(request_id, processed){
+  return await post_with_token('team-collection/admin/team-request/process', { request_id, processed })
+}
+
+// Leaderboard
+export async function publicFinalizedTeamsLeaderboard(){
+  return await get_with_token('team-collection/public/finalized/teams')
+}
+export async function publicFinalizedTeamsByContest(){
+  return await get_with_token('team-collection/public/finalized/teams/by-contest')
+}
+
 // Admin
 export async function adminStartTeamCollection(room_id, title, allow_non_participants=true){
   return await post_with_token('team-collection/admin/start', { room_id, title, allow_non_participants })
@@ -87,6 +117,14 @@ export async function adminRenameTeam(collection_id, team_title, new_title){
 
 export async function adminAssignCoach(collection_id, team_title, coach_vjudge_id){
   return await post_with_token('team-collection/admin/team/assign-coach', { collection_id, team_title, coach_vjudge_id })
+}
+
+// Phase controls
+export async function adminSetPhase1Deadline(collection_id, phase1_deadline){
+  return await post_with_token('team-collection/admin/phase1/deadline', { collection_id, phase1_deadline })
+}
+export async function adminStartPhase2(collection_id){
+  return await post_with_token('team-collection/admin/phase2/start', { collection_id })
 }
 
 export async function searchUsersClient(q){

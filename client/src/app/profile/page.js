@@ -13,7 +13,9 @@ import Image from "next/image"
 import Link from 'next/link'
 import { redirect } from "next/navigation"
 import { post_with_token } from "@/lib/action"
+import { listActiveParticipationCollections, setParticipation } from "@/actions/team_collection"
 import { createClient } from "@/utils/supabase/server"
+import { ParticipationToggle } from "@/components/ParticipationToggle"
 
 
 
@@ -35,6 +37,8 @@ export default async function page({ searchParams }) {
   const myTeams = myTeamsRes?.result || []
   const coachedTeamsRes = user?.vjudge_id ? await post_with_token('team-collection/public/teams/coached-by-vjudge', { vjudge_id: user.vjudge_id }) : { result: [] }
   const coachedTeams = coachedTeamsRes?.result || []
+  const participationCollectionsRes = await listActiveParticipationCollections()
+  const participationCollections = participationCollectionsRes?.result || []
 
   return (
   <div className="min-h-[calc(100vh-4rem)] w-full relative bg-[radial-gradient(ellipse_at_top,hsl(var(--background)/0.95),hsl(var(--background)/0.55))] dark:bg-[radial-gradient(ellipse_at_top,hsl(var(--background)/0.94),hsl(var(--background)/0.52))]">
@@ -188,6 +192,22 @@ export default async function page({ searchParams }) {
 
         {/* Right column stack: CP Profiles + My Teams */}
         <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+  {/* Participation Toggles */}
+  <Card className="h-fit border border-black/5 dark:border-white/10 bg-white/60 dark:bg-zinc-900/50 backdrop-blur-xl rounded-3xl shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              Contest Participation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-2 space-y-4">
+            {participationCollections.length === 0 && (
+              <p className="text-sm text-muted-foreground font-medium">No active participation windows.</p>
+            )}
+            {participationCollections.map(col => (
+              <ParticipationToggle key={col.id} col={col} />
+            ))}
+          </CardContent>
+        </Card>
   {/* Competitive Programming Profiles */}
   <Card className="h-fit border border-black/5 dark:border-white/10 bg-white/60 dark:bg-zinc-900/50 backdrop-blur-xl rounded-3xl shadow-sm">
           <CardHeader className="pb-3">
