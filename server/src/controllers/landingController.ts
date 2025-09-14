@@ -13,32 +13,27 @@ async function requireAdmin(c: any) {
 
 export const getLandingPublic = async (c: any) => {
     try {
-        const [features, stats, timeline, alumni] = await Promise.all([
-            sql`select id, title, description, position from landing_features where active = true order by position, id`,
-            sql`select id, title, value, suffix, position from landing_stats where active = true order by position, id`,
-            sql`select id, year, title, body, position from landing_timeline where active = true order by position, id`,
-            sql`select id, name, title, quote, image_url, position from landing_testimonials where active = true order by position, id`,
-        ])
+        const features = await sql`select id, title, description, position from landing_features where active = true order by position, id`
+        const stats = await sql`select id, title, value, suffix, position from landing_stats where active = true order by position, id`
+        const timeline = await sql`select id, year, title, body, position from landing_timeline where active = true order by position, id`
+        const alumni = await sql`select id, name, title, quote, image_url, position from landing_testimonials where active = true order by position, id`
         return c.json({ features, stats, timeline, alumni })
     } catch (e) {
-        console.error(e)
+        console.error('Landing public data load failed:', e)
         return c.json({ error: 'Failed to load landing data' }, 500)
     }
 }
 
-// Generic CRUD helpers
 async function insertRow(table: string, fields: Record<string, any>) {
     const cols = Object.keys(fields)
     const values = Object.values(fields)
     if (cols.length === 0) return []
     const colIdents = cols.map(c => sql(c))
-    // Build parameter list (value fragments already safe)
     let valsFragment: any = sql``
     values.forEach((v, idx) => {
         if (idx === 0) valsFragment = sql`${v}`
         else valsFragment = sql`${valsFragment}, ${v}`
     })
-    // Build column list
     let colsFragment: any = sql``
     colIdents.forEach((cIdent, idx) => {
         if (idx === 0) colsFragment = cIdent
@@ -64,7 +59,6 @@ async function deleteRow(table: string, id: number) {
     return await sql`DELETE FROM ${sql(table)} WHERE id = ${id} RETURNING *`
 }
 
-// Factory to create CRUD handlers for a table
 function makeCrud(table: string, allowedInsert: string[], allowedUpdate: string[]) {
     return {
         create: async (c: any) => {
