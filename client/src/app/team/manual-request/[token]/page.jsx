@@ -32,13 +32,24 @@ export default async function ManualRequestPage({ params }) {
     const membersCsv = formData.get('desired_member_vjudge_ids') || ''
     const desired_member_vjudge_ids = membersCsv.split(',').map(s=>s.trim()).filter(Boolean)
     const note = formData.get('note')
-    if(!desired_member_vjudge_ids.length){ return { error: 'At least one member required' } }
-    await submitTeamRequest(col.id, proposed_team_title, desired_member_vjudge_ids, note)
-    revalidatePath(`/team/manual-request/${token}`)
-    return { success: true }
+    if(desired_member_vjudge_ids.length!=3){ return { error: 'Exactly three members required' } }
+    try {
+      const res = await submitTeamRequest(col.id, proposed_team_title, desired_member_vjudge_ids, note)
+      if(res?.error){
+        return { error: res.error }
+      }
+      revalidatePath(`/team/manual-request/${token}`)
+      return { success: true }
+    } catch (e){
+      return { error: 'Submission failed' }
+    }
   }
 
-  const disabledReason = !myVj ? 'You must have a Vjudge ID set in your profile.' : phase !== 2 ? 'Manual requests only accepted during Phase 2.' : col.finalized ? 'Collection finalized.' : null
+  const disabledReason = !myVj
+    ? 'You must have a Vjudge ID set in your profile.'
+    : (phase === 1)
+      ? 'Manual requests open after participation phase (Phase 2 or 3).'
+      : null
   const disabled = !!disabledReason
 
   return (
@@ -61,7 +72,7 @@ export default async function ManualRequestPage({ params }) {
           </div>
         )}
 
-        <ManualRequestForm action={requestManualTeam} disabled={disabled} />
+  <ManualRequestForm action={requestManualTeam} disabled={disabled} myVjudge={myVj} />
         <div className="mt-10 text-center text-xs text-muted-foreground">
           Share this page link directly with members or admin as needed.
         </div>

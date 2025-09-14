@@ -580,10 +580,7 @@ function ManualRequestItem({ request, collectionId }){
   }
   async function approveDirect(){
     "use server"
-    const { adminApproveManualTeam } = await import("@/actions/team_collection")
-    const members = Array.isArray(request.desired_member_vjudge_ids) ? request.desired_member_vjudge_ids : []
-    await adminApproveManualTeam(collectionId, request.proposed_team_title || `Manual-${members.slice(0,3).join('-')}`, members)
-    await adminProcessTeamRequest(request.id, true)
+    await adminProcessTeamRequest(request.id, true, true)
     revalidatePath(`/admin/team-collection/${collectionId}`)
   }
   return (

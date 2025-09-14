@@ -2,7 +2,7 @@
 import { useTransition } from 'react'
 import { toast } from 'sonner'
 
-export function ManualRequestForm({ action, disabled }) {
+export function ManualRequestForm({ action, disabled, myVjudge }) {
   const [isPending, startTransition] = useTransition()
 
   return (
@@ -12,6 +12,15 @@ export function ManualRequestForm({ action, disabled }) {
         if (disabled) return
         const form = e.currentTarget
         const fd = new FormData(form)
+        if (myVjudge) {
+          const raw = fd.get('desired_member_vjudge_ids') || ''
+          const list = String(raw).split(',').map(s=>s.trim()).filter(Boolean)
+          const hasSelf = list.some(v => v.toLowerCase() === String(myVjudge).toLowerCase())
+          if(!hasSelf){
+            toast.error('You must include your own VJudge ID (' + myVjudge + ') in the members list.')
+            return
+          }
+        }
         startTransition(async () => {
           const id = toast.loading('Submitting request...')
           try {
@@ -24,7 +33,7 @@ export function ManualRequestForm({ action, disabled }) {
             toast.success('Manual team request submitted', { id })
           } catch (err) {
             console.error(err)
-            toast.error('Submission failed', { id })
+            toast.error('Submission failed check again!!', { id })
           }
         })
       }}
@@ -52,6 +61,7 @@ export function ManualRequestForm({ action, disabled }) {
             <ul className="list-disc ml-4 space-y-1">
               <li>List only vjudge IDs (no spaces)</li>
               <li>Admins may partially adjust membership</li>
+              {myVjudge && <li>Include yourself: <code className="font-mono text-xs">{myVjudge}</code></li>}
             </ul>
           </div>
           <div className="text-xs text-muted-foreground space-y-2">

@@ -801,8 +801,53 @@ export const submitTeamRequest = async (c: any) => {
     const { collection_id, proposed_team_title, desired_member_vjudge_ids, note } = await c.req.json()
     if (!collection_id || !Array.isArray(desired_member_vjudge_ids)) return c.json({ error: 'Invalid payload' }, 400)
 
-    await sql`INSERT INTO public.team_collection_team_requests (collection_id, user_id, vjudge_id, proposed_team_title, desired_member_vjudge_ids, note) VALUES (${collection_id}, ${user.id}, ${user.vjudge_id}, ${proposed_team_title || null}, ${desired_member_vjudge_ids}, ${note || null})`
-    return c.json({ success: true })
+    const crows = await sql`SELECT id, phase, finalized FROM public.team_collections WHERE id=${collection_id} LIMIT 1`
+    if (crows.length === 0) return c.json({ error: 'Collection not found' }, 404)
+    const collection = crows[0]
+    if (!(collection.phase === 2 || collection.phase === 3)) {
+        return c.json({ error: 'Manual team requests only allowed in phase 2 or 3' }, 400)
+    }
+
+    const rawList: string[] = desired_member_vjudge_ids
+        .map((x: any) => String(x))
+        .join(',')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    const seen = new Set<string>()
+    const members: string[] = []
+    for (const m of rawList) {
+        const key = m.toLowerCase()
+        if (!seen.has(key)) { seen.add(key); members.push(m) }
+    }
+    if (members.length === 0) return c.json({ error: 'At least one member required' }, 400)
+    if (members.length < 2 || members.length > 5) return c.json({ error: 'Team must have between 2 and 5 members' }, 400)
+    if (user.vjudge_id && !members.map(x => x.toLowerCase()).includes(String(user.vjudge_id).toLowerCase())) {
+        members.unshift(String(user.vjudge_id))
+    }
+    const userRows = await sql`SELECT id, vjudge_id, email, full_name FROM public.users WHERE LOWER(vjudge_id) = ANY(${members.map(m => m.toLowerCase())})`
+    const foundMap = new Map(userRows.map((u: any) => [String(u.vjudge_id).toLowerCase(), u]))
+    const missing = members.filter(m => !foundMap.has(m.toLowerCase()))
+    if (missing.length > 0) return c.json({ error: 'Some Vjudge IDs not found', missing })
+
+    const existingTeams = await sql`SELECT member_vjudge_ids FROM public.team_collection_teams WHERE collection_id=${collection_id} AND approved=true`
+    const already = new Set<string>()
+    for (const t of existingTeams) {
+        const arr: string[] = Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids : []
+        for (const v of arr) already.add(String(v).toLowerCase())
+    }
+    const conflicts = members.filter(m => already.has(m.toLowerCase()))
+    if (conflicts.length > 0) {
+        return c.json({ error: 'Some members are already in a team', conflicts })
+    }
+
+    try {
+        await sql`INSERT INTO public.team_collection_team_requests (collection_id, user_id, vjudge_id, proposed_team_title, desired_member_vjudge_ids, note) VALUES (${collection_id}, ${user.id}, ${user.vjudge_id}, ${proposed_team_title || null}, ${members}, ${note || null})`
+        return c.json({ success: true })
+    } catch (e) {
+        console.error('submitTeamRequest failed', e)
+        return c.json({ error: 'Failed to submit request' }, 500)
+    }
 }
 
 export const adminListTeamRequests = async (c: any) => {
@@ -822,11 +867,48 @@ export const adminProcessTeamRequest = async (c: any) => {
     if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
     const admin = await sql`SELECT id FROM users WHERE id=${id} AND email=${email} AND admin=true`
     if (admin.length === 0) return c.json({ error: 'Unauthorized' }, 401)
-    const { request_id, processed } = await c.req.json()
+    const { request_id, processed, approve } = await c.req.json()
     if (!request_id || typeof processed !== 'boolean') return c.json({ error: 'Invalid payload' }, 400)
 
+    const rows = await sql`SELECT * FROM public.team_collection_team_requests WHERE id=${request_id} LIMIT 1`
+    if (rows.length === 0) return c.json({ error: 'Request not found' }, 404)
+    const reqRow = rows[0]
     await sql`UPDATE public.team_collection_team_requests SET processed=${processed}, processed_at=now() WHERE id=${request_id}`
-    return c.json({ success: true })
+    // If admin chooses to approve and create the team now
+    if (approve === true && processed) {
+        const collRows = await sql`SELECT * FROM public.team_collections WHERE id=${reqRow.collection_id} LIMIT 1`
+        if (collRows.length === 0) return c.json({ error: 'Collection not found' }, 404)
+        const teamTitle = reqRow.proposed_team_title || `Team-${reqRow.id.slice(0, 6)}`
+        const members: string[] = Array.isArray(reqRow.desired_member_vjudge_ids) ? reqRow.desired_member_vjudge_ids : []
+        // Re-check no conflicts (in case of race)
+        const existingTeams = await sql`SELECT member_vjudge_ids FROM public.team_collection_teams WHERE collection_id=${reqRow.collection_id} AND approved=true`
+        const already = new Set<string>()
+        for (const t of existingTeams) {
+            const arr: string[] = Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids : []
+            for (const v of arr) already.add(String(v).toLowerCase())
+        }
+        const conflicts = members.filter(m => already.has(String(m).toLowerCase()))
+        if (conflicts.length > 0) {
+            return c.json({ error: 'Cannot approve, conflicts with existing team members', conflicts })
+        }
+        // Create/approve team
+        const ins = await sql`INSERT INTO public.team_collection_teams (collection_id, team_title, member_vjudge_ids, approved, approved_by, approved_at) VALUES (${reqRow.collection_id}, ${teamTitle}, ${members}, true, ${id}, now()) ON CONFLICT (collection_id, team_title) DO UPDATE SET member_vjudge_ids=EXCLUDED.member_vjudge_ids, approved=true, approved_by=${id}, approved_at=now() RETURNING *`
+        // Email members if emails exist
+        try {
+            const userRows = await sql`SELECT email, full_name, vjudge_id FROM public.users WHERE LOWER(vjudge_id) = ANY(${members.map(m => String(m).toLowerCase())}) AND email IS NOT NULL`
+            const clientUrl = process.env.CLIENT_URL || process.env.NEXT_PUBLIC_CLIENT_URL || ''
+            await Promise.all(userRows.map(async (u: any) => {
+                try {
+                    const subject = `Manual Team Approved: ${teamTitle}`
+                    const text = `Hello ${u.full_name || u.vjudge_id},\n\nYour manual team '${teamTitle}' has been approved. Members: ${members.join(', ')}\n${clientUrl ? 'View: ' + clientUrl + '/my_dashboard' : ''}`
+                    const html = `<p>Hello <strong>${u.full_name || u.vjudge_id}</strong>,</p><p>Your manual team <strong>${teamTitle}</strong> has been <strong>approved</strong>.</p><p><strong>Members:</strong> ${members.map(m => `<code>${m}</code>`).join(', ')}</p>${clientUrl ? `<p><a href="${clientUrl}/my_dashboard" target="_blank">Open Dashboard</a></p>` : ''}`
+                    await sendEmail(u.email, subject, text, html)
+                } catch (e) { console.error('Failed email member', u.email, e) }
+            }))
+        } catch (e) { console.error('Emailing manual team approval failed', e) }
+        return c.json({ success: true, approved: true })
+    }
+    return c.json({ success: true, approved: false })
 }
 
 export const publicFinalizedTeamsLeaderboard = async (c: any) => {

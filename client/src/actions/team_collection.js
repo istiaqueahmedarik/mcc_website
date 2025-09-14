@@ -50,8 +50,8 @@ export async function submitTeamRequest(collection_id, proposed_team_title, desi
 export async function adminListTeamRequests(collection_id){
   return await post_with_token('team-collection/admin/team-request/list', { collection_id })
 }
-export async function adminProcessTeamRequest(request_id, processed){
-  return await post_with_token('team-collection/admin/team-request/process', { request_id, processed })
+export async function adminProcessTeamRequest(request_id, processed, approve=false){
+  return await post_with_token('team-collection/admin/team-request/process', { request_id, processed, approve })
 }
 
 // Leaderboard
