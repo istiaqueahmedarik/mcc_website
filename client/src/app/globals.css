@@ -42,6 +42,15 @@
     --alumni-royal: 226 70% 40%;
     --alumni-royal-fade: 226 70% 18%;
     --alumni-parchment: 46 35% 96%;
+    /* Profile page accent palette */
+    --profile-accent-1: 253 83% 74%;
+    /* soft indigo */
+    --profile-accent-2: 267 84% 72%;
+    /* violet */
+    --profile-accent-3: 289 78% 74%;
+    /* fuchsia */
+    --profile-accent-solid: 263 70% 55%;
+    --profile-accent-solid-alt: 286 68% 57%;
   }
 
   .dark {
@@ -82,6 +91,12 @@
     --alumni-royal: 226 70% 58%;
     --alumni-royal-fade: 226 70% 20%;
     --alumni-parchment: 45 15% 12%;
+    /* Dark mode adjustments for profile accents */
+    --profile-accent-1: 253 70% 65%;
+    --profile-accent-2: 267 72% 62%;
+    --profile-accent-3: 289 68% 64%;
+    --profile-accent-solid: 263 72% 60%;
+    --profile-accent-solid-alt: 286 70% 62%;
   }
 
 
@@ -349,4 +364,139 @@
 
 .alumni-card-glow {
   animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* Liquid Glass (Glassmorphism / Liquid UI) Utilities */
+/* Research-informed: Uses backdrop-filter with moderate blur & saturation;
+   relies on radial gradient background to create depth while preserving readability. */
+.liquid-bg {
+  --lg-glow-1: hsl(var(--brand)/0.18);
+  --lg-glow-2: hsl(var(--highlight)/0.20);
+  --lg-glow-3: hsl(var(--primary)/0.25);
+  background:
+    radial-gradient(circle at 15% 20%, var(--lg-glow-1) 0%, transparent 55%),
+    radial-gradient(circle at 85% 30%, var(--lg-glow-2) 0%, transparent 60%),
+    radial-gradient(circle at 55% 80%, var(--lg-glow-3) 0%, transparent 65%),
+    linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+  filter: saturate(120%);
+}
+
+.dark .liquid-bg {
+  --lg-glow-1: hsl(var(--brand)/0.28);
+  --lg-glow-2: hsl(var(--highlight)/0.22);
+  --lg-glow-3: hsl(var(--primary)/0.35);
+  background:
+    radial-gradient(circle at 18% 22%, var(--lg-glow-1) 0%, transparent 55%),
+    radial-gradient(circle at 82% 28%, var(--lg-glow-2) 0%, transparent 60%),
+    radial-gradient(circle at 55% 78%, var(--lg-glow-3) 0%, transparent 70%),
+    linear-gradient(140deg, hsl(var(--background)) 0%, hsl(var(--alumni-royal-fade)) 90%);
+}
+
+.liquid-glass {
+  position: relative;
+  background:
+    linear-gradient(165deg,
+      hsl(var(--background)/0.55) 0%,
+      hsl(var(--background)/0.35) 40%,
+      hsl(var(--accent)/0.25) 100%) border-box;
+  backdrop-filter: blur(18px) saturate(160%) brightness(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%) brightness(110%);
+  border: 1px solid hsl(var(--border)/0.45);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 4px 24px -6px hsl(var(--foreground)/0.22),
+    0 1px 0 0 hsl(var(--foreground)/0.08) inset,
+    0 0 0 1px hsl(var(--foreground)/0.04) inset;
+  overflow: hidden;
+  transition: box-shadow .5s, border-color .4s, background .6s;
+}
+
+.dark .liquid-glass {
+  background:
+    linear-gradient(165deg,
+      hsl(var(--background)/0.30) 0%,
+      hsl(var(--background)/0.22) 38%,
+      hsl(var(--accent)/0.18) 100%) border-box;
+  border-color: hsl(var(--border)/0.35);
+  box-shadow:
+    0 4px 30px -8px hsl(var(--foreground)/0.45),
+    0 0 0 1px hsl(var(--foreground)/0.05) inset;
+}
+
+.liquid-glass:before,
+.liquid-glass:after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+}
+
+/* Soft top highlight */
+.liquid-glass:before {
+  background:
+    linear-gradient(180deg,
+      hsl(var(--foreground)/0.25) 0%,
+      transparent 60%);
+  mix-blend-mode: overlay;
+  opacity: .35;
+}
+
+/* Irregular reflective blotches (very subtle) */
+.liquid-glass:after {
+  background:
+    radial-gradient(circle at 25% 35%, hsl(var(--foreground)/0.10) 0%, transparent 55%),
+    radial-gradient(circle at 70% 65%, hsl(var(--foreground)/0.08) 0%, transparent 60%),
+    radial-gradient(circle at 85% 25%, hsl(var(--foreground)/0.05) 0%, transparent 55%);
+  opacity: .35;
+  mix-blend-mode: soft-light;
+}
+
+.liquid-glass:hover {
+  box-shadow:
+    0 6px 32px -8px hsl(var(--foreground)/0.28),
+    0 0 0 1px hsl(var(--foreground)/0.06) inset;
+}
+
+.liquid-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      hsl(var(--border)/0.6) 30%,
+      hsl(var(--border)/0.6) 70%,
+      transparent 100%);
+}
+
+/* Interactive focus ring helper */
+.liquid-focus:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px hsl(var(--brand)/0.35);
+}
+
+/* Reduced motion / transparency fallbacks */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--card));
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--card)/0.92);
+  }
+}
+
+/* Utility spacing wrapper for pages using liquid glass */
+.liquid-page-wrapper {
+  position: relative;
+}
+
+.liquid-page-wrapper>.liquid-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
 }

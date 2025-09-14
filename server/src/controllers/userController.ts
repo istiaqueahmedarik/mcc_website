@@ -4,87 +4,48 @@ import { Hono } from 'hono'
 type Ctx = any
 
 
-export const verifyCodeforces = async (c: Ctx) => {
+// ---- Codeforces manual verification (mirrors VJudge flow) ----
+export const setCodeforcesId = async (c: Ctx) => {
   const { id, email } = c.get('jwtPayload') || {}
   if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
-
-
   try {
-    const { code, redirect_uri } = await c.req.json()
-    if (!code || !redirect_uri) {
-      return c.json({ error: 'Missing code or redirect_uri' }, 400)
+    const { cf_id } = await c.req.json()
+    if (!cf_id || typeof cf_id !== 'string') {
+      return c.json({ error: 'Invalid cf_id' }, 400)
     }
-
-    const client_id = process.env.CF_CLIENT_ID
-    const client_secret = process.env.CF_CLIENT_SECRET
-    const issuer = 'https://codeforces.com'
-    if (!client_id || !client_secret) {
-      return c.json({ error: 'Server not configured for Codeforces OAuth' }, 500)
-    }
-
-    const tokenEndpoint = 'https://codeforces.com/oauth/token'
-
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id,
-      client_secret,
-      redirect_uri,
-    })
-
-    const resp = await fetch(tokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    })
-    if (!resp.ok) {
-      const txt = await resp.text()
-      return c.json({ error: 'Token exchange failed', detail: txt }, 400)
-    }
-    const tokenRes = await resp.json()
-    const id_token = tokenRes.id_token as string
-    if (!id_token) return c.json({ error: 'No id_token returned' }, 400)
-
-    // CF uses HS256 with client_secret as the key per discovery doc
-    const [headerB64, payloadB64, signatureB64] = id_token.split('.')
-    if (!headerB64 || !payloadB64 || !signatureB64)
-      return c.json({ error: 'Invalid id_token format' }, 400)
-
-    const enc = (s: string) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
-    const payloadStr = enc(payloadB64)
-    const payload = JSON.parse(payloadStr)
-
-    // Verify signature HS256
-    const crypto = await import('crypto')
-    const data = `${headerB64}.${payloadB64}`
-    const expected = crypto.createHmac('sha256', client_secret).update(data).digest('base64')
-      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-    if (expected !== signatureB64) {
-      return c.json({ error: 'Invalid token signature' }, 400)
-    }
-
-    // Basic claim checks
-    if (payload.iss !== issuer) return c.json({ error: 'Invalid issuer' }, 400)
-    if (payload.aud !== client_id) return c.json({ error: 'Invalid audience' }, 400)
-    if (Date.now() / 1000 > payload.exp) return c.json({ error: 'Token expired' }, 400)
-
-    const handle: string | undefined = payload.handle
-    const avatar: string | undefined = payload.avatar
-    const rating: number | undefined = payload.rating
-
-    const userRows = await sql`select * from users where id = ${id} and email = ${email}`
-    if (userRows.length === 0) return c.json({ error: 'User not found' }, 404)
-
-    const current = userRows[0]
-
-    const newHandle = current.cf_id || handle || null
-
-    await sql`update users set cf_verified = true, cf_id = ${newHandle} where id = ${id}`
-
-    return c.json({ success: true, handle, avatar, rating })
+    const rows = await sql`update users set cf_id = ${cf_id}, cf_verified = false where id = ${id} returning id, cf_id, cf_verified`
+    return c.json({ result: rows[0] })
   } catch (e) {
     console.error(e)
-    return c.json({ error: 'Verification failed' }, 500)
+    return c.json({ error: 'Failed to set Codeforces ID' }, 400)
+  }
+}
+
+export const listCodeforcesPending = async (c: Ctx) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const rows = await sql`select id, full_name, email, cf_id, cf_verified, vjudge_id, vjudge_verified from users where cf_id is not null and cf_id <> '' and cf_verified = false order by created_at desc`
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to load pending list' }, 400)
+  }
+}
+
+export const verifyCodeforces = async (c: Ctx) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { user_id, verified } = await c.req.json()
+    if (!user_id) return c.json({ error: 'Missing user_id' }, 400)
+    const flag = verified === false ? false : true
+    const rows = await sql`update users set cf_verified = ${flag} where id = ${user_id} returning id, cf_id, cf_verified`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to update verification' }, 400)
   }
 }
 
@@ -293,5 +254,29 @@ export const setProfilePic = async (c: any) => {
   } catch (e) {
     console.error(e)
     return c.json({ error: 'Failed to set profile picture' }, 400)
+  }
+}
+
+// Lightweight user search for admin tooling / coach assignment
+export const searchUsers = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  const { q } = c.req.query() as { q?: string }
+  const query = (q || '').trim()
+  console.log(query);
+  if (!query) return c.json({ result: [] })
+  try {
+    const like = `%${query.replace(/%/g, '')}%`
+    const rows = await sql`
+      SELECT id, full_name, email, vjudge_id
+      FROM users
+      WHERE (full_name ILIKE ${like} OR email ILIKE ${like} OR vjudge_id ILIKE ${like})
+      ORDER BY full_name NULLS LAST
+      LIMIT 10
+    `
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Search failed' }, 500)
   }
 }
