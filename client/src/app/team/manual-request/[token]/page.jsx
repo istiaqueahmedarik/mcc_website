@@ -73,9 +73,7 @@ export default async function ManualRequestPage({ params }) {
         )}
 
   <ManualRequestForm action={requestManualTeam} disabled={disabled} myVjudge={myVj} />
-        <div className="mt-10 text-center text-xs text-muted-foreground">
-          Share this page link directly with members or admin as needed.
-        </div>
+       
       </div>
     </div>
   )
