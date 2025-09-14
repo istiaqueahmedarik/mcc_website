@@ -48,7 +48,7 @@ export default async function FinalizedTeamsByContestPage(){
     if(s.length < 4) return '-'
     const year = parseInt(s.slice(0,4))
     if(!Number.isFinite(year)) return '-'
-    const lvl = yearNow - year
+    const lvl = yearNow - year+1
     return lvl > 0 ? lvl : 1
   }
 

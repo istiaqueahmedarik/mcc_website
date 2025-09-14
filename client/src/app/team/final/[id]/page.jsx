@@ -30,6 +30,19 @@ async function fetchPublicProfile(vjudge) {
   }
 }
 
+async function fetchMe() {
+  try {
+    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+    const res = await fetch(`${base}/auth/me`, { cache: "no-store", credentials: "include" })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.result || null
+  } catch (e) {
+    console.error(e)
+    return null
+  }
+}
+
 function deriveUserPerformanceAcrossReports(vjudge, reports) {
   const rows = []
   for (const r of reports || []) {
@@ -164,12 +177,35 @@ export default async function TeamFinalPage({ params }) {
   const team = teamRes.result
   const members = Array.isArray(team.member_vjudge_ids) ? team.member_vjudge_ids : []
   const coach = team.coach_vjudge_id || null
+  const me = await fetchMe()
+  const myVjudge = me?.vjudge_id || me?.cf_id || null
+  const canRename = !!myVjudge && (members.map(String).includes(String(myVjudge)) || (coach && String(coach) === String(myVjudge)))
   const allReports = await fetchAllSharedReports()
   const teamRows = deriveTeamBestRankAcrossReports(members, allReports?.result || [], team.room_id)
 
 
   async function doRename(formDataOrPrev, maybeFormData) {
     "use server"
+    // Extra server-side guard: only allow rename if caller is member or coach
+    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+    let currentUser = null
+    try {
+      const meRes = await fetch(`${base}/auth/me`, { cache: "no-store", credentials: "include" })
+      if (meRes.ok) {
+        const meJson = await meRes.json()
+        currentUser = meJson?.result || null
+      }
+    } catch (e) {
+      console.error("Failed to re-fetch current user in rename action", e)
+    }
+    const currentVj = currentUser?.vjudge_id || currentUser?.cf_id || null
+    const memberList = Array.isArray(team.member_vjudge_ids) ? team.member_vjudge_ids.map(String) : []
+    const isCoach = coach && String(coach) === String(currentVj)
+    const isMember = currentVj && memberList.includes(String(currentVj))
+    if (!isCoach && !isMember) {
+      // Silently ignore unauthorized attempt
+      return
+    }
     const formData = maybeFormData instanceof FormData ? maybeFormData : formDataOrPrev
     const new_title = formData?.get("new_title")
     if (typeof new_title === "string" && new_title.trim()) {
@@ -233,7 +269,11 @@ export default async function TeamFinalPage({ params }) {
               </div>
             </div>
 
-            <RenameTeamClient serverAction={doRename} />
+            {canRename ? (
+              <RenameTeamClient serverAction={doRename} />
+            ) : (
+              <div className="text-sm text-muted-foreground italic">Only team members or the coach can rename this team.</div>
+            )}
           </div>
         </div>
 
