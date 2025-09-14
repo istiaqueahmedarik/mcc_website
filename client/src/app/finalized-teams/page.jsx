@@ -71,16 +71,16 @@ export default async function FinalizedTeamsByContestPage(){
         {blocks.map(block => (
           <section key={block.collection_id} className="space-y-6" aria-labelledby={`c-${block.collection_id}`}>
             <div className="flex items-center justify-between flex-wrap gap-4">
-              <h2 id={`c-${block.collection_id}`} className="text-2xl font-semibold tracking-tight flex items-center gap-3">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-primary/10 text-primary font-bold shadow-inner">{block.teams.length}</span>
+              <h2 id={`c-${block.collection_id}`} className="text-2xl font-semibold text-center tracking-tight flex items-center gap-3">
                 <span>{block.collection_title || 'Untitled Collection'}</span>
+                <span className="inline-flex h-6 w-32 items-center justify-center rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 text-primary/60 shadow-inner">{block.teams.length} teams</span>
               </h2>
             </div>
 
             {!isAdmin && (
               <>
                 {/* Public (shared) compact leaderboard */}
-                <div className="px-2 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Public Leaderboard</div>
+                <div className="px-2 pb-2 text-xs text-center font-medium uppercase tracking-wider text-muted-foreground">Public Leaderboard</div>
                 <div className="rounded-xl border border-border/60 bg-card/60 backdrop-blur shadow-sm overflow-hidden">
                   <Table className="text-sm">
                     <TableHeader>
@@ -90,7 +90,7 @@ export default async function FinalizedTeamsByContestPage(){
                         <TableHead className="w-24">Score</TableHead>
                         <TableHead className="w-40">Member</TableHead>
                         <TableHead className="w-28">ID</TableHead>
-                        <TableHead className="w-16">Level</TableHead>
+                        {/* <TableHead className="w-16">Level</TableHead> */}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -124,7 +124,7 @@ export default async function FinalizedTeamsByContestPage(){
                                 </Link>
                               </TableCell>
                               <TableCell className="text-muted-foreground/90">{profileMap.get(m)?.mist_id || '-'}</TableCell>
-                              <TableCell>{deriveLevel(profileMap.get(m)?.mist_id)}</TableCell>
+                              {/* <TableCell>{deriveLevel(profileMap.get(m)?.mist_id)}</TableCell> */}
                             </TableRow>
                           )
                         })
