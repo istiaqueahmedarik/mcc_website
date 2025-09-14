@@ -17,9 +17,14 @@ async function fetchPublicProfile(vjudge){
 }
 
 async function fetchCurrentUser(){
-  const user = await get_with_token('auth/user/profile')
-  console.log(user);
-  return user?.error ? null : user.result[0]
+  try {
+    const user = await get_with_token('auth/user/profile')
+    if(!user || user.error) return null
+    if(!Array.isArray(user.result) || user.result.length === 0) return null
+    return user.result[0]
+  } catch (e) {
+    return null
+  }
 }
 
 export default async function FinalizedTeamsByContestPage(){

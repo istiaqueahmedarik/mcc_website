@@ -1,6 +1,6 @@
 'use server'
 
-import { get_with_token, post, post_with_token } from '@/lib/action'
+import { get, get_with_token, post, post_with_token } from '@/lib/action'
 
 const API = process.env.SERVER_URL
 
@@ -59,7 +59,7 @@ export async function publicFinalizedTeamsLeaderboard(){
   return await get_with_token('team-collection/public/finalized/teams')
 }
 export async function publicFinalizedTeamsByContest(){
-  return await get_with_token('team-collection/public/finalized/teams/by-contest')
+  return await get('team-collection/public/finalized/teams/by-contest')
 }
 
 // Admin
