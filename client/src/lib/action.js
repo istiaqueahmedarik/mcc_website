@@ -50,7 +50,7 @@ export const get = cache(async (url) => {
     {
       cache: 'force-cache',
     },
-    { next: { revalidate: 30000 } },
+    { next: { revalidate: 60000 } },
   )
   try {
     const json = await response.json()
