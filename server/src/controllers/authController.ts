@@ -44,9 +44,22 @@ export const signup = async (c: any) => {
       )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
         RETURNING *`;
     return c.json({ result });
-  } catch (error) {
-    console.log(error);
-    return c.json({ error: "error" }, 400);
+  } catch (error: any) {
+    console.error('Database error in signup:', error.message);
+
+    // Handle specific database errors
+    if (error.code === 'CONNECTION_CLOSED' || error.code === 'CONNECTION_ENDED') {
+      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    }
+    if (error.code === '26000') { // Prepared statement error
+      console.error('Prepared statement error - this should not happen with transaction mode');
+      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    }
+    if (error.code === '23505') { // Unique constraint violation
+      return c.json({ error: "Email already exists" }, 400);
+    }
+
+    return c.json({ error: "Registration failed. Please try again." }, 500);
   }
 };
 
@@ -68,9 +81,19 @@ export const login = async (c: any) => {
     }
     const token = await JwtSign({ email, id: result[0].id }, secret);
     return c.json({ result, token, admin: result[0].admin });
-  } catch (error) {
-    console.log(error);
-    return c.json({ error: "Something went wrong" }, 400);
+  } catch (error: any) {
+    console.error('Database error in login:', error.message);
+
+    // Handle specific database errors
+    if (error.code === 'CONNECTION_CLOSED' || error.code === 'CONNECTION_ENDED') {
+      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    }
+    if (error.code === '26000') { // Prepared statement error
+      console.error('Prepared statement error - this should not happen with transaction mode');
+      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    }
+
+    return c.json({ error: "Login failed. Please try again." }, 500);
   }
 };
 
@@ -132,8 +155,18 @@ export const getPublicProfileByVjudge = async (c: any) => {
         mist_id: u.mist_id,
       }
     })
-  } catch (e) {
-    console.error(e);
+  } catch (e: any) {
+    console.error('Database error in getPublicProfileByVjudge:', e.message);
+
+    // Handle specific database errors
+    if (e.code === 'CONNECTION_CLOSED' || e.code === 'CONNECTION_ENDED') {
+      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    }
+    if (e.code === '26000') { // Prepared statement error
+      console.error('Prepared statement error - this should not happen with transaction mode');
+      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    }
+
     return c.json({ error: "Something went wrong" }, 500);
   }
 };
