@@ -45,7 +45,7 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '10mb',
     },
-    viewTransition: false,
+    viewTransition: true,
     
     //   ppr: 'incremental',
   },
