@@ -6,28 +6,28 @@ import { get_with_token } from '@/lib/action'
 
 export const dynamic = 'force-dynamic'
 
-async function fetchPublicProfile(vjudge){
+async function fetchPublicProfile(vjudge) {
   try {
     const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
     const r = await fetch(`${base}/auth/public/profile/vj/${encodeURIComponent(vjudge)}`, { cache: 'force-cache', next: { revalidate: 300 } })
     return await r.json()
-  } catch (e){
+  } catch (e) {
     return { error: 'failed' }
   }
 }
 
-async function fetchCurrentUser(){
+async function fetchCurrentUser() {
   try {
     const user = await get_with_token('auth/user/profile')
-    if(!user || user.error) return null
-    if(!Array.isArray(user.result) || user.result.length === 0) return null
+    if (!user || user.error) return null
+    if (!Array.isArray(user.result) || user.result.length === 0) return null
     return user.result[0]
   } catch (e) {
     return null
   }
 }
 
-export default async function FinalizedTeamsByContestPage(){
+export default async function FinalizedTeamsByContestPage() {
   const [res, me] = await Promise.all([
     publicFinalizedTeamsByContest(),
     fetchCurrentUser()
@@ -36,8 +36,8 @@ export default async function FinalizedTeamsByContestPage(){
   const isAdmin = !!me?.admin
 
   const memberSet = new Set()
-  for (const b of blocks){
-    for (const t of b.teams || []){
+  for (const b of blocks) {
+    for (const t of b.teams || []) {
       for (const m of (t.members || [])) memberSet.add(m)
       if (t.coach_vjudge_id) memberSet.add(t.coach_vjudge_id)
     }
@@ -48,13 +48,19 @@ export default async function FinalizedTeamsByContestPage(){
 
   const yearNow = new Date().getFullYear()
   const deriveLevel = (mistId) => {
-    if(!mistId) return '-'
+    if (!mistId) return '-'
     const s = String(mistId)
-    if(s.length < 4) return '-'
-    const year = parseInt(s.slice(0,4))
-    if(!Number.isFinite(year)) return '-'
-    const lvl = yearNow - year+1
-    return lvl > 0 ? lvl : 1
+    if (s.length < 4) return '-'
+    const year = parseInt(s.slice(0, 4))
+    if (!Number.isFinite(year)) return '-'
+    const lvl = yearNow - year + 1
+    return Math.min(4, lvl > 0 ? lvl : 1)
+  }
+
+
+  const calculateScore = (score) => {
+    if (typeof score !== 'number') return '—'
+    return (score / 3).toFixed(2)
   }
 
   return (
@@ -75,7 +81,7 @@ export default async function FinalizedTeamsByContestPage(){
 
         {blocks.map(block => (
           <section key={block.collection_id} className="space-y-6" aria-labelledby={`c-${block.collection_id}`}>
-            <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center justify-between text-center flex-wrap gap-4">
               <h2 id={`c-${block.collection_id}`} className="text-2xl font-semibold text-center tracking-tight flex items-center gap-3">
                 <span>{block.collection_title || 'Untitled Collection'}</span>
                 <span className="inline-flex h-6 w-32 items-center justify-center rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 text-primary/60 shadow-inner">{block.teams.length} teams</span>
@@ -93,9 +99,9 @@ export default async function FinalizedTeamsByContestPage(){
                         <TableHead className="w-12 text-center">#</TableHead>
                         <TableHead className="w-24 text-center">Team</TableHead>
                         <TableHead className="w-24">Score</TableHead>
-                        <TableHead className="w-40">Member</TableHead>
+                        <TableHead className="w-40">Members</TableHead>
                         <TableHead className="w-28">ID</TableHead>
-                        {/* <TableHead className="w-16">Level</TableHead> */}
+                        <TableHead className="w-16">Level</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -113,23 +119,26 @@ export default async function FinalizedTeamsByContestPage(){
                           const img = p.profile_pic
                           return (
                             <TableRow key={`${t.id}_${m}`} className={top ? '' : ''}>
-                              {mi === 0 && <TableCell rowSpan={t.members.length} className="font-semibold align-middle text-center">{idx+1}</TableCell>}
+                              {mi === 0 && <TableCell rowSpan={t.members.length} className="font-semibold align-middle text-center">{idx + 1}</TableCell>}
                               {mi === 0 && (
-                                <TableCell rowSpan={t.members.length} className="align-middle text-center">
+                                <TableCell rowSpan={t.members.length} className="align-middle text-center text-[16px] font-semibold">
                                   <Link href={`/team/final/${t.id}`} className="font-medium hover:text-primary transition-colors inline-block">{t.team_title}</Link>
                                 </TableCell>
                               )}
-                              {mi === 0 && <TableCell rowSpan={t.members.length}>{scoreCell}</TableCell>}
+                              {mi === 0 && <TableCell rowSpan={t.members.length}>{calculateScore(t.combined_score)}</TableCell>}
                               <TableCell>
                                 <Link href={`/profile/${encodeURIComponent(m)}`} className="flex items-center gap-2 hover:text-primary">
-                                  <span className="relative w-6 h-6 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
+                                  <span className="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
                                     {img ? <Image src={img} alt={display} fill sizes="24px" className="object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">{display.charAt(0).toUpperCase()}</span>}
                                   </span>
-                                  <span className="truncate max-w-[8rem] text-[12px]">{display}</span>
+                                  <div className="flex flex-col">
+                                    <span className="truncate max-w-[8rem] text-[14px]">{display}</span>
+                                    <span className="text-muted-foreground/90 text-[12px]">{p.email}</span>
+                                  </div>
                                 </Link>
                               </TableCell>
                               <TableCell className="text-muted-foreground/90">{profileMap.get(m)?.mist_id || '-'}</TableCell>
-                              {/* <TableCell>{deriveLevel(profileMap.get(m)?.mist_id)}</TableCell> */}
+                              <TableCell>{deriveLevel(profileMap.get(m)?.mist_id)}</TableCell>
                             </TableRow>
                           )
                         })
@@ -148,15 +157,11 @@ export default async function FinalizedTeamsByContestPage(){
                     <TableRow className="bg-muted/30">
                       <TableHead className="w-12 text-center">#</TableHead>
                       <TableHead className="w-48 text-center">Team</TableHead>
-                      <TableHead className="w-48">Member</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead className="w-auto">Members</TableHead>
                       <TableHead className="w-28">ID</TableHead>
                       <TableHead className="w-16">Level</TableHead>
                       <TableHead className="w-28">Contact</TableHead>
-                      <TableHead className="w-40">Coach</TableHead>
-                      <TableHead className="w-40">Coach Email</TableHead>
-                      <TableHead className="w-28">Coach Contact</TableHead>
-                      <TableHead className="w-24">Coach T-Shirt</TableHead>
+                      <TableHead className="w-48">Coach Information</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -168,12 +173,12 @@ export default async function FinalizedTeamsByContestPage(){
                         const img = p.profile_pic
                         return (
                           <TableRow key={`${t.id}_${m}`}>
-                            {mi === 0 && <TableCell rowSpan={t.members.length} className="align-middle font-semibold text-center">{idx+1}</TableCell>}
+                            {mi === 0 && <TableCell rowSpan={t.members.length} className="align-middle font-semibold text-center">{idx + 1}</TableCell>}
                             {mi === 0 && (
                               <TableCell rowSpan={t.members.length} className="align-middle text-center">
                                 <div className="space-y-1">
                                   <Link href={`/team/final/${t.id}`} className="font-semibold text-sm hover:text-primary inline-block">{t.team_title}</Link>
-                                  <div className="text-[11px] text-muted-foreground">Score: {typeof t.combined_score === 'number' ? t.combined_score.toFixed(2) : '—'}</div>
+                                  <div className="text-[11px] text-muted-foreground">Score: {calculateScore(t.combined_score)}</div>
                                 </div>
                               </TableCell>
                             )}
@@ -182,23 +187,34 @@ export default async function FinalizedTeamsByContestPage(){
                                 <span className="relative w-7 h-7 rounded-full overflow-hidden ring-2 ring-background/60">
                                   {img ? <Image src={img} alt={display} fill sizes="28px" className="object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">{display.charAt(0).toUpperCase()}</span>}
                                 </span>
-                                <span className="truncate max-w-[9rem]">{display}</span>
+                                <div className='flex flex-col'>
+                                  <span className="truncate max-w-[9rem]">{display}</span>
+                                  <span className="text-muted-foreground/90">{p.email || '-'}</span>
+                                </div>
                               </Link>
                             </TableCell>
-                            <TableCell className="text-muted-foreground/90">{p.email || '-'}</TableCell>
                             <TableCell>{p.mist_id || '-'}</TableCell>
                             <TableCell>{deriveLevel(p.mist_id)}</TableCell>
                             <TableCell>{p.phone || '-'}</TableCell>
                             {mi === 0 && (
                               <>
-                                <TableCell rowSpan={t.members.length} className="align-top text-xs">
-                                  {t.coach_vjudge_id ? (
-                                    <Link href={`/profile/${encodeURIComponent(t.coach_vjudge_id)}`} className="underline underline-offset-2 hover:text-primary">{coachProfile.full_name || t.coach_vjudge_id}</Link>
-                                  ) : <span className="text-muted-foreground/60">—</span>}
+                                <TableCell rowSpan={t.members.length} className="align-center justify-center text-xs">
+                                  {t.coach_vjudge_id && (
+                                    <Link href={`/profile/${encodeURIComponent(t.coach_vjudge_id)}`} className="mb-1 flex items-center gap-2">
+                                      <span className="relative w-10 h-10 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
+                                        {coachProfile.profile_pic ? <Image src={coachProfile.profile_pic} alt={coachProfile.full_name || t.coach_vjudge_id} fill sizes="28px" className="object-cover" /> : <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">{(coachProfile.full_name || t.coach_vjudge_id).charAt(0).toUpperCase()}</span>}
+                                      </span>
+                                      <div className="flex flex-col">
+                                        <span className="truncate max-w-[12rem]">{coachProfile.full_name || t.coach_vjudge_id}</span>
+                                        <span className="text-muted-foreground/90 text-[12px]">{coachProfile.email || '-'}</span>
+                                        <span rowSpan={t.members.length} className="text-muted-foreground/90 text-[12px]">{coachProfile.phone || '-'}</span>
+                                        {/* <span rowSpan={t.members.length} className="align-top text-xs">{coachProfile.tshirt_size || '-'}</span> */}
+                                      </div>
+                                    </Link>
+                                  )}
+                                  {!t.coach_vjudge_id && (
+                                    <span className="text-muted-foreground/60">—</span>)}
                                 </TableCell>
-                                <TableCell rowSpan={t.members.length} className="align-top text-xs">{coachProfile.email || '-'}</TableCell>
-                                <TableCell rowSpan={t.members.length} className="align-top text-xs">{coachProfile.phone || '-'}</TableCell>
-                                <TableCell rowSpan={t.members.length} className="align-top text-xs">{coachProfile.tshirt_size || '-'}</TableCell>
                               </>
                             )}
                           </TableRow>
