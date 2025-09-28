@@ -83,7 +83,7 @@ export const deleteAchievement = async (c: any) => {
 
 export const getAchievements = async (c: any) => {
   try {
-    const result = await sql`SELECT * FROM achievements`
+    const result = await sql`SELECT * FROM achievements ORDER BY date DESC`
     return c.json({ result })
   } catch (error) {
     console.log('error: ', error)

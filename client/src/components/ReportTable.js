@@ -2,8 +2,9 @@
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { X, AlertCircle, Search, Users2, CheckCheck, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -149,6 +150,21 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const maxPossibleSolved = useMemo(() => {
         return Math.max(...merged.users.map((u) => u.totalSolved), 0)
     }, [merged.users])
+
+    // Load valid VJudge IDs from server to decide linking
+    const [validVjudgeIds, setValidVjudgeIds] = useState(null)
+    useEffect(() => {
+        const load = async () => {
+            try{
+                const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+                const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
+                const json = await res.json()
+                const set = new Set(json?.result || [])
+                setValidVjudgeIds(set)
+            } catch(e){ console.error('Failed to load vjudge ids', e) }
+        }
+        load()
+    }, [])
 
     // Progress: build per-contest ranking and compute last vs previous attended
     const { contestRanks, progressByUser } = useMemo(() => {
@@ -680,7 +696,13 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                     </div>
                                 </TableCell>
                                 <TableCell className={cn('font-bold', isTop && 'top-rank-name')}>
-                                    <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
+                                    {validVjudgeIds?.has(String(u.username)) ? (
+                                        <Link href={`/profile/${encodeURIComponent(u.username)}`} className="underline-offset-2 hover:underline transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>
+                                            {u.username}
+                                        </Link>
+                                    ) : (
+                                        <span className="transition-all duration-200" style={!isTop ? { color: getNameColor(index + 1) } : undefined}>{u.username}</span>
+                                    )}
                                 </TableCell>
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 <TableCell>

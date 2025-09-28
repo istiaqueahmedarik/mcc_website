@@ -1,4 +1,53 @@
 import sql from '../db'
+import { Hono } from 'hono'
+
+type Ctx = any
+
+
+// ---- Codeforces manual verification (mirrors VJudge flow) ----
+export const setCodeforcesId = async (c: Ctx) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { cf_id } = await c.req.json()
+    if (!cf_id || typeof cf_id !== 'string') {
+      return c.json({ error: 'Invalid cf_id' }, 400)
+    }
+    const rows = await sql`update users set cf_id = ${cf_id}, cf_verified = false where id = ${id} returning id, cf_id, cf_verified`
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to set Codeforces ID' }, 400)
+  }
+}
+
+export const listCodeforcesPending = async (c: Ctx) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const rows = await sql`select id, full_name, email, cf_id, cf_verified, vjudge_id, vjudge_verified from users where cf_id is not null and cf_id <> '' and cf_verified = false order by created_at desc`
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to load pending list' }, 400)
+  }
+}
+
+export const verifyCodeforces = async (c: Ctx) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { user_id, verified } = await c.req.json()
+    if (!user_id) return c.json({ error: 'Missing user_id' }, 400)
+    const flag = verified === false ? false : true
+    const rows = await sql`update users set cf_verified = ${flag} where id = ${user_id} returning id, cf_id, cf_verified`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to update verification' }, 400)
+  }
+}
 
 export const getVjudgeId = async (c: any) => {
   const { id, email } = c.get('jwtPayload')
@@ -113,5 +162,121 @@ order by s.time`
   } catch (error) {
     console.log(error)
     return c.json({ erro: 'error' }, 400)
+  }
+}
+
+// ---- VJudge verification helpers/endpoints ----
+async function requireAdmin(c: any) {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return null
+  const rows = await sql`select id from users where id = ${id} and email = ${email} and admin = true`
+  if (rows.length === 0) return null
+  return rows[0]
+}
+
+export const setVjudgeId = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { vjudge_id } = await c.req.json()
+    if (!vjudge_id || typeof vjudge_id !== 'string') {
+      return c.json({ error: 'Invalid vjudge_id' }, 400)
+    }
+    const rows = await sql`update users set vjudge_id = ${vjudge_id}, vjudge_verified = false where id = ${id} returning id, vjudge_id, vjudge_verified`
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to set VJudge ID' }, 400)
+  }
+}
+
+export const listVjudgePending = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const rows = await sql`select id, full_name, email, vjudge_id, vjudge_verified, cf_id, cf_verified from users where vjudge_id is not null and vjudge_id <> '' and vjudge_verified = false order by created_at desc`
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to load pending list' }, 400)
+  }
+}
+
+export const verifyVjudge = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { user_id, verified } = await c.req.json()
+    if (!user_id) return c.json({ error: 'Missing user_id' }, 400)
+    const flag = verified === false ? false : true
+    const rows = await sql`update users set vjudge_verified = ${flag} where id = ${user_id} returning id, vjudge_id, vjudge_verified`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to update verification' }, 400)
+  }
+}
+
+// ---- Profile fields updates ----
+export const setTshirtSize = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { tshirt_size } = await c.req.json()
+    const allowed = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL']
+    if (tshirt_size !== null && tshirt_size !== undefined) {
+      if (typeof tshirt_size !== 'string' || !allowed.includes(tshirt_size)) {
+        return c.json({ error: 'Invalid tshirt_size' }, 400)
+      }
+    }
+    const rows = await sql`update users set tshirt_size = ${tshirt_size} where id = ${id} returning id, tshirt_size`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to set T-shirt size' }, 400)
+  }
+}
+
+// Update profile picture URL
+export const setProfilePic = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const { profile_pic } = await c.req.json()
+    if (!profile_pic || typeof profile_pic !== 'string') {
+      return c.json({ error: 'Invalid profile_pic' }, 400)
+    }
+    const rows = await sql`update users set profile_pic = ${profile_pic} where id = ${id} returning id, profile_pic`
+    if (rows.length === 0) return c.json({ error: 'User not found' }, 404)
+    return c.json({ result: rows[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to set profile picture' }, 400)
+  }
+}
+
+// Lightweight user search for admin tooling / coach assignment
+export const searchUsers = async (c: any) => {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return c.json({ error: 'Unauthorized' }, 401)
+  const { q } = c.req.query() as { q?: string }
+  const query = (q || '').trim()
+  console.log(query);
+  if (!query) return c.json({ result: [] })
+  try {
+    const like = `%${query.replace(/%/g, '')}%`
+    const rows = await sql`
+      SELECT id, full_name, email, vjudge_id
+      FROM users
+      WHERE (full_name ILIKE ${like} OR email ILIKE ${like} OR vjudge_id ILIKE ${like})
+      ORDER BY full_name NULLS LAST
+      LIMIT 10
+    `
+    return c.json({ result: rows })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Search failed' }, 500)
   }
 }

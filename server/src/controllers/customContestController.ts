@@ -69,7 +69,7 @@ export const deleteCustomContest = async (c: any) => {
         const body = await c.req.json()
         const { contest_id } = body
         if (!contest_id) return c.json({ error: 'Missing contest_id' }, 400)
-        const result = await sql`UPDATE custom_contests SET is_active = false, updated_at = NOW() WHERE id = ${contest_id} RETURNING *`
+        const result = await sql`DELETE FROM custom_contests WHERE id = ${contest_id} RETURNING *`
         return c.json({ result: result[0], success: true })
     } catch (e) {
         console.error(e)

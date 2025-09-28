@@ -32,6 +32,9 @@ import {
   UserPlus,
   AlertTriangle,
   SheetIcon,
+  LaptopMinimalIcon,
+  Globe,
+  Users,
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -45,12 +48,14 @@ const Navbar = async () => {
       icon: CalendarClock,
       label: 'Contest Reminders',
     },
-    { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
+    { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
+    { href: '/finalized-teams', icon: Users, label: 'Teams' },
   ]
-
+  
   const userTools = [
+    { href: '/courses', icon: BookOpen, label: 'Course Details' },
     { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
   ]
 
@@ -63,7 +68,10 @@ const Navbar = async () => {
     { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
     { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
+    { href: '/admin/team-collection', icon: Users, label: 'Team Collections' },
     { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
+    { href: '/admin/vjudge-verification', icon: LaptopMinimalIcon, label: 'VJudge Verification' },
+    { href: '/admin/cf-verification', icon: LaptopMinimalIcon, label: 'CF Verification' },
   ]
 
   const loggedIn = (await cookies()).get('token')
@@ -119,7 +127,7 @@ const Navbar = async () => {
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gpa-2">
                   {' '}
-                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin Tools
+                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {adminTools.map((item) => (

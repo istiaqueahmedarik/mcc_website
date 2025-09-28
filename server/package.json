@@ -10,7 +10,8 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.15",
     "postgres": "^3.4.4",
-    "server": "file:"
+    "server": "file:",
+    "uuidv7": "^1.0.2"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

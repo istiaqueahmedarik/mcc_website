@@ -1,5 +1,6 @@
 'use client'
 
+import ResetPasswordModal from '@/components/ResetPasswordModal'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,9 +13,10 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login } from '@/lib/action'
-import { AtSign, Lock } from 'lucide-react'
-import {Link} from 'next-view-transitions'
-import { useActionState } from 'react'
+import { AtSign, Eye, EyeOff, Lock } from 'lucide-react'
+import { Link } from 'next-view-transitions'
+import { useActionState, useState } from 'react'
+
 const initialState = {
   message: '',
   success: false,
@@ -22,6 +24,9 @@ const initialState = {
 
 export default function Page() {
   const [state, formAction, pending] = useActionState(login, initialState)
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
@@ -59,17 +64,40 @@ export default function Page() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="px-0 font-normal h-auto"
+                  onClick={() => setShowResetModal(true)}
+                >
+                  Forgot password?
+                </Button>
+              </div>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
                 <Lock />
                 <Input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
                   placeholder="Enter your password"
                   className="ring-0 border-0 focus:bg-transparent focus-visible:ring-offset-0 focus-visible:ring-0"
                   required
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
               </div>
             </div>
 
@@ -89,6 +117,11 @@ export default function Page() {
           </form>
         </CardContent>
       </Card>
+
+      <ResetPasswordModal 
+        isOpen={showResetModal} 
+        onClose={() => setShowResetModal(false)} 
+      />
     </div>
   )
 }
