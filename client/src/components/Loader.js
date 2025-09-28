@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import Image from "next/image";
 
 const Loader = () => {
   return (
@@ -8,9 +8,10 @@ const Loader = () => {
         alt="loading"
         width={100}
         height={100}
+        unoptimized
       />
     </div>
-  )
-}
+  );
+};
 
-export default Loader
+export default Loader;

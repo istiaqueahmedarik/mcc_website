@@ -42,6 +42,15 @@
     --alumni-royal: 226 70% 40%;
     --alumni-royal-fade: 226 70% 18%;
     --alumni-parchment: 46 35% 96%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
     /* Profile page accent palette */
     --profile-accent-1: 253 83% 74%;
     /* soft indigo */
@@ -51,6 +60,7 @@
     /* fuchsia */
     --profile-accent-solid: 263 70% 55%;
     --profile-accent-solid-alt: 286 68% 57%;
+
   }
 
   .dark {
@@ -91,19 +101,27 @@
     --alumni-royal: 226 70% 58%;
     --alumni-royal-fade: 226 70% 20%;
     --alumni-parchment: 45 15% 12%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
     /* Dark mode adjustments for profile accents */
     --profile-accent-1: 253 70% 65%;
     --profile-accent-2: 267 72% 62%;
     --profile-accent-3: 289 68% 64%;
     --profile-accent-solid: 263 72% 60%;
     --profile-accent-solid-alt: 286 70% 62%;
+
   }
-
-
 }
 
 .arik {
-  @apply rounded-xl p-4
+  @apply rounded-xl p-4;
 }
 
 @layer base {
@@ -166,35 +184,69 @@
 
 /* Alumni utility classes */
 .alumni-hero {
-  background:
-    radial-gradient(circle at 20% 20%, hsl(var(--alumni-gold)/0.15), transparent 60%),
-    radial-gradient(circle at 80% 30%, hsl(var(--alumni-royal)/0.25), transparent 70%),
-    linear-gradient(to bottom right, hsl(var(--alumni-parchment)), hsl(var(--background)));
+  background: radial-gradient(
+      circle at 20% 20%,
+      hsl(var(--alumni-gold) / 0.15),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 80% 30%,
+      hsl(var(--alumni-royal) / 0.25),
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom right,
+      hsl(var(--alumni-parchment)),
+      hsl(var(--background))
+    );
 }
 
 .dark .alumni-hero {
-  background:
-    radial-gradient(circle at 15% 25%, hsl(var(--alumni-royal)/0.35), transparent 65%),
-    radial-gradient(circle at 85% 35%, hsl(var(--alumni-gold)/0.25), transparent 70%),
-    linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--alumni-royal-fade)));
+  background: radial-gradient(
+      circle at 15% 25%,
+      hsl(var(--alumni-royal) / 0.35),
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 85% 35%,
+      hsl(var(--alumni-gold) / 0.25),
+      transparent 70%
+    ),
+    linear-gradient(
+      to bottom right,
+      hsl(var(--background)),
+      hsl(var(--alumni-royal-fade))
+    );
 }
 
 .alumni-batch-card {
   @apply relative rounded-xl border backdrop-blur-sm overflow-hidden transition-all;
-  background: linear-gradient(135deg, hsl(var(--alumni-gold-soft)/0.9) 0%, hsl(var(--background)) 60%);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--alumni-gold-soft) / 0.9) 0%,
+    hsl(var(--background)) 60%
+  );
 }
 
 .dark .alumni-batch-card {
-  background: linear-gradient(135deg, hsl(var(--alumni-royal-fade)/0.6) 0%, hsl(var(--background)) 65%);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--alumni-royal-fade) / 0.6) 0%,
+    hsl(var(--background)) 65%
+  );
 }
 
 .alumni-batch-card:before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, hsl(var(--alumni-gold)/0.35), transparent 40%);
+  background: linear-gradient(
+    120deg,
+    hsl(var(--alumni-gold) / 0.35),
+    transparent 40%
+  );
   opacity: 0;
-  transition: opacity .5s;
+  transition: opacity 0.5s;
 }
 
 .alumni-batch-card:hover:before {
@@ -202,11 +254,16 @@
 }
 
 .alumni-batch-card:hover {
-  box-shadow: 0 0 0 1px hsl(var(--alumni-gold)/0.4), 0 4px 28px -4px hsl(var(--alumni-gold)/0.35);
+  box-shadow: 0 0 0 1px hsl(var(--alumni-gold) / 0.4),
+    0 4px 28px -4px hsl(var(--alumni-gold) / 0.35);
 }
 
 .alumni-name {
-  background: linear-gradient(90deg, hsl(var(--alumni-gold)), hsl(var(--alumni-royal)));
+  background: linear-gradient(
+    90deg,
+    hsl(var(--alumni-gold)),
+    hsl(var(--alumni-royal))
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -216,15 +273,28 @@
 /* Simplified top rank highlight (removed shimmer & animation) */
 .top-rank-wrapper {
   position: relative;
-  background: linear-gradient(90deg, hsl(var(--alumni-gold)/0.12), hsl(var(--alumni-gold)/0.05));
+  background: linear-gradient(
+    90deg,
+    hsl(var(--alumni-gold) / 0.12),
+    hsl(var(--alumni-gold) / 0.05)
+  );
 }
 
 .dark .top-rank-wrapper {
-  background: linear-gradient(90deg, hsl(var(--alumni-gold)/0.18), hsl(var(--alumni-gold)/0.07));
+  background: linear-gradient(
+    90deg,
+    hsl(var(--alumni-gold) / 0.18),
+    hsl(var(--alumni-gold) / 0.07)
+  );
 }
 
 .top-rank-name {
-  background: linear-gradient(92deg, hsl(var(--alumni-gold)), hsl(var(--alumni-royal)) 60%, hsl(var(--alumni-gold)) 100%);
+  background: linear-gradient(
+    92deg,
+    hsl(var(--alumni-gold)),
+    hsl(var(--alumni-royal)) 60%,
+    hsl(var(--alumni-gold)) 100%
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -232,14 +302,14 @@
 }
 
 .top-rank-name:after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: -2px;
   right: 0;
   height: 1px;
   background: linear-gradient(90deg, hsl(var(--alumni-gold)), transparent);
-  opacity: .7;
+  opacity: 0.7;
 }
 
 /* Removed top-rank-pulse animation */
@@ -253,12 +323,21 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, hsl(var(--alumni-gold)/0.85), hsl(var(--alumni-gold)/0.5) 65%);
-  box-shadow: 0 0 0 1px hsl(var(--alumni-gold)/0.6), 0 2px 6px -1px hsl(var(--alumni-gold)/0.55);
+  background: radial-gradient(
+    circle at 35% 30%,
+    hsl(var(--alumni-gold) / 0.85),
+    hsl(var(--alumni-gold) / 0.5) 65%
+  );
+  box-shadow: 0 0 0 1px hsl(var(--alumni-gold) / 0.6),
+    0 2px 6px -1px hsl(var(--alumni-gold) / 0.55);
 }
 
 /* Removed rotating overlay */
 
+.g-md-wysiwyg-editor_toolbar .yfm-editor {
+  color: var(--g-color-text-primary) !important;
+  background-color: var(--g-color-base-background) !important;
+}
 /* Enhanced 3D effects for alumni cards */
 .perspective-1000 {
   perspective: 1000px;
