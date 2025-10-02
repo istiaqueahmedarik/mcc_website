@@ -161,14 +161,17 @@ export default async function PublicProfilePage({ params }) {
   const perf = deriveUserPerformanceAcrossReports(vjudge, allReports?.result || [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background">
-      <div className="container mx-auto py-12 px-6 space-y-8 max-w-6xl">
-        <Card className="apple-card overflow-hidden">
-          <CardContent className="p-0">
-            <div className="bg-gradient-to-r from-primary/10 via-accent/5 to-primary/10 p-8">
-              <div className="flex flex-col lg:flex-row items-center gap-8">
+    <div className="min-h-screen w-full" style={{ background: 'hsl(var(--profile-bg))' }}>
+      <div className="max-w-[1400px] mx-auto py-8 px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+          {/* Left Sidebar */}
+          <aside className="space-y-6">
+            {/* Profile Card */}
+            <div className="profile-card profile-sidebar-sticky">
+              <div className="flex flex-col items-center text-center space-y-4">
+                {/* Avatar */}
                 <div className="relative">
-                  <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-2xl shadow-black/20 ring-4 ring-white/50">
+                  <div className="w-32 h-32 rounded-2xl overflow-hidden border-2" style={{ borderColor: u.vjudge_verified ? 'hsl(var(--profile-primary))' : 'hsl(var(--profile-border))' }}>
                     <Image
                       src={u.profile_pic || "/vercel.svg"}
                       alt={u.full_name || u.vjudge_id}
@@ -177,287 +180,351 @@ export default async function PublicProfilePage({ params }) {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-white text-sm font-bold">✓</span>
+                  {u.vjudge_verified && (
+                    <div className="absolute -bottom-2 -right-2 rounded-full p-2 shadow-lg" style={{ background: 'hsl(var(--profile-success))' }}>
+                      <span className="text-white text-sm font-bold">✓</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Name & Badges */}
+                <div className="w-full">
+                  <h1 className="text-2xl font-bold mb-3 break-words" style={{ color: 'hsl(var(--profile-text))' }}>
+                    {u.full_name || u.vjudge_id}
+                  </h1>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {u.vjudge_verified && (
+                      <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-primary))', color: 'white' }}>
+                        VJudge Verified
+                      </span>
+                    )}
+                    {u.cf_verified && (
+                      <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-danger))', color: 'white' }}>
+                        CF Verified
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex-1 text-center lg:text-left space-y-4">
-                  <div className="space-y-2">
-                    <h1 className="text-4xl font-bold text-balance bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                      {u.full_name || u.vjudge_id}
-                    </h1>
-                    <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                      {u.vjudge_verified && (
-                        <Badge className="bg-gradient-to-r from-purple-500 to-purple-600 text-white border-0 rounded-full px-4 py-1 shadow-lg">
-                          VJudge Verified
-                        </Badge>
-                      )}
-                      {u.cf_verified && (
-                        <Badge className="bg-gradient-to-r from-red-500 to-red-600 text-white border-0 rounded-full px-4 py-1 shadow-lg">
-                          CF Verified
-                        </Badge>
-                      )}
+                {/* Contact Info */}
+                <div className="w-full space-y-2 text-sm" style={{ color: 'hsl(var(--profile-text-secondary))' }}>
+                  <div className="flex items-center gap-2 justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(var(--profile-primary))' }}></div>
+                    <span>Joined {new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                  </div>
+                  {u.email && (
+                    <div className="flex items-center gap-2 justify-center break-all">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'hsl(var(--profile-success))' }}></div>
+                      <span className="text-xs">{u.email}</span>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-6 text-sm text-muted-foreground justify-center lg:justify-start">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span>Joined {new Date(u.created_at).toLocaleDateString()}</span>
+                  )}
+                  {u.phone && (
+                    <div className="flex items-center gap-2 justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(var(--profile-warning))' }}></div>
+                      <span>{u.phone}</span>
                     </div>
-                    {u.email && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-accent rounded-full"></div>
-                        <span>{u.email}</span>
-                      </div>
-                    )}
-                    {u.phone && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-chart-2 rounded-full"></div>
-                        <span>{u.phone}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                    {u.vjudge_id && (
-                      <Link
-                        href={`https://vjudge.net/user/${encodeURIComponent(u.vjudge_id)}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-500/10 text-purple-600 rounded-xl hover:bg-purple-500/20 transition-all duration-300 font-medium"
-                      >
-                        VJudge Profile →
-                      </Link>
-                    )}
-                    {u.cf_id && (
-                      <Link
-                        href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-600 rounded-xl hover:bg-red-500/20 transition-all duration-300 font-medium"
-                      >
-                        Codeforces Profile →
-                      </Link>
-                    )}
-                    {u.codechef_id && (
-                      <Link
-                        href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 text-amber-600 rounded-xl hover:bg-amber-500/20 transition-all duration-300 font-medium"
-                      >
-                        CodeChef Profile →
-                      </Link>
-                    )}
-                    {u.atcoder_id && (
-                      <Link
-                        href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-500/10 text-gray-600 rounded-xl hover:bg-gray-500/20 transition-all duration-300 font-medium"
-                      >
-                        AtCoder Profile →
-                      </Link>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {teams.length > 0 && (
-          <Card className="apple-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <span className="text-primary font-bold">👥</span>
-                </div>
-                Teams
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {teams.map((t) => (
+            {/* CP Profiles Card */}
+            <div className="profile-card">
+              <h3 className="text-sm font-semibold mb-4 px-1" style={{ color: 'hsl(var(--profile-text-secondary))' }}>
+                Competitive Programming Profiles
+              </h3>
+              <div className="space-y-3">
+                {u.vjudge_id && (
                   <Link
-                    key={t.id}
-                    href={`/team/final/${t.id}`}
-                    className="group block p-6 bg-gradient-to-br from-card to-muted/30 border border-border/50 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                    href={`https://vjudge.net/user/${encodeURIComponent(u.vjudge_id)}`}
+                    target="_blank"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    style={{
+                      background: 'hsl(var(--profile-primary) / 0.1)',
+                      color: 'hsl(var(--profile-primary))'
+                    }}
                   >
-                    <div className="font-bold text-lg text-primary group-hover:text-primary/80 transition-colors mb-2 text-balance">
-                      {t.team_title}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Members:</span>{" "}
-                      {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
-                    </div>
+                    <span className="text-sm flex-1">VJudge</span>
+                    <span className="text-xs">→</span>
                   </Link>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {coachedTeams.length > 0 && (
-          <Card className="apple-card">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-2xl font-bold flex items-center gap-3">
-                <div className="w-8 h-8 bg-accent/10 rounded-xl flex items-center justify-center">
-                  <span className="text-accent font-bold">🎯</span>
-                </div>
-                Teams Coached
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {coachedTeams.map((t) => (
+                )}
+                {u.cf_id && (
                   <Link
-                    key={`coached-${t.id}`}
-                    href={`/team/final/${t.id}`}
-                    className="group block p-6 bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/20 rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                    href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
+                    target="_blank"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    style={{
+                      background: 'hsl(var(--profile-danger) / 0.1)',
+                      color: 'hsl(var(--profile-danger))'
+                    }}
                   >
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge className="bg-accent/20 text-accent border-0 text-xs px-2 py-1 rounded-lg">Coach</Badge>
-                    </div>
-                    <div className="font-bold text-lg text-accent group-hover:text-accent/80 transition-colors mb-2 text-balance">
-                      {t.team_title}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Members:</span>{" "}
-                      {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
-                    </div>
+                    <span className="text-sm flex-1">Codeforces</span>
+                    <span className="text-xs">→</span>
                   </Link>
-                ))}
+                )}
+                {u.codechef_id && (
+                  <Link
+                    href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
+                    target="_blank"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    style={{
+                      background: 'hsl(var(--profile-warning) / 0.1)',
+                      color: 'hsl(var(--profile-warning))'
+                    }}
+                  >
+                    <span className="text-sm flex-1">CodeChef</span>
+                    <span className="text-xs">→</span>
+                  </Link>
+                )}
+                {u.atcoder_id && (
+                  <Link
+                    href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
+                    target="_blank"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    style={{
+                      background: 'hsl(var(--profile-text-muted) / 0.1)',
+                      color: 'hsl(var(--profile-text))'
+                    }}
+                  >
+                    <span className="text-sm flex-1">AtCoder</span>
+                    <span className="text-xs">→</span>
+                  </Link>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card className="apple-card">
-          <CardHeader className="pb-6">
-            <CardTitle className="text-2xl font-bold flex items-center gap-3">
-              <div className="w-8 h-8 bg-chart-1/10 rounded-xl flex items-center justify-center">
-                <span className="text-chart-1 font-bold">📊</span>
-              </div>
-              Contest Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl">
-                <div className="text-2xl font-bold text-primary">{perf.summary.totalContests}</div>
-                <div className="text-sm text-muted-foreground font-medium">Contests</div>
-              </div>
-              <div className="text-center p-4 bg-gradient-to-br from-chart-2/5 to-chart-2/10 rounded-2xl">
-                <div className="text-2xl font-bold text-chart-2">{perf.summary.totalSolved}</div>
-                <div className="text-sm text-muted-foreground font-medium">Problems Solved</div>
-              </div>
-              {perf.summary.bestRank && (
-                <div className="text-center p-4 bg-gradient-to-br from-chart-4/5 to-chart-4/10 rounded-2xl">
-                  <div className="text-2xl font-bold text-chart-4">{perf.summary.bestRank}</div>
-                  <div className="text-sm text-muted-foreground font-medium">Best Rank</div>
-                </div>
-              )}
-              {perf.summary.avgRank > 0 && (
-                <div className="text-center p-4 bg-gradient-to-br from-chart-5/5 to-chart-5/10 rounded-2xl">
-                  <div className="text-2xl font-bold text-chart-5">{perf.summary.avgRank}</div>
-                  <div className="text-sm text-muted-foreground font-medium">Avg Rank</div>
-                </div>
-              )}
             </div>
+          </aside>
 
-            <Tabs defaultValue="graph" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-2xl">
-                <TabsTrigger
-                  value="table"
-                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                >
-                  Table View
-                </TabsTrigger>
-                <TabsTrigger
-                  value="graph"
-                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
-                >
-                  Chart View
-                </TabsTrigger>
-              </TabsList>
+          {/* Main Content */}
+          <main className="space-y-6">
 
-              <TabsContent value="table" className="mt-6">
-                <div className="rounded-2xl border border-border/50 overflow-hidden bg-card/50">
-                  <ScrollArea className="w-full h-[60vh]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-border/50">
-                          <TableHead className="font-semibold">Room</TableHead>
-                          <TableHead className="font-semibold">Contest</TableHead>
-                          <TableHead className="text-right font-semibold">Rank</TableHead>
-                          <TableHead className="text-right font-semibold">Participants</TableHead>
-                          <TableHead className="text-right font-semibold">Solved</TableHead>
-                          <TableHead className="text-right font-semibold">Penalty</TableHead>
-                          <TableHead className="text-right font-semibold">Score</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {perf.rows.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-12">
-                              No contest data available
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          perf.rows.map((r, idx) => (
-                            <TableRow
-                              key={`${r.roomName}-${r.contestId}-${idx}`}
-                              className="border-border/30 hover:bg-muted/30"
-                            >
-                              <TableCell className="font-medium">{r.roomName}</TableCell>
-                              <TableCell>{r.contestTitle}</TableCell>
-                              <TableCell className="text-right font-mono">{r.rank ?? "—"}</TableCell>
-                              <TableCell className="text-right font-mono">{r.participants}</TableCell>
-                              <TableCell className="text-right font-mono font-semibold text-chart-2">
-                                {r.solved}
-                              </TableCell>
-                              <TableCell className="text-right font-mono">
-                                {typeof r.penalty === "number" ? r.penalty.toFixed(2) : r.penalty}
-                              </TableCell>
-                              <TableCell className="text-right font-mono font-semibold text-primary">
-                                {typeof r.score === "number" ? r.score.toFixed(2) : r.score}
-                              </TableCell>
+            {teams.length > 0 && (
+              <div className="profile-card mb-6">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-3" style={{ color: 'hsl(var(--profile-text))' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'hsl(var(--profile-primary) / 0.1)' }}>
+                      <span className="text-xl">👥</span>
+                    </div>
+                    Teams
+                  </h2>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {teams.map((t) => (
+                    <Link
+                      key={t.id}
+                      href={`/team/final/${t.id}`}
+                      className="group block p-5 border rounded-xl transition-all profile-focus-ring hover:-translate-y-0.5"
+                      style={{
+                        background: 'hsl(var(--profile-surface-1))',
+                        borderColor: 'hsl(var(--profile-border))'
+                      }}
+                    >
+                      <div className="font-bold text-lg mb-2 text-balance group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
+                        {t.team_title}
+                      </div>
+                      <div className="text-sm" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                        <span className="font-medium">Members:</span>{" "}
+                        {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {coachedTeams.length > 0 && (
+              <div className="profile-card mb-6">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-3" style={{ color: 'hsl(var(--profile-text))' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'hsl(var(--profile-warning) / 0.1)' }}>
+                      <span className="text-xl">🎯</span>
+                    </div>
+                    Teams Coached
+                  </h2>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {coachedTeams.map((t) => (
+                    <Link
+                      key={`coached-${t.id}`}
+                      href={`/team/final/${t.id}`}
+                      className="group block p-5 border rounded-xl transition-all profile-focus-ring hover:-translate-y-0.5"
+                      style={{
+                        background: 'hsl(var(--profile-surface-1))',
+                        borderColor: 'hsl(var(--profile-border))'
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-warning) / 0.2)', color: 'hsl(var(--profile-warning))' }}>
+                          Coach
+                        </span>
+                      </div>
+                      <div className="font-bold text-lg mb-2 text-balance group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
+                        {t.team_title}
+                      </div>
+                      <div className="text-sm" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                        <span className="font-medium">Members:</span>{" "}
+                        {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="profile-card mb-6">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold flex items-center gap-3" style={{ color: 'hsl(var(--profile-text))' }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'hsl(var(--profile-primary) / 0.1)' }}>
+                    <span className="text-xl">📊</span>
+                  </div>
+                  Contest Performance
+                </h2>
+              </div>
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="profile-stat-tile text-center">
+                    <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-primary))' }}>
+                      {perf.summary.totalContests}
+                    </div>
+                    <div className="text-sm font-medium" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                      Contests
+                    </div>
+                  </div>
+                  <div className="profile-stat-tile text-center">
+                    <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-success))' }}>
+                      {perf.summary.totalSolved}
+                    </div>
+                    <div className="text-sm font-medium" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                      Problems Solved
+                    </div>
+                  </div>
+                  {perf.summary.bestRank && (
+                    <div className="profile-stat-tile text-center">
+                      <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-warning))' }}>
+                        {perf.summary.bestRank}
+                      </div>
+                      <div className="text-sm font-medium" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                        Best Rank
+                      </div>
+                    </div>
+                  )}
+                  {perf.summary.avgRank > 0 && (
+                    <div className="profile-stat-tile text-center">
+                      <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-text))' }}>
+                        {perf.summary.avgRank}
+                      </div>
+                      <div className="text-sm font-medium" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                        Avg Rank
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Tabs defaultValue="graph" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 p-1 rounded-xl" style={{ background: 'hsl(var(--profile-surface-2))' }}>
+                    <TabsTrigger
+                      value="table"
+                      className="rounded-lg data-[state=active]:shadow-sm transition-all profile-focus-ring"
+                      style={{ color: 'hsl(var(--profile-text-secondary))' }}
+                    >
+                      Table View
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="graph"
+                      className="rounded-lg data-[state=active]:shadow-sm transition-all profile-focus-ring"
+                      style={{ color: 'hsl(var(--profile-text-secondary))' }}
+                    >
+                      Chart View
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="table" className="mt-6">
+                    <div className="rounded-xl border overflow-hidden" style={{
+                      background: 'hsl(var(--profile-surface-1))',
+                      borderColor: 'hsl(var(--profile-border))'
+                    }}>
+                      <ScrollArea className="w-full h-[60vh]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow style={{ borderColor: 'hsl(var(--profile-border))' }}>
+                              <TableHead className="font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Room</TableHead>
+                              <TableHead className="font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Contest</TableHead>
+                              <TableHead className="text-right font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Rank</TableHead>
+                              <TableHead className="text-right font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Participants</TableHead>
+                              <TableHead className="text-right font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Solved</TableHead>
+                              <TableHead className="text-right font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Penalty</TableHead>
+                              <TableHead className="text-right font-semibold" style={{ color: 'hsl(var(--profile-text))' }}>Score</TableHead>
                             </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                </div>
-              </TabsContent>
+                          </TableHeader>
+                          <TableBody>
+                            {perf.rows.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={7} className="text-center py-12" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                                  No contest data available
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              perf.rows.map((r, idx) => (
+                                <TableRow
+                                  key={`${r.roomName}-${r.contestId}-${idx}`}
+                                  className="transition-colors"
+                                  style={{ borderColor: 'hsl(var(--profile-border))' }}
+                                >
+                                  <TableCell className="font-medium" style={{ color: 'hsl(var(--profile-text))' }}>{r.roomName}</TableCell>
+                                  <TableCell style={{ color: 'hsl(var(--profile-text-secondary))' }}>{r.contestTitle}</TableCell>
+                                  <TableCell className="text-right font-mono" style={{ color: 'hsl(var(--profile-text-secondary))' }}>{r.rank ?? "—"}</TableCell>
+                                  <TableCell className="text-right font-mono" style={{ color: 'hsl(var(--profile-text-secondary))' }}>{r.participants}</TableCell>
+                                  <TableCell className="text-right font-mono font-semibold" style={{ color: 'hsl(var(--profile-success))' }}>
+                                    {r.solved}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                                    {typeof r.penalty === "number" ? r.penalty.toFixed(2) : r.penalty}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono font-semibold" style={{ color: 'hsl(var(--profile-primary))' }}>
+                                    {typeof r.score === "number" ? r.score.toFixed(2) : r.score}
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </div>
+                  </TabsContent>
 
-              <TabsContent value="graph" className="mt-6">
-                <div className="rounded-2xl border border-border/50 overflow-hidden bg-card/50 p-6">
-                  <PastPerformanceChart rows={perf.rows} />
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        {u.cf_id && (
-          <Card className="apple-card">
-            <CardHeader className="pb-6">
-              <CardTitle className="text-2xl font-bold flex items-center gap-3">
-                <div className="w-8 h-8 bg-red-500/10 rounded-xl flex items-center justify-center">
-                  <span className="text-red-500 font-bold">🔥</span>
-                </div>
-                Codeforces Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-2xl border border-border/50 overflow-hidden bg-card/50 p-6">
-                <CodeforcesSubmissionDashboard
-                  users={[{ id: u.id, full_name: u.full_name || u.vjudge_id, cf_id: u.cf_id }]}
-                />
+                  <TabsContent value="graph" className="mt-6">
+                    <div className="rounded-xl border p-6" style={{
+                      background: 'hsl(var(--profile-surface-1))',
+                      borderColor: 'hsl(var(--profile-border))'
+                    }}>
+                      <PastPerformanceChart rows={perf.rows} />
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+
+            {u.cf_id && (
+              <div className="profile-card">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-3" style={{ color: 'hsl(var(--profile-text))' }}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'hsl(var(--profile-danger) / 0.1)' }}>
+                      <span className="text-xl">🔥</span>
+                    </div>
+                    Codeforces Activity
+                  </h2>
+                </div>
+                <div className="rounded-xl border p-6" style={{
+                  background: 'hsl(var(--profile-surface-1))',
+                  borderColor: 'hsl(var(--profile-border))'
+                }}>
+                  <CodeforcesSubmissionDashboard
+                    users={[{ id: u.id, full_name: u.full_name || u.vjudge_id, cf_id: u.cf_id }]}
+                  />
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   )

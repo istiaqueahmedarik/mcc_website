@@ -4,6 +4,27 @@
 
 @layer base {
   :root {
+    /* Profile Design System - Light Theme */
+    --profile-bg: 247 11% 97%;
+    --profile-surface-1: 0 0% 100%;
+    --profile-surface-2: 240 10% 97%;
+    --profile-text: 222 47% 11%;
+    --profile-text-secondary: 215 16% 28%;
+    --profile-text-muted: 215 14% 42%;
+    --profile-primary: 263 70% 62%;
+    --profile-success: 142 71% 45%;
+    --profile-warning: 38 92% 50%;
+    --profile-danger: 0 84% 60%;
+    --profile-border: 0 0% 0% / 0.08;
+    --profile-ring: 263 70% 62% / 0.45;
+
+    /* Profile spacing and visual tokens */
+    --profile-radius-sm: 8px;
+    --profile-radius-md: 12px;
+    --profile-radius-lg: 16px;
+    --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+    /* Existing tokens */
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -64,6 +85,24 @@
   }
 
   .dark {
+    /* Profile Design System - Dark Theme (Default) */
+    --profile-bg: 222 20% 6%;
+    --profile-surface-1: 222 18% 8%;
+    --profile-surface-2: 222 16% 11%;
+    --profile-text: 210 17% 93%;
+    --profile-text-secondary: 215 15% 70%;
+    --profile-text-muted: 215 12% 54%;
+    --profile-primary: 263 72% 68%;
+    --profile-success: 142 76% 36%;
+    --profile-warning: 38 92% 50%;
+    --profile-danger: 0 72% 51%;
+    --profile-border: 255 255% 255% / 0.08;
+    --profile-ring: 263 72% 68% / 0.6;
+
+    /* Profile shadows in dark mode */
+    --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+
+    /* Existing tokens */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -184,67 +223,49 @@
 
 /* Alumni utility classes */
 .alumni-hero {
-  background: radial-gradient(
-      circle at 20% 20%,
+  background: radial-gradient(circle at 20% 20%,
       hsl(var(--alumni-gold) / 0.15),
-      transparent 60%
-    ),
-    radial-gradient(
-      circle at 80% 30%,
+      transparent 60%),
+    radial-gradient(circle at 80% 30%,
       hsl(var(--alumni-royal) / 0.25),
-      transparent 70%
-    ),
-    linear-gradient(
-      to bottom right,
+      transparent 70%),
+    linear-gradient(to bottom right,
       hsl(var(--alumni-parchment)),
-      hsl(var(--background))
-    );
+      hsl(var(--background)));
 }
 
 .dark .alumni-hero {
-  background: radial-gradient(
-      circle at 15% 25%,
+  background: radial-gradient(circle at 15% 25%,
       hsl(var(--alumni-royal) / 0.35),
-      transparent 65%
-    ),
-    radial-gradient(
-      circle at 85% 35%,
+      transparent 65%),
+    radial-gradient(circle at 85% 35%,
       hsl(var(--alumni-gold) / 0.25),
-      transparent 70%
-    ),
-    linear-gradient(
-      to bottom right,
+      transparent 70%),
+    linear-gradient(to bottom right,
       hsl(var(--background)),
-      hsl(var(--alumni-royal-fade))
-    );
+      hsl(var(--alumni-royal-fade)));
 }
 
 .alumni-batch-card {
   @apply relative rounded-xl border backdrop-blur-sm overflow-hidden transition-all;
-  background: linear-gradient(
-    135deg,
-    hsl(var(--alumni-gold-soft) / 0.9) 0%,
-    hsl(var(--background)) 60%
-  );
+  background: linear-gradient(135deg,
+      hsl(var(--alumni-gold-soft) / 0.9) 0%,
+      hsl(var(--background)) 60%);
 }
 
 .dark .alumni-batch-card {
-  background: linear-gradient(
-    135deg,
-    hsl(var(--alumni-royal-fade) / 0.6) 0%,
-    hsl(var(--background)) 65%
-  );
+  background: linear-gradient(135deg,
+      hsl(var(--alumni-royal-fade) / 0.6) 0%,
+      hsl(var(--background)) 65%);
 }
 
 .alumni-batch-card:before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    120deg,
-    hsl(var(--alumni-gold) / 0.35),
-    transparent 40%
-  );
+  background: linear-gradient(120deg,
+      hsl(var(--alumni-gold) / 0.35),
+      transparent 40%);
   opacity: 0;
   transition: opacity 0.5s;
 }
@@ -259,11 +280,9 @@
 }
 
 .alumni-name {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--alumni-gold)),
-    hsl(var(--alumni-royal))
-  );
+  background: linear-gradient(90deg,
+      hsl(var(--alumni-gold)),
+      hsl(var(--alumni-royal)));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -273,28 +292,22 @@
 /* Simplified top rank highlight (removed shimmer & animation) */
 .top-rank-wrapper {
   position: relative;
-  background: linear-gradient(
-    90deg,
-    hsl(var(--alumni-gold) / 0.12),
-    hsl(var(--alumni-gold) / 0.05)
-  );
+  background: linear-gradient(90deg,
+      hsl(var(--alumni-gold) / 0.12),
+      hsl(var(--alumni-gold) / 0.05));
 }
 
 .dark .top-rank-wrapper {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--alumni-gold) / 0.18),
-    hsl(var(--alumni-gold) / 0.07)
-  );
+  background: linear-gradient(90deg,
+      hsl(var(--alumni-gold) / 0.18),
+      hsl(var(--alumni-gold) / 0.07));
 }
 
 .top-rank-name {
-  background: linear-gradient(
-    92deg,
-    hsl(var(--alumni-gold)),
-    hsl(var(--alumni-royal)) 60%,
-    hsl(var(--alumni-gold)) 100%
-  );
+  background: linear-gradient(92deg,
+      hsl(var(--alumni-gold)),
+      hsl(var(--alumni-royal)) 60%,
+      hsl(var(--alumni-gold)) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -323,11 +336,9 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: radial-gradient(
-    circle at 35% 30%,
-    hsl(var(--alumni-gold) / 0.85),
-    hsl(var(--alumni-gold) / 0.5) 65%
-  );
+  background: radial-gradient(circle at 35% 30%,
+      hsl(var(--alumni-gold) / 0.85),
+      hsl(var(--alumni-gold) / 0.5) 65%);
   box-shadow: 0 0 0 1px hsl(var(--alumni-gold) / 0.6),
     0 2px 6px -1px hsl(var(--alumni-gold) / 0.55);
 }
@@ -338,6 +349,91 @@
   color: var(--g-color-text-primary) !important;
   background-color: var(--g-color-base-background) !important;
 }
+
+/* Profile Page Design System Utilities */
+.profile-card {
+  background: hsl(var(--profile-surface-1));
+  border: 1px solid rgba(var(--profile-border));
+  border-radius: var(--profile-radius-lg);
+  box-shadow: var(--profile-shadow), 0 0 0 1px rgba(var(--profile-border)) inset;
+  padding: 24px;
+  transition: box-shadow 150ms ease, transform 100ms ease;
+}
+
+.profile-card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(var(--profile-border)) inset;
+}
+
+.profile-stat-tile {
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid rgba(var(--profile-border));
+  border-radius: var(--profile-radius-md);
+  padding: 20px;
+  transition: all 150ms ease;
+}
+
+.profile-stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  transition: all 100ms ease;
+}
+
+.profile-badge-verified {
+  background: hsl(var(--profile-primary));
+  color: white;
+}
+
+.profile-badge-success {
+  background: hsl(var(--profile-success));
+  color: white;
+}
+
+.profile-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid rgba(var(--profile-border));
+  border-radius: var(--profile-radius-sm);
+  font-size: 14px;
+  color: hsl(var(--profile-text-secondary));
+  transition: all 100ms ease;
+}
+
+.profile-info-chip:hover {
+  background: hsl(var(--profile-surface-1));
+  border-color: hsl(var(--profile-primary) / 0.3);
+}
+
+.profile-focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--profile-ring));
+  outline-offset: 2px;
+}
+
+.profile-sidebar-sticky {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 1023px) {
+  .profile-sidebar-sticky {
+    position: relative;
+    top: 0;
+  }
+}
+
 /* Enhanced 3D effects for alumni cards */
 .perspective-1000 {
   perspective: 1000px;
