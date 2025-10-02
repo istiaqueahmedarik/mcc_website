@@ -50,9 +50,9 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --yellowCus1: 55, 69%, 81%;
-    --yellowCus1-foreground: 20, 31%, 31%;
-    --greenAC: 121, 99%, 77%;
+    --yellowCus1: 55 69% 81%;
+    --yellowCus1-foreground: 20 31% 31%;
+    --greenAC: 121 99% 77%;
     --brand: 213.3 93.9% 67.8%;
     --highlight: 48 96% 53%;
     --radius: 0.5rem;
@@ -98,11 +98,8 @@
     --profile-danger: 0 72% 51%;
     --profile-border: 255 255% 255% / 0.08;
     --profile-ring: 263 72% 68% / 0.6;
-
-    /* Profile shadows in dark mode */
     --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 
-    /* Existing tokens */
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
@@ -127,12 +124,11 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --yellowCus1: 20, 31%, 31%;
-    --yellowCus1-foreground: 55, 69%, 81%;
-    --greenAC: 120, 100%, 25%;
+    --yellowCus1: 20 31% 31%;
+    --yellowCus1-foreground: 55 69% 81%;
+    --greenAC: 120 100% 25%;
     --brand: 217.2 91.2% 59.8%;
     --highlight: 47.9 95.8% 53.1%;
-    --radius: 0.5rem;
     /* Alumni dark overrides */
     --alumni-gold: 45 96% 58%;
     --alumni-gold-soft: 45 35% 22%;
@@ -348,90 +344,6 @@
 .g-md-wysiwyg-editor_toolbar .yfm-editor {
   color: var(--g-color-text-primary) !important;
   background-color: var(--g-color-base-background) !important;
-}
-
-/* Profile Page Design System Utilities */
-.profile-card {
-  background: hsl(var(--profile-surface-1));
-  border: 1px solid rgba(var(--profile-border));
-  border-radius: var(--profile-radius-lg);
-  box-shadow: var(--profile-shadow), 0 0 0 1px rgba(var(--profile-border)) inset;
-  padding: 24px;
-  transition: box-shadow 150ms ease, transform 100ms ease;
-}
-
-.profile-card:hover {
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(var(--profile-border)) inset;
-}
-
-.profile-stat-tile {
-  background: hsl(var(--profile-surface-2));
-  border: 1px solid rgba(var(--profile-border));
-  border-radius: var(--profile-radius-md);
-  padding: 20px;
-  transition: all 150ms ease;
-}
-
-.profile-stat-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-}
-
-.profile-badge {
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
-  font-size: 13px;
-  font-weight: 600;
-  gap: 6px;
-  transition: all 100ms ease;
-}
-
-.profile-badge-verified {
-  background: hsl(var(--profile-primary));
-  color: white;
-}
-
-.profile-badge-success {
-  background: hsl(var(--profile-success));
-  color: white;
-}
-
-.profile-info-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: hsl(var(--profile-surface-2));
-  border: 1px solid rgba(var(--profile-border));
-  border-radius: var(--profile-radius-sm);
-  font-size: 14px;
-  color: hsl(var(--profile-text-secondary));
-  transition: all 100ms ease;
-}
-
-.profile-info-chip:hover {
-  background: hsl(var(--profile-surface-1));
-  border-color: hsl(var(--profile-primary) / 0.3);
-}
-
-.profile-focus-ring:focus-visible {
-  outline: 2px solid hsl(var(--profile-ring));
-  outline-offset: 2px;
-}
-
-.profile-sidebar-sticky {
-  position: sticky;
-  top: 24px;
-}
-
-@media (max-width: 1023px) {
-  .profile-sidebar-sticky {
-    position: relative;
-    top: 0;
-  }
 }
 
 /* Enhanced 3D effects for alumni cards */
@@ -674,4 +586,92 @@
   position: absolute;
   inset: 0;
   z-index: -1;
+}
+
+/* Profile Design System Utility Classes */
+.profile-card {
+  background: hsl(var(--profile-surface-1));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-lg);
+  box-shadow: var(--profile-shadow), 0 0 0 1px hsl(var(--profile-border)) inset;
+  padding: 24px;
+  transition: box-shadow 150ms ease, transform 100ms ease;
+}
+
+.profile-card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px hsl(var(--profile-border)) inset;
+}
+
+.profile-stat-tile {
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-md);
+  padding: 20px;
+  transition: all 150ms ease;
+}
+
+.profile-stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  transition: all 100ms ease;
+}
+
+.profile-badge-verified {
+  background: hsl(var(--profile-primary));
+  color: white;
+}
+
+.profile-badge-success {
+  background: hsl(var(--profile-success));
+  color: white;
+}
+
+.profile-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-sm);
+  font-size: 14px;
+  color: hsl(var(--profile-text-secondary));
+  transition: all 100ms ease;
+}
+
+.profile-info-chip:hover {
+  background: hsl(var(--profile-surface-1));
+  border-color: hsl(263 70% 62% / 0.3);
+}
+
+.dark .profile-info-chip:hover {
+  border-color: hsl(263 72% 68% / 0.3);
+}
+
+.profile-focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--profile-ring));
+  outline-offset: 2px;
+}
+
+.profile-sidebar-sticky {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 1023px) {
+  .profile-sidebar-sticky {
+    position: relative;
+    top: 0;
+  }
 }
