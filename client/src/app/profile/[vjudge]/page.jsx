@@ -170,36 +170,31 @@ export default async function PublicProfilePage({ params }) {
             <div className="profile-card profile-sidebar-sticky">
               <div className="flex flex-col items-center text-center space-y-4">
                 {/* Avatar */}
-                <div className="relative">
-                  <div className="w-32 h-32 rounded-2xl overflow-hidden border-2" style={{ borderColor: u.vjudge_verified ? 'hsl(var(--profile-primary))' : 'hsl(var(--profile-border))' }}>
+                <div className="relative group">
+                  <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 transition-all duration-300 hover:scale-105 hover:shadow-xl" style={{ borderColor: 'hsl(var(--profile-primary))' }}>
                     <Image
                       src={u.profile_pic || "/vercel.svg"}
                       alt={u.full_name || u.vjudge_id}
                       width={128}
                       height={128}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
                   </div>
-                  {u.vjudge_verified && (
-                    <div className="absolute -bottom-2 -right-2 rounded-full p-2 shadow-lg" style={{ background: 'hsl(var(--profile-success))' }}>
-                      <span className="text-white text-sm font-bold">✓</span>
-                    </div>
-                  )}
                 </div>
 
                 {/* Name & Badges */}
                 <div className="w-full">
-                  <h1 className="text-2xl font-bold mb-3 break-words" style={{ color: 'hsl(var(--profile-text))' }}>
+                  <h1 className="text-2xl font-bold mb-3 break-words transition-colors duration-200" style={{ color: 'hsl(var(--profile-text))' }}>
                     {u.full_name || u.vjudge_id}
                   </h1>
                   <div className="flex flex-wrap gap-2 justify-center">
                     {u.vjudge_verified && (
-                      <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-primary))', color: 'white' }}>
+                      <span className="profile-badge text-xs transition-all duration-200 hover:scale-105 hover:shadow-md" style={{ background: 'hsl(var(--profile-primary))', color: 'white' }}>
                         VJudge Verified
                       </span>
                     )}
                     {u.cf_verified && (
-                      <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-danger))', color: 'white' }}>
+                      <span className="profile-badge text-xs transition-all duration-200 hover:scale-105 hover:shadow-md" style={{ background: 'hsl(var(--profile-danger))', color: 'white' }}>
                         CF Verified
                       </span>
                     )}
@@ -208,18 +203,18 @@ export default async function PublicProfilePage({ params }) {
 
                 {/* Contact Info */}
                 <div className="w-full space-y-2 text-sm" style={{ color: 'hsl(var(--profile-text-secondary))' }}>
-                  <div className="flex items-center gap-2 justify-center">
+                  <div className="flex items-center gap-2 justify-center transition-all duration-200 hover:translate-x-1">
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(var(--profile-primary))' }}></div>
                     <span>Joined {new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                   </div>
                   {u.email && (
-                    <div className="flex items-center gap-2 justify-center break-all">
+                    <div className="flex items-center gap-2 justify-center break-all transition-all duration-200 hover:translate-x-1">
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: 'hsl(var(--profile-success))' }}></div>
                       <span className="text-xs">{u.email}</span>
                     </div>
                   )}
                   {u.phone && (
-                    <div className="flex items-center gap-2 justify-center">
+                    <div className="flex items-center gap-2 justify-center transition-all duration-200 hover:translate-x-1">
                       <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'hsl(var(--profile-warning))' }}></div>
                       <span>{u.phone}</span>
                     </div>
@@ -238,56 +233,56 @@ export default async function PublicProfilePage({ params }) {
                   <Link
                     href={`https://vjudge.net/user/${encodeURIComponent(u.vjudge_id)}`}
                     target="_blank"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 profile-focus-ring hover:-translate-y-0.5 hover:shadow-md"
                     style={{
                       background: 'hsl(var(--profile-primary) / 0.1)',
                       color: 'hsl(var(--profile-primary))'
                     }}
                   >
                     <span className="text-sm flex-1">VJudge</span>
-                    <span className="text-xs">→</span>
+                    <span className="text-xs transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </Link>
                 )}
                 {u.cf_id && (
                   <Link
                     href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
                     target="_blank"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 profile-focus-ring hover:-translate-y-0.5 hover:shadow-md"
                     style={{
                       background: 'hsl(var(--profile-danger) / 0.1)',
                       color: 'hsl(var(--profile-danger))'
                     }}
                   >
                     <span className="text-sm flex-1">Codeforces</span>
-                    <span className="text-xs">→</span>
+                    <span className="text-xs transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </Link>
                 )}
                 {u.codechef_id && (
                   <Link
                     href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
                     target="_blank"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 profile-focus-ring hover:-translate-y-0.5 hover:shadow-md"
                     style={{
                       background: 'hsl(var(--profile-warning) / 0.1)',
                       color: 'hsl(var(--profile-warning))'
                     }}
                   >
                     <span className="text-sm flex-1">CodeChef</span>
-                    <span className="text-xs">→</span>
+                    <span className="text-xs transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </Link>
                 )}
                 {u.atcoder_id && (
                   <Link
                     href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
                     target="_blank"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all profile-focus-ring hover:-translate-y-0.5"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 profile-focus-ring hover:-translate-y-0.5 hover:shadow-md"
                     style={{
                       background: 'hsl(var(--profile-text-muted) / 0.1)',
                       color: 'hsl(var(--profile-text))'
                     }}
                   >
                     <span className="text-sm flex-1">AtCoder</span>
-                    <span className="text-xs">→</span>
+                    <span className="text-xs transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </Link>
                 )}
               </div>
@@ -312,16 +307,16 @@ export default async function PublicProfilePage({ params }) {
                     <Link
                       key={t.id}
                       href={`/team/final/${t.id}`}
-                      className="group block p-5 border rounded-xl transition-all profile-focus-ring hover:-translate-y-0.5"
+                      className="group block p-5 border rounded-xl transition-all duration-300 profile-focus-ring hover:-translate-y-1 hover:shadow-lg"
                       style={{
                         background: 'hsl(var(--profile-surface-1))',
                         borderColor: 'hsl(var(--profile-border))'
                       }}
                     >
-                      <div className="font-bold text-lg mb-2 text-balance group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
+                      <div className="font-bold text-lg mb-2 text-balance transition-colors duration-200 group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
                         {t.team_title}
                       </div>
-                      <div className="text-sm" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                      <div className="text-sm transition-colors duration-200" style={{ color: 'hsl(var(--profile-text-muted))' }}>
                         <span className="font-medium">Members:</span>{" "}
                         {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
                       </div>
@@ -346,21 +341,21 @@ export default async function PublicProfilePage({ params }) {
                     <Link
                       key={`coached-${t.id}`}
                       href={`/team/final/${t.id}`}
-                      className="group block p-5 border rounded-xl transition-all profile-focus-ring hover:-translate-y-0.5"
+                      className="group block p-5 border rounded-xl transition-all duration-300 profile-focus-ring hover:-translate-y-1 hover:shadow-lg"
                       style={{
                         background: 'hsl(var(--profile-surface-1))',
                         borderColor: 'hsl(var(--profile-border))'
                       }}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="profile-badge text-xs" style={{ background: 'hsl(var(--profile-warning) / 0.2)', color: 'hsl(var(--profile-warning))' }}>
+                        <span className="profile-badge text-xs transition-all duration-200 hover:scale-105" style={{ background: 'hsl(var(--profile-warning) / 0.2)', color: 'hsl(var(--profile-warning))' }}>
                           Coach
                         </span>
                       </div>
-                      <div className="font-bold text-lg mb-2 text-balance group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
+                      <div className="font-bold text-lg mb-2 text-balance transition-colors duration-200 group-hover:underline" style={{ color: 'hsl(var(--profile-text))' }}>
                         {t.team_title}
                       </div>
-                      <div className="text-sm" style={{ color: 'hsl(var(--profile-text-muted))' }}>
+                      <div className="text-sm transition-colors duration-200" style={{ color: 'hsl(var(--profile-text-muted))' }}>
                         <span className="font-medium">Members:</span>{" "}
                         {Array.isArray(t.member_vjudge_ids) ? t.member_vjudge_ids.join(", ") : ""}
                       </div>
@@ -381,7 +376,7 @@ export default async function PublicProfilePage({ params }) {
               </div>
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="profile-stat-tile text-center">
+                  <div className="profile-stat-tile text-center transition-all duration-300 hover:scale-105 hover:shadow-lg">
                     <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-primary))' }}>
                       {perf.summary.totalContests}
                     </div>
@@ -389,7 +384,7 @@ export default async function PublicProfilePage({ params }) {
                       Contests
                     </div>
                   </div>
-                  <div className="profile-stat-tile text-center">
+                  <div className="profile-stat-tile text-center transition-all duration-300 hover:scale-105 hover:shadow-lg">
                     <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-success))' }}>
                       {perf.summary.totalSolved}
                     </div>
@@ -398,7 +393,7 @@ export default async function PublicProfilePage({ params }) {
                     </div>
                   </div>
                   {perf.summary.bestRank && (
-                    <div className="profile-stat-tile text-center">
+                    <div className="profile-stat-tile text-center transition-all duration-300 hover:scale-105 hover:shadow-lg">
                       <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-warning))' }}>
                         {perf.summary.bestRank}
                       </div>
@@ -408,7 +403,7 @@ export default async function PublicProfilePage({ params }) {
                     </div>
                   )}
                   {perf.summary.avgRank > 0 && (
-                    <div className="profile-stat-tile text-center">
+                    <div className="profile-stat-tile text-center transition-all duration-300 hover:scale-105 hover:shadow-lg">
                       <div className="text-3xl font-bold mb-1" style={{ color: 'hsl(var(--profile-text))' }}>
                         {perf.summary.avgRank}
                       </div>
@@ -423,14 +418,14 @@ export default async function PublicProfilePage({ params }) {
                   <TabsList className="grid w-full grid-cols-2 p-1 rounded-xl" style={{ background: 'hsl(var(--profile-surface-2))' }}>
                     <TabsTrigger
                       value="table"
-                      className="rounded-lg data-[state=active]:shadow-sm transition-all profile-focus-ring"
+                      className="rounded-lg data-[state=active]:shadow-sm transition-all duration-200 profile-focus-ring hover:scale-[1.02]"
                       style={{ color: 'hsl(var(--profile-text-secondary))' }}
                     >
                       Table View
                     </TabsTrigger>
                     <TabsTrigger
                       value="graph"
-                      className="rounded-lg data-[state=active]:shadow-sm transition-all profile-focus-ring"
+                      className="rounded-lg data-[state=active]:shadow-sm transition-all duration-200 profile-focus-ring hover:scale-[1.02]"
                       style={{ color: 'hsl(var(--profile-text-secondary))' }}
                     >
                       Chart View
@@ -466,7 +461,7 @@ export default async function PublicProfilePage({ params }) {
                               perf.rows.map((r, idx) => (
                                 <TableRow
                                   key={`${r.roomName}-${r.contestId}-${idx}`}
-                                  className="transition-colors"
+                                  className="transition-all duration-200 hover:bg-muted/30"
                                   style={{ borderColor: 'hsl(var(--profile-border))' }}
                                 >
                                   <TableCell className="font-medium" style={{ color: 'hsl(var(--profile-text))' }}>{r.roomName}</TableCell>

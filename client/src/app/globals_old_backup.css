@@ -1,0 +1,660 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Profile Design System - Light Theme */
+    --profile-bg: 247 11% 97%;
+    --profile-surface-1: 0 0% 100%;
+    --profile-surface-2: 240 10% 97%;
+    --profile-text: 222 47% 11%;
+    --profile-text-secondary: 215 16% 28%;
+    --profile-text-muted: 215 14% 42%;
+    --profile-primary: 263 70% 62%;
+    --profile-success: 142 71% 45%;
+    --profile-warning: 38 92% 50%;
+    --profile-danger: 0 84% 60%;
+    --profile-border: 0 0% 0% / 0.08;
+    --profile-ring: 263 70% 62% / 0.45;
+
+    /* Profile spacing and visual tokens */
+    --profile-radius-sm: 8px;
+    --profile-radius-md: 12px;
+    --profile-radius-lg: 16px;
+    --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+
+    /* Existing tokens */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+    --yellowCus1: 55 69% 81%;
+    --yellowCus1-foreground: 20 31% 31%;
+    --greenAC: 121 99% 77%;
+    --brand: 213.3 93.9% 67.8%;
+    --highlight: 48 96% 53%;
+    --radius: 0.5rem;
+    /* Alumni themed variables */
+    --alumni-gold: 45 92% 52%;
+    --alumni-gold-soft: 45 92% 90%;
+    --alumni-ink: 223 47% 11%;
+    --alumni-royal: 226 70% 40%;
+    --alumni-royal-fade: 226 70% 18%;
+    --alumni-parchment: 46 35% 96%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Profile page accent palette */
+    --profile-accent-1: 253 83% 74%;
+    /* soft indigo */
+    --profile-accent-2: 267 84% 72%;
+    /* violet */
+    --profile-accent-3: 289 78% 74%;
+    /* fuchsia */
+    --profile-accent-solid: 263 70% 55%;
+    --profile-accent-solid-alt: 286 68% 57%;
+
+  }
+
+  .dark {
+    /* Profile Design System - Dark Theme (Default) */
+    --profile-bg: 222 20% 6%;
+    --profile-surface-1: 222 18% 8%;
+    --profile-surface-2: 222 16% 11%;
+    --profile-text: 210 17% 93%;
+    --profile-text-secondary: 215 15% 70%;
+    --profile-text-muted: 215 12% 54%;
+    --profile-primary: 263 72% 68%;
+    --profile-success: 142 76% 36%;
+    --profile-warning: 38 92% 50%;
+    --profile-danger: 0 72% 51%;
+    --profile-border: 255 255% 255% / 0.08;
+    --profile-ring: 263 72% 68% / 0.6;
+
+    /* Profile shadows in dark mode */
+    --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+
+    /* Existing tokens */
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --yellowCus1: 20 31% 31%;
+    --yellowCus1-foreground: 55 69% 81%;
+    --greenAC: 120 100% 25%;
+    --brand: 217.2 91.2% 59.8%;
+    --highlight: 47.9 95.8% 53.1%;
+    --radius: 0.5rem;
+    /* Alumni dark overrides */
+    --alumni-gold: 45 96% 58%;
+    --alumni-gold-soft: 45 35% 22%;
+    --alumni-ink: 222 30% 96%;
+    --alumni-royal: 226 70% 58%;
+    --alumni-royal-fade: 226 70% 20%;
+    --alumni-parchment: 45 15% 12%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Dark mode adjustments for profile accents */
+    --profile-accent-1: 253 70% 65%;
+    --profile-accent-2: 267 72% 62%;
+    --profile-accent-3: 289 68% 64%;
+    --profile-accent-solid: 263 72% 60%;
+    --profile-accent-solid-alt: 286 70% 62%;
+
+  }
+}
+
+.arik {
+  @apply rounded-xl p-4;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes zoom-out {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(0.5);
+  }
+}
+
+@keyframes zoom-in {
+  0% {
+    transform: scale(0.5);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes feature-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+::view-transition-old(page) {
+  animation: zoom-out 0.5s ease-in-out;
+}
+
+::view-transition-new(page) {
+  animation: zoom-in 0.5s ease-in-out;
+}
+
+/* Alumni utility classes */
+.alumni-hero {
+  background: radial-gradient(circle at 20% 20%, hsl(var(--alumni-gold) / 0.15), transparent 60%), radial-gradient(circle at 80% 30%, hsl(var(--alumni-royal) / 0.25), transparent 70%), linear-gradient(to bottom right, hsl(var(--alumni-parchment)), hsl(var(--background)));
+}
+
+.dark .alumni-hero {
+  background: radial-gradient(circle at 15% 25%, hsl(var(--alumni-royal) / 0.35), transparent 65%), radial-gradient(circle at 85% 35%, hsl(var(--alumni-gold) / 0.25), transparent 70%), linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--alumni-royal-fade)));
+}
+
+.alumni-batch-card {
+  @apply relative rounded-xl border backdrop-blur-sm overflow-hidden transition-all;
+  background: linear-gradient(135deg, hsl(var(--alumni-gold-soft) / 0.9) 0%, hsl(var(--background)) 60%);
+}
+
+.dark .alumni-batch-card {
+  background: linear-gradient(135deg, hsl(var(--alumni-royal-fade) / 0.6) 0%, hsl(var(--background)) 65%);
+}
+
+.alumni-batch-card:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, hsl(var(--alumni-gold) / 0.35), transparent 40%);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.alumni-batch-card:hover:before {
+  opacity: 1;
+}
+
+.alumni-batch-card:hover {
+  box-shadow: 0 0 0 1px hsl(var(--alumni-gold) / 0.4), 0 4px 28px -4px hsl(var(--alumni-gold) / 0.35);
+}
+
+.alumni-name {
+  background: linear-gradient(90deg, hsl(var(--alumni-gold)), hsl(var(--alumni-royal)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Top rank highlight */
+/* Simplified top rank highlight (removed shimmer & animation) */
+.top-rank-wrapper {
+  position: relative;
+  background: linear-gradient(90deg, hsl(var(--alumni-gold) / 0.12), hsl(var(--alumni-gold) / 0.05));
+}
+
+.dark .top-rank-wrapper {
+  background: linear-gradient(90deg, hsl(var(--alumni-gold) / 0.18), hsl(var(--alumni-gold) / 0.07));
+}
+
+.top-rank-name {
+  background: linear-gradient(92deg,
+      hsl(var(--alumni-gold)),
+      hsl(var(--alumni-royal)) 60%,
+      hsl(var(--alumni-gold)) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  position: relative;
+}
+
+.top-rank-name:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, hsl(var(--alumni-gold)), transparent);
+  opacity: 0.7;
+}
+
+/* Removed top-rank-pulse animation */
+
+/* Simplified crown badge (static) */
+.crown-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%,
+      hsl(45 92% 52% / 0.85),
+      hsl(45 92% 52% / 0.5) 65%);
+  box-shadow: 0 0 0 1px hsl(45 92% 52% / 0.6),
+    0 2px 6px -1px hsl(45 92% 52% / 0.55);
+}
+
+.dark .crown-badge {
+  background: radial-gradient(circle at 35% 30%,
+      hsl(45 96% 58% / 0.85),
+      hsl(45 96% 58% / 0.5) 65%);
+  box-shadow: 0 0 0 1px hsl(45 96% 58% / 0.6),
+    0 2px 6px -1px hsl(45 96% 58% / 0.55);
+}
+
+/* Removed rotating overlay */
+
+.g-md-wysiwyg-editor_toolbar .yfm-editor {
+  color: var(--g-color-text-primary) !important;
+  background-color: var(--g-color-base-background) !important;
+}
+
+/* Profile Page Design System Utilities */
+.profile-card {
+  background: hsl(var(--profile-surface-1));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-lg);
+  box-shadow: var(--profile-shadow), 0 0 0 1px hsl(var(--profile-border)) inset;
+  padding: 24px;
+  transition: box-shadow 150ms ease, transform 100ms ease;
+}
+
+.profile-card:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 0 0 1px hsl(var(--profile-border)) inset;
+}
+
+.profile-stat-tile {
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-md);
+  padding: 20px;
+  transition: all 150ms ease;
+}
+
+.profile-stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.profile-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  transition: all 100ms ease;
+}
+
+.profile-badge-verified {
+  background: hsl(var(--profile-primary));
+  color: white;
+}
+
+.profile-badge-success {
+  background: hsl(var(--profile-success));
+  color: white;
+}
+
+.profile-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: hsl(var(--profile-surface-2));
+  border: 1px solid hsl(var(--profile-border));
+  border-radius: var(--profile-radius-sm);
+  font-size: 14px;
+  color: hsl(var(--profile-text-secondary));
+  transition: all 100ms ease;
+}
+
+.profile-info-chip:hover {
+  background: hsl(var(--profile-surface-1));
+  border-color: hsl(263 70% 62% / 0.3);
+}
+
+.dark .profile-info-chip:hover {
+  border-color: hsl(263 72% 68% / 0.3);
+}
+
+.profile-focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--profile-ring));
+  outline-offset: 2px;
+}
+
+.profile-sidebar-sticky {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 1023px) {
+  .profile-sidebar-sticky {
+    position: relative;
+    top: 0;
+  }
+}
+
+/* Enhanced 3D effects for alumni cards */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.rotate-x-2:hover {
+  transform: rotateX(2deg);
+}
+
+.shadow-3xl {
+  box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.25);
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes glow-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(var(--primary), 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 40px rgba(var(--primary), 0.6);
+  }
+}
+
+@keyframes slide-in-from-top {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-out-to-top {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-in {
+  animation: slide-in-from-top 0.3s ease-out;
+}
+
+.animate-out {
+  animation: slide-out-to-top 0.3s ease-in;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.2s ease-out;
+}
+
+.alumni-card-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.alumni-card-glow {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* Liquid Glass (Glassmorphism / Liquid UI) Utilities */
+/* Research-informed: Uses backdrop-filter with moderate blur & saturation;
+   relies on radial gradient background to create depth while preserving readability. */
+.liquid-bg {
+  --lg-glow-1: hsl(var(--brand)/0.18);
+  --lg-glow-2: hsl(var(--highlight)/0.20);
+  --lg-glow-3: hsl(var(--primary)/0.25);
+  background:
+    radial-gradient(circle at 15% 20%, var(--lg-glow-1) 0%, transparent 55%),
+    radial-gradient(circle at 85% 30%, var(--lg-glow-2) 0%, transparent 60%),
+    radial-gradient(circle at 55% 80%, var(--lg-glow-3) 0%, transparent 65%),
+    linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+  filter: saturate(120%);
+}
+
+.dark .liquid-bg {
+  --lg-glow-1: hsl(var(--brand)/0.28);
+  --lg-glow-2: hsl(var(--highlight)/0.22);
+  --lg-glow-3: hsl(var(--primary)/0.35);
+  background:
+    radial-gradient(circle at 18% 22%, var(--lg-glow-1) 0%, transparent 55%),
+    radial-gradient(circle at 82% 28%, var(--lg-glow-2) 0%, transparent 60%),
+    radial-gradient(circle at 55% 78%, var(--lg-glow-3) 0%, transparent 70%),
+    linear-gradient(140deg, hsl(var(--background)) 0%, hsl(var(--alumni-royal-fade)) 90%);
+}
+
+.liquid-glass {
+  position: relative;
+  background:
+    linear-gradient(165deg,
+      hsl(var(--background)/0.55) 0%,
+      hsl(var(--background)/0.35) 40%,
+      hsl(var(--accent)/0.25) 100%) border-box;
+  backdrop-filter: blur(18px) saturate(160%) brightness(110%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%) brightness(110%);
+  border: 1px solid hsl(var(--border)/0.45);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 4px 24px -6px hsl(var(--foreground)/0.22),
+    0 1px 0 0 hsl(var(--foreground)/0.08) inset,
+    0 0 0 1px hsl(var(--foreground)/0.04) inset;
+  overflow: hidden;
+  transition: box-shadow .5s, border-color .4s, background .6s;
+}
+
+.dark .liquid-glass {
+  background:
+    linear-gradient(165deg,
+      hsl(var(--background)/0.30) 0%,
+      hsl(var(--background)/0.22) 38%,
+      hsl(var(--accent)/0.18) 100%) border-box;
+  border-color: hsl(var(--border)/0.35);
+  box-shadow:
+    0 4px 30px -8px hsl(var(--foreground)/0.45),
+    0 0 0 1px hsl(var(--foreground)/0.05) inset;
+}
+
+.liquid-glass:before,
+.liquid-glass:after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+}
+
+/* Soft top highlight */
+.liquid-glass:before {
+  background:
+    linear-gradient(180deg,
+      hsl(var(--foreground)/0.25) 0%,
+      transparent 60%);
+  mix-blend-mode: overlay;
+  opacity: .35;
+}
+
+/* Irregular reflective blotches (very subtle) */
+.liquid-glass:after {
+  background:
+    radial-gradient(circle at 25% 35%, hsl(var(--foreground)/0.10) 0%, transparent 55%),
+    radial-gradient(circle at 70% 65%, hsl(var(--foreground)/0.08) 0%, transparent 60%),
+    radial-gradient(circle at 85% 25%, hsl(var(--foreground)/0.05) 0%, transparent 55%);
+  opacity: .35;
+  mix-blend-mode: soft-light;
+}
+
+.liquid-glass:hover {
+  box-shadow:
+    0 6px 32px -8px hsl(var(--foreground)/0.28),
+    0 0 0 1px hsl(var(--foreground)/0.06) inset;
+}
+
+.liquid-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      hsl(var(--border)/0.6) 30%,
+      hsl(var(--border)/0.6) 70%,
+      transparent 100%);
+}
+
+/* Interactive focus ring helper */
+.liquid-focus:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px hsl(var(--brand)/0.35);
+}
+
+/* Reduced motion / transparency fallbacks */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--card));
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .liquid-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: hsl(var(--card)/0.92);
+  }
+}
+
+/* Utility spacing wrapper for pages using liquid glass */
+.liquid-page-wrapper {
+  position: relative;
+}
+
+.liquid-page-wrapper>.liquid-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}

@@ -41,34 +41,29 @@ export default async function page({ searchParams }) {
               {/* Avatar */}
               <div className="flex justify-center mb-5">
                 <div className="relative group">
-                  <Avatar className="h-32 w-32 rounded-2xl border-2" style={{ borderColor: user.granted ? 'hsl(var(--profile-primary))' : 'rgba(var(--profile-border))' }}>
+                  <Avatar className="h-32 w-32 rounded-2xl border-2 transition-all duration-300 hover:scale-105" style={{ borderColor: 'hsl(var(--profile-primary))' }}>
                     <AvatarImage src={user.profile_pic} alt={user.full_name || "User"} className="object-cover" />
                     <AvatarFallback className="text-4xl" style={{ background: 'linear-gradient(135deg, hsl(var(--profile-primary)), hsl(var(--profile-success)))', color: 'white' }}>
                       {user.full_name ? user.full_name.charAt(0) : "U"}
                     </AvatarFallback>
                   </Avatar>
-                  {user.granted && (
-                    <div className="absolute -bottom-1 -right-1 rounded-full p-1.5 shadow-lg" style={{ background: 'hsl(var(--profile-success))' }}>
-                      <CheckCircle2 className="h-5 w-5 text-white" />
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Name and Badges */}
               <div className="text-center mb-5">
-                <h1 className="text-2xl font-bold mb-2" style={{ color: 'hsl(var(--profile-text))' }}>
+                <h1 className="text-2xl font-bold mb-2 transition-colors duration-200" style={{ color: 'hsl(var(--profile-text))' }}>
                   {user.full_name || "Anonymous User"}
                 </h1>
                 <div className="flex flex-wrap justify-center gap-2 mb-4">
                   {user.admin && (
-                    <span className="profile-badge" style={{ background: 'hsl(var(--profile-primary))', color: 'white' }}>
+                    <span className="profile-badge transition-all duration-200 hover:scale-105" style={{ background: 'hsl(var(--profile-primary))', color: 'white' }}>
                       <Shield className="h-3.5 w-3.5" />
                       Admin
                     </span>
                   )}
                   {user.granted && (
-                    <span className="profile-badge profile-badge-success">
+                    <span className="profile-badge profile-badge-success transition-all duration-200 hover:scale-105">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Verified
                     </span>
@@ -78,17 +73,17 @@ export default async function page({ searchParams }) {
 
               {/* Contact Info Chips */}
               <div className="space-y-2 mb-5">
-                <a href={`mailto:${user.email}`} className="profile-info-chip w-full profile-focus-ring" title={user.email}>
+                <a href={`mailto:${user.email}`} className="profile-info-chip w-full profile-focus-ring transition-all duration-200 hover:translate-x-1" title={user.email}>
                   <Mail className="h-4 w-4 flex-shrink-0" />
                   <span className="truncate text-sm">{user.email}</span>
                 </a>
                 {user.phone && (
-                  <a href={`tel:${user.phone}`} className="profile-info-chip w-full profile-focus-ring" title={user.phone}>
+                  <a href={`tel:${user.phone}`} className="profile-info-chip w-full profile-focus-ring transition-all duration-200 hover:translate-x-1" title={user.phone}>
                     <Phone className="h-4 w-4 flex-shrink-0" />
                     <span className="truncate text-sm">{user.phone}</span>
                   </a>
                 )}
-                <div className="profile-info-chip w-full">
+                <div className="profile-info-chip w-full transition-all duration-200">
                   <Calendar className="h-4 w-4 flex-shrink-0" />
                   <span className="text-sm">Joined {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                 </div>
@@ -105,7 +100,7 @@ export default async function page({ searchParams }) {
                   className="w-full text-sm mb-2 profile-focus-ring"
                   style={{ borderRadius: 'var(--profile-radius-sm)' }}
                 />
-                <Button type="submit" size="sm" className="w-full profile-focus-ring" style={{ background: 'hsl(var(--profile-primary))', color: 'white', borderRadius: 'var(--profile-radius-sm)' }}>
+                <Button type="submit" size="sm" className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'hsl(var(--profile-primary))', color: 'white', borderRadius: 'var(--profile-radius-sm)' }}>
                   Upload Photo
                 </Button>
               </form>
@@ -114,7 +109,7 @@ export default async function page({ searchParams }) {
               <form action={logout}>
                 <Button
                   variant="outline"
-                  className="w-full profile-focus-ring"
+                  className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                   style={{
                     borderRadius: 'var(--profile-radius-sm)',
                     color: 'hsl(var(--profile-danger))',
@@ -170,7 +165,7 @@ export default async function page({ searchParams }) {
                   <option value="3XL">3XL</option>
                   <option value="4XL">4XL</option>
                 </select>
-                <Button type="submit" size="sm" className="w-full profile-focus-ring" style={{ background: 'hsl(var(--profile-primary))', color: 'white', borderRadius: 'var(--profile-radius-sm)' }}>Save</Button>
+                <Button type="submit" size="sm" className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]" style={{ background: 'hsl(var(--profile-primary))', color: 'white', borderRadius: 'var(--profile-radius-sm)' }}>Save</Button>
               </form>
               {user.tshirt_size && (
                 <p className="mt-2 text-xs text-center" style={{ color: 'hsl(var(--profile-text-muted))' }}>Current: {user.tshirt_size}</p>
