@@ -156,7 +156,7 @@ function deriveTeamBestRankAcrossReports(memberVjs, reports, roomId) {
 }
 
 export default async function TeamFinalPage({ params }) {
-  const { id } = params
+  const { id } = await params
   const teamRes = await publicTeamById(id)
   if (teamRes?.error || !teamRes?.result) {
     return (
@@ -211,7 +211,7 @@ export default async function TeamFinalPage({ params }) {
     if (typeof new_title === "string" && new_title.trim()) {
       await renameMyTeam(id, new_title.trim())
     }
-    revalidatePath(`/team/${id}`)  
+    revalidatePath(`/team/${id}`)
   }
 
   const profiles = await Promise.all(members.map(async (vj) => ({ vj, data: await fetchPublicProfile(vj) })))
@@ -226,303 +226,349 @@ export default async function TeamFinalPage({ params }) {
 
   return (
     <div className="min-h-screen bg-background">
-      
-      <div className="inline-flex items-center gap-3 bg-card/60 backdrop-blur-xl rounded-full px-6 py-3 mb-6 shadow-lg border border-border/20">
-        <div className="w-3 h-3 bg-[hsl(var(--brand))] rounded-full animate-pulse" />
-        <span className="text-sm font-medium text-muted-foreground">Team Dashboard</span>
-      </div>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Breadcrumb */}
+        <div className="inline-flex items-center gap-2 bg-card/90 dark:bg-card/70 backdrop-blur-md rounded-full px-5 py-2.5 mb-6 shadow-lg border border-border/40 dark:border-border/20 hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+          <div className="w-2 h-2 bg-brand rounded-full animate-pulse shadow-[0_0_8px_rgba(var(--brand),0.6)]" />
+          <span className="text-sm font-semibold text-foreground dark:text-foreground/90 group-hover:text-brand transition-colors">Team Dashboard</span>
+        </div>
 
-      <div className="container mx-auto px-6 pb-16 space-y-8">
-        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-border/20 hover:shadow-3xl transition-all duration-500">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-[hsl(var(--brand))] rounded-2xl flex items-center justify-center shadow-lg">
-                  <span className="text-white text-xl font-bold">{team.team_title.charAt(0)}</span>
+        {/* Main Team Card - Team Info + Coach on Left, Members on Right */}
+        <div className="bg-card/95 dark:bg-card/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-border/40 dark:border-border/20 overflow-hidden hover:shadow-3xl transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            {/* Left Side - Team Name + Coach */}
+            <div className="lg:col-span-5 p-6 sm:p-8 bg-gradient-to-br from-accent/8 via-accent/4 to-background dark:from-accent/12 dark:via-accent/6 dark:to-background/95 border-b lg:border-b-0 lg:border-r border-border/40 dark:border-border/25">
+              {/* Team Info */}
+              <div className="mb-8 animate-in fade-in slide-in-from-left-4 duration-500">
+                <div className="flex items-start gap-4 mb-5">
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-br from-brand via-brand/50 to-brand/30 rounded-2xl blur-md opacity-75 group-hover:opacity-100 transition duration-500"></div>
+                    <div className="relative w-16 h-16 sm:w-18 sm:h-18 bg-gradient-to-br from-brand to-brand/80 dark:from-brand dark:to-brand/90 rounded-2xl flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform duration-500">
+                      <span className="text-white text-2xl sm:text-3xl font-bold drop-shadow-lg">{team.team_title.charAt(0)}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-foreground/95 mb-2 tracking-tight">
+                      {team.team_title}
+                    </h1>
+                    <div className="flex items-center gap-2 text-sm text-foreground/70 dark:text-foreground/60">
+                      <svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span className="font-medium">{team.collection_title}</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">{team.team_title}</h2>
-                  <p className="text-muted-foreground">Competition: {team.collection_title}</p>
-                </div>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                
-                {members.map((m) => (
-                  <Link
-                    key={m}
-                    href={`/profile/${encodeURIComponent(m)}`}
-                    className="inline-flex items-center gap-2 bg-[hsl(var(--brand))] text-white rounded-full px-4 py-2 text-sm font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                  >
-                    <span className="w-2 h-2 bg-white/30 rounded-full" />
-                    {m}
-                  </Link>
-                ))}
-                {coach && (
-                  <Link
-                    href={`/profile/${encodeURIComponent(coach)}`}
-                    className="inline-flex items-center gap-2 bg-accent text-accent-foreground rounded-full px-4 py-2 text-sm font-medium border border-border/40 hover:shadow-lg hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
-                  >
-                    {coach}
-                  </Link>
+                {/* Member Tags */}
+                <div className="flex flex-wrap gap-2.5 mb-4">
+                  {members.map((m, idx) => (
+                    <Link
+                      key={m}
+                      href={`/profile/${encodeURIComponent(m)}`}
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                      className="inline-flex items-center gap-2 bg-brand/15 hover:bg-brand/25 dark:bg-brand/25 dark:hover:bg-brand/35 text-brand dark:text-brand/95 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300 animate-in fade-in zoom-in-95"
+                    >
+                      <span className="w-1.5 h-1.5 bg-brand rounded-full shadow-[0_0_6px_rgba(var(--brand),0.8)]" />
+                      {m}
+                    </Link>
+                  ))}
+                </div>
+
+                {canRename && (
+                  <div className="pt-5 border-t border-border/40 dark:border-border/25 animate-in fade-in slide-in-from-bottom-2 duration-700 delay-200">
+                    <RenameTeamClient serverAction={doRename} />
+                  </div>
                 )}
               </div>
-            </div>
 
-            {canRename ? (
-              <RenameTeamClient serverAction={doRename} />
-            ) : (
-              <div className="text-sm text-muted-foreground italic">Only team members or the coach can rename this team.</div>
-            )}
-          </div>
-        </div>
-
-
-        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-border/20 hover:shadow-3xl transition-all duration-500">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-[hsl(var(--accent))] rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-xl">👥</span>
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-foreground">Team Members</h3>
-              <p className="text-muted-foreground">Profiles and competitive programming accounts</p>
-            </div>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {profiles.map((p) => {
-              const u = p.data?.result
+              {/* Coach Card */}
+              {coach && coachProfile && (() => {
+                const u = coachProfile?.result
                 return (
-                <div
-                  key={p.vj}
-                  className="group bg-card rounded-2xl p-6 border border-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
-                >
-                  <div className="flex items-start gap-4">
-                  <div className="relative">
-                    <Image
-                    src={u?.profile_pic || "/placeholder.svg?height=64&width=64&query=user avatar"}
-                    alt={(u?.full_name || p.vj || "").slice(0, 5)}
-                    width={64}
-                    height={64}
-                    className="rounded-2xl border-2 border-white shadow-lg group-hover:shadow-xl transition-shadow duration-300"
-                    />
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full border-2 border-white shadow-sm" />
-                  </div>
+                  <div className="relative group animate-in fade-in slide-in-from-left-6 duration-700 delay-300">
+                    {/* Subtle glow effect */}
+                    <div className="absolute -inset-0.5 bg-gradient-to-br from-accent via-accent/50 to-accent/30 rounded-3xl blur-lg opacity-60 group-hover:opacity-80 transition duration-700"></div>
 
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-lg text-foreground truncate">{u?.full_name || p.vj}</h4>
-                    <p className="text-sm text-muted-foreground mb-3">VJudge: {p.vj}</p>
+                    <div className="relative bg-gradient-to-br from-accent/25 via-accent/15 to-accent/5 dark:from-accent/35 dark:via-accent/25 dark:to-accent/10 backdrop-blur-md rounded-3xl p-6 border-2 border-accent/40 dark:border-accent/50 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.02]">
+                      {/* Coach Badge */}
+                      <div className="flex items-center justify-center gap-2 mb-5">
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-accent/40 rounded-full blur-md animate-pulse"></div>
+                          <svg className="relative w-5 h-5 text-accent dark:text-accent/90" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-bold uppercase tracking-widest text-accent dark:text-accent/90 drop-shadow-sm">Team Coach</span>
+                      </div>
 
-                    <div className="space-y-2">
-                    {u?.email && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="w-2 h-2 bg-blue-400 rounded-full" />
-                      {u.email}
+                      {/* Profile Section */}
+                      <div className="flex flex-col items-center text-center mb-5">
+                        <div className="relative mb-4 group/img">
+                          {/* Animated ring */}
+                          <div className="absolute -inset-2 bg-gradient-to-br from-accent via-brand to-accent rounded-3xl blur-md opacity-75 group-hover/img:opacity-100 group-hover/img:blur-xl transition duration-500 animate-pulse"></div>
+                          <div className="absolute -inset-1 bg-gradient-to-br from-accent to-brand rounded-3xl opacity-50"></div>
+
+                          <Image
+                            src={u?.profile_pic || "/placeholder.svg?height=96&width=96"}
+                            alt={u?.full_name || coach}
+                            width={96}
+                            height={96}
+                            className="relative rounded-3xl ring-4 ring-accent/30 dark:ring-accent/40 shadow-2xl group-hover/img:ring-accent/60 dark:group-hover/img:ring-accent/70 group-hover/img:scale-105 transition-all duration-500 brightness-105 dark:brightness-110"
+                          />
+                        </div>
+
+                        <h3 className="text-xl font-bold text-foreground dark:text-foreground/95 mb-1.5 tracking-tight">{u?.full_name || coach}</h3>
+                        <p className="text-sm font-medium text-foreground/60 dark:text-foreground/50 mb-1">@{coach}</p>
                       </div>
-                    )}
-                    {u?.phone && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="w-2 h-2 bg-green-400 rounded-full" />
-                      {u.phone}
+
+                      {/* Contact Info */}
+                      <div className="space-y-2.5 mb-5">
+                        {u?.email && (
+                          <div className="flex items-center gap-2.5 text-xs font-medium text-foreground/70 dark:text-foreground/65 bg-background/60 dark:bg-background/40 rounded-xl px-3.5 py-2.5 hover:bg-background/80 dark:hover:bg-background/60 transition-all duration-300 group/email">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.6)] group-hover/email:shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
+                            <span className="truncate">{u.email}</span>
+                          </div>
+                        )}
+                        {u?.phone && (
+                          <div className="flex items-center gap-2.5 text-xs font-medium text-foreground/70 dark:text-foreground/65 bg-background/60 dark:bg-background/40 rounded-xl px-3.5 py-2.5 hover:bg-background/80 dark:hover:bg-background/60 transition-all duration-300 group/phone">
+                            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0 shadow-[0_0_8px_rgba(34,197,94,0.6)] group-hover/phone:shadow-[0_0_12px_rgba(34,197,94,0.8)]" />
+                            <span>{u.phone}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {u?.mist_id_card && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="w-2 h-2 bg-yellow-400 rounded-full" />
-                        <Link
-                          href={u.mist_id_card}
-                          target="_blank"
-                          className="underline hover:text-foreground"
-                        >
-                          ID Card
-                        </Link>
+
+                      {/* Platform Badges */}
+                      <div className="flex flex-wrap justify-center gap-2 mb-5">
+                        {u?.cf_id && (
+                          <Link
+                            href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 bg-red-500 hover:bg-red-600 text-white rounded-xl px-3 py-1.5 text-[11px] font-bold shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
+                            CF: {u.cf_id}
+                          </Link>
+                        )}
+                        {u?.codechef_id && (
+                          <Link
+                            href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl px-3 py-1.5 text-[11px] font-bold shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
+                          >
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
+                            CC: {u.codechef_id}
+                          </Link>
+                        )}
                       </div>
-                    )}
-                    {u?.tshirt_size && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="w-2 h-2 bg-pink-400 rounded-full" />
-                        T-Shirt: {u.tshirt_size}
-                      </div>
-                    )}
+
+                      {/* View Profile Button */}
+                      <Link
+                        href={`/profile/${encodeURIComponent(coach)}`}
+                        className="block w-full text-center bg-accent/30 hover:bg-accent/40 dark:bg-accent/40 dark:hover:bg-accent/50 text-accent-foreground dark:text-foreground/90 font-bold py-3 rounded-xl transition-all duration-300 text-sm shadow-lg hover:shadow-xl hover:scale-105 ring-2 ring-accent/20 hover:ring-accent/40"
+                      >
+                        View Full Profile →
+                      </Link>
                     </div>
-
-                    <div className="flex flex-wrap gap-2 mt-4">
-                    {u?.cf_id && (
-                      <Link
-                      href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 bg-[hsl(var(--destructive))] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                      >
-                      CF: {u.cf_id}
-                      </Link>
-                    )}
-                    {u?.codechef_id && (
-                      <Link
-                      href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 bg-[hsl(var(--highlight))] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                      >
-                      CC: {u.codechef_id}
-                      </Link>
-                    )}
-                    {u?.atcoder_id && (
-                      <Link
-                      href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
-                      target="_blank"
-                      className="inline-flex items-center gap-1 bg-[hsl(var(--foreground)/0.65)] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                      >
-                      AC: {u.atcoder_id}
-                      </Link>
-                    )}
-                    </div>
                   </div>
-                  </div>
+                )
+              })()}
+            </div>
 
-                  <div className="mt-4 pt-4 border-t border-border/40">
-                  <Link
-                    href={`/profile/${encodeURIComponent(p.vj)}`}
-                    className="inline-flex items-center gap-2 text-accent-foreground hover:text-accent-foreground/80 font-medium text-sm group-hover:gap-3 transition-all duration-300"
-                  >
-                    View Full Profile
-                    <span className="text-lg">→</span>
-                  </Link>
+            {/* Right Side - Team Members */}
+            <div className="lg:col-span-7 p-6 sm:p-8 animate-in fade-in slide-in-from-right-4 duration-700">
+              <div className="flex items-center gap-3 mb-7">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-brand/30 rounded-xl blur-md group-hover:blur-lg transition duration-300"></div>
+                  <div className="relative w-12 h-12 bg-gradient-to-br from-brand/20 to-brand/10 dark:from-brand/30 dark:to-brand/20 rounded-xl flex items-center justify-center ring-2 ring-brand/30 group-hover:ring-brand/50 transition-all duration-300">
+                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
                   </div>
                 </div>
-                )
-            })}
-            {coach && coachProfile && (
-              (() => {
-                const u = coachProfile?.result
-                console.log(u);
-                return (
-                  <div
-                    key={`coach-${coach}`}
-                    className="group bg-accent/20 rounded-2xl p-6 border border-border/50 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="relative">
-                        <Image
-                          src={u?.profile_pic || "/placeholder.svg?height=64&width=64&query=coach avatar"}
-                          alt={(u?.full_name || coach || "").slice(0, 5)}
-                          width={64}
-                          height={64}
-                          className="rounded-2xl border-2 border-accent shadow-lg group-hover:shadow-xl transition-shadow duration-300"
-                        />
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-gradient-to-br from-purple-400 to-fuchsia-500 rounded-full border-2 border-white shadow-sm" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-bold text-lg text-foreground truncate">{u?.full_name || coach}</h4>
-                          <span className="inline-flex text-[10px] uppercase tracking-wide font-semibold bg-accent text-accent-foreground px-2 py-0.5 rounded-full border border-border/40">Coach</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">VJudge: {coach}</p>
-                        <div className="space-y-2">
-                          {u?.email && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="w-2 h-2 bg-blue-400 rounded-full" />
-                              {u.email}
+                <div>
+                  <h3 className="text-xl font-bold text-foreground dark:text-foreground/95">Team Members</h3>
+                  <p className="text-sm font-medium text-foreground/60 dark:text-foreground/55">{members.length} {members.length === 1 ? 'Member' : 'Members'}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                {profiles.map((p, idx) => {
+                  const u = p.data?.result
+                  return (
+                    <div
+                      key={p.vj}
+                      style={{ animationDelay: `${idx * 100}ms` }}
+                      className="group relative animate-in fade-in zoom-in-95 duration-500"
+                    >
+                      {/* Card glow on hover */}
+                      <div className="absolute -inset-0.5 bg-gradient-to-br from-brand/20 via-accent/20 to-brand/20 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
+
+                      <div className="relative bg-background/60 hover:bg-background/90 dark:bg-background/40 dark:hover:bg-background/70 backdrop-blur-sm rounded-2xl p-5 border border-border/40 hover:border-brand/50 dark:border-border/25 dark:hover:border-brand/60 shadow-lg hover:shadow-2xl transition-all duration-500 group-hover:scale-[1.03] group-hover:-translate-y-1">
+                        <div className="flex gap-4">
+                          {/* Profile Picture with enhanced visibility */}
+                          <div className="relative flex-shrink-0 group/avatar">
+                            <div className="absolute -inset-1 bg-gradient-to-br from-brand/40 via-accent/40 to-brand/40 rounded-2xl blur-sm opacity-60 group-hover/avatar:opacity-100 group-hover/avatar:blur-md transition duration-500"></div>
+                            <Image
+                              src={u?.profile_pic || "/placeholder.svg?height=80&width=80"}
+                              alt={u?.full_name || p.vj}
+                              width={80}
+                              height={80}
+                              className="relative rounded-2xl ring-3 ring-border/50 dark:ring-border/40 group-hover/avatar:ring-brand/60 dark:group-hover/avatar:ring-brand/70 shadow-xl group-hover/avatar:shadow-2xl group-hover/avatar:scale-110 transition-all duration-500 brightness-105 dark:brightness-115"
+                            />
+                          </div>
+
+                          {/* Member Info */}
+                          <div className="flex-1 min-w-0 flex flex-col">
+                            <h4 className="text-base font-bold text-foreground dark:text-foreground/95 mb-1 truncate group-hover:text-brand dark:group-hover:text-brand/90 transition-colors duration-300">
+                              {u?.full_name || p.vj}
+                            </h4>
+                            <p className="text-sm font-medium text-foreground/60 dark:text-foreground/55 mb-2.5">@{p.vj}</p>
+
+                            {/* Contact Info */}
+                            <div className="space-y-1.5 mb-3">
+                              {u?.email && (
+                                <div className="flex items-center gap-2 text-xs font-medium text-foreground/65 dark:text-foreground/60">
+                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+                                  <span className="truncate">{u.email}</span>
+                                </div>
+                              )}
+                              {u?.phone && (
+                                <div className="flex items-center gap-2 text-xs font-medium text-foreground/65 dark:text-foreground/60">
+                                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
+                                  <span>{u.phone}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                          {u?.phone && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="w-2 h-2 bg-green-400 rounded-full" />
-                              {u.phone}
+
+                            {/* Platform Badges */}
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {u?.cf_id && (
+                                <Link
+                                  href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 bg-red-500/95 hover:bg-red-500 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                >
+                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                  </svg>
+                                  CF
+                                </Link>
+                              )}
+                              {u?.codechef_id && (
+                                <Link
+                                  href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 bg-amber-500/95 hover:bg-amber-500 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                >
+                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                  </svg>
+                                  CC
+                                </Link>
+                              )}
+                              {u?.atcoder_id && (
+                                <Link
+                                  href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 bg-gray-600/95 hover:bg-gray-600 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                >
+                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                  </svg>
+                                  AC
+                                </Link>
+                              )}
+                              {!u?.cf_id && !u?.codechef_id && !u?.atcoder_id && (
+                                <span className="inline-flex items-center gap-1 bg-muted/60 dark:bg-muted/40 text-foreground/70 dark:text-foreground/65 rounded-lg px-2 py-1 text-[10px] font-semibold shadow-sm">
+                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                  </svg>
+                                  VJudge
+                                </span>
+                              )}
                             </div>
-                          )}
-                          {u?.mist_id_card && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="w-2 h-2 bg-yellow-400 rounded-full" />
-                              <Link
-                                href={u.mist_id_card}
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                              >
-                                ID Card
-                              </Link>
-                            </div>
-                          )}
-                          {u?.tshirt_size && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span className="w-2 h-2 bg-pink-400 rounded-full" />
-                              T-Shirt: {u.tshirt_size}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-4">
-                          {u?.cf_id && (
+
+                            {/* View Profile Link */}
                             <Link
-                              href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
-                              target="_blank"
-                              className="inline-flex items-center gap-1 bg-[hsl(var(--destructive))] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
+                              href={`/profile/${encodeURIComponent(p.vj)}`}
+                              className="inline-flex items-center gap-1.5 text-xs text-brand dark:text-brand/90 hover:text-brand/80 dark:hover:text-brand/70 font-bold group/link transition-all duration-300 mt-auto"
                             >
-                              CF: {u.cf_id}
+                              View Profile
+                              <svg className="w-3.5 h-3.5 group-hover/link:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                              </svg>
                             </Link>
-                          )}
-                          {u?.codechef_id && (
-                            <Link
-                              href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
-                              target="_blank"
-                              className="inline-flex items-center gap-1 bg-[hsl(var(--highlight))] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                            >
-                              CC: {u.codechef_id}
-                            </Link>
-                          )}
-                          {u?.atcoder_id && (
-                            <Link
-                              href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
-                              target="_blank"
-                              className="inline-flex items-center gap-1 bg-[hsl(var(--foreground)/0.65)] text-white rounded-lg px-3 py-1.5 text-xs font-medium hover:shadow-lg hover:scale-105 transition-all duration-300"
-                            >
-                              AC: {u.atcoder_id}
-                            </Link>
-                          )}
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-border/40">
-                          <Link
-                            href={`/profile/${encodeURIComponent(coach)}`}
-                            className="inline-flex items-center gap-2 text-accent-foreground hover:text-accent font-medium text-sm group-hover:gap-3 transition-all duration-300"
-                          >
-                            View Coach Profile
-                            <span className="text-lg">→</span>
-                          </Link>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })()
-            )}
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-border/20 hover:shadow-3xl transition-all duration-500">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 bg-[hsl(var(--greenAC))] rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-xl">📊</span>
+
+        {/* Team Performance Section */}
+        <div className="bg-gradient-to-br from-card/95 via-card/90 to-card/80 dark:from-card/90 dark:via-card/85 dark:to-card/75 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/20 dark:border-border/10 mb-8 hover:shadow-3xl transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-md opacity-75 group-hover:opacity-100 group-hover:blur-lg transition duration-500" />
+              <div className="relative w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                <svg className="w-7 h-7 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
             </div>
-            <div>
-              <h3 className="text-2xl font-bold text-foreground">Team Performance</h3>
-              <p className="text-muted-foreground">Best rank across all contests</p>
+            <div className="flex-1">
+              <h3 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-foreground/95 mb-1">Team Performance</h3>
+              <p className="text-foreground/60 dark:text-foreground/55 font-medium">Historical contest rankings and achievements</p>
             </div>
+            {teamRows.length > 0 && (
+              <div className="hidden sm:flex items-center gap-2 bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/40 dark:border-emerald-500/30 rounded-full px-4 py-2 hover:bg-emerald-500/20 dark:hover:bg-emerald-500/30 transition-colors duration-300">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{teamRows.length} Contests</span>
+              </div>
+            )}
           </div>
 
           {teamRows.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 bg-gradient-to-br from-[hsl(var(--accent)/0.4)] to-[hsl(var(--accent)/0.2)] rounded-full mx-auto mb-6 flex items-center justify-center">
-                <span className="text-muted-foreground text-2xl">📈</span>
+            <div className="text-center py-16 px-4 animate-in fade-in zoom-in-95 duration-700">
+              <div className="relative inline-block mb-6 group">
+                <div className="absolute inset-0 bg-gradient-to-r from-accent/30 to-brand/30 rounded-full blur-2xl opacity-75 group-hover:opacity-100 transition duration-500" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-accent/25 to-brand/25 dark:from-accent/35 dark:to-brand/35 rounded-full flex items-center justify-center border border-border/40 dark:border-border/30 group-hover:scale-110 transition-transform duration-500">
+                  <svg className="w-12 h-12 text-foreground/50 dark:text-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
               </div>
-              <p className="text-muted-foreground text-lg">No contest data available yet</p>
-              <p className="text-muted-foreground/70 text-sm mt-2">
-                Performance metrics will appear here once team members participate in contests
+              <h4 className="text-xl font-bold text-foreground dark:text-foreground/95 mb-2">No Performance Data Yet</h4>
+              <p className="text-foreground/60 dark:text-foreground/55 font-medium max-w-md mx-auto">
+                Performance metrics and contest rankings will appear here once team members start participating in competitive programming contests
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl p-4 border border-border/40 bg-accent/30">
-                <p className="text-sm text-foreground font-medium">
-                  📍 Showing best (lowest) rank among team members per contest
-                </p>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+              <div className="flex items-start gap-3 rounded-2xl p-4 border border-emerald-500/40 dark:border-emerald-500/25 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 dark:from-emerald-500/10 dark:to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 dark:hover:from-emerald-500/15 dark:hover:to-teal-500/15 transition-colors duration-300">
+                <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 shadow-lg">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-1">Best Team Performance</p>
+                  <p className="text-xs text-foreground/65 dark:text-foreground/60 font-medium leading-relaxed">
+                    Displaying the best (lowest) rank achieved by any team member in each contest. This represents the team's peak performance across all participants.
+                  </p>
+                </div>
               </div>
-              <div className="bg-accent/20 rounded-2xl p-6">
+
+              <div className="bg-gradient-to-br from-background/60 to-accent/10 dark:from-background/40 dark:to-accent/15 rounded-2xl p-6 border border-border/40 dark:border-border/25 shadow-inner hover:shadow-lg transition-shadow duration-500">
                 <PastPerformanceChart
                   rows={teamRows.map((r, idx) => ({
                     roomName: r.roomName,
@@ -537,18 +583,29 @@ export default async function TeamFinalPage({ params }) {
           )}
         </div>
 
+        {/* Codeforces Activity Section */}
         {cfUsers.length > 0 && (
-          <div className="bg-card/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-border/20 hover:shadow-3xl transition-all duration-500">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-[hsl(var(--destructive))] rounded-2xl flex items-center justify-center shadow-lg">
-                <span className="text-white text-xl font-bold">CF</span>
+          <div className="bg-gradient-to-br from-card/95 via-card/90 to-card/80 dark:from-card/90 dark:via-card/85 dark:to-card/75 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/20 dark:border-border/10 hover:shadow-3xl transition-all duration-700 animate-in fade-in slide-in-from-bottom-4 delay-200">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl blur-md opacity-75 group-hover:opacity-100 group-hover:blur-lg transition duration-500" />
+                <div className="relative w-14 h-14 bg-gradient-to-br from-red-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
+                  <svg className="w-7 h-7 text-white font-bold drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                    <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fontSize="12" fontWeight="bold">CF</text>
+                  </svg>
+                </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-bold text-foreground">Codeforces Activity</h3>
-                <p className="text-muted-foreground">Recent submissions and progress</p>
+              <div className="flex-1">
+                <h3 className="text-2xl sm:text-3xl font-bold text-foreground dark:text-foreground/95 mb-1">Codeforces Activity</h3>
+                <p className="text-foreground/60 dark:text-foreground/55 font-medium">Live submission tracking and coding statistics</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 bg-red-500/15 dark:bg-red-500/20 border border-red-500/40 dark:border-red-500/30 rounded-full px-4 py-2 hover:bg-red-500/20 dark:hover:bg-red-500/30 transition-colors duration-300">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+                <span className="text-sm font-bold text-red-700 dark:text-red-400">{cfUsers.length} {cfUsers.length === 1 ? 'Member' : 'Members'}</span>
               </div>
             </div>
-            <div className="bg-[hsl(var(--destructive)/0.15)] rounded-2xl p-6">
+
+            <div className="bg-gradient-to-br from-background/60 to-red-500/10 dark:from-background/40 dark:to-red-500/15 rounded-2xl p-6 border border-border/40 dark:border-border/25 shadow-inner hover:shadow-lg transition-shadow duration-500 animate-in fade-in slide-in-from-bottom-2 duration-700 delay-300">
               <CodeforcesSubmissionDashboard users={cfUsers} />
             </div>
           </div>
