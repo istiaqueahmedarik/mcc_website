@@ -282,6 +282,25 @@ export default async function TeamFinalPage({ params }) {
                 )}
               </div>
 
+              {/* TEAM COACH Section Header */}
+              {coach && coachProfile && (
+                <div className="mb-6 animate-in fade-in slide-in-from-left-5 duration-600 delay-200">
+                  <div className="flex items-center gap-4">
+                    <div className="relative group/header">
+                      <div className="absolute -inset-1 bg-accent/30 rounded-xl blur-md group-hover/header:blur-lg transition duration-300"></div>
+                      <div className="relative w-14 h-14 bg-gradient-to-br from-accent/20 to-accent/10 dark:from-accent/30 dark:to-accent/20 rounded-xl flex items-center justify-center ring-2 ring-accent/30 group-hover/header:ring-accent/50 transition-all duration-300">
+                        <svg className="w-7 h-7 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-foreground dark:text-foreground/95">Team Coach</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Coach Card */}
               {coach && coachProfile && (() => {
                 const u = coachProfile?.result
@@ -291,16 +310,6 @@ export default async function TeamFinalPage({ params }) {
                     <div className="absolute -inset-0.5 bg-gradient-to-br from-accent via-accent/50 to-accent/30 rounded-3xl blur-lg opacity-60 group-hover:opacity-80 transition duration-700"></div>
 
                     <div className="relative bg-gradient-to-br from-accent/25 via-accent/15 to-accent/5 dark:from-accent/35 dark:via-accent/25 dark:to-accent/10 backdrop-blur-md rounded-3xl p-6 border-2 border-accent/40 dark:border-accent/50 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:scale-[1.02]">
-                      {/* Coach Badge */}
-                      <div className="flex items-center justify-center gap-2 mb-5">
-                        <div className="relative">
-                          <div className="absolute inset-0 bg-accent/40 rounded-full blur-md animate-pulse"></div>
-                          <svg className="relative w-5 h-5 text-accent dark:text-accent/90" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                          </svg>
-                        </div>
-                        <span className="text-sm font-bold uppercase tracking-widest text-accent dark:text-accent/90 drop-shadow-sm">Team Coach</span>
-                      </div>
 
                       {/* Profile Section */}
                       <div className="flex flex-col items-center text-center mb-5">
@@ -381,22 +390,22 @@ export default async function TeamFinalPage({ params }) {
 
             {/* Right Side - Team Members */}
             <div className="lg:col-span-7 p-6 sm:p-8 animate-in fade-in slide-in-from-right-4 duration-700">
-              <div className="flex items-center gap-3 mb-7">
+              <div className="flex items-center gap-4 mb-6">
                 <div className="relative group">
                   <div className="absolute -inset-1 bg-brand/30 rounded-xl blur-md group-hover:blur-lg transition duration-300"></div>
-                  <div className="relative w-12 h-12 bg-gradient-to-br from-brand/20 to-brand/10 dark:from-brand/30 dark:to-brand/20 rounded-xl flex items-center justify-center ring-2 ring-brand/30 group-hover:ring-brand/50 transition-all duration-300">
-                    <svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="relative w-14 h-14 bg-gradient-to-br from-brand/20 to-brand/10 dark:from-brand/30 dark:to-brand/20 rounded-xl flex items-center justify-center ring-2 ring-brand/30 group-hover:ring-brand/50 transition-all duration-300">
+                    <svg className="w-7 h-7 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-foreground dark:text-foreground/95">Team Members</h3>
-                  <p className="text-sm font-medium text-foreground/60 dark:text-foreground/55">{members.length} {members.length === 1 ? 'Member' : 'Members'}</p>
+                  <h3 className="text-2xl font-bold text-foreground dark:text-foreground/95">Team Members</h3>
+                  <p className="text-base font-semibold text-foreground/65 dark:text-foreground/60">{members.length} {members.length === 1 ? 'Member' : 'Members'}</p>
                 </div>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
                 {profiles.map((p, idx) => {
                   const u = p.data?.result
                   return (
@@ -406,54 +415,46 @@ export default async function TeamFinalPage({ params }) {
                       className="group relative animate-in fade-in zoom-in-95 duration-500"
                     >
                       {/* Card glow on hover */}
-                      <div className="absolute -inset-0.5 bg-gradient-to-br from-brand/20 via-accent/20 to-brand/20 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
+                      <div className="absolute -inset-0.5 bg-gradient-to-br from-brand/20 via-accent/20 to-brand/20 rounded-3xl blur-md opacity-0 group-hover:opacity-100 transition duration-500"></div>
 
-                      <div className="relative bg-background/60 hover:bg-background/90 dark:bg-background/40 dark:hover:bg-background/70 backdrop-blur-sm rounded-2xl p-5 border border-border/40 hover:border-brand/50 dark:border-border/25 dark:hover:border-brand/60 shadow-lg hover:shadow-2xl transition-all duration-500 group-hover:scale-[1.03] group-hover:-translate-y-1">
-                        <div className="flex gap-4">
+                      <div className="relative bg-background/60 hover:bg-background/90 dark:bg-background/40 dark:hover:bg-background/70 backdrop-blur-sm rounded-3xl p-4 sm:p-5 lg:p-6 border border-border/40 hover:border-brand/50 dark:border-border/25 dark:hover:border-brand/60 shadow-lg hover:shadow-2xl transition-all duration-500 group-hover:scale-[1.02] group-hover:-translate-y-1 h-full">
+                        <div className="flex flex-col sm:flex-row gap-4 sm:gap-5 h-full">
                           {/* Profile Picture with enhanced visibility */}
-                          <div className="relative flex-shrink-0 group/avatar">
-                            <div className="absolute -inset-1 bg-gradient-to-br from-brand/40 via-accent/40 to-brand/40 rounded-2xl blur-sm opacity-60 group-hover/avatar:opacity-100 group-hover/avatar:blur-md transition duration-500"></div>
+                          <div className="relative flex-shrink-0 self-center sm:self-start group/avatar">
+                            <div className="absolute -inset-2 bg-gradient-to-br from-brand/40 via-accent/40 to-brand/40 rounded-3xl blur-lg opacity-60 group-hover/avatar:opacity-100 group-hover/avatar:blur-xl transition duration-500"></div>
                             <Image
-                              src={u?.profile_pic || "/placeholder.svg?height=80&width=80"}
+                              src={u?.profile_pic || "/placeholder.svg?height=120&width=120"}
                               alt={u?.full_name || p.vj}
-                              width={80}
-                              height={80}
-                              className="relative rounded-2xl ring-3 ring-border/50 dark:ring-border/40 group-hover/avatar:ring-brand/60 dark:group-hover/avatar:ring-brand/70 shadow-xl group-hover/avatar:shadow-2xl group-hover/avatar:scale-110 transition-all duration-500 brightness-105 dark:brightness-115"
+                              width={120}
+                              height={120}
+                              className="relative rounded-3xl ring-4 ring-border/50 dark:ring-border/40 group-hover/avatar:ring-brand/60 dark:group-hover/avatar:ring-brand/70 shadow-2xl group-hover/avatar:shadow-3xl group-hover/avatar:scale-105 transition-all duration-500 brightness-105 dark:brightness-120 w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 object-cover"
                             />
                           </div>
 
                           {/* Member Info */}
-                          <div className="flex-1 min-w-0 flex flex-col">
-                            <h4 className="text-base font-bold text-foreground dark:text-foreground/95 mb-1 truncate group-hover:text-brand dark:group-hover:text-brand/90 transition-colors duration-300">
+                          <div className="flex-1 min-w-0 flex flex-col text-center sm:text-left">
+                            <h4 className="text-base sm:text-lg md:text-xl font-bold text-foreground dark:text-foreground/95 mb-1 sm:mb-1.5 md:mb-2 break-words line-clamp-2 group-hover:text-brand dark:group-hover:text-brand/90 transition-colors duration-300">
                               {u?.full_name || p.vj}
                             </h4>
-                            <p className="text-sm font-medium text-foreground/60 dark:text-foreground/55 mb-2.5">@{p.vj}</p>
+                            <p className="text-sm sm:text-base md:text-lg font-semibold text-foreground/65 dark:text-foreground/60 mb-2 sm:mb-3 md:mb-4 break-words">@{p.vj}</p>
 
-                            {/* Contact Info */}
-                            <div className="space-y-1.5 mb-3">
-                              {u?.email && (
-                                <div className="flex items-center gap-2 text-xs font-medium text-foreground/65 dark:text-foreground/60">
-                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
-                                  <span className="truncate">{u.email}</span>
-                                </div>
-                              )}
-                              {u?.phone && (
-                                <div className="flex items-center gap-2 text-xs font-medium text-foreground/65 dark:text-foreground/60">
-                                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
-                                  <span>{u.phone}</span>
-                                </div>
-                              )}
-                            </div>
+                            {/* Contact Info - Phone Only */}
+                            {u?.phone && (
+                              <div className="flex items-center justify-center sm:justify-start gap-2 sm:gap-2.5 md:gap-3 text-xs sm:text-sm md:text-base font-medium text-foreground/70 dark:text-foreground/65 mb-3 sm:mb-4 md:mb-5">
+                                <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-green-500 rounded-full flex-shrink-0 shadow-[0_0_10px_rgba(34,197,94,0.7)]" />
+                                <span className="truncate">{u.phone}</span>
+                              </div>
+                            )}
 
                             {/* Platform Badges */}
-                            <div className="flex flex-wrap gap-1.5 mb-3">
+                            <div className="flex flex-wrap justify-center sm:justify-start gap-1.5 sm:gap-2 md:gap-2.5 mb-3 sm:mb-4 md:mb-5">
                               {u?.cf_id && (
                                 <Link
                                   href={`https://codeforces.com/profile/${encodeURIComponent(u.cf_id)}`}
                                   target="_blank"
-                                  className="inline-flex items-center gap-1 bg-red-500/95 hover:bg-red-500 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                  className="inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 bg-red-500/95 hover:bg-red-500 text-white rounded-lg sm:rounded-xl px-2 sm:px-2.5 md:px-3.5 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm font-bold shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
                                 >
-                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                   </svg>
                                   CF
@@ -463,9 +464,9 @@ export default async function TeamFinalPage({ params }) {
                                 <Link
                                   href={`https://www.codechef.com/users/${encodeURIComponent(u.codechef_id)}`}
                                   target="_blank"
-                                  className="inline-flex items-center gap-1 bg-amber-500/95 hover:bg-amber-500 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                  className="inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 bg-amber-500/95 hover:bg-amber-500 text-white rounded-lg sm:rounded-xl px-2 sm:px-2.5 md:px-3.5 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm font-bold shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
                                 >
-                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                   </svg>
                                   CC
@@ -475,17 +476,17 @@ export default async function TeamFinalPage({ params }) {
                                 <Link
                                   href={`https://atcoder.jp/users/${encodeURIComponent(u.atcoder_id)}`}
                                   target="_blank"
-                                  className="inline-flex items-center gap-1 bg-gray-600/95 hover:bg-gray-600 text-white rounded-lg px-2 py-1 text-[10px] font-bold shadow-md hover:shadow-lg hover:scale-110 transition-all duration-300"
+                                  className="inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 bg-gray-600/95 hover:bg-gray-600 text-white rounded-lg sm:rounded-xl px-2 sm:px-2.5 md:px-3.5 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm font-bold shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300"
                                 >
-                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                   </svg>
                                   AC
                                 </Link>
                               )}
                               {!u?.cf_id && !u?.codechef_id && !u?.atcoder_id && (
-                                <span className="inline-flex items-center gap-1 bg-muted/60 dark:bg-muted/40 text-foreground/70 dark:text-foreground/65 rounded-lg px-2 py-1 text-[10px] font-semibold shadow-sm">
-                                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 24 24">
+                                <span className="inline-flex items-center gap-1 sm:gap-1.5 md:gap-2 bg-muted/60 dark:bg-muted/40 text-foreground/75 dark:text-foreground/70 rounded-lg sm:rounded-xl px-2 sm:px-2.5 md:px-3.5 py-1 sm:py-1.5 md:py-2 text-xs sm:text-sm font-bold shadow-sm">
+                                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                                   </svg>
                                   VJudge
@@ -496,10 +497,10 @@ export default async function TeamFinalPage({ params }) {
                             {/* View Profile Link */}
                             <Link
                               href={`/profile/${encodeURIComponent(p.vj)}`}
-                              className="inline-flex items-center gap-1.5 text-xs text-brand dark:text-brand/90 hover:text-brand/80 dark:hover:text-brand/70 font-bold group/link transition-all duration-300 mt-auto"
+                              className="inline-flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-xs sm:text-sm md:text-base text-brand dark:text-brand/90 hover:text-brand/80 dark:hover:text-brand/70 font-bold group/link transition-all duration-300 mt-auto"
                             >
                               View Profile
-                              <svg className="w-3.5 h-3.5 group-hover/link:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 group-hover/link:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                               </svg>
                             </Link>
