@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sheet'
 import { get_with_token } from '@/lib/action'
 import {
+  AlertTriangle,
   Award,
   Backpack,
   BookOpen,
@@ -25,16 +26,14 @@ import {
   ChartNoAxesCombined,
   Code,
   Coffee,
+  Globe,
   LogIn,
   Menu,
+  SheetIcon,
   ShieldHalf,
   UserCheck,
   UserPlus,
-  AlertTriangle,
-  SheetIcon,
-  LaptopMinimalIcon,
-  Globe,
-  Users,
+  Users
 } from 'lucide-react'
 import { Link } from 'next-view-transitions'
 import { cookies } from 'next/headers'
@@ -53,25 +52,22 @@ const Navbar = async () => {
     { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
     { href: '/finalized-teams', icon: Users, label: 'Teams' },
   ]
-  
+
   const userTools = [
-    { href: '/courses', icon: BookOpen, label: 'Course Details' },
-    { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
+    // { href: '/courses', icon: BookOpen, label: 'Course Details' },
+    // { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
   ]
 
   const adminTools = [
     { href: '/admin', icon: SheetIcon, label: 'CMS' },
-
-    { href: '/grantuser', icon: UserCheck, label: 'Grant Users' },
+    { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
-    { href: '/batches', icon: BrainCircuit, label: 'Batches' },
-    { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
+    // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
+    // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
     { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
     { href: '/admin/team-collection', icon: Users, label: 'Team Collections' },
     { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
-    { href: '/admin/vjudge-verification', icon: LaptopMinimalIcon, label: 'VJudge Verification' },
-    { href: '/admin/cf-verification', icon: LaptopMinimalIcon, label: 'CF Verification' },
   ]
 
   const loggedIn = (await cookies()).get('token')
@@ -80,7 +76,7 @@ const Navbar = async () => {
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-center space-x-8">
+        <div className="flex items-center w-full space-x-8">
           <Link
             href="/"
             className="flex items-center space-x-2"
@@ -91,7 +87,7 @@ const Navbar = async () => {
             />
           </Link>
 
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden lg:flex items-center justify-center w-full space-x-2">
             {navItems.map((item) => (
               <Link
                 key={item.href}
