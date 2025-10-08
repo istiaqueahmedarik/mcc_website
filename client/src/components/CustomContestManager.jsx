@@ -286,7 +286,7 @@ export default function CustomContestManager({ initialContests }){
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-zinc-700 dark:text-zinc-300">
-              Are you sure you want to deactivate the contest <span className="font-semibold">"{confirmDelete.contestName}"</span>?
+              Are you sure you want to deactivate the contest <span className="font-semibold">&quot;{confirmDelete.contestName}&quot;</span>?
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               This action will remove the contest from the active list. This action cannot be undone.

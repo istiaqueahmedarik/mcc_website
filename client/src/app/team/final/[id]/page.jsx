@@ -746,7 +746,7 @@ export default async function TeamFinalPage({ params }) {
                   </p>
                   <p className="text-xs text-foreground/65 dark:text-foreground/60 font-medium leading-relaxed">
                     Displaying the best (lowest) rank achieved by any team
-                    member in each contest. This represents the team's peak
+                    member in each contest. This represents the team&apos;s peak
                     performance across all participants.
                   </p>
                 </div>
