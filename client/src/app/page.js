@@ -1,24 +1,15 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { motion, useScroll } from "framer-motion";
 import AchievementPage from "@/components/achievements/AchievmentPage";
 import MccLogo from "@/components/IconChanger/MccLogo";
 import { Button } from "@/components/ui/button";
 import MagicButton from "@/components/ui/MagicButton";
-import MagicButton2 from "@/components/ui/MagicButton2";
 import { Spotlight } from "@/components/ui/Spotlight";
-import {
-  TextRevealCard,
-  TextRevealCardTitle,
-} from "@/components/ui/TextReveal";
 import { TextGenerateEffect } from "@/components/ui/TextGenEffect";
 import {
-  Anvil,
-  AudioWaveform,
-  Landmark,
   MoveRight,
-  Tv,
   Target,
   Database,
   PlayCircle,
@@ -31,10 +22,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import StatsCounter from "@/components/landing/StatsCounter";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [cms, setCms] = React.useState(null);
   const { scrollYProgress } = useScroll();
+  const router = useRouter();
 
   // Function to scroll to stats section
   const scrollToStats = () => {
@@ -43,6 +36,14 @@ export default function Home() {
       statsSection.scrollIntoView({ behavior: "smooth" });
     }
   };
+  const joinNowDestination = useMemo(() => {
+    const token = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("token="));
+
+    if (!token) return "/login";
+    return "/courses";
+  }, []);
 
   React.useEffect(() => {
     async function load() {
@@ -324,19 +325,14 @@ export default function Home() {
             <div className="absolute -inset-4 bg-gradient-to-r from-transparent via-primary/5 to-transparent rounded-lg opacity-0 hover:opacity-100 transition-opacity duration-300 -z-10" />
           </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link href="/login">
+            <Link href={joinNowDestination}>
               <MagicButton
                 title="Join Now"
                 position="right"
                 icon={<MoveRight className="ml-2" />}
-                otherClasses="hover:bg-primary hover:text-primary-foreground transform hover:scale-105 transition-all duration-300"
               />
             </Link>
-            <MagicButton
-              title="Explore Platform"
-              handleClick={scrollToStats}
-              otherClasses="hover:bg-secondary hover:text-secondary-foreground transform hover:scale-105 transition-all duration-300"
-            />
+            <MagicButton title="Explore Platform" handleClick={scrollToStats} />
           </div>
         </div>
       </section>
