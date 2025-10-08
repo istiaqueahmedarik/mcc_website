@@ -33,10 +33,7 @@ import {
   ShieldHalf,
   UserCheck,
   UserPlus,
-  AlertTriangle,
-  SheetIcon,
   LaptopMinimalIcon,
-  Globe,
   Users,
 } from "lucide-react";
 import { Link } from "next-view-transitions";
