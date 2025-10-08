@@ -1,21 +1,21 @@
-import MarkdownRender from '@/components/MarkdownRenderer'
-import { getAchievementsById } from '@/lib/action'
-import { formatRelative } from 'date-fns'
-import { CalendarArrowUp } from 'lucide-react'
-import Image from 'next/image'
+import MarkdownRender from "@/components/MarkdownRenderer";
+import { getAchievementsById } from "@/lib/action";
+import { formatRelative } from "date-fns";
+import { CalendarArrowUp } from "lucide-react";
+import Image from "next/image";
 
 export default async function SingleAchievement({ params }) {
-  const { ach_id } = await params
-  const achievementArr = await getAchievementsById(ach_id)
-  const achievement = achievementArr[0]
-  console.log('ach: ', achievement)
+  const { ach_id } = await params;
+  const achievementArr = await getAchievementsById(ach_id);
+  const achievement = achievementArr[0];
+  console.log("ach: ", achievement);
 
   if (!Array.isArray(achievementArr) || achievementArr.length === 0) {
     return (
       <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
         Achievement Not Found
       </div>
-    )
+    );
   }
 
   return (
@@ -35,5 +35,5 @@ export default async function SingleAchievement({ params }) {
         <MarkdownRender content={achievement.description} />
       </div>
     </div>
-  )
+  );
 }

@@ -1,32 +1,33 @@
-'use client'
+"use client";
 
-import ResetPasswordModal from '@/components/ResetPasswordModal'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import ProgressLink from "@/components/ProgressLink";
+import ResetPasswordModal from "@/components/ResetPasswordModal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { login } from '@/lib/action'
-import { AtSign, Eye, EyeOff, Lock } from 'lucide-react'
-import { Link } from 'next-view-transitions'
-import { useActionState, useState } from 'react'
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { login } from "@/lib/action";
+import { AtSign, Eye, EyeOff, Lock } from "lucide-react";
+import { Link } from "next-view-transitions";
+import { useActionState, useState } from "react";
 
 const initialState = {
-  message: '',
+  message: "",
   success: false,
-}
+};
 
 export default function Page() {
-  const [state, formAction, pending] = useActionState(login, initialState)
-  const [showResetModal, setShowResetModal] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  
+  const [state, formAction, pending] = useActionState(login, initialState);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
@@ -34,20 +35,13 @@ export default function Page() {
           <CardTitle className="text-2xl font-bold">Login</CardTitle>
           <CardDescription>
             Don&apos;t have an account?
-            <Link
-              href="/signup"
-              className="text-primary"
-            >
+            <ProgressLink href="/signup" className="text-primary">
               Sign Up
-            </Link>
-            
+            </ProgressLink>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form
-            action={formAction}
-            className="space-y-4"
-          >
+          <form action={formAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">
@@ -102,26 +96,22 @@ export default function Page() {
             </div>
 
             {state?.message && (
-              <Alert variant={state?.success ? 'default' : 'destructive'}>
+              <Alert variant={state?.success ? "default" : "destructive"}>
                 <AlertDescription>{state?.message}</AlertDescription>
               </Alert>
             )}
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={pending}
-            >
-              {pending ? 'Submitting...' : 'Login'}
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Submitting..." : "Login"}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <ResetPasswordModal 
-        isOpen={showResetModal} 
-        onClose={() => setShowResetModal(false)} 
+      <ResetPasswordModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
       />
     </div>
-  )
+  );
 }

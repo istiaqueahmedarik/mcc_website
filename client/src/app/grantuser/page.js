@@ -1,5 +1,5 @@
-import Accept from '@/components/Accept'
-import Reject from '@/components/Reject'
+import Accept from "@/components/Accept";
+import Reject from "@/components/Reject";
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -15,24 +15,24 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { get_with_token, pendingUsers } from '@/lib/action'
-import { cookies } from 'next/headers'
-import Image from 'next/image'
-import { redirect } from 'next/navigation'
+} from "@/components/ui/table";
+import { get_with_token, pendingUsers } from "@/lib/action";
+import { cookies } from "next/headers";
+import Image from "next/image";
+import { redirect } from "next/navigation";
 
 export default async function Page() {
-  if (!(await cookies()).get('token')) {
-    redirect('/login')
+  if (!(await cookies()).get("token")) {
+    redirect("/login");
   }
-  const user = await get_with_token('auth/user/profile')
+  const user = await get_with_token("auth/user/profile");
   if (user?.result.length === 0) {
-    redirect('/login')
+    redirect("/login");
   }
   if (user?.result[0].admin === false) {
-    redirect('/')
+    redirect("/");
   }
-  const pendingU = await pendingUsers()
+  const pendingU = await pendingUsers();
   return (
     <div className="min-h-screen w-full py-12 px-4 flex justify-center bg-background">
       {pendingU && pendingU.length > 0 ? (
@@ -106,5 +106,5 @@ export default async function Page() {
         </div>
       )}
     </div>
-  )
+  );
 }
