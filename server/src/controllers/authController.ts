@@ -45,17 +45,30 @@ export const signup = async (c: any) => {
         RETURNING *`;
     return c.json({ result });
   } catch (error: any) {
-    console.error('Database error in signup:', error.message);
+    console.error("Database error in signup:", error.message);
 
     // Handle specific database errors
-    if (error.code === 'CONNECTION_CLOSED' || error.code === 'CONNECTION_ENDED') {
-      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    if (
+      error.code === "CONNECTION_CLOSED" ||
+      error.code === "CONNECTION_ENDED"
+    ) {
+      return c.json(
+        { error: "Database connection issue. Please try again." },
+        503
+      );
     }
-    if (error.code === '26000') { // Prepared statement error
-      console.error('Prepared statement error - this should not happen with transaction mode');
-      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    if (error.code === "26000") {
+      // Prepared statement error
+      console.error(
+        "Prepared statement error - this should not happen with transaction mode"
+      );
+      return c.json(
+        { error: "Database configuration issue. Please contact support." },
+        500
+      );
     }
-    if (error.code === '23505') { // Unique constraint violation
+    if (error.code === "23505") {
+      // Unique constraint violation
       return c.json({ error: "Email already exists" }, 400);
     }
 
@@ -82,15 +95,27 @@ export const login = async (c: any) => {
     const token = await JwtSign({ email, id: result[0].id }, secret);
     return c.json({ result, token, admin: result[0].admin });
   } catch (error: any) {
-    console.error('Database error in login:', error.message);
+    console.error("Database error in login:", error.message);
 
     // Handle specific database errors
-    if (error.code === 'CONNECTION_CLOSED' || error.code === 'CONNECTION_ENDED') {
-      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    if (
+      error.code === "CONNECTION_CLOSED" ||
+      error.code === "CONNECTION_ENDED"
+    ) {
+      return c.json(
+        { error: "Database connection issue. Please try again." },
+        503
+      );
     }
-    if (error.code === '26000') { // Prepared statement error
-      console.error('Prepared statement error - this should not happen with transaction mode');
-      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    if (error.code === "26000") {
+      // Prepared statement error
+      console.error(
+        "Prepared statement error - this should not happen with transaction mode"
+      );
+      return c.json(
+        { error: "Database configuration issue. Please contact support." },
+        500
+      );
     }
 
     return c.json({ error: "Login failed. Please try again." }, 500);
@@ -153,18 +178,27 @@ export const getPublicProfileByVjudge = async (c: any) => {
         tshirt_size: u.tshirt_size,
         mist_id_card: u.mist_id_card,
         mist_id: u.mist_id,
-      }
-    })
+      },
+    });
   } catch (e: any) {
-    console.error('Database error in getPublicProfileByVjudge:', e.message);
+    console.error("Database error in getPublicProfileByVjudge:", e.message);
 
     // Handle specific database errors
-    if (e.code === 'CONNECTION_CLOSED' || e.code === 'CONNECTION_ENDED') {
-      return c.json({ error: "Database connection issue. Please try again." }, 503);
+    if (e.code === "CONNECTION_CLOSED" || e.code === "CONNECTION_ENDED") {
+      return c.json(
+        { error: "Database connection issue. Please try again." },
+        503
+      );
     }
-    if (e.code === '26000') { // Prepared statement error
-      console.error('Prepared statement error - this should not happen with transaction mode');
-      return c.json({ error: "Database configuration issue. Please contact support." }, 500);
+    if (e.code === "26000") {
+      // Prepared statement error
+      console.error(
+        "Prepared statement error - this should not happen with transaction mode"
+      );
+      return c.json(
+        { error: "Database configuration issue. Please contact support." },
+        500
+      );
     }
 
     return c.json({ error: "Something went wrong" }, 500);
@@ -206,11 +240,13 @@ export const rejectUser = async (c: any) => {
       "MIST Computer Club - Account Registration Status",
       `Dear ${result[0].full_name},
 
-We appreciate your interest in joining the MIST Computer Club community.
+Thank you for your interest in joining the MIST Computer Club community.
 
 After careful review of your application, we regret to inform you that we are unable to approve your account registration at this time. This decision may be due to incomplete information or verification requirements not being met.
 
-If you believe this is an error or would like to reapply, please feel free to contact us or submit a new registration with complete and accurate information.
+Next Steps:
+• Contact your senior if you believe this is an error or need assistance with the application process
+• Reapply if you are eligible and can provide complete and accurate information
 
 Thank you for your understanding.
 
@@ -218,41 +254,61 @@ Best regards,
 MIST Computer Club
 Military Institute of Science and Technology`,
       `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2563eb; margin: 0; font-size: 24px;">MIST Computer Club</h1>
-              <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Military Institute of Science and Technology</p>
+        <div style="font-family: 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 12px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1e40af; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">MIST Computer Club</h1>
+              <p style="color: #64748b; margin: 4px 0 0 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
             </div>
             
-            <h2 style="color: #333; margin-bottom: 20px;">Account Registration Status</h2>
+            <h2 style="color: #1f2937; margin-bottom: 16px; font-size: 18px; font-weight: 600;">Account Registration Status</h2>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">Dear <strong>${result[0].full_name}</strong>,</p>
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 12px; font-weight: 400;">Dear <strong>${result[0].full_name}</strong>,</p>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">
-              We appreciate your interest in joining the MIST Computer Club community.
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 16px; font-weight: 400;">
+              Thank you for your interest in joining the MIST Computer Club community.
             </p>
             
-            <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 5px;">
-              <p style="color: #dc2626; margin: 0; font-weight: 500;">
+            <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 16px 0; border-radius: 4px;">
+              <p style="color: #dc2626; margin: 0; font-weight: 500; line-height: 1.5;">
                 After careful review of your application, we regret to inform you that we are unable to approve your account registration at this time.
               </p>
             </div>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 12px; font-weight: 400;">
               This decision may be due to incomplete information or verification requirements not being met.
             </p>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 20px;">
-              If you believe this is an error or would like to reapply, please feel free to contact us or submit a new registration with complete and accurate information.
-            </p>
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 6px; margin: 16px 0;">
+              <h3 style="color: #1e40af; margin: 0 0 8px 0; font-size: 15px; font-weight: 600;">Next Steps:</h3>
+              <ul style="color: #374151; line-height: 1.5; margin: 0; padding-left: 16px; font-weight: 400;">
+                <li style="margin-bottom: 6px;"><strong>Contact your senior</strong> if you believe this is an error or need assistance with the application process</li>
+                <li style="margin-bottom: 6px;"><strong>Reapply</strong> if you are eligible and can provide complete and accurate information</li>
+              </ul>
+            </div>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 5px;">Thank you for your understanding.</p>
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 6px; font-weight: 400;">Thank you for your understanding.</p>
             
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
-              <p style="color: #333; margin: 0; font-weight: 500;">Best regards,</p>
-              <p style="color: #2563eb; margin: 5px 0 0 0; font-weight: 600;">MIST Computer Club</p>
-              <p style="color: #666; margin: 0; font-size: 14px;">Military Institute of Science and Technology</p>
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <p style="color: #374151; margin: 0; font-weight: 500;">Best regards,</p>
+                  <p style="color: #1e40af; margin: 4px 0 2px 0; font-weight: 600; font-size: 15px;">MIST Computer Club</p>
+                  <p style="color: #64748b; margin: 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
+                </div>
+                <div style="flex-shrink: 0;">
+                  <img src="https://computerclub.mist.ac.bd/mccLogoBlack.png" alt="MIST Computer Club Logo" style="width: 50px; height: 50px; object-fit: contain;">
+                </div>
+              </div>
+              
+              <div style="text-align: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f3f4f6;">
+                <a href="https://computerclub.mist.ac.bd" style="color: #1e40af; text-decoration: none; font-weight: 500; font-size: 13px;">
+                  🌐 Visit our website: computerclub.mist.ac.bd
+                </a>
+                <p style="color: #9ca3af; margin: 6px 0 0 0; font-size: 11px;">
+                  This email was sent from MIST Computer Club. Please do not reply to this email.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -281,16 +337,9 @@ Congratulations and welcome to the MIST Computer Club!
 
 We are pleased to inform you that your account registration has been successfully approved. You are now an official member of our programming community.
 
-You can now access your account and start participating in our activities:
-• Programming contests and competitions
-• Technical workshops and seminars
-• Collaborative projects
-• Knowledge sharing sessions
-• Networking opportunities with fellow programmers
+Important Next Step: Please complete your profile information to get started.
 
-To get started, please log in to your account using your registered email and password at our website.
-
-We look forward to your active participation and contribution to our vibrant community.
+We look forward to your active participation and contribution to our vibrant programming community.
 
 Welcome aboard!
 
@@ -298,53 +347,59 @@ Best regards,
 MIST Computer Club
 Military Institute of Science and Technology`,
       `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2563eb; margin: 0; font-size: 24px;">MIST Computer Club</h1>
-              <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Military Institute of Science and Technology</p>
+        <div style="font-family: 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 12px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1e40af; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">MIST Computer Club</h1>
+              <p style="color: #64748b; margin: 4px 0 0 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
             </div>
             
-            <h2 style="color: #16a34a; margin-bottom: 20px;">🎉 Welcome! Account Approved</h2>
+            <h2 style="color: #059669; margin-bottom: 16px; font-size: 20px; font-weight: 600;">🎉 Welcome! Account Approved</h2>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">Dear <strong>${result[0].full_name}</strong>,</p>
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 12px; font-weight: 400;">Dear <strong>${result[0].full_name}</strong>,</p>
             
-            <div style="background-color: #dcfce7; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0; border-radius: 5px;">
-              <p style="color: #15803d; margin: 0; font-weight: 500;">
+            <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 16px; margin: 16px 0; border-radius: 4px;">
+              <p style="color: #047857; margin: 0; font-weight: 500; line-height: 1.5;">
                 Congratulations! Your account registration has been successfully approved. Welcome to the MIST Computer Club!
               </p>
             </div>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 16px; font-weight: 400;">
               You are now an official member of our programming community and can access all club features and activities.
             </p>
             
-            <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #2563eb; margin: 0 0 15px 0; font-size: 18px;">What you can do now:</h3>
-              <ul style="color: #333; line-height: 1.6; margin: 0; padding-left: 20px;">
-                <li style="margin-bottom: 8px;">Participate in programming contests and competitions</li>
-                <li style="margin-bottom: 8px;">Attend technical workshops and seminars</li>
-                <li style="margin-bottom: 8px;">Join collaborative projects</li>
-                <li style="margin-bottom: 8px;">Participate in knowledge sharing sessions</li>
-                <li style="margin-bottom: 8px;">Network with fellow programmers</li>
-              </ul>
+            <div style="background-color: #dbeafe; border: 1px solid #3b82f6; padding: 16px; border-radius: 6px; margin: 16px 0; text-align: center;">
+              <h3 style="color: #1e40af; margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Important Next Step</h3>
+              <p style="color: #1e40af; margin: 0; font-weight: 500; font-size: 14px;">
+                Please complete your profile information to get started
+              </p>
             </div>
             
-            <div style="text-align: center; margin: 25px 0;">
-              <div style="background-color: #2563eb; color: white; padding: 15px 25px; border-radius: 8px; display: inline-block;">
-                <p style="margin: 0; font-weight: 500;">Ready to get started? Log in to your account now!</p>
-              </div>
-            </div>
-            
-            <p style="color: #333; line-height: 1.6; margin-bottom: 20px;">
-              We look forward to your active participation and contribution to our vibrant community.
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 16px; font-weight: 400;">
+              We look forward to your active participation and contribution to our vibrant programming community.
             </p>
             
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
-              <p style="color: #333; margin: 0; font-weight: 500;">Welcome aboard!</p>
-              <p style="color: #333; margin: 10px 0 5px 0; font-weight: 500;">Best regards,</p>
-              <p style="color: #2563eb; margin: 5px 0 0 0; font-weight: 600;">MIST Computer Club</p>
-              <p style="color: #666; margin: 0; font-size: 14px;">Military Institute of Science and Technology</p>
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <p style="color: #374151; margin: 0; font-weight: 500;">Welcome aboard!</p>
+                  <p style="color: #374151; margin: 6px 0 4px 0; font-weight: 500;">Best regards,</p>
+                  <p style="color: #1e40af; margin: 4px 0 2px 0; font-weight: 600; font-size: 15px;">MIST Computer Club</p>
+                  <p style="color: #64748b; margin: 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
+                </div>
+                <div style="flex-shrink: 0;">
+                  <img src="https://computerclub.mist.ac.bd/mccLogoBlack.png" alt="MIST Computer Club Logo" style="width: 50px; height: 50px; object-fit: contain;">
+                </div>
+              </div>
+              
+              <div style="text-align: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f3f4f6;">
+                <a href="https://computerclub.mist.ac.bd" style="color: #1e40af; text-decoration: none; font-weight: 500; font-size: 13px;">
+                  🌐 Visit our website: computerclub.mist.ac.bd
+                </a>
+                <p style="color: #9ca3af; margin: 6px 0 0 0; font-size: 11px;">
+                  This email was sent from MIST Computer Club. Please do not reply to this email.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -406,44 +461,60 @@ Best regards,
 MIST Computer Club
 Military Institute of Science and Technology`,
       `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #2563eb; margin: 0; font-size: 24px;">MIST Computer Club</h1>
-              <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Military Institute of Science and Technology</p>
+        <div style="font-family: 'Poppins', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 12px; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1e40af; margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.5px;">MIST Computer Club</h1>
+              <p style="color: #64748b; margin: 4px 0 0 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
             </div>
             
-            <h2 style="color: #333; margin-bottom: 20px;">🔒 Password Reset Request</h2>
+            <h2 style="color: #1f2937; margin-bottom: 16px; font-size: 18px; font-weight: 600;">🔒 Password Reset Request</h2>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">Dear User,</p>
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 12px; font-weight: 400;">Dear User,</p>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 20px;">
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 16px; font-weight: 400;">
               You have requested to reset your password for your MIST Computer Club account.
             </p>
             
-            <div style="background-color: #dbeafe; border: 2px solid #2563eb; padding: 25px; text-align: center; margin: 30px 0; border-radius: 10px;">
-              <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #1e40af;">Your Verification Code</h3>
-              <div style="font-size: 32px; font-weight: bold; color: #1e40af; letter-spacing: 4px; font-family: 'Courier New', monospace;">${otp}</div>
+            <div style="background-color: #dbeafe; border: 2px solid #3b82f6; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+              <h3 style="margin: 0 0 8px 0; font-size: 15px; color: #1e40af; font-weight: 600;">Your Verification Code</h3>
+              <div style="font-size: 30px; font-weight: 700; color: #1e40af; letter-spacing: 4px; font-family: 'Poppins', 'Courier New', monospace;">${otp}</div>
             </div>
             
-            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 5px;">
-              <p style="color: #d97706; margin: 0; font-weight: 500;">
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 16px 0; border-radius: 4px;">
+              <p style="color: #d97706; margin: 0; font-weight: 500; line-height: 1.5;">
                 ⏰ This code will expire in 5 minutes for security reasons. Please use it immediately to reset your password.
               </p>
             </div>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 15px;">
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 12px; font-weight: 400;">
               If you did not request this password reset, please ignore this email and your account will remain secure.
             </p>
             
-            <p style="color: #333; line-height: 1.6; margin-bottom: 20px;">
+            <p style="color: #374151; line-height: 1.6; margin-bottom: 16px; font-weight: 400;">
               For any assistance, please contact the MIST Computer Club support team.
             </p>
             
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e5e5;">
-              <p style="color: #333; margin: 0; font-weight: 500;">Best regards,</p>
-              <p style="color: #2563eb; margin: 5px 0 0 0; font-weight: 600;">MIST Computer Club</p>
-              <p style="color: #666; margin: 0; font-size: 14px;">Military Institute of Science and Technology</p>
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <p style="color: #374151; margin: 0; font-weight: 500;">Best regards,</p>
+                  <p style="color: #1e40af; margin: 4px 0 2px 0; font-weight: 600; font-size: 15px;">MIST Computer Club</p>
+                  <p style="color: #64748b; margin: 0; font-size: 13px; font-weight: 400;">Military Institute of Science and Technology</p>
+                </div>
+                <div style="flex-shrink: 0;">
+                  <img src="https://computerclub.mist.ac.bd/mccLogoBlack.png" alt="MIST Computer Club Logo" style="width: 50px; height: 50px; object-fit: contain;">
+                </div>
+              </div>
+              
+              <div style="text-align: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid #f3f4f6;">
+                <a href="https://computerclub.mist.ac.bd" style="color: #1e40af; text-decoration: none; font-weight: 500; font-size: 13px;">
+                  🌐 Visit our website: computerclub.mist.ac.bd
+                </a>
+                <p style="color: #9ca3af; margin: 6px 0 0 0; font-size: 11px;">
+                  This email was sent from MIST Computer Club. Please do not reply to this email.
+                </p>
+              </div>
             </div>
           </div>
         </div>

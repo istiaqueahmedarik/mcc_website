@@ -1,0 +1,21 @@
+{
+  "name": "MIST Computer Club",
+  "short_name": "MCC",
+  "description": "MIST Computer Club is one of the finest clubs of MIST that is supervised by our experienced, cooperative and helpful faculty members",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "/mcc.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/mcc.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

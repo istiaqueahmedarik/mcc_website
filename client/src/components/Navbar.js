@@ -45,51 +45,32 @@ import ProgressLink from "./ProgressLink";
 const Navbar = async () => {
   const navItems = [
     {
-      href: "/contest_reminders",
+      href: '/contest_reminders',
       icon: CalendarClock,
-      label: "Contest Reminders",
+      label: 'Contest Reminders',
     },
-    { href: "/alumni", icon: Award, label: "Alumni" },
-    { href: "/achievements", icon: ChartNoAxesCombined, label: "Achievements" },
-    { href: "/contests_report/live", icon: Globe, label: "Contests Report" },
-    { href: "/finalized-teams", icon: Users, label: "Teams" },
-  ];
+    { href: '/alumni', icon: Award, label: 'Alumni' },
+    { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
+    { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
+    { href: '/finalized-teams', icon: Users, label: 'Teams' },
+  ]
 
   const userTools = [
-    { href: "/courses", icon: BookOpen, label: "Course Details" },
-    { href: "/my_dashboard", icon: Backpack, label: "My Dashboard" },
-  ];
+    // { href: '/courses', icon: BookOpen, label: 'Course Details' },
+    // { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
+  ]
 
   const adminTools = [
-    { href: "/admin", icon: SheetIcon, label: "CMS" },
-
-    { href: "/grantuser", icon: UserCheck, label: "Grant Users" },
-    { href: "/achievements/insert", icon: Award, label: "Insert Achievement" },
-    { href: "/batches", icon: BrainCircuit, label: "Batches" },
-    { href: "/courses/insert", icon: Coffee, label: "Create Course" },
-    { href: "/contests_report", icon: Code, label: "Generate Contest Report" },
-    {
-      href: "/contests_report/demerit",
-      icon: AlertTriangle,
-      label: "Manage Demerits",
-    },
-    { href: "/admin/team-collection", icon: Users, label: "Team Collections" },
-    {
-      href: "/admin/custom-contests",
-      icon: CalendarClock,
-      label: "Custom Contests",
-    },
-    {
-      href: "/admin/vjudge-verification",
-      icon: LaptopMinimalIcon,
-      label: "VJudge Verification",
-    },
-    {
-      href: "/admin/cf-verification",
-      icon: LaptopMinimalIcon,
-      label: "CF Verification",
-    },
-  ];
+    { href: '/admin', icon: SheetIcon, label: 'CMS' },
+    { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
+    { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
+    // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
+    // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
+    { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },
+    { href: '/contests_report/demerit', icon: AlertTriangle, label: 'Manage Demerits' },
+    { href: '/admin/team-collection', icon: Users, label: 'Team Collections' },
+    { href: '/admin/custom-contests', icon: CalendarClock, label: 'Custom Contests' },
+  ]
 
   const loggedIn = (await cookies()).get("token");
   const user = await get_with_token("auth/user/profile");
@@ -97,7 +78,7 @@ const Navbar = async () => {
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <div className="flex items-center space-x-8">
+        <div className="flex items-center w-full space-x-8">
           <ProgressLink href="/" className="flex items-center space-x-2">
             <MccLogo w={60} h={60} />
           </ProgressLink>

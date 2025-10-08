@@ -219,8 +219,13 @@ export const verifyVjudge = async (c: any) => {
     const { user_id, verified } = await c.req.json();
     if (!user_id) return c.json({ error: "Missing user_id" }, 400);
     const flag = verified === false ? false : true;
-    const rows =
-      await sql`update users set vjudge_verified = ${flag} where id = ${user_id} returning id, vjudge_id, vjudge_verified`;
+    let rows;
+    if (!flag)
+      rows =
+        await sql`update users set vjudge_id = null, vjudge_verified = false where id = ${user_id} returning id, vjudge_id, vjudge_verified`;
+    else
+      rows =
+        await sql`update users set vjudge_verified = ${flag} where id = ${user_id} returning id, vjudge_id, vjudge_verified`;
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
     return c.json({ result: rows[0] });
   } catch (e) {

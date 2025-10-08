@@ -1,10 +1,10 @@
-import localFont from "next/font/local";
-import "./globals.css";
+import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
+import localFont from "next/font/local";
 import { unstable_ViewTransition as ViewTransition } from "react";
 import { Toaster } from "sonner";
-import Footer from "@/components/Footer";
+import "./globals.css";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -24,12 +24,32 @@ export const metadata = {
   title: "MIST Computer Club",
   description:
     "MIST Computer Club is one of the finest clubs of MIST that is supervised by our experienced, cooperative and so many helpful faculty members",
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/mcc.png', sizes: '32x32', type: 'image/png' },
+      { url: '/mcc.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: '/mcc.png',
+  },
+  manifest: '/site.webmanifest',
+  themeColor: '#1e40af',
+  other: {
+    'msapplication-TileColor': '#1e40af',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
     <ViewTransition>
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/mccLogo.png" type="image/png" />
+          <link rel="apple-touch-icon" href="/mccLogo.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+          <meta name="theme-color" content="#1e40af" />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${Ubuntu_Medium.className} font-[--font-ubuntu-medium]`}
           cz-shortcut-listen="true"
