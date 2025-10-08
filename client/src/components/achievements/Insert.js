@@ -108,7 +108,7 @@ const Insert = ({ state, inputRef, handleCopy }) => {
 
           <div className="flex items-center space-x-3 pr-8 lg:pr-0">
             <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-blue-600 truncate">
+              <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-100 truncate">
                 Create Achievement
               </h1>
               <p className="text-xs text-gray-500 dark:text-gray-300 break-words">
@@ -205,9 +205,9 @@ const Insert = ({ state, inputRef, handleCopy }) => {
               thumbnail.
             </p>
           </div>
-          {!state?.message && (
+          {state?.message && (
             <Alert variant={state?.success ? "success" : "destructive"}>
-              <AlertDescription>{state?.message}asfasfsf</AlertDescription>
+              <AlertDescription>{state?.message}</AlertDescription>
             </Alert>
           )}
         </div>
