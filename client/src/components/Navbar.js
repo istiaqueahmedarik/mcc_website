@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { get_with_token } from "@/lib/action";
 import {
+  AlertTriangle,
   Award,
   Backpack,
   BookOpen,
@@ -25,8 +26,10 @@ import {
   ChartNoAxesCombined,
   Code,
   Coffee,
+  Globe,
   LogIn,
   Menu,
+  SheetIcon,
   ShieldHalf,
   UserCheck,
   UserPlus,
@@ -102,7 +105,7 @@ const Navbar = async () => {
             <MccLogo w={60} h={60} />
           </ProgressLink>
 
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden lg:flex items-center justify-center w-full space-x-2">
             {navItems.map((item) => (
               <ProgressLink key={item.href} href={item.href}>
                 <Button

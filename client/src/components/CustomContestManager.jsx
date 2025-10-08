@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { createCustomContestAction, deleteCustomContestAction, updateCustomContestAction } from '@/lib/action'
-import { CheckCircle, Edit3, Loader2, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Edit3, Loader2, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useActionState, useEffect, useState, useTransition } from 'react'
 
@@ -22,6 +22,7 @@ export default function CustomContestManager({ initialContests }){
   const [showSuccess, setShowSuccess] = useState(null)
   const [createFormRef, setCreateFormRef] = useState(null)
   const [previewEndTime, setPreviewEndTime] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null) // { contestId, contestName }
 
   const [createState, createAction] = useActionState(createCustomContestAction, { })
   const [updateState, updateAction] = useActionState(updateCustomContestAction, { })
@@ -74,26 +75,27 @@ export default function CustomContestManager({ initialContests }){
       // Clear the form
       if (createFormRef) {
         createFormRef.reset()
+        setPreviewEndTime('') // Clear preview end time
       }
       
-      // Reload the section by fetching fresh data
-      setTimeout(async () => {
-        setIsRefreshing(true)
-        try {
-          // Force page refresh to get updated contest data
-          window.location.reload()
-        } catch (error) {
-          console.error('Error refreshing:', error)
-          setIsRefreshing(false)
-        }
-      }, 1000)
+      // Update local state with new contest if available
+      if (createState.contest) {
+        setContests(prev => [createState.contest, ...prev])
+      } else {
+        // Only refresh if no contest data in response
+        setTimeout(() => {
+          setIsRefreshing(true)
+          router.refresh()
+          setTimeout(() => setIsRefreshing(false), 500)
+        }, 500)
+      }
       
       setTimeout(() => setShowSuccess(null), 3000)
     }
     if (createState?.error) {
       setCreateLoading(false)
     }
-  }, [createState, createFormRef])
+  }, [createState, createFormRef, router])
 
   useEffect(() => {
     if (updateState?.success) {
@@ -108,23 +110,32 @@ export default function CustomContestManager({ initialContests }){
           contest.id === updateState.contest.id ? updateState.contest : contest
         ))
       } else {
-        // Fallback: if no contest data in response, refresh the page
+        // Only refresh if no contest data in response
         setTimeout(() => {
           setIsRefreshing(true)
           router.refresh()
+          setTimeout(() => setIsRefreshing(false), 500)
         }, 500)
       }
-      
-      // Optional: Still do a delayed refresh to ensure consistency
-      setTimeout(() => {
-        setIsRefreshing(true)
-        router.refresh()
-      }, 3000) // Increased delay since we update locally first
     }
     if (updateState?.error) {
       setUpdateLoading(false)
     }
   }, [updateState, router])
+
+  // Handle escape key for confirmation dialog
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && confirmDelete) {
+        setConfirmDelete(null)
+      }
+    }
+
+    if (confirmDelete) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [confirmDelete])
 
   const handleCreateSubmit = (e) => {
     e.preventDefault()
@@ -204,10 +215,17 @@ export default function CustomContestManager({ initialContests }){
     return `${year}-${month}-${day}T${hours}:${minutes}`
   }
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
-    router.refresh()
-    setTimeout(() => setIsRefreshing(false), 1000)
+    try {
+      router.refresh()
+      // Add a small delay to show the refresh indicator
+      await new Promise(resolve => setTimeout(resolve, 300))
+    } catch (error) {
+      console.error('Error refreshing:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   // Update preview when start time or duration changes
@@ -218,6 +236,25 @@ export default function CustomContestManager({ initialContests }){
     } else {
       setPreviewEndTime('')
     }
+  }
+
+  // Handle delete confirmation and execution
+  const handleDeleteConfirm = async (contestId) => {
+    setConfirmDelete(null)
+    setEditing(null)
+    setDeleteLoading(contestId)
+    
+    const formData = new FormData()
+    formData.append('contest_id', contestId)
+    
+    startTransition(async () => {
+      const res = await deleteAction(formData)
+      setDeleteLoading(null)
+      if(!res?.error){
+        setContests(prev => prev.filter(x => x.id !== contestId))
+        setDeletedIds(prev => new Set([...prev, contestId]))
+      }
+    })
   }
 
   return <div className='space-y-8'>
@@ -232,6 +269,56 @@ export default function CustomContestManager({ initialContests }){
                showSuccess === 'update' ? 'Contest updated successfully!' : 
                'Action completed successfully!'}
             </span>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+
+    {/* Delete Confirmation Dialog */}
+    {confirmDelete && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md bg-white dark:bg-zinc-900 shadow-2xl animate-in zoom-in-95 duration-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Deactivation
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+              Are you sure you want to deactivate the contest <span className="font-semibold">"{confirmDelete.contestName}"</span>?
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              This action will remove the contest from the active list. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button 
+                variant="destructive" 
+                onClick={() => handleDeleteConfirm(confirmDelete.contestId)}
+                disabled={deleteLoading === confirmDelete.contestId}
+                className="flex-1"
+              >
+                {deleteLoading === confirmDelete.contestId ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deactivating...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Yes, Deactivate
+                  </>
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleteLoading === confirmDelete.contestId}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -388,6 +475,22 @@ export default function CustomContestManager({ initialContests }){
                   Refresh
                 </>
               )}
+            </Button>
+            
+            <Button 
+              type="button" 
+              variant="ghost" 
+              onClick={() => {
+                if (createFormRef) {
+                  createFormRef.reset()
+                  setPreviewEndTime('')
+                }
+              }}
+              disabled={createLoading}
+              className="min-w-[80px]"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Clear
             </Button>
           </div>
           
@@ -557,43 +660,24 @@ export default function CustomContestManager({ initialContests }){
                       <Edit3 className="mr-2 h-4 w-4" />
                       Edit
                     </Button>
-                    <form
-                      onSubmit={(e)=>{
-                        e.preventDefault()
-                        setEditing(null)
-                        setDeleteLoading(c.id)
-                        const fd = new FormData(e.currentTarget)
-                        const id = c.id
-                        startTransition(async () => {
-                          const res = await deleteAction(fd)
-                          setDeleteLoading(null)
-                          if(!res?.error){
-                            setContests(prev => prev.filter(x => x.id !== id))
-                            setDeletedIds(prev => new Set([...prev, id]))
-                          }
-                        })
-                      }}
+                    <Button 
+                      variant='destructive' 
+                      onClick={() => setConfirmDelete({ contestId: c.id, contestName: c.name })}
+                      disabled={editing !== null || deleteLoading === c.id}
+                      className="min-w-[110px] transition-all duration-200"
                     >
-                      <input type='hidden' name='contest_id' value={c.id} />
-                      <Button 
-                        type="submit"
-                        variant='destructive' 
-                        disabled={editing !== null || deleteLoading === c.id}
-                        className="min-w-[110px] transition-all duration-200"
-                      >
-                        {deleteLoading === c.id ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Deactivate
-                          </>
-                        )}
-                      </Button>
-                    </form>
+                      {deleteLoading === c.id ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Deactivate
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
                 {deletedIds.has(c.id) && (
