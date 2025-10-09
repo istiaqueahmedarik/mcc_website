@@ -64,7 +64,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
               color: "hsl(var(--profile-text-muted))"
             }}
           >
-            ℹ️ If you're the first member, your team title becomes official. You can request changes before finalization.
+            ℹ️ If you&apos;re the first member, your team title becomes official. You can request changes before finalization.
           </p>
         </div>
 
@@ -101,7 +101,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
               }}
             >
               📋 Pick {UI_MIN}–{UI_MAX} teammates within an effective score window of ±5. Higher-ranked selections override
-              yours; you'll receive the next available names from your ordered list.
+              yours; you&apos;ll receive the next available names from your ordered list.
             </p>
           </div>
         ) : (
@@ -130,7 +130,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
                 color: "hsl(var(--profile-text-muted))"
               }}
             >
-              👤 You're not on the participant list. Propose teammates by vjudge ID for admin review.
+              👤 You&apos;re not on the participant list. Propose teammates by vjudge ID for admin review.
             </p>
           </div>
         )}
