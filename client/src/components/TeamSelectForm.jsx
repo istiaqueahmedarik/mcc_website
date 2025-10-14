@@ -11,7 +11,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
 
   return (
     <div className="profile-card transition-all duration-300 hover:shadow-xl">
-      <h3 
+      <h3
         className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8"
         style={{ color: "hsl(var(--profile-text))" }}
       >
@@ -39,7 +39,7 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
         className="space-y-6 sm:space-y-8"
       >
         <div className="space-y-3">
-          <label 
+          <label
             className="block text-sm font-bold"
             style={{ color: "hsl(var(--profile-text))" }}
           >
@@ -51,34 +51,34 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
             defaultValue={myChoice?.team_title || ""}
             placeholder="Enter a unique team title"
             className="w-full px-4 py-3 sm:py-3.5 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 profile-focus-ring text-sm sm:text-base"
-            style={{ 
+            style={{
               background: "hsl(var(--profile-surface-1))",
               borderColor: "hsl(var(--profile-border))",
               color: "hsl(var(--profile-text))"
             }}
           />
-          <p 
+          <p
             className="text-xs sm:text-sm px-4 py-2.5 rounded-lg"
-            style={{ 
+            style={{
               background: "hsl(var(--profile-surface-2))",
               color: "hsl(var(--profile-text-muted))"
             }}
           >
-            ℹ️ If you're the first member, your team title becomes official. You can request changes before finalization.
+            ℹ️ If you&apos;re the first member, your team title becomes official. You can request changes before finalization.
           </p>
         </div>
 
         {isParticipant ? (
           <div className="space-y-4">
-            <label 
+            <label
               className="block text-sm font-bold"
               style={{ color: "hsl(var(--profile-text))" }}
             >
               Select and Order Your Preferred Teammates (choose {UI_MIN}-{UI_MAX})
             </label>
-            <div 
+            <div
               className="rounded-xl p-4 sm:p-6 border"
-              style={{ 
+              style={{
                 background: "hsl(var(--profile-surface-2))",
                 borderColor: "hsl(var(--profile-border))"
               }}
@@ -90,23 +90,23 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
                 max={UI_MAX}
                 initial={Array.isArray(myChoice?.ordered_choices) ? myChoice.ordered_choices.filter((x) => eligible.includes(x)) : []}
                 performance={performance}
-                onChange={(list)=> setSelectedCount(list.length)}
+                onChange={(list) => setSelectedCount(list.length)}
               />
             </div>
-            <p 
+            <p
               className="text-xs sm:text-sm px-4 py-2.5 rounded-lg"
-              style={{ 
+              style={{
                 background: "hsl(var(--profile-surface-2))",
                 color: "hsl(var(--profile-text-muted))"
               }}
             >
               📋 Pick {UI_MIN}–{UI_MAX} teammates within an effective score window of ±5. Higher-ranked selections override
-              yours; you'll receive the next available names from your ordered list.
+              yours; you&apos;ll receive the next available names from your ordered list.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            <label 
+            <label
               className="block text-sm font-bold"
               style={{ color: "hsl(var(--profile-text))" }}
             >
@@ -117,20 +117,20 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
               defaultValue={Array.isArray(myChoice?.ordered_choices) ? myChoice.ordered_choices.join(",") : ""}
               placeholder="e.g. alice,bob,charlie"
               className="w-full px-4 py-3 sm:py-3.5 rounded-xl border transition-all duration-200 focus:outline-none focus:ring-2 profile-focus-ring text-sm sm:text-base"
-              style={{ 
+              style={{
                 background: "hsl(var(--profile-surface-1))",
                 borderColor: "hsl(var(--profile-border))",
                 color: "hsl(var(--profile-text))"
               }}
             />
-            <p 
+            <p
               className="text-xs sm:text-sm px-4 py-2.5 rounded-lg"
-              style={{ 
+              style={{
                 background: "hsl(var(--profile-surface-2))",
                 color: "hsl(var(--profile-text-muted))"
               }}
             >
-              👤 You're not on the participant list. Propose teammates by vjudge ID for admin review.
+              👤 You&apos;re not on the participant list. Propose teammates by vjudge ID for admin review.
             </p>
           </div>
         )}
@@ -140,9 +140,9 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
             type="submit"
             disabled={isPending || (isParticipant && selectedCount < SUBMIT_MIN)}
             className="w-full font-bold py-3.5 sm:py-4 px-6 rounded-xl transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-sm sm:text-base"
-            style={{ 
-              background: isPending || (isParticipant && selectedCount < SUBMIT_MIN) 
-                ? "hsl(var(--profile-text-muted))" 
+            style={{
+              background: isPending || (isParticipant && selectedCount < SUBMIT_MIN)
+                ? "hsl(var(--profile-text-muted))"
                 : "hsl(var(--profile-primary))",
               color: "white",
             }}
@@ -151,21 +151,21 @@ export function TeamSelectForm({ submitAction, myChoice, isParticipant, eligible
           </button>
         </div>
         {isParticipant && selectedCount < SUBMIT_MIN && (
-          <p 
+          <p
             className="text-center text-xs sm:text-sm font-semibold mt-2"
             style={{ color: "hsl(var(--profile-danger))" }}
           >
             Select at least {SUBMIT_MIN} teammates before submitting.
           </p>
         )}
-        <div 
+        <div
           className="rounded-xl p-4 border"
-          style={{ 
+          style={{
             background: "hsl(var(--profile-warning) / 0.05)",
             borderColor: "hsl(var(--profile-warning) / 0.2)"
           }}
         >
-          <p 
+          <p
             className="text-xs sm:text-sm leading-relaxed"
             style={{ color: "hsl(var(--profile-text-secondary))" }}
           >
