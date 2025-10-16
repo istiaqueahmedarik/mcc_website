@@ -38,11 +38,20 @@ const nextConfig = {
     },
   },
   reactStrictMode: true,
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
     };
+
+    // Ignore @diplodoc/cut-extension modules
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@diplodoc/cut-extension': false,
+      '@diplodoc/cut-extension/runtime': false,
+      '@diplodoc/cut-extension/runtime/styles.css': false,
+    };
+
     return config;
   },
 };

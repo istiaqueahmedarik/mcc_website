@@ -16,11 +16,18 @@ export default async function Page({ params }) {
   const res = await getCollectionPublicByToken(token);
   if (res?.error)
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="bg-card rounded-3xl shadow-lg border border-border p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div 
+        className="min-h-screen flex items-center justify-center p-4 sm:p-6"
+        style={{ background: "hsl(var(--profile-bg))" }}
+      >
+        <div className="profile-card max-w-md w-full text-center">
+          <div 
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6"
+            style={{ background: "hsl(var(--profile-danger) / 0.1)" }}
+          >
             <svg
-              className="w-8 h-8 text-destructive"
+              className="w-10 h-10"
+              style={{ color: "hsl(var(--profile-danger))" }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -33,10 +40,13 @@ export default async function Page({ params }) {
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-card-foreground mb-2">
+          <h2 
+            className="text-2xl font-bold mb-3"
+            style={{ color: "hsl(var(--profile-text))" }}
+          >
             Invalid Link
           </h2>
-          <p className="text-muted-foreground">
+          <p style={{ color: "hsl(var(--profile-text-muted))" }}>
             This team selection link is invalid or has expired.
           </p>
         </div>
@@ -99,9 +109,21 @@ export default async function Page({ params }) {
   }
 
   const getStatusColor = () => {
-    if (col.finalized) return "bg-accent/10 text-accent border-accent/20";
-    if (col.is_open) return "bg-primary/10 text-primary border-primary/20";
-    return "bg-muted text-muted-foreground border-border";
+    if (col.finalized) return "hsl(var(--profile-success))";
+    if (col.is_open) return "hsl(var(--profile-primary))";
+    return "hsl(var(--profile-text-muted))";
+  };
+
+  const getStatusBg = () => {
+    if (col.finalized) return "hsl(var(--profile-success) / 0.1)";
+    if (col.is_open) return "hsl(var(--profile-primary) / 0.1)";
+    return "hsl(var(--profile-surface-2))";
+  };
+
+  const getStatusBorder = () => {
+    if (col.finalized) return "hsl(var(--profile-success) / 0.3)";
+    if (col.is_open) return "hsl(var(--profile-primary) / 0.3)";
+    return "hsl(var(--profile-border))";
   };
 
   const getStatusIcon = () => {
@@ -158,11 +180,21 @@ export default async function Page({ params }) {
   const PhaseBanner = () => {
     if (phase === 1) {
       return (
-        <div className="bg-accent border border-border rounded-2xl p-6 mb-8">
+        <div 
+          className="rounded-2xl p-6 mb-6 border transition-all duration-300 hover:shadow-md"
+          style={{ 
+            background: "hsl(var(--profile-primary) / 0.05)",
+            borderColor: "hsl(var(--profile-primary) / 0.2)"
+          }}
+        >
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <div 
+              className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-105"
+              style={{ background: "hsl(var(--profile-primary) / 0.15)" }}
+            >
               <svg
-                className="w-6 h-6 text-blue-600"
+                className="w-7 h-7"
+                style={{ color: "hsl(var(--profile-primary))" }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -175,11 +207,17 @@ export default async function Page({ params }) {
                 />
               </svg>
             </div>
-            <div>
-              <h3 className="font-semibold text-primary mb-1">
+            <div className="flex-1">
+              <h3 
+                className="text-lg font-semibold mb-2"
+                style={{ color: "hsl(var(--profile-text))" }}
+              >
                 Participation Phase In Progress
               </h3>
-              <p className="text-sm text-blue-700 leading-relaxed mb-3">
+              <p 
+                className="text-sm leading-relaxed mb-3"
+                style={{ color: "hsl(var(--profile-text-secondary))" }}
+              >
                 Admin has not started team selection yet. Toggle your
                 participation from your profile page. Once Phase 2 starts, you
                 can submit team preferences here.
@@ -190,7 +228,7 @@ export default async function Page({ params }) {
                     iso={col.phase1_deadline}
                     mode="participation"
                   />
-                  <span className="text-blue-700/70">
+                  <span style={{ color: "hsl(var(--profile-text-muted))" }}>
                     Ends {new Date(col.phase1_deadline).toLocaleString()}
                   </span>
                 </div>
@@ -202,11 +240,21 @@ export default async function Page({ params }) {
     }
     if (phase === 2 && !isParticipant) {
       return (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8">
+        <div 
+          className="rounded-2xl p-6 mb-6 border transition-all duration-300 hover:shadow-md"
+          style={{ 
+            background: "hsl(var(--profile-warning) / 0.05)",
+            borderColor: "hsl(var(--profile-warning) / 0.2)"
+          }}
+        >
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <div 
+              className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-105"
+              style={{ background: "hsl(var(--profile-warning) / 0.15)" }}
+            >
               <svg
-                className="w-6 h-6 text-amber-600"
+                className="w-7 h-7"
+                style={{ color: "hsl(var(--profile-warning))" }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -219,11 +267,17 @@ export default async function Page({ params }) {
                 />
               </svg>
             </div>
-            <div>
-              <h3 className="font-semibold text-amber-800 mb-1">
+            <div className="flex-1">
+              <h3 
+                className="text-lg font-semibold mb-2"
+                style={{ color: "hsl(var(--profile-text))" }}
+              >
                 You Are Not Participating
               </h3>
-              <p className="text-sm text-amber-700 leading-relaxed">
+              <p 
+                className="text-sm leading-relaxed"
+                style={{ color: "hsl(var(--profile-text-secondary))" }}
+              >
                 You did not opt into this contest before selection began. You
                 can view information but cannot submit choices.
               </p>
@@ -234,11 +288,21 @@ export default async function Page({ params }) {
     }
     if (phase === 2 && isParticipant && !col.is_open && !col.finalized) {
       return (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-8">
+        <div 
+          className="rounded-2xl p-6 mb-6 border transition-all duration-300 hover:shadow-md"
+          style={{ 
+            background: "hsl(var(--profile-warning) / 0.05)",
+            borderColor: "hsl(var(--profile-warning) / 0.2)"
+          }}
+        >
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+            <div 
+              className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-105"
+              style={{ background: "hsl(var(--profile-warning) / 0.15)" }}
+            >
               <svg
-                className="w-6 h-6 text-amber-600"
+                className="w-7 h-7"
+                style={{ color: "hsl(var(--profile-warning))" }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -251,11 +315,17 @@ export default async function Page({ params }) {
                 />
               </svg>
             </div>
-            <div>
-              <h3 className="font-semibold text-amber-800 mb-1">
+            <div className="flex-1">
+              <h3 
+                className="text-lg font-semibold mb-2"
+                style={{ color: "hsl(var(--profile-text))" }}
+              >
                 Selection Paused
               </h3>
-              <p className="text-sm text-amber-700 leading-relaxed">
+              <p 
+                className="text-sm leading-relaxed"
+                style={{ color: "hsl(var(--profile-text-secondary))" }}
+              >
                 Admin temporarily closed submissions. Your existing preferences
                 are saved.
               </p>
@@ -271,19 +341,52 @@ export default async function Page({ params }) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4 text-balance">
+    <div 
+      className="min-h-screen"
+      style={{ background: "hsl(var(--profile-bg))" }}
+    >
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+        {/* Header Section */}
+        <div className="text-center mb-8 sm:mb-12">
+          <div className="inline-block mb-4">
+            <div 
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center mx-auto transition-transform duration-300 hover:scale-105"
+              style={{ background: "hsl(var(--profile-primary) / 0.1)" }}
+            >
+              <svg 
+                className="w-8 h-8 sm:w-10 sm:h-10"
+                style={{ color: "hsl(var(--profile-primary))" }}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+          </div>
+          
+          <h1 
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 transition-colors duration-200"
+            style={{ color: "hsl(var(--profile-text))" }}
+          >
             Team Selection
           </h1>
-          <p className="text-xl text-muted-foreground mb-6">
+          
+          <p 
+            className="text-lg sm:text-xl mb-6 max-w-2xl mx-auto"
+            style={{ color: "hsl(var(--profile-text-secondary))" }}
+          >
             {col.title || "Room"}
           </p>
 
           {/* Status Badge */}
           <div
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium ${getStatusColor()}`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-semibold transition-all duration-300 hover:scale-105"
+            style={{
+              background: getStatusBg(),
+              color: getStatusColor(),
+              borderColor: getStatusBorder(),
+            }}
           >
             {getStatusIcon()}
             {col.finalized
@@ -298,11 +401,15 @@ export default async function Page({ params }) {
 
         {/* Current Submission Display */}
         {myChoice && (
-          <div className="bg-card border border-border rounded-3xl p-8 mb-8 shadow-sm">
+          <div className="profile-card mb-6 sm:mb-8 transition-all duration-300 hover:shadow-lg">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <div 
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 hover:scale-110"
+                style={{ background: "hsl(var(--profile-success) / 0.15)" }}
+              >
                 <svg
-                  className="w-6 h-6 text-primary"
+                  className="w-6 h-6 sm:w-7 sm:h-7"
+                  style={{ color: "hsl(var(--profile-success))" }}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -315,21 +422,36 @@ export default async function Page({ params }) {
                   />
                 </svg>
               </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-card-foreground mb-4">
+              <div className="flex-1 min-w-0">
+                <h3 
+                  className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6"
+                  style={{ color: "hsl(var(--profile-text))" }}
+                >
                   Your Current Submission
                 </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground min-w-[100px]">
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    <span 
+                      className="text-sm font-semibold min-w-[110px]"
+                      style={{ color: "hsl(var(--profile-text-secondary))" }}
+                    >
                       Team Title:
                     </span>
-                    <span className="font-semibold text-card-foreground bg-primary/5 px-3 py-1 rounded-full text-sm">
+                    <span 
+                      className="font-bold px-4 py-2 rounded-xl text-sm sm:text-base break-all"
+                      style={{ 
+                        background: "hsl(var(--profile-primary) / 0.1)",
+                        color: "hsl(var(--profile-primary))"
+                      }}
+                    >
                       {myChoice.team_title}
                     </span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <span className="text-sm font-medium text-muted-foreground min-w-[100px] mt-1">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3">
+                    <span 
+                      className="text-sm font-semibold min-w-[110px] mt-1"
+                      style={{ color: "hsl(var(--profile-text-secondary))" }}
+                    >
                       Choices:
                     </span>
                     <div className="flex flex-wrap gap-2">
@@ -337,7 +459,12 @@ export default async function Page({ params }) {
                         ? myChoice.ordered_choices.map((choice, index) => (
                             <span
                               key={choice}
-                              className="bg-secondary/10 text-primary px-3 py-1 rounded-full text-sm font-medium"
+                              className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 hover:scale-105"
+                              style={{ 
+                                background: "hsl(var(--profile-surface-2))",
+                                color: "hsl(var(--profile-primary))",
+                                border: "1px solid hsl(var(--profile-border))"
+                              }}
                             >
                               {index + 1}. {choice}
                             </span>
@@ -346,7 +473,13 @@ export default async function Page({ params }) {
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-4 bg-muted/50 px-4 py-2 rounded-xl">
+                <p 
+                  className="text-xs sm:text-sm mt-4 sm:mt-6 px-4 py-3 rounded-xl"
+                  style={{ 
+                    background: "hsl(var(--profile-surface-2))",
+                    color: "hsl(var(--profile-text-muted))"
+                  }}
+                >
                   💡 You can resubmit to update your choices while the
                   collection remains open.
                 </p>
@@ -370,7 +503,10 @@ export default async function Page({ params }) {
           />
         )}
         {phase === 2 && isParticipant && !col.is_open && !col.finalized && (
-          <p className="text-center text-sm text-muted-foreground">
+          <p 
+            className="text-center text-sm"
+            style={{ color: "hsl(var(--profile-text-muted))" }}
+          >
             Waiting for admin to reopen or finalize.
           </p>
         )}

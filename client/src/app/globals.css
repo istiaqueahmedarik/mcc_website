@@ -15,8 +15,8 @@
     --profile-success: 142 71% 45%;
     --profile-warning: 38 92% 50%;
     --profile-danger: 0 84% 60%;
-    --profile-border: 0 0% 0% / 0.08;
-    --profile-ring: 263 70% 62% / 0.45;
+    --profile-border: 220 13% 91%;
+    --profile-ring: 263 70% 62%;
 
     /* Profile spacing and visual tokens */
     --profile-radius-sm: 8px;
@@ -95,8 +95,8 @@
     --profile-success: 142 76% 36%;
     --profile-warning: 38 92% 50%;
     --profile-danger: 0 72% 51%;
-    --profile-border: 255 255% 255% / 0.08;
-    --profile-ring: 263 72% 68% / 0.6;
+    --profile-border: 240 3.7% 15.9%;
+    --profile-ring: 263 72% 68%;
     --profile-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 
     --background: 0 0% 3.9%;
@@ -594,9 +594,9 @@
 /* Profile Design System Utility Classes */
 .profile-card {
   background: hsl(var(--profile-surface-1));
-  border: 1px solid hsl(var(--profile-border));
+  border: 1px solid hsl(var(--profile-border) / 0.3);
   border-radius: var(--profile-radius-lg);
-  box-shadow: var(--profile-shadow), 0 0 0 1px hsl(var(--profile-border)) inset;
+  box-shadow: var(--profile-shadow);
   padding: 24px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   transform: translateY(0) scale(1);
