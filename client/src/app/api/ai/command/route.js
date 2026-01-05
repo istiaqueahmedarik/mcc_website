@@ -1,6 +1,5 @@
 import { google } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { convertToCoreMessages, streamText } from 'ai';
+import { convertToModelMessages, streamText } from 'ai';
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
@@ -14,7 +13,7 @@ export async function POST(req) {
   try {
     const result = await streamText({
       maxTokens: 2048,
-      messages: convertToCoreMessages(messages),
+      messages: convertToModelMessages(messages),
       model: google('gemini-2.0-flash-exp'),
       system: system,
     });
