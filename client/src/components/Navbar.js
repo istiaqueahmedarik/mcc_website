@@ -19,28 +19,22 @@ import { get_with_token } from "@/lib/action";
 import {
   AlertTriangle,
   Award,
-  Backpack,
-  BookOpen,
-  BrainCircuit,
   CalendarClock,
   ChartNoAxesCombined,
   Code,
-  Coffee,
   Globe,
   LogIn,
   Menu,
-  SheetIcon,
+  Settings,
   ShieldHalf,
   UserCheck,
   UserPlus,
-  LaptopMinimalIcon,
-  Users,
+  Users
 } from "lucide-react";
-import { Link } from "next-view-transitions";
 import { cookies } from "next/headers";
 import MccLogo from "./IconChanger/MccLogo";
-import ThemeChanger from "./ThemeChanger";
 import ProgressLink from "./ProgressLink";
+import ThemeChanger from "./ThemeChanger";
 
 const Navbar = async () => {
   const navItems = [
@@ -61,7 +55,7 @@ const Navbar = async () => {
   ]
 
   const adminTools = [
-    { href: '/admin', icon: SheetIcon, label: 'CMS' },
+    { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
@@ -111,7 +105,7 @@ const Navbar = async () => {
               ))}
             {user && user.result && user.result[0].admin && (
               <DropdownMenu>
-                <DropdownMenuTrigger className="flex flex-row items-center gpa-2">
+                <DropdownMenuTrigger className="flex flex-row items-center gap-2">
                   {" "}
                   <ShieldHalf className="w-4 h-4 mr-2" /> Admin
                 </DropdownMenuTrigger>

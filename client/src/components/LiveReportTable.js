@@ -41,8 +41,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useEffect, useState } from "react";
-import { ScrollArea } from "./ui/scroll-area";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 
 function ReportTable({ merged, lastUpdated }) {
   const users = useMemo(() => {
@@ -156,7 +156,7 @@ function ReportTable({ merged, lastUpdated }) {
   };
 
   return (
-    <Card className="overflow-hidden     border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-lg">
+    <Card className="overflow-hidden border border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-lg">
       <CardHeader className="relative bg-gradient-to-r from-[hsl(var(--primary)/0.1)] to-[hsl(var(--primary)/0.05)] pb-2">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
@@ -295,9 +295,10 @@ function ReportTable({ merged, lastUpdated }) {
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="w-full overflow-x-auto whitespace-nowrap rounded-md border">
-          <Table>
-            <TableHeader className="bg-[hsl(var(--muted)/0.5)]">
+        <ScrollArea className="w-full">
+          <div className="min-w-max">
+            <Table className="w-full">
+              <TableHeader className="bg-[hsl(var(--muted)/0.5)]">
               <TableRow className="hover:bg-[hsl(var(--muted)/0.6)] transition-colors">
                 <TableHead className="w-[60px] text-[hsl(var(--foreground))]">
                   Rank
@@ -698,6 +699,8 @@ function ReportTable({ merged, lastUpdated }) {
               })}
             </TableBody>
           </Table>
+          </div>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>
     </Card>

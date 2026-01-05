@@ -1,18 +1,49 @@
-import * as XLSX from "xlsx";
+import * as ExcelJS from "exceljs";
 
 export function exportToExcel(data, filename = "export", sheetName = "Sheet1") {
     try {
         // Create a new workbook
-        const workbook = XLSX.utils.book_new();
+        const workbook = new ExcelJS.Workbook();
+        
+        // Add a worksheet
+        const worksheet = workbook.addWorksheet(sheetName);
 
-        // Convert data to worksheet
-        const worksheet = XLSX.utils.json_to_sheet(data);
+        if (data && data.length > 0) {
+            // Add headers
+            const headers = Object.keys(data[0]);
+            worksheet.addRow(headers);
 
-        // Add the worksheet to the workbook
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            // Add data rows
+            data.forEach(row => {
+                const values = headers.map(header => row[header]);
+                worksheet.addRow(values);
+            });
+
+            // Style the header row
+            const headerRow = worksheet.getRow(1);
+            headerRow.font = { bold: true };
+            headerRow.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0E0E0' }
+            };
+        }
 
         // Generate Excel file and trigger download
-        XLSX.writeFile(workbook, `${filename}.xlsx`);
+        workbook.xlsx.writeBuffer().then(buffer => {
+            const blob = new Blob([buffer], { 
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${filename}.xlsx`);
+            link.style.visibility = "hidden";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
 
         return true;
     } catch (error) {

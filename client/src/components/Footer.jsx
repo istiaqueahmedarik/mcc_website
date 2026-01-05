@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import MccLogo from '@/components/IconChanger/MccLogo'
-import { Github, Mail, Linkedin, Globe2 } from 'lucide-react'
+import { Github, Linkedin, Mail, MessageSquare } from 'lucide-react'
+import Link from 'next/link'
 
 const links = {
   explore: [
@@ -33,10 +33,10 @@ export default function Footer() {
             Empowering programmers through contests, collaboration & continuous learning.
           </p>
           <div className="flex gap-3 mt-2">
-            <a href="#" aria-label="GitHub" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Github className="h-4 w-4" /></a>
-            <a href="mailto:club@example.com" aria-label="Email" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Mail className="h-4 w-4" /></a>
-            <a href="#" aria-label="LinkedIn" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Linkedin className="h-4 w-4" /></a>
-            <a href="#" aria-label="Website" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Globe2 className="h-4 w-4" /></a>
+            <a href="https://github.com/mistcomputerclub" aria-label="GitHub" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Github className="h-4 w-4" /></a>
+            <a href="mailto:computerclubmist@gmail.com" aria-label="Email" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Mail className="h-4 w-4" /></a>
+            <a href="https://www.linkedin.com/company/mistcomputerclub" aria-label="LinkedIn" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><Linkedin className="h-4 w-4" /></a>
+            <a href="https://discord.gg/NXnnA4aNqU" aria-label="Discord" className="p-2 rounded-md border border-border/60 hover:bg-primary/10 transition-colors"><MessageSquare className="h-4 w-4" /></a>
           </div>
         </div>
 

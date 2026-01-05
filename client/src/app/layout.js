@@ -2,7 +2,6 @@ import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import localFont from "next/font/local";
-import { unstable_ViewTransition as ViewTransition } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -41,32 +40,30 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <ViewTransition>
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <link rel="icon" href="/favicon.ico" sizes="any" />
-          <link rel="icon" href="/mccLogo.png" type="image/png" />
-          <link rel="apple-touch-icon" href="/mccLogo.png" />
-          <link rel="manifest" href="/site.webmanifest" />
-          <meta name="theme-color" content="#1e40af" />
-        </head>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} ${Ubuntu_Medium.className} font-[--font-ubuntu-medium]`}
-          cz-shortcut-listen="true"
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/mccLogo.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/mccLogo.png" />
+        <link rel="manifest" href="/site.webmanifest" />
+        <meta name="theme-color" content="#1e40af" />
+      </head>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${Ubuntu_Medium.className} font-[--font-ubuntu-medium]`}
+        cz-shortcut-listen="true"
+      >
+        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
         >
-          <Toaster />
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <Navbar />
-            {children}
-            <Footer />
-          </ThemeProvider>
-        </body>
-      </html>
-    </ViewTransition>
+          <Navbar />
+          {children}
+          <Footer />
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }

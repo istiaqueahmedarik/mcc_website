@@ -1,28 +1,28 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { motion, useScroll } from "framer-motion";
 import AchievementPage from "@/components/achievements/AchievmentPage";
 import MccLogo from "@/components/IconChanger/MccLogo";
+import StatsCounter from "@/components/landing/StatsCounter";
 import { Button } from "@/components/ui/button";
 import MagicButton from "@/components/ui/MagicButton";
 import { Spotlight } from "@/components/ui/Spotlight";
 import { TextGenerateEffect } from "@/components/ui/TextGenEffect";
+import { motion, useScroll } from "framer-motion";
 import {
-  MoveRight,
-  Target,
+  Award,
+  BarChart3,
+  Bell,
   Database,
+  LineChart,
+  MoveRight,
   PlayCircle,
+  Target,
   Trophy,
   Users,
-  BarChart3,
-  Award,
-  Bell,
-  LineChart,
 } from "lucide-react";
 import Link from "next/link";
-import StatsCounter from "@/components/landing/StatsCounter";
 import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 
 export default function Home() {
   const [cms, setCms] = React.useState(null);
@@ -31,18 +31,25 @@ export default function Home() {
 
   // Function to scroll to stats section
   const scrollToStats = () => {
-    const statsSection = document.getElementById("stats-section");
-    if (statsSection) {
-      statsSection.scrollIntoView({ behavior: "smooth" });
+    if (typeof window !== "undefined") {
+      const statsSection = document.getElementById("stats-section");
+      if (statsSection) {
+        statsSection.scrollIntoView({ behavior: "smooth" });
+      }
     }
   };
-  const joinNowDestination = useMemo(() => {
-    const token = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("token="));
+  
+  const [joinNowDestination, setJoinNowDestination] = useState("/login");
 
-    if (!token) return "/login";
-    return "/courses";
+  useEffect(() => {
+    // Check for token only on client side
+    if (typeof window !== "undefined") {
+      const token = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("token="));
+      
+      setJoinNowDestination(token ? "/courses" : "/login");
+    }
   }, []);
 
   React.useEffect(() => {
