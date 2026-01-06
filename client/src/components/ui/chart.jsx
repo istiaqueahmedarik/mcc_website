@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react"
-import * as RechartsPrimitive from "recharts"
+import { ResponsiveContainer, Tooltip, Legend } from "recharts"
 
 import { cn } from "@/lib/utils"
 
@@ -37,9 +37,9 @@ const ChartContainer = React.forwardRef(({ id, className, children, config, ...p
         )}
         {...props}>
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
+        <ResponsiveContainer>
           {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        </ResponsiveContainer>
       </div>
     </ChartContext.Provider>
   );
@@ -77,7 +77,7 @@ return color ? `  --color-${key}: ${color};` : null
   );
 }
 
-const ChartTooltip = RechartsPrimitive.Tooltip
+const ChartTooltip = Tooltip
 
 const ChartTooltipContent = React.forwardRef((
   {
@@ -214,7 +214,7 @@ const ChartTooltipContent = React.forwardRef((
 })
 ChartTooltipContent.displayName = "ChartTooltip"
 
-const ChartLegend = RechartsPrimitive.Legend
+const ChartLegend = Legend
 
 const ChartLegendContent = React.forwardRef((
   { className, hideIcon = false, payload, verticalAlign = "bottom", nameKey },

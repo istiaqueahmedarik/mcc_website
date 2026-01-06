@@ -31,6 +31,16 @@ const nextConfig = {
     },
     viewTransition: true,
     // ppr: 'incremental',
+    optimizePackageImports: [
+      '@gravity-ui/uikit',
+      '@gravity-ui/markdown-editor',
+      'lucide-react',
+      'recharts',
+      '@udecode/plate',
+      'react-icons',
+      '@radix-ui/react-icons',
+      'date-fns',
+    ],
   },
   turbopack: {
     resolveAlias: {

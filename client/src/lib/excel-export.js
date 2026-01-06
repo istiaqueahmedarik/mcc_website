@@ -1,7 +1,8 @@
-import * as ExcelJS from "exceljs";
-
-export function exportToExcel(data, filename = "export", sheetName = "Sheet1") {
+export async function exportToExcel(data, filename = "export", sheetName = "Sheet1") {
     try {
+        // Dynamic import to reduce bundle size
+        const ExcelJS = await import("exceljs");
+        
         // Create a new workbook
         const workbook = new ExcelJS.Workbook();
         

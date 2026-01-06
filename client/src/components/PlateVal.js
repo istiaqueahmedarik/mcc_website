@@ -1,28 +1,23 @@
+/**
+ * DISABLED: This component has missing dependencies:
+ * - ./editor/use-create-editor (file doesn't exist)
+ * - @/components/plate-ui/editor (directory doesn't exist)
+ * 
+ * This was causing build memory issues. Re-enable once dependencies are created.
+ */
+
 'use client'
 import React from 'react'
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
-import { Plate } from '@udecode/plate/react';
-import { Editor, EditorContainer } from '@/components/plate-ui/editor';
-import { useCreateEditor } from './editor/use-create-editor';
+
+// Placeholder component until plate-ui is properly set up
 function PlateVal({ value }) {
-    const editor = useCreateEditor(
-        {
-            value: value,
-            readonly: true,
-        }
-        
-      );
-    
+  console.warn('PlateVal: Component disabled - missing plate-ui dependencies');
   return (
-      <div>
-                          <Plate editor={editor}>
-                            <EditorContainer>
-                              <Editor variant="default" />
-                            </EditorContainer>
-                          </Plate>
+    <div className="p-4 border rounded bg-muted">
+      <p className="text-muted-foreground">Rich text viewer not available</p>
+      {typeof value === 'string' && <pre className="mt-2 text-sm">{value}</pre>}
     </div>
-  )
+  );
 }
 
 export default PlateVal

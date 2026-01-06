@@ -32,10 +32,13 @@ export const metadata = {
     apple: '/mcc.png',
   },
   manifest: '/site.webmanifest',
-  themeColor: '#1e40af',
   other: {
     'msapplication-TileColor': '#1e40af',
   },
+};
+
+export const viewport = {
+  themeColor: '#1e40af',
 };
 
 export default function RootLayout({ children }) {

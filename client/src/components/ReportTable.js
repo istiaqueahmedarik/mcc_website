@@ -9,7 +9,6 @@ import { X, AlertCircle, Search, Users2, CheckCheck, TrendingUp, TrendingDown, M
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import LiveShareModal from "./LiveShareModal"
 import { ScrollArea } from "./ui/scroll-area"
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -306,6 +305,9 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     }
 
     const exportToPDF = async () => {
+        // Dynamic import to reduce bundle size
+        const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+        
         const headers = [
             "Rank",
             "Username",

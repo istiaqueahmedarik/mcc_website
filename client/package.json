@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "build": "next build  --experimental-debug-memory-usage",
     "start": "next start",
     "lint": "next lint"
   },
