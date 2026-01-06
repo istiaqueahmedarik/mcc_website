@@ -8,8 +8,8 @@
     "os": false
   },
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build  --experimental-debug-memory-usage",
+    "dev": "next dev ",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
