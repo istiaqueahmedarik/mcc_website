@@ -23,7 +23,7 @@ export const post = cache(async (url, data) => {
     {
       cache: "force-cache",
     },
-    { next: { revalidate: 30000 } }
+    { next: { revalidate: 900 } }
   );
   try {
     const json = await response.json();
@@ -51,7 +51,7 @@ export const get = cache(async (url) => {
       cache: "force-cache",
     },
 
-    { next: { revalidate: 60000 } },
+    { next: { revalidate: 900 } },
   )
   try {
     const json = await response.json();
@@ -80,7 +80,7 @@ export const get_with_token = cache(async (url) => {
     {
       cache: "force-cache",
     },
-    { next: { revalidate: 30000 } }
+    { next: { revalidate: 900 } }
   );
   try {
     const json = await response.json();
@@ -112,7 +112,7 @@ export const post_with_token = cache(async (url, data) => {
     {
       cache: "force-cache",
     },
-    { next: { revalidate: 30000 } }
+    { next: { revalidate: 900 } }
   );
   try {
     const json = await response.json();

@@ -10,6 +10,7 @@ const supHost = (() => {
 })();
 
 const nextConfig = {
+  
   images: {
     remotePatterns: [
       ...(process.env.HOST_NAME
@@ -26,6 +27,7 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
   },
   experimental: {
+    webpackMemoryOptimizations: true,
     serverActions: {
       bodySizeLimit: "10mb",
     },

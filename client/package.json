@@ -8,8 +8,8 @@
     "os": false
   },
   "scripts": {
-    "dev": "next dev ",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
   },
@@ -139,6 +139,7 @@
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
     "shadcn": "^2.4.0-canary.17",
+    "sharp": "^0.34.5",
     "sonner": "^2.0.1",
     "tailwind-merge": "^2.6.0",
     "tailwind-scrollbar-hide": "^2.0.0",
