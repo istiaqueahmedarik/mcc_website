@@ -1,0 +1,34 @@
+name: Pull Request Workflow
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js for client
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24.x'
+
+      - name: Install client dependencies
+        run: npm install
+        working-directory: ./client
+
+      - name: Build client
+        run: npm run build
+        working-directory: ./client
+
+      - name: Set up Bun for server
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install server dependencies
+        run: bun install
+        working-directory: ./server
