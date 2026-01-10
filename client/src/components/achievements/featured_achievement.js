@@ -5,22 +5,22 @@ import ProgressLink from "@/components/ProgressLink";
 
 export default function FeaturedAchievement( { featuredAchievement}) {
     return (
-        <div className="w-full max-w-6xl relative">
+        <div className="w-full">
             <div className="relative h-[350px] md:h-[450px] rounded-3xl overflow-hidden group shadow-2xl">
                 
-                <div className="absolute inset-0">
+                <div className="absolute inset-0 bg-muted">
                     <Image
                         key={featuredAchievement.id}
                         src={featuredAchievement.image || "/vjudge_cover.png"}
                         alt={featuredAchievement.title || "Achievement"}
                         fill
-                        className="object-cover transition-all duration-1000 ease-in-out"
+                        className="object-contain transition-all duration-300 ease-in-out group-hover:blur-sm"
                         priority
                     />
                     <div className="absolute inset-0 bg-black/30" />
                 </div>
                 
-                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 z-10">
+                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="max-w-4xl">
                         
                         <div className="flex items-center gap-2 mb-3">

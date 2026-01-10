@@ -8,12 +8,13 @@ export default function AchievementPage() {
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [resetKey, setResetKey] = useState(true);
 
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
         const data = await getAchievements();
-        setAchievements(data.slice(0, 15) || []);
+        setAchievements(data.slice(0, 12) || []);
         console.log("achi: ", data);
       } catch (error) {
         console.error("Error fetching achievements:", error);
@@ -32,7 +33,7 @@ export default function AchievementPage() {
       setFeaturedIndex((prev) => (prev + 1) % achievements.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [achievements.length]);
+  }, [achievements.length, resetKey]);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -44,12 +45,20 @@ export default function AchievementPage() {
 
   const featuredAchievement = achievements[featuredIndex];
 
+  const resetTimer = () => {
+    setResetKey((prev) => !prev);
+  };
+
   return (
     <div className="w-full flex flex-col items-center justify-center gap-10">
       
       <FeaturedAchievement featuredAchievement={featuredAchievement}/>
 
-      <LandingAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} />
+      <p className="text-gray-400 text-lg tracking-wide">
+        Hover or tap to view details
+      </p>
+
+      <LandingAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} resetTimer={resetTimer} />
     </div>
   );
 }

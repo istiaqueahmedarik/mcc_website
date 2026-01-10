@@ -5,21 +5,24 @@ import { format } from "date-fns";
 import ProgressLink from "@/components/ProgressLink";
 
 export default function LandingAchievements({
-    achievements, setFeaturedIndex, featuredIndex
+    achievements, setFeaturedIndex, featuredIndex, resetTimer
 }) {
     return (
-        <div className="w-full max-w-6xl">
+        <div className="w-full">
 
             <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
                 <Trophy className="w-6 h-6 text-primary" />
                 All Achievements
             </h3>
 
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {achievements.map((achievement, index) => (
                     <div
                         key={achievement.id}
-                        onClick={() => setFeaturedIndex(index)}
+                        onClick={() => {
+                            setFeaturedIndex(index);
+                            resetTimer();
+                        }}
                         className={cn(
                             "group relative h-40 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300",
                             featuredIndex === index
@@ -28,12 +31,12 @@ export default function LandingAchievements({
                         )}
                     >
 
-                        <div className="absolute inset-0">
+                        <div className="absolute inset-0 bg-muted">
                             <Image
                                 src={achievement.image || "/vjudge_cover.png"}
                                 alt={achievement.title || "Achievement"}
                                 fill
-                                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                className="object-contain group-hover:scale-110 transition-transform duration-500"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                         </div>
