@@ -421,14 +421,14 @@ export default function Home() {
       </section>
 
       {/* Achievements Preview */}
-      <section className="w-full max-w-7xl px-4 py-16 bg-primary/5 rounded-2xl">
+      <section className="w-full max-w-7xl px-4 py-16 rounded-2xl">
         <h2 className="uppercase text-3xl md:text-4xl font-bold tracking-wider mb-8 text-center">
           Our Achievements
         </h2>
         <div className="flex flex-col items-center">
           <AchievementPage />
-          <Link href="/achievements" className="mt-4">
-            <Button>See more</Button>
+          <Link href="/achievements" className="mt-8">
+            <Button>See all</Button>
           </Link>
         </div>
       </section>

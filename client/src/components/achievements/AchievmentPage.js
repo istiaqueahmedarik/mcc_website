@@ -53,11 +53,6 @@ export default function AchievementPage() {
     <div className="w-full flex flex-col items-center justify-center gap-10">
       
       <FeaturedAchievement featuredAchievement={featuredAchievement}/>
-
-      <p className="text-gray-400 text-lg tracking-wide">
-        Hover or tap to view details
-      </p>
-
       <LandingAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} resetTimer={resetTimer} />
     </div>
   );

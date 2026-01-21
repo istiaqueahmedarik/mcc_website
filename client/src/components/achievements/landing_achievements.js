@@ -3,22 +3,26 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { format } from "date-fns";
 import ProgressLink from "@/components/ProgressLink";
+import { deleteAchievement } from "@/lib/action";
+import DeleteComp from "@/components/deleteComp";
+import { isAdminClient } from "@/lib/isAdmin";
 
 export default function LandingAchievements({
     achievements, setFeaturedIndex, featuredIndex, resetTimer
 }) {
+    const isAdmin = isAdminClient();
     return (
         <div className="w-full">
 
             <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
                 <Trophy className="w-6 h-6 text-primary" />
-                All Achievements
+                Recent Achievements
             </h3>
 
             <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {achievements.map((achievement, index) => (
                     <div
-                        key={achievement.id}
+                        key={index}
                         onClick={() => {
                             setFeaturedIndex(index);
                             resetTimer();
@@ -36,16 +40,18 @@ export default function LandingAchievements({
                                 src={achievement.image || "/vjudge_cover.png"}
                                 alt={achievement.title || "Achievement"}
                                 fill
-                                className="object-contain group-hover:scale-110 transition-transform duration-500"
+                                className="object-contain group-hover:scale-110 transition-transform duration-500 blur-[3px]"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                         </div>
 
                         <div className="absolute inset-0 p-4 flex flex-col justify-between">
-                            <h4 className="font-bold text-white line-clamp-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
-                                {achievement.title}
-                            </h4>
-
+                            <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-mono font-black text-white line-clamp-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] flex-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+                                    {achievement.title}
+                                </h4>
+                                {isAdmin && <DeleteComp delFunc={deleteAchievement} content={achievement} />}
+                            </div>
                             <div className="flex items-end justify-between">
                                 <div className="flex items-center gap-2">
                                     <Calendar className="w-3 h-3 text-white/70" />
