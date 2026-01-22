@@ -2,7 +2,7 @@
 import { getAchievements } from "@/lib/action";
 import { useEffect, useState } from "react";
 import FeaturedAchievement from '@/components/achievements/featured_achievement';
-import LandingAchievements from '@/components/achievements/landing_achievements';
+import MoreAchievements from '@/components/achievements/more_achievements';
 
 export default function AchievementPage() {
   const [achievements, setAchievements] = useState([]);
@@ -53,7 +53,7 @@ export default function AchievementPage() {
     <div className="w-full flex flex-col items-center justify-center gap-10">
       
       <FeaturedAchievement featuredAchievement={featuredAchievement}/>
-      <LandingAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} resetTimer={resetTimer} />
+      <MoreAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} resetTimer={resetTimer} />
     </div>
   );
 }
