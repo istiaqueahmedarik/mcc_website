@@ -6,9 +6,9 @@ import ProgressLink from "@/components/ProgressLink";
 export default function FeaturedAchievement( { featuredAchievement}) {
     return (
         <div className="w-full">
-            <div className="flex flex-row gap-8 rounded-3xl shadow-2xl border">
+            <div className="flex flex-col lg:flex-row gap-8 rounded-3xl shadow-2xl border">
                 
-                <div className="relative w-1/2 h-[450px] flex-shrink-0">
+                <div className="relative lg:w-1/2 h-[300px] lg:h-[450px] flex-shrink-0">
                     <Image
                         key={featuredAchievement.id}
                         src={featuredAchievement.image || "/vjudge_cover.png"}
@@ -19,8 +19,7 @@ export default function FeaturedAchievement( { featuredAchievement}) {
                     />
                 </div>
                 
-                {/* Content Section - Right Side */}
-                <div className="flex flex-col justify-between p-6 md:p-10 md:w-1/2">
+                <div className="flex flex-col justify-between p-6 md:p-10 lg:w-1/2">
                     <div className="flex items-center gap-2 mb-4">
                         <Calendar className="w-5 h-5 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">

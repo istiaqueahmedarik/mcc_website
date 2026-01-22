@@ -7,7 +7,7 @@ import { deleteAchievement } from "@/lib/action";
 import DeleteComp from "@/components/deleteComp";
 import { isAdminClient } from "@/lib/isAdmin";
 
-export default function LandingAchievements({
+export default function MoreAchievements({
     achievements, setFeaturedIndex, featuredIndex, resetTimer
 }) {
     const isAdmin = isAdminClient();
