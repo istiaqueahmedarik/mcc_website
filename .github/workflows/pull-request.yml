@@ -19,7 +19,7 @@ jobs:
           node-version: '24.x'
 
       - name: Install client dependencies
-        run: npm install
+        run: npm install --force
         working-directory: ./client
 
       - name: Build client
