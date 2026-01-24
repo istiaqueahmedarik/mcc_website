@@ -1,7 +1,7 @@
 "use server";
 
+import { get, get_with_token, post_with_token } from "@/lib/action";
 import { cookies } from "next/headers";
-import { post_with_token, get_with_token, get } from "@/lib/action";
 
 const API_URL = process.env.SERVER_URL || "http://localhost:5000";
 
@@ -121,7 +121,7 @@ export async function getContestStructuredRankWithDemerits(
   contestId,
   problemWeights
 ) {
-  const vjSession = (await cookies)().get("vj_session")?.value;
+  const vjSession = (await cookies()).get("vj_session")?.value;
   if (!vjSession) {
     return {
       status: "error",

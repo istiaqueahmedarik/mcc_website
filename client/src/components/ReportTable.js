@@ -1,18 +1,17 @@
 "use client"
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { useState, useMemo, useEffect } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { cn } from '@/lib/utils'
+import { AlertCircle, CheckCheck, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { X, AlertCircle, Search, Users2, CheckCheck, TrendingUp, TrendingDown, Minus } from "lucide-react"
-import { cn } from '@/lib/utils'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useMemo, useState } from "react"
 import LiveShareModal from "./LiveShareModal"
 import { ScrollArea } from "./ui/scroll-area"
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { Info } from "lucide-react"
 
 function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     const [searchText, setSearchText] = useState("")
@@ -709,13 +708,13 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                                 <TableCell>{u.totalContestsAttended}</TableCell>
                                 <TableCell>
                                     <p>
-                                        Solved - {u.effectiveTotalSolved.toFixed(2)}
+                                        Solved: {u.effectiveTotalSolved.toFixed(2)}
                                         {u.effectiveTotalSolved !== u.totalSolved && (
                                             <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
                                         )}
                                     </p>
                                     <p>
-                                        Penalty - {u.effectiveTotalPenalty.toFixed(2)}
+                                        Penalty: {u.effectiveTotalPenalty.toFixed(2)}
                                         {u.effectiveTotalPenalty !== u.totalPenalty && (
                                             <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
                                         )}
