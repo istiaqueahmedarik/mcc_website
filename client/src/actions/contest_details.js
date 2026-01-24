@@ -23,17 +23,17 @@ export async function loginToVJudge(email, pass) {
     const { jsessionid } = data;
 
     if (jsessionid) {
-      cookies().set("vj_session", jsessionid, {
+      (await cookies()).set("vj_session", jsessionid, {
         httpOnly: true,
         path: "/",
         sameSite: "lax",
       });
-      cookies().set("vj_session_username", email, {
+      (await cookies()).set("vj_session_username", email, {
         httpOnly: true,
         path: "/",
         sameSite: "lax",
       });
-      cookies().set("vj_session_password", pass, {
+      (await cookies()).set("vj_session_password", pass, {
         httpOnly: true,
         path: "/",
         sameSite: "lax",
@@ -48,15 +48,15 @@ export async function loginToVJudge(email, pass) {
 }
 
 export async function revalidateVJudgeSession() {
-  const username = cookies().get("vj_session_username")?.value;
-  const password = cookies().get("vj_session_password")?.value;
+  const username = (await cookies)().get("vj_session_username")?.value;
+  const password = (await cookies)().get("vj_session_password")?.value;
   if (!username || !password) return { status: "error" };
   await loginToVJudge(username, password);
   return { status: "success" };
 }
 
 export async function getContestStructuredRank(contestId, problemWeights) {
-  const vjSession = cookies().get("vj_session")?.value;
+  const vjSession = (await cookies)().get("vj_session")?.value;
   if (!vjSession) {
     return {
       status: "error",
@@ -81,7 +81,7 @@ export async function getContestStructuredRank(contestId, problemWeights) {
     if (!response.ok) {
       if (response.status === 401) {
         await revalidateVJudgeSession();
-        const newVjSession = cookies().get("vj_session")?.value;
+        const newVjSession = (await cookies)().get("vj_session")?.value;
         const retryResponse = await fetch(
           `${API_URL}/vjudge/contest-rank/${contestId}`,
           {
@@ -121,7 +121,7 @@ export async function getContestStructuredRankWithDemerits(
   contestId,
   problemWeights
 ) {
-  const vjSession = cookies().get("vj_session")?.value;
+  const vjSession = (await cookies)().get("vj_session")?.value;
   if (!vjSession) {
     return {
       status: "error",
@@ -147,7 +147,7 @@ export async function getContestStructuredRankWithDemerits(
     if (!response.ok) {
       if (response.status === 401) {
         await revalidateVJudgeSession();
-        const newVjSession = cookies().get("vj_session")?.value;
+        const newVjSession = (await cookies)().get("vj_session")?.value;
         const retryResponse = await fetch(
           `${API_URL}/vjudge/contest-rank/${contestId}`,
           {
