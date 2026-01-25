@@ -20,6 +20,7 @@ const Ubuntu_Medium = localFont({
 });
 
 export const metadata = {
+  metadataBase: new URL('https://computerclub.mist.ac.bd'),
   title: "MIST Computer Club",
   description:
     "MIST Computer Club is one of the finest clubs of MIST that is supervised by our experienced, cooperative and so many helpful faculty members",
@@ -32,6 +33,14 @@ export const metadata = {
     apple: '/mcc.png',
   },
   manifest: '/site.webmanifest',
+  openGraph: {
+    images: '/mccLogoBlack.png',
+    width: 1200,
+    height: 630,
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'MIST Computer Club',
+  },
   other: {
     'msapplication-TileColor': '#1e40af',
   },
