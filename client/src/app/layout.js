@@ -34,9 +34,9 @@ export const metadata = {
   },
   manifest: '/site.webmanifest',
   openGraph: {
-    images: '/mccLogoBlack.png',
+    images: '/og-image.png',
     width: 1200,
-    height: 630,
+    height: 600,
     type: 'website',
     locale: 'en_US',
     siteName: 'MIST Computer Club',
