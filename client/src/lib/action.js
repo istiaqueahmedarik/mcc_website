@@ -787,10 +787,10 @@ export async function isCourseIns(course_id) {
   return response.result;
 }
 
-export async function getAchievements() {
-  const response = await get("achieve/get_achievements");
-  if (response.error) return response.error;
-  return response.result;
+export async function getAchievements(limit, offset=0) {
+  const response = await get(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
+  if (response?.error) return response.error;
+  return response?.result;
 }
 
 export async function getAchievementsById(ach_id) {

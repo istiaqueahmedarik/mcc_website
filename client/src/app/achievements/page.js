@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 import { cookies } from 'next/headers'
 
 export default async function Achievements() {
-  const achievements = await getAchievements()
+  const achievements = await getAchievements(12)
   if (!Array.isArray(achievements) || achievements.length === 0) {
     return <></>
   }

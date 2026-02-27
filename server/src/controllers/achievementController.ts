@@ -82,14 +82,22 @@ export const deleteAchievement = async (c: any) => {
 }
 
 export const getAchievements = async (c: any) => {
+  const limit = c.req.query('limit') || '10'
+  const offset = c.req.query('offset') || '0'
   try {
-    const result = await sql`SELECT * FROM achievements ORDER BY date DESC`
-    return c.json({ result })
+    const result = await sql`
+      SELECT * FROM achievements
+      ORDER BY date DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `;
+
+    return c.json({ result });
   } catch (error) {
-    console.log('error: ', error)
-    return c.json({ error: 'error' }, 400)
+    console.log("error: ", error);
+    return c.json({ error: "error" }, 400);
   }
-}
+};
 
 export const getAchievement = async (c: any) => {
   const { id } = await c.req.json()

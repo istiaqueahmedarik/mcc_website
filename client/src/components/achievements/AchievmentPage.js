@@ -13,9 +13,8 @@ export default function AchievementPage() {
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
-        const data = await getAchievements();
-        setAchievements(data.slice(0, 12) || []);
-        console.log("achi: ", data);
+        const data = await getAchievements(12);
+        setAchievements(data);
       } catch (error) {
         console.error("Error fetching achievements:", error);
         setAchievements([]);
