@@ -87,7 +87,7 @@ export const getAchievements = async (c: any) => {
   try {
     const result = await sql`
       SELECT * FROM achievements
-      ORDER BY date DESC
+      ORDER BY date DESC, id DESC
       LIMIT ${limit}
       OFFSET ${offset}
     `;
@@ -104,6 +104,16 @@ export const getAchievement = async (c: any) => {
   try {
     const result = await sql`SELECT * FROM achievements WHERE id = ${id}`
     // console.log('result: ', result)
+    return c.json({ result })
+  } catch (error) {
+    console.log('error: ', error)
+    return c.json({ error: 'error' }, 400)
+  }
+}
+
+export const getAchievementNumber = async (c: any) => {
+  try {
+    const result = await sql`SELECT COUNT(*) FROM achievements`
     return c.json({ result })
   } catch (error) {
     console.log('error: ', error)

@@ -1,38 +1,51 @@
 import { deleteAchievement } from "@/lib/action";
 import { format } from "date-fns";
+import { CalendarDays, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import DeleteComp from "../deleteComp";
 import ProgressLink from "../ProgressLink";
 
 export default function AchievementCard({ achievement, isAdmin }) {
   return (
-    <div className="relative h-64 w-full rounded-2xl overflow-hidden group shadow-md">
+    <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden group shadow-lg ring-1 ring-white/10 bg-black">
+      {/* Image */}
       <Image
         src={achievement.image || "/vjudge_cover.png"}
         alt={achievement.title || "Achievement Photo"}
         fill
-        className="object-cover w-full h-full"
+        className="object-contain transition-transform duration-500 group-hover:scale-105"
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         priority
       />
-      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-all" />
+
+      {/* Gradient overlay — always present, stronger at bottom */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 transition-opacity duration-300 group-hover:from-black/90 group-hover:via-black/40" />
+
       {isAdmin && (
         <DeleteComp delFunc={deleteAchievement} content={achievement} />
       )}
-      <div className="absolute inset-0 flex flex-col justify-between p-4 z-10">
-        <div>
-          <h2 className="text-2xl font-bold text-white drop-shadow mb-2 truncate">
-            {achievement.title}
-          </h2>
-          <h4 className="drop-shadow mb-2 truncate">
-            {format(achievement.date, "dd MMM yyyy")}
-          </h4>
+
+      {/* Content */}
+      <div className="absolute inset-x-0 bottom-0 p-4 flex flex-col gap-2 z-10">
+        {/* Date */}
+        <div className="flex items-center gap-1.5 text-white/70 text-xs">
+          <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+          <span>{format(achievement.date, "dd MMM yyyy")}</span>
         </div>
-        <div className="flex justify-end">
+
+        {/* Title */}
+        <h2 className="text-base font-semibold text-white leading-snug line-clamp-2 drop-shadow">
+          {achievement.title}
+        </h2>
+
+        {/* CTA — slides in on hover */}
+        <div className="translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
           <ProgressLink
             href={`/achievements/${achievement.id}`}
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow"
+            className="flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white text-xs border border-white/20"
           >
-            View achievement
+            View Achievement
+            <ArrowRight className="w-3.5 h-3.5" />
           </ProgressLink>
         </div>
       </div>

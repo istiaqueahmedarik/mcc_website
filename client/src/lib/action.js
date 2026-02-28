@@ -801,6 +801,12 @@ export async function getAchievementsById(ach_id) {
   return response.result;
 }
 
+export async function getAchievementNumber() {
+  const response = await get("achieve/get_achievement_number");
+  if (response?.error) return response.error;
+  return response?.result?.[0]?.count;
+}
+
 export async function getContestResults(contestId, sessionId) {
   if (!contestId || isNaN(Number(contestId))) {
     throw new Error("Invalid contest ID");
