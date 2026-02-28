@@ -13,7 +13,6 @@ export default function InfiniteScrollAchievements({
     isAdmin,
 }) {
     const [achievements, setAchievements] = useState(initialAchievements)
-    const [offset, setOffset] = useState(initialAchievements.length)
     const [loading, setLoading] = useState(false)
     const [hasMore, setHasMore] = useState(
         initialAchievements.length < totalCount,
@@ -26,7 +25,7 @@ export default function InfiniteScrollAchievements({
     setLoading(true)
 
     try {
-        const currentOffset = achievements.length // ✅ ALWAYS correct
+        const currentOffset = achievements.length
 
         const more = await getAchievements(LIMIT, currentOffset)
 
@@ -75,7 +74,6 @@ export default function InfiniteScrollAchievements({
                 ))}
             </div>
 
-            {/* Sentinel element for IntersectionObserver */}
             <div ref={sentinelRef} className="h-1 w-full" />
 
             {loading && (

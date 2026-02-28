@@ -8,7 +8,7 @@ import ProgressLink from "../ProgressLink";
 export default function AchievementCard({ achievement, isAdmin }) {
   return (
     <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden group shadow-lg ring-1 ring-white/10 bg-black">
-      {/* Image */}
+      
       <Image
         src={achievement.image || "/vjudge_cover.png"}
         alt={achievement.title || "Achievement Photo"}
@@ -18,7 +18,6 @@ export default function AchievementCard({ achievement, isAdmin }) {
         priority
       />
 
-      {/* Gradient overlay — always present, stronger at bottom */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 transition-opacity duration-300 group-hover:from-black/90 group-hover:via-black/40" />
 
       {isAdmin && (
@@ -34,11 +33,11 @@ export default function AchievementCard({ achievement, isAdmin }) {
         </div>
 
         {/* Title */}
-        <h2 className="text-base font-semibold text-white leading-snug line-clamp-2 drop-shadow">
+        <h2 className="font-mono text-base font-semibold text-white leading-snug line-clamp-2 drop-shadow">
           {achievement.title}
         </h2>
 
-        {/* CTA — slides in on hover */}
+        {/* slide on hover */}
         <div className="translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
           <ProgressLink
             href={`/achievements/${achievement.id}`}
