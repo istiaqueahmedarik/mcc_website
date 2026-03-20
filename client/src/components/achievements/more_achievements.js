@@ -8,7 +8,7 @@ import DeleteComp from "@/components/deleteComp";
 import { isAdminClient } from "@/lib/isAdmin";
 
 export default function MoreAchievements({
-    achievements, setFeaturedIndex, featuredIndex, resetTimer
+    achievements, setFeaturedIndex, featuredIndex, resetTimer, onDeleteSuccess
 }) {
     const isAdmin = isAdminClient();
     return (
@@ -22,7 +22,7 @@ export default function MoreAchievements({
             <div className="grid sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {achievements.map((achievement, index) => (
                     <div
-                        key={index}
+                        key={achievement.id}
                         onClick={() => {
                             setFeaturedIndex(index);
                             resetTimer();
@@ -50,7 +50,13 @@ export default function MoreAchievements({
                                 <h4 className="font-mono font-black text-white line-clamp-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] flex-1" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
                                     {achievement.title}
                                 </h4>
-                                {isAdmin && <DeleteComp delFunc={deleteAchievement} content={achievement} />}
+                                {isAdmin && (
+                                    <DeleteComp
+                                        delFunc={deleteAchievement}
+                                        content={achievement}
+                                        onDeleteSuccess={onDeleteSuccess}
+                                    />
+                                )}
                             </div>
                             <div className="flex items-end justify-between">
                                 <div className="flex items-center gap-2">

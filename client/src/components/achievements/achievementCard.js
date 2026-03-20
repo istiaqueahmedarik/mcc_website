@@ -5,7 +5,7 @@ import Image from "next/image";
 import DeleteComp from "../deleteComp";
 import ProgressLink from "../ProgressLink";
 
-export default function AchievementCard({ achievement, isAdmin }) {
+export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess }) {
   return (
     <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden group shadow-lg ring-1 ring-white/10 bg-black">
       
@@ -21,7 +21,11 @@ export default function AchievementCard({ achievement, isAdmin }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 transition-opacity duration-300 group-hover:from-black/90 group-hover:via-black/40" />
 
       {isAdmin && (
-        <DeleteComp delFunc={deleteAchievement} content={achievement} />
+        <DeleteComp
+          delFunc={deleteAchievement}
+          content={achievement}
+          onDeleteSuccess={onDeleteSuccess}
+        />
       )}
 
       {/* Content */}

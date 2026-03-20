@@ -1,15 +1,21 @@
 'use client'
 
 import { Loader, Trash2 } from 'lucide-react'
-import { useActionState, useCallback } from 'react'
+import { useActionState, useCallback, useEffect } from 'react'
 
 const initialState = {
   message: '',
   success: false,
 }
 
-export default function DeleteComp({ delFunc, content }) {
-  const [state, formAction, pending] = useActionState(delFunc, {})
+export default function DeleteComp({ delFunc, content, onDeleteSuccess }) {
+  const [state, formAction, pending] = useActionState(delFunc, initialState)
+
+  useEffect(() => {
+    if (state?.success && onDeleteSuccess) {
+      onDeleteSuccess(content.id)
+    }
+  }, [state, onDeleteSuccess, content.id])
 
   const handleSubmit = useCallback(
     (formData) => {

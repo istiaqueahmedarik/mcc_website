@@ -216,7 +216,7 @@ const Insert = ({ state, inputRef, handleCopy }) => {
   );
 };
 
-const MainContent = ({ description, setDescription, pending }) => {
+const MainContent = ({ description, setDescription, pending, editorResetKey }) => {
   const handleDescriptionChange = useCallback(
     (newValue) => {
       setDescription(newValue);
@@ -230,6 +230,7 @@ const MainContent = ({ description, setDescription, pending }) => {
         <div className="flex-1 flex flex-col">
           <div>
             <EditorWrapper
+              key={editorResetKey}
               value={description}
               handleChange={handleDescriptionChange}
             />
@@ -242,7 +243,6 @@ const MainContent = ({ description, setDescription, pending }) => {
             <button
               type="submit"
               disabled={pending}
-              onClick={() => setDescription("")}
               className="px-6 py-2 bg-zinc-700 dark:bg-zinc-200 text-white rounded-lg dark:text-zinc-800 transition-colors"
             >
               {pending ? "Submitting..." : "Create Achievement"}
@@ -256,11 +256,20 @@ const MainContent = ({ description, setDescription, pending }) => {
 
 const NHEFPage = () => {
   const [description, setDescription] = useState("");
+  const [editorResetKey, setEditorResetKey] = useState(0);
   const [state, formAction, pending] = useActionState(
     createAchievement,
     initialState
   );
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (state?.success) {
+      // Clear the controlled value only after backend confirms successful save.
+      setDescription("");
+      setEditorResetKey((prev) => (prev + 1) % 2);
+    }
+  }, [state]);
 
   const handleCopy = useCallback(() => {
     if (inputRef.current?.value) {
@@ -276,6 +285,7 @@ const NHEFPage = () => {
           pending={pending}
           setDescription={setDescription}
           description={description}
+          editorResetKey={editorResetKey}
         />
       </div>
     </form>

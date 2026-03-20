@@ -19,33 +19,37 @@ export default function InfiniteScrollAchievements({
     )
     const sentinelRef = useRef(null)
 
+    const handleDeleteSuccess = useCallback((deletedId) => {
+        setAchievements((prev) => prev.filter((item) => item.id !== deletedId))
+    }, [])
+
     const loadMore = useCallback(async () => {
-    if (loading || !hasMore) return
+        if (loading || !hasMore) return
 
-    setLoading(true)
+        setLoading(true)
 
-    try {
-        const currentOffset = achievements.length
+        try {
+            const currentOffset = achievements.length
 
-        const more = await getAchievements(LIMIT, currentOffset)
+            const more = await getAchievements(LIMIT, currentOffset)
 
-        if (!Array.isArray(more) || more.length === 0) {
+            if (!Array.isArray(more) || more.length === 0) {
+                setHasMore(false)
+                return
+            }
+
+            setAchievements((prev) => [...prev, ...more])
+
+            if (currentOffset + more.length >= totalCount || more.length < LIMIT) {
+                setHasMore(false)
+            }
+
+        } catch {
             setHasMore(false)
-            return
+        } finally {
+            setLoading(false)
         }
-
-        setAchievements((prev) => [...prev, ...more])
-
-        if (currentOffset + more.length >= totalCount || more.length < LIMIT) {
-            setHasMore(false)
-        }
-
-    } catch {
-        setHasMore(false)
-    } finally {
-        setLoading(false)
-    }
-}, [loading, hasMore, achievements.length, totalCount])
+    }, [loading, hasMore, achievements.length, totalCount])
 
     useEffect(() => {
         const sentinel = sentinelRef.current
@@ -65,11 +69,12 @@ export default function InfiniteScrollAchievements({
     return (
         <div className="w-full">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {achievements.map((achievement, index) => (
+                {achievements.map((achievement) => (
                     <AchievementCard
-                        key={index}
+                        key={achievement.id}
                         achievement={achievement}
                         isAdmin={isAdmin}
+                        onDeleteSuccess={handleDeleteSuccess}
                     />
                 ))}
             </div>

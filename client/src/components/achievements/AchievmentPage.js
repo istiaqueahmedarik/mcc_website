@@ -1,6 +1,6 @@
 "use client";
 import { getAchievements } from "@/lib/action";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import FeaturedAchievement from '@/components/achievements/featured_achievement';
 import MoreAchievements from '@/components/achievements/more_achievements';
 
@@ -34,6 +34,16 @@ export default function AchievementPage() {
     return () => clearInterval(timer);
   }, [achievements.length, resetKey]);
 
+  useEffect(() => {
+    if (featuredIndex >= achievements.length) {
+      setFeaturedIndex(0);
+    }
+  }, [featuredIndex, achievements.length]);
+
+  const handleDeleteSuccess = useCallback((deletedId) => {
+    setAchievements((prev) => prev.filter((item) => item.id !== deletedId));
+  }, []);
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -52,7 +62,13 @@ export default function AchievementPage() {
     <div className="w-full flex flex-col items-center justify-center gap-10">
       
       <FeaturedAchievement featuredAchievement={featuredAchievement}/>
-      <MoreAchievements achievements={achievements} setFeaturedIndex={setFeaturedIndex} featuredIndex={featuredIndex} resetTimer={resetTimer} />
+      <MoreAchievements
+        achievements={achievements}
+        setFeaturedIndex={setFeaturedIndex}
+        featuredIndex={featuredIndex}
+        resetTimer={resetTimer}
+        onDeleteSuccess={handleDeleteSuccess}
+      />
     </div>
   );
 }

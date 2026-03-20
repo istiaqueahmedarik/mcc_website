@@ -458,12 +458,26 @@ export async function deleteCourse(data, formData) {
 export async function deleteAchievement(data, formData) {
   let raw = Object.fromEntries(formData);
   try {
-    await post_with_token("achieve/insert/delete", {
+    const response = await post_with_token("achieve/insert/delete", {
       ach_id: raw.id,
     });
+    if (response?.error) {
+      return {
+        success: false,
+        message: response.error,
+      };
+    }
     revalidatePath("/achievements");
+    return {
+      success: true,
+      message: "Achievement deleted successfully",
+    };
   } catch (error) {
     console.log(error);
+    return {
+      success: false,
+      message: "Failed to delete achievement",
+    };
   }
 }
 
