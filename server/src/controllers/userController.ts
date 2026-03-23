@@ -275,6 +275,47 @@ export const setProfilePic = async (c: any) => {
   }
 };
 
+export const setMistIdCard = async (c: any) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+  try {
+    const { mist_id_card } = await c.req.json();
+    if (!mist_id_card || typeof mist_id_card !== "string") {
+      return c.json({ error: "Invalid mist_id_card" }, 400);
+    }
+    const rows =
+      await sql`update users set mist_id_card = ${mist_id_card} where id = ${id} returning id, mist_id_card`;
+    if (rows.length === 0) return c.json({ error: "User not found" }, 404);
+    return c.json({ result: rows[0] });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to set MIST ID card" }, 400);
+  }
+};
+
+export const setMistId = async (c: any) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+  try {
+    const { mist_id } = await c.req.json();
+    const sanitized = typeof mist_id === "string" ? mist_id.trim() : "";
+    if (!sanitized) {
+      return c.json({ error: "Invalid mist_id" }, 400);
+    }
+    const numeric = Number(sanitized);
+    if (Number.isNaN(numeric)) {
+      return c.json({ error: "MIST ID must be numeric" }, 400);
+    }
+    const rows =
+      await sql`update users set mist_id = ${numeric} where id = ${id} returning id, mist_id`;
+    if (rows.length === 0) return c.json({ error: "User not found" }, 404);
+    return c.json({ result: rows[0] });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to set MIST ID" }, 400);
+  }
+};
+
 // Lightweight user search for admin tooling / coach assignment
 export const searchUsers = async (c: any) => {
   const { id, email } = c.get("jwtPayload") || {};

@@ -1,5 +1,14 @@
+import { listActiveParticipationCollections } from "@/actions/team_collection";
+import { ParticipationToggle } from "@/components/ParticipationToggle";
+import ProgressLink from "@/components/ProgressLink";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -7,33 +16,24 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { get_with_token, logout, post_with_token } from "@/lib/action";
+import { createClient } from "@/utils/supabase/server";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { get_with_token, logout } from "@/lib/action";
-import {
+  Award,
+  Calendar,
+  CheckCircle2,
+  Edit3,
   ExternalLink,
   LogOut,
-  Shield,
-  ZoomIn,
-  CheckCircle2,
-  XCircle,
   Mail,
   Phone,
-  Calendar,
+  Shield,
   Users,
-  Award,
+  XCircle,
+  ZoomIn,
 } from "lucide-react";
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { post_with_token } from "@/lib/action";
-import { listActiveParticipationCollections } from "@/actions/team_collection";
-import { createClient } from "@/utils/supabase/server";
-import { ParticipationToggle } from "@/components/ParticipationToggle";
-import ProgressLink from "@/components/ProgressLink";
 
 export default async function page({ searchParams }) {
   // Removed Codeforces OAuth code parameter handling
@@ -280,22 +280,79 @@ export default async function page({ searchParams }) {
             </div>
 
             {/* MIST ID */}
-            {user.mist_id && (
-              <div className="profile-card">
-                <h3
-                  className="text-sm font-semibold mb-2"
-                  style={{ color: "hsl(var(--profile-text-secondary))" }}
-                >
-                  MIST ID
-                </h3>
-                <p
-                  className="text-sm font-mono"
-                  style={{ color: "hsl(var(--profile-text))" }}
-                >
-                  {user.mist_id}
-                </p>
+            <div className="profile-card">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: "hsl(var(--profile-text-secondary))" }}
+                  >
+                    MIST ID
+                  </h3>
+                  <p
+                    className="text-sm font-mono"
+                    style={{ color: "hsl(var(--profile-text))" }}
+                  >
+                    {user.mist_id || "No MIST ID saved yet"}
+                  </p>
+                </div>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="profile-focus-ring flex items-center gap-2"
+                      style={{ borderRadius: "var(--profile-radius-sm)" }}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      Edit
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogTitle className="text-lg font-medium mb-3">
+                      Update MIST ID
+                    </DialogTitle>
+                    <form action={saveMistId} className="space-y-3">
+                      <Label
+                        htmlFor="mist-id-input"
+                        className="text-xs font-semibold"
+                        style={{ color: "hsl(var(--profile-text-secondary))" }}
+                      >
+                        Student ID
+                      </Label>
+                      <Input
+                        id="mist-id-input"
+                        name="mist_id"
+                        type="text"
+                        defaultValue={user.mist_id ?? ""}
+                        placeholder="Enter your MIST student ID"
+                        className="text-sm w-full profile-focus-ring"
+                        style={{
+                          borderRadius: "var(--profile-radius-sm)",
+                          background: "hsl(var(--profile-surface-2))",
+                          color: "hsl(var(--profile-text))",
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Saving will update the ID stored on your profile.
+                      </p>
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="w-full profile-focus-ring"
+                        style={{
+                          background: "hsl(var(--profile-primary))",
+                          color: "white",
+                          borderRadius: "var(--profile-radius-sm)",
+                        }}
+                      >
+                        Save MIST ID
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
-            )}
+            </div>
 
             {/* MIST ID Card - Collapsible */}
             {user.mist_id_card && (
@@ -778,6 +835,14 @@ async function saveVjudge(formData) {
   const vjudge_id = formData.get("vjudge_id")?.toString().trim();
   if (!vjudge_id) return;
   await post_with_token("user/vjudge/set", { vjudge_id });
+  redirect("/profile");
+}
+
+async function saveMistId(formData) {
+  "use server";
+  const mist_id = formData.get("mist_id")?.toString().trim();
+  if (!mist_id) return;
+  await post_with_token("user/mist-id/set", { mist_id });
   redirect("/profile");
 }
 
