@@ -148,6 +148,14 @@ export async function uploadImage(folder, uId, file, bucket) {
   return { data, url };
 }
 
+export async function getAchievementTags() {
+  // console.log("Getting achievement tags");
+  const response = await get("achieve/get_tags");
+  // console.log("Tags response:", response);
+  if (response.error) return response.error;
+  return { success: true, tags: response.result || [] };
+}
+
 export async function createAchievement(prevState, formData) {
   let raw = Object.fromEntries(formData);
 
@@ -205,7 +213,7 @@ export async function updateAchievement(prevState, formData) {
   // console.log('imgurl: ', prevState.imgurl)
 
   // return {}
-
+  // console.log("Updating achievement with data:", raw);
   const response = await post_with_token("achieve/insert/update", raw);
   if (response.error)
     return {
@@ -465,12 +473,26 @@ export async function deleteCourse(data, formData) {
 export async function deleteAchievement(data, formData) {
   let raw = Object.fromEntries(formData);
   try {
-    await post_with_token("achieve/insert/delete", {
+    const response = await post_with_token("achieve/insert/delete", {
       ach_id: raw.id,
     });
+    if (response?.error) {
+      return {
+        success: false,
+        message: response.error,
+      };
+    }
     revalidatePath("/achievements");
+    return {
+      success: true,
+      message: "Achievement deleted successfully",
+    };
   } catch (error) {
     console.log(error);
+    return {
+      success: false,
+      message: "Failed to delete achievement",
+    };
   }
 }
 
@@ -794,10 +816,10 @@ export async function isCourseIns(course_id) {
   return response.result;
 }
 
-export async function getAchievements() {
-  const response = await get("achieve/get_achievements");
-  if (response.error) return response.error;
-  return response.result;
+export async function getAchievements(limit, offset=0) {
+  const response = await get(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
+  if (response?.error) return response.error;
+  return response?.result;
 }
 
 export async function getAchievementsById(ach_id) {
@@ -806,6 +828,12 @@ export async function getAchievementsById(ach_id) {
   });
   if (response.error) return response.error;
   return response.result;
+}
+
+export async function getAchievementNumber() {
+  const response = await get("achieve/get_achievement_number");
+  if (response?.error) return response.error;
+  return response?.result?.[0]?.count;
 }
 
 export async function getContestResults(contestId, sessionId) {

@@ -6,15 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import {
-  Menu,
-  X,
-  ImageIcon,
-  TrophyIcon,
-  CalendarIcon,
-  Check,
-  Copy,
-} from "lucide-react";
+import { Menu, X, ImageIcon, TrophyIcon, CalendarIcon, Check, Copy } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,13 +19,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createAchievement, uploadImage } from "@/lib/action";
+import TagsInput from "@/components/achievements/TagsInput";
 
 const initialState = {
   message: "",
   success: false,
 };
 
-const Insert = ({ state, inputRef, handleCopy }) => {
+const Insert = ({ state, inputRef, handleCopy, tagsResetKey }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -51,19 +44,12 @@ const Insert = ({ state, inputRef, handleCopy }) => {
       "all_picture"
     );
     if (error) {
-      return {
-        success: false,
-        message: "Problem uploading image",
-        url: "",
-      };
+      return { success: false, message: "Problem uploading image", url: "" };
     }
     inputRef.current.value = url;
-    return {
-      success: true,
-      message: "",
-      url,
-    };
+    return { success: true, message: "", url };
   }, []);
+
   const updateCopy = () => {
     handleCopy();
     setCopied(true);
@@ -133,6 +119,7 @@ const Insert = ({ state, inputRef, handleCopy }) => {
               />
             </div>
           </div>
+
           {/* Image */}
           <div className="space-y-2">
             <Label htmlFor="image">Image</Label>
@@ -148,6 +135,7 @@ const Insert = ({ state, inputRef, handleCopy }) => {
               />
             </div>
           </div>
+
           {/* Image URL */}
           <div className="space-y-2">
             <Label htmlFor="imageUrl">Uploaded Image URL</Label>
@@ -189,6 +177,7 @@ const Insert = ({ state, inputRef, handleCopy }) => {
               </TooltipProvider>
             </div>
           </div>
+
           {/* Date */}
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
@@ -197,14 +186,19 @@ const Insert = ({ state, inputRef, handleCopy }) => {
               <Input type="date" id="date" name="date" className="pl-10" />
             </div>
           </div>
+
+          {/* Tags */}
+          <TagsInput key={tagsResetKey} />
+
           <div className="space-b-2">
             <p className="italic text-gray-400 text-sm dark:text-gray-700">
               Note: You can copy the url by uploading an image and paste that on
               the description. Remember that always upload the thumbnail image
-              at last. So that the last image will be automatically taken fot
+              at last. So that the last image will be automatically taken for
               thumbnail.
             </p>
           </div>
+
           {state?.message && (
             <Alert variant={state?.success ? "success" : "destructive"}>
               <AlertDescription>{state?.message}</AlertDescription>
@@ -216,11 +210,9 @@ const Insert = ({ state, inputRef, handleCopy }) => {
   );
 };
 
-const MainContent = ({ description, setDescription, pending }) => {
+const MainContent = ({ description, setDescription, pending, editorResetKey }) => {
   const handleDescriptionChange = useCallback(
-    (newValue) => {
-      setDescription(newValue);
-    },
+    (newValue) => setDescription(newValue),
     [setDescription]
   );
 
@@ -230,6 +222,7 @@ const MainContent = ({ description, setDescription, pending }) => {
         <div className="flex-1 flex flex-col">
           <div>
             <EditorWrapper
+              key={editorResetKey}
               value={description}
               handleChange={handleDescriptionChange}
             />
@@ -242,7 +235,6 @@ const MainContent = ({ description, setDescription, pending }) => {
             <button
               type="submit"
               disabled={pending}
-              onClick={() => setDescription("")}
               className="px-6 py-2 bg-zinc-700 dark:bg-zinc-200 text-white rounded-lg dark:text-zinc-800 transition-colors"
             >
               {pending ? "Submitting..." : "Create Achievement"}
@@ -256,11 +248,16 @@ const MainContent = ({ description, setDescription, pending }) => {
 
 const NHEFPage = () => {
   const [description, setDescription] = useState("");
-  const [state, formAction, pending] = useActionState(
-    createAchievement,
-    initialState
-  );
+  const [editorResetKey, setEditorResetKey] = useState(0);
+  const [state, formAction, pending] = useActionState(createAchievement, initialState);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (state?.success) {
+      setDescription("");
+      setEditorResetKey((prev) => (prev + 1) % 2);
+    }
+  }, [state]);
 
   const handleCopy = useCallback(() => {
     if (inputRef.current?.value) {
@@ -271,11 +268,17 @@ const NHEFPage = () => {
   return (
     <form action={formAction} className="w-full flex flex-col justify-center">
       <div className="flex w-full">
-        <Insert state={state} inputRef={inputRef} handleCopy={handleCopy} />
+        <Insert
+          state={state}
+          inputRef={inputRef}
+          handleCopy={handleCopy}
+          tagsResetKey={editorResetKey}
+        />
         <MainContent
           pending={pending}
           setDescription={setDescription}
           description={description}
+          editorResetKey={editorResetKey}
         />
       </div>
     </form>
