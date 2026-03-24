@@ -1,31 +1,35 @@
+import { getAllContestRooms } from "@/actions/contest_details";
 import {
+  adminCopyTeamCollection,
   adminDeleteTeamCollection,
   adminFinalizeTeamCollection,
-  adminUnfinalizeTeamCollection,
   adminListTeamCollections,
-  adminStartTeamCollection,
-  adminStopTeamCollection,
+  adminRenameTeamCollection,
   adminReopenTeamCollection,
   adminSetPhase1Deadline,
   adminStartPhase2,
+  adminStartTeamCollection,
+  adminStopTeamCollection,
+  adminUnfinalizeTeamCollection,
 } from "@/actions/team_collection";
+import { CollectionCopyButton } from "@/components/CollectionCopyButton";
+import { CollectionNameEditor } from "@/components/CollectionNameEditor";
 import { TeamActionForm } from "@/components/TeamActionForm";
-import { getAllContestRooms } from "@/actions/contest_details";
-import Link from "next/link";
+import { get_with_token } from "@/lib/action";
 import {
-  Eye,
-  Square,
   CheckCircle,
-  Unlock,
-  Trash2,
-  Play,
   Clock,
+  Eye,
   FastForward,
+  Play,
+  Square,
+  Trash2,
+  Unlock,
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { get_with_token } from "@/lib/action";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +95,23 @@ export default async function Page() {
     await adminStartPhase2(id);
     revalidatePath("/admin/team-collection");
   }
+  async function renameCollection(formData) {
+    "use server";
+    const id = formData.get("id");
+    const title = formData.get("title") || "";
+    await adminRenameTeamCollection(id, String(title));
+    revalidatePath("/admin/team-collection");
+  }
+  async function copyCollection(formData) {
+    "use server";
+    const id = formData.get("collection_id") || formData.get("id");
+    const title = formData.get("title") || "";
+    const res = await adminCopyTeamCollection(id, String(title));
+    if (res?.error) {
+      throw new Error(res.error || "Copy failed");
+    }
+    revalidatePath("/admin/team-collection");
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,12 +146,26 @@ export default async function Page() {
                 <div className="flex items-start justify-between gap-8">
                   <div className="flex-1 space-y-4">
                     <div className="space-y-2">
-                      <Link
-                        className="text-xl font-semibold text-primary hover:text-primary/80 transition-colors duration-200"
-                        href={`/admin/team-collection/${col.id}`}
-                      >
-                        {col.title || "Untitled Collection"}
-                      </Link>
+                      <div className="flex items-center justify-between gap-3">
+                        <Link
+                          className="text-xl font-semibold text-primary hover:text-primary/80 transition-colors duration-200"
+                          href={`/admin/team-collection/${col.id}`}
+                        >
+                          {col.title || col.collection_name || "Untitled Collection"}
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          <CollectionNameEditor
+                            id={col.id}
+                            name={col.title ?? col.collection_name ?? ""}
+                            renameAction={renameCollection}
+                          />
+                          <CollectionCopyButton
+                            id={col.id}
+                            defaultName={col.title ?? col.collection_name ?? ""}
+                            copyAction={copyCollection}
+                          />
+                        </div>
+                      </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground font-medium">
                           Room:

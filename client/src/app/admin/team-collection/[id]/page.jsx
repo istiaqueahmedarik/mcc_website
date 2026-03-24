@@ -1,52 +1,50 @@
 import {
-  adminFinalizeTeamCollection,
-  adminUnfinalizeTeamCollection,
-  adminGetCollectionDetail,
-  adminPreviewCollection,
-  adminApproveManualTeam,
-  adminDeleteTeam,
-  adminRemoveMember,
-  adminRenameTeam,
-  adminListTeamRequests,
-  adminProcessTeamRequest,
+    adminApproveManualTeam,
+    adminDeleteTeam,
+    adminFinalizeTeamCollection,
+    adminGetCollectionDetail,
+    adminListTeamRequests,
+    adminPreviewCollection,
+    adminProcessTeamRequest,
+    adminRemoveMember,
+    adminRenameTeam,
+    adminSetPhase1Deadline,
+    adminStartPhase2,
+    adminUnfinalizeTeamCollection,
 } from "@/actions/team_collection";
-import { TeamActionForm } from "@/components/TeamActionForm";
 import CoachAssignInline from "@/components/CoachAssignInline";
+import ProgressLink from "@/components/ProgressLink";
+import { TeamActionForm } from "@/components/TeamActionForm";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { get_with_token } from "@/lib/action";
 import {
-  Users,
-  FileText,
-  Settings,
-  Plus,
-  Trash2,
-  Edit3,
-  UserPlus,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-  FastForward,
-  LinkIcon,
+    AlertCircle,
+    CheckCircle2,
+    Clock,
+    Edit3,
+    FastForward,
+    FileText,
+    LinkIcon,
+    Plus,
+    Settings,
+    Trash2,
+    UserPlus,
+    Users,
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { get_with_token } from "@/lib/action";
-import {
-  adminSetPhase1Deadline,
-  adminStartPhase2,
-} from "@/actions/team_collection";
-import ProgressLink from "@/components/ProgressLink";
 
 export const dynamic = "force-dynamic";
 
@@ -172,7 +170,7 @@ export default async function Page({ params }) {
                 Collection Management
               </h1>
               <div className="flex items-center gap-3 text-muted-foreground">
-                <span className="font-medium">{collection?.title}</span>
+                <span className="font-medium">{collection?.title ?? collection?.collection_name}</span>
                 <Separator orientation="vertical" className="h-4" />
                 <span className="flex items-center gap-1">
                   <Settings className="h-4 w-4" />
