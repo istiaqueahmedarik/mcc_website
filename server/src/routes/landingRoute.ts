@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { getLandingPublic, featuresCrud, statsCrud, timelineCrud, alumniBatchCrud, alumniMemberCrud, migrateLegacyTestimonialsToAlumni } from '../controllers/landingController'
+import { getLandingPublic, featuresCrud, statsCrud, timelineCrud, alumniBatchCrud, alumniMemberCrud } from '../controllers/landingController'
 
 const route = new Hono()
 
@@ -33,7 +33,7 @@ route.get('/admin/alumni/batch', alumniBatchCrud.list)
 route.post('/admin/alumni/batch/create', alumniBatchCrud.create)
 route.post('/admin/alumni/batch/update', alumniBatchCrud.update)
 route.post('/admin/alumni/batch/delete', alumniBatchCrud.delete)
-route.post('/admin/alumni/migrate-legacy', migrateLegacyTestimonialsToAlumni)
+
 
 route.get('/admin/alumni/member', alumniMemberCrud.list)
 route.post('/admin/alumni/member/create', alumniMemberCrud.create)

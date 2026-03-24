@@ -175,38 +175,6 @@ export default function LandingAdminClient({ token }) {
     setLoading(false);
   }
 
-  async function runLegacyMigration() {
-    const ok = window.confirm(
-      "Migrate all legacy landing testimonials into Alumni Directory Members and remove legacy rows?"
-    );
-    if (!ok) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(base + "/landing/admin/alumni/migrate-legacy", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-        body: JSON.stringify({}),
-      });
-      const json = await res.json();
-      if (json.error) {
-        alert(json.error);
-      } else {
-        const summary = json?.result
-          ? `Migrated: ${json.result.migrated || 0}, Updated: ${json.result.updated || 0}, Removed legacy: ${json.result.removed || 0}`
-          : "Legacy alumni migration completed.";
-        alert(summary);
-        await load();
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Failed to migrate legacy alumni data");
-    }
-    setLoading(false);
-  }
 
   return (
     <div className="min-h-screen w-full p-6 max-w-6xl mx-auto">
@@ -215,20 +183,6 @@ export default function LandingAdminClient({ token }) {
         Manage dynamic landing page content. Changes reflect immediately for new
         visitors.
       </p>
-      <div className="mb-6 rounded border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
-        Alumni insertion is unified. Use <strong>Alumni Directory Members</strong> only.
-        Set <strong>Show on Landing</strong> and <strong>Sort Order</strong> to control
-        landing-page alumni visibility and order.
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={runLegacyMigration}
-            className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
-          >
-            Migrate Previous Alumni Data
-          </button>
-        </div>
-      </div>
       <Section
         kind="features"
         title="Features"
