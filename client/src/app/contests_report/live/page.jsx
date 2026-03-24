@@ -42,9 +42,11 @@ export default async function PublicSharedReportsPage(){
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl md:text-3xl font-bold">Public Contest Room Reports</h1>
-        <Badge variant="secondary">{parsed.length} shared</Badge>
+      <div className="flex items-center justify-center gap-4 flex-wrap">
+        <h1 className="text-xl md:text-2xl font-bold">Public Contest Room Reports</h1>
+        <Badge variant="secondary text-muted-foreground">
+          {parsed.length} shared
+        </Badge>
       </div>
 
       {parsed.length === 0 ? (
@@ -55,7 +57,7 @@ export default async function PublicSharedReportsPage(){
         </Card>
       ) : (
         <ScrollArea className="w-full rounded-md border">
-          <div className="grid gap-4 p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 p-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
             {parsed.map((item) => (
               <Card key={item.id} className="flex flex-col">
                 <CardHeader className="pb-3">

@@ -526,48 +526,57 @@ export const finalizeCollection = async (c: any) => {
     }
     await sql`UPDATE public.team_collections SET finalized=true, finalized_at=now(), is_open=false, phase=3 WHERE id=${collection_id}`;
 
-    try {
-      const finalTeams =
-        (await sql`SELECT team_title, member_vjudge_ids FROM public.team_collection_teams WHERE collection_id=${collection_id} AND approved=true`) as any[];
-      const memberToTeam: Record<string, { title: string; members: string[] }> =
-        {};
-      const allMembers: string[] = [];
-      for (const t of finalTeams) {
-        const members: string[] = Array.isArray(t.member_vjudge_ids)
-          ? t.member_vjudge_ids
-          : [];
-        for (const m of members) {
-          memberToTeam[String(m)] = { title: t.team_title, members };
-          allMembers.push(String(m));
+    const emailFlag = process.env.ENABLE_TEAM_FINALIZATION_EMAILS;
+    const shouldSendFinalizeEmails =
+      emailFlag === "true" ||
+      (emailFlag == null && process.env.NODE_ENV === "production");
+
+    if (shouldSendFinalizeEmails) {
+      try {
+        const finalTeams =
+          (await sql`SELECT team_title, member_vjudge_ids FROM public.team_collection_teams WHERE collection_id=${collection_id} AND approved=true`) as any[];
+        const memberToTeam: Record<
+          string,
+          { title: string; members: string[] }
+        > = {};
+        const allMembers: string[] = [];
+        for (const t of finalTeams) {
+          const members: string[] = Array.isArray(t.member_vjudge_ids)
+            ? t.member_vjudge_ids
+            : [];
+          for (const m of members) {
+            memberToTeam[String(m)] = { title: t.team_title, members };
+            allMembers.push(String(m));
+          }
         }
-      }
-      const uniqueMembers = Array.from(new Set(allMembers));
-      if (uniqueMembers.length > 0) {
-        const userRows =
-          await sql`SELECT email, full_name, vjudge_id FROM users WHERE vjudge_id = ANY(${uniqueMembers})`;
-        const clientUrl = process.env.CLIENT_URL || "";
-        await Promise.all(
-          userRows.map(async (u: any) => {
-            if (!u.email) return;
-            const info = memberToTeam[String(u.vjudge_id)];
-            if (!info) return;
-            const subject = `Your Team Has Been Finalized: ${info.title}`;
-            const text = `Hello ${u.full_name || u.vjudge_id},\n\nYour team '${info.title}' has been finalized.\nMembers: ${info.members.join(", ")}\n\nGood luck!`;
-            const html = `<p>Hello <strong>${u.full_name || u.vjudge_id}</strong>,</p>
+        const uniqueMembers = Array.from(new Set(allMembers));
+        if (uniqueMembers.length > 0) {
+          const userRows =
+            await sql`SELECT email, full_name, vjudge_id FROM users WHERE vjudge_id = ANY(${uniqueMembers})`;
+          const clientUrl = process.env.CLIENT_URL || "";
+          await Promise.all(
+            userRows.map(async (u: any) => {
+              if (!u.email) return;
+              const info = memberToTeam[String(u.vjudge_id)];
+              if (!info) return;
+              const subject = `Your Team Has Been Finalized: ${info.title}`;
+              const text = `Hello ${u.full_name || u.vjudge_id},\n\nYour team '${info.title}' has been finalized.\nMembers: ${info.members.join(", ")}\n\nGood luck!`;
+              const html = `<p>Hello <strong>${u.full_name || u.vjudge_id}</strong>,</p>
 <p>Your team <strong>${info.title}</strong> has been <strong>finalized</strong>.</p>
 <p><strong>Members (${info.members.length}):</strong><br/>${info.members.map((m) => `<code>${m}</code>`).join(", ")}</p>
 <p>You can view your teams on the platform.<br/>${clientUrl ? `<a href="${clientUrl}/my_dashboard" target="_blank">Open Dashboard</a>` : ""}</p>
 <p>Good luck!</p>`;
-            try {
-              await sendEmail(u.email, subject, text, html);
-            } catch (e) {
-              console.error("Failed to email", u.email, e);
-            }
-          }),
-        );
+              try {
+                await sendEmail(u.email, subject, text, html);
+              } catch (e) {
+                console.error("Failed to email", u.email, e);
+              }
+            }),
+          );
+        }
+      } catch (e) {
+        console.error("Failed sending team finalization emails", e);
       }
-    } catch (e) {
-      console.error("Failed sending team finalization emails", e);
     }
 
     return c.json({ success: true, teams });
@@ -1309,7 +1318,7 @@ export const publicFinalizedTeamsLeaderboard = async (c: any) => {
 export const publicFinalizedTeamsByContest = async (c: any) => {
   // Load all approved teams for finalized collections
   const teams =
-    await sql`SELECT t.*, c.room_id, c.title as collection_title, c.id as collection_id, r."Room Name" as room_name FROM public.team_collection_teams t JOIN public.team_collections c ON t.collection_id=c.id JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.finalized=true AND t.approved=true`;
+    await sql`SELECT t.*, c.room_id, c.title as collection_title, c.id as collection_id, r."Room Name" as room_name, c.finalized_at as finalized_at FROM public.team_collection_teams t JOIN public.team_collections c ON t.collection_id=c.id JOIN public."Contest_report_room" r ON c.room_id=r.id WHERE c.finalized=true AND t.approved=true ORDER BY c.finalized_at DESC NULLS LAST`;
   if (teams.length === 0) return c.json({ success: true, result: [] });
   const collectionIds = Array.from(
     new Set(teams.map((t: any) => t.collection_id)),
@@ -1351,6 +1360,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
       collection_id: string;
       collection_title: string;
       room_name: string;
+      finalized_at: Date | null;
       teams: any[];
     }
   > = {};
@@ -1361,6 +1371,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
         collection_id: cid,
         collection_title: t.collection_title,
         room_name: t.room_name,
+        finalized_at: t.finalized_at,
         teams: [],
       };
     const members: string[] = Array.isArray(t.member_vjudge_ids)
@@ -1390,11 +1401,13 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
       );
       return block;
     })
-    .sort(
-      (a, b) =>
-        a.room_name.localeCompare(b.room_name) ||
-        a.collection_title.localeCompare(b.collection_title),
-    );
+    .sort((a, b) => {
+      const aTime = a.finalized_at ? new Date(a.finalized_at).getTime() : 0;
+      const bTime = b.finalized_at ? new Date(b.finalized_at).getTime() : 0;
+      return (
+        bTime - aTime || a.collection_title.localeCompare(b.collection_title)
+      );
+    });
   return c.json({ success: true, result });
 };
 
