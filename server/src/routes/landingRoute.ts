@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
-import { getLandingPublic, featuresCrud, statsCrud, timelineCrud, alumniCrud, alumniBatchCrud, alumniMemberCrud } from '../controllers/landingController'
+import { getLandingPublic, featuresCrud, statsCrud, timelineCrud, alumniBatchCrud, alumniMemberCrud, migrateLegacyTestimonialsToAlumni } from '../controllers/landingController'
 
 const route = new Hono()
 
@@ -28,27 +28,16 @@ route.post('/admin/timeline/create', timelineCrud.create)
 route.post('/admin/timeline/update', timelineCrud.update)
 route.post('/admin/timeline/delete', timelineCrud.delete)
 
-// Landing Alumni (Testimonials)
-route.get('/admin/testimonials', alumniCrud.list)
-route.post('/admin/testimonials/create', alumniCrud.create)
-route.post('/admin/testimonials/update', alumniCrud.update)
-route.post('/admin/testimonials/delete', alumniCrud.delete)
-
 // Alumni batch & member
 route.get('/admin/alumni/batch', alumniBatchCrud.list)
 route.post('/admin/alumni/batch/create', alumniBatchCrud.create)
 route.post('/admin/alumni/batch/update', alumniBatchCrud.update)
 route.post('/admin/alumni/batch/delete', alumniBatchCrud.delete)
+route.post('/admin/alumni/migrate-legacy', migrateLegacyTestimonialsToAlumni)
 
 route.get('/admin/alumni/member', alumniMemberCrud.list)
 route.post('/admin/alumni/member/create', alumniMemberCrud.create)
 route.post('/admin/alumni/member/update', alumniMemberCrud.update)
 route.post('/admin/alumni/member/delete', alumniMemberCrud.delete)
-
-// Legacy Alumni routes (now testimonials)
-route.get('/admin/alumni', alumniCrud.list)
-route.post('/admin/alumni/create', alumniCrud.create)
-route.post('/admin/alumni/update', alumniCrud.update)
-route.post('/admin/alumni/delete', alumniCrud.delete)
 
 export default route

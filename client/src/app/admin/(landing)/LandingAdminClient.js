@@ -1,6 +1,105 @@
 "use client";
 import React from "react";
 
+function parseAlumniBio(rawBio) {
+  if (!rawBio) return { about: "", career_path: [] };
+  if (typeof rawBio === "object") {
+    return {
+      ...rawBio,
+      about: rawBio.about || rawBio.bio_summary || "",
+      career_path: Array.isArray(rawBio.career_path)
+        ? rawBio.career_path
+        : typeof rawBio.career_path === "string"
+          ? rawBio.career_path
+              .split(/->|→|\|/)
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
+    };
+  }
+
+  const text = String(rawBio).trim();
+  if (!text) return { about: "", career_path: [] };
+
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object") {
+      return {
+        ...parsed,
+        about: parsed.about || parsed.bio_summary || "",
+        career_path: Array.isArray(parsed.career_path)
+          ? parsed.career_path
+          : typeof parsed.career_path === "string"
+            ? parsed.career_path
+                .split(/->|→|\|/)
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : [],
+      };
+    }
+  } catch {
+    return { about: text, career_path: [] };
+  }
+
+  return { about: "", career_path: [] };
+}
+
+function enrichAlumniMember(member) {
+  const meta = parseAlumniBio(member.bio);
+  const careerPath = (meta.career_path || []).join(" -> ");
+  return {
+    ...member,
+    current_company: meta.current_company || meta.company || "",
+    location: meta.location || "",
+    email: meta.email || "",
+    phone: meta.phone || "",
+    facebook_url: meta.facebook_url || meta.facebook || "",
+    bio_summary: meta.about || "",
+    career_path: careerPath,
+  };
+}
+
+function buildAlumniMemberPayload(form, editId) {
+  const clean = (v) => String(v ?? "").trim();
+  const careerPathList = clean(form.career_path)
+    ? clean(form.career_path)
+        .split(/->|→|\|/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+
+  const currentCompany = clean(form.current_company);
+  const computedCurrentPosition = [clean(form.role), currentCompany]
+    .filter(Boolean)
+    .join(" @ ");
+
+  const bioMeta = {
+    about: clean(form.bio_summary),
+    current_company: currentCompany,
+    location: clean(form.location),
+    email: clean(form.email),
+    phone: clean(form.phone),
+    facebook_url: clean(form.facebook_url),
+    career_path: careerPathList,
+  };
+
+  const payload = {
+    batch_id: form.batch_id,
+    full_name: clean(form.full_name),
+    role: clean(form.role),
+    current_position: computedCurrentPosition || clean(form.current_position),
+    image_url: clean(form.image_url),
+    linkedin_url: clean(form.linkedin_url),
+    highlight: form.highlight === true || form.highlight === "true",
+    sort_order: clean(form.sort_order) || "0",
+    is_active: form.is_active === true || form.is_active === "true",
+    bio: JSON.stringify(bioMeta),
+  };
+
+  if (editId) payload.id = editId;
+  return payload;
+}
+
 export default function LandingAdminClient({ token }) {
   const [data, setData] = React.useState({
     features: [],
@@ -14,7 +113,7 @@ export default function LandingAdminClient({ token }) {
   async function load() {
     try {
       const headers = { Authorization: "Bearer " + token };
-      const [f, s, t, tt, ab, am] = await Promise.all([
+      const [f, s, t, ab, am] = await Promise.all([
         fetch(base + "/landing/admin/features", { headers }).then((r) =>
           r.json()
         ),
@@ -22,11 +121,6 @@ export default function LandingAdminClient({ token }) {
         fetch(base + "/landing/admin/timeline", { headers }).then((r) =>
           r.json()
         ),
-        fetch(base + "/landing/admin/testimonials", { headers }).then((r) => {
-          console.log("r", r);
-          if (!r.ok) return { result: [] };
-          return r.json();
-        }),
         fetch(base + "/landing/admin/alumni/batch", { headers }).then((r) =>
           r.json()
         ),
@@ -34,13 +128,24 @@ export default function LandingAdminClient({ token }) {
           r.json()
         ),
       ]);
+
+      const batches = ab.result || [];
+      const batchMap = new Map(batches.map((b) => [String(b.id), b]));
+      const members = (am.result || []).map((m) => {
+        const batch = batchMap.get(String(m.batch_id));
+        return {
+          ...enrichAlumniMember(m),
+          batch_label: batch ? `${batch.label} (${batch.year})` : String(m.batch_id),
+        };
+      });
+
       setData({
         features: f.result || [],
         stats: s.result || [],
         timeline: t.result || [],
-        testimonials: tt.result || [],
-        alumni_batches: ab.result || [],
-        alumni_members: am.result || [],
+        testimonials: [],
+        alumni_batches: batches,
+        alumni_members: members,
       });
     } catch (e) {
       console.error(e);
@@ -48,8 +153,6 @@ export default function LandingAdminClient({ token }) {
   }
   React.useEffect(() => {
     load();
-
-    console.log(data);
   }, []);
 
   async function adminFetch(path, body) {
@@ -72,6 +175,39 @@ export default function LandingAdminClient({ token }) {
     setLoading(false);
   }
 
+  async function runLegacyMigration() {
+    const ok = window.confirm(
+      "Migrate all legacy landing testimonials into Alumni Directory Members and remove legacy rows?"
+    );
+    if (!ok) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(base + "/landing/admin/alumni/migrate-legacy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (json.error) {
+        alert(json.error);
+      } else {
+        const summary = json?.result
+          ? `Migrated: ${json.result.migrated || 0}, Updated: ${json.result.updated || 0}, Removed legacy: ${json.result.removed || 0}`
+          : "Legacy alumni migration completed.";
+        alert(summary);
+        await load();
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to migrate legacy alumni data");
+    }
+    setLoading(false);
+  }
+
   return (
     <div className="min-h-screen w-full p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Landing CMS</h1>
@@ -79,6 +215,20 @@ export default function LandingAdminClient({ token }) {
         Manage dynamic landing page content. Changes reflect immediately for new
         visitors.
       </p>
+      <div className="mb-6 rounded border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+        Alumni insertion is unified. Use <strong>Alumni Directory Members</strong> only.
+        Set <strong>Show on Landing</strong> and <strong>Sort Order</strong> to control
+        landing-page alumni visibility and order.
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={runLegacyMigration}
+            className="px-3 py-1.5 text-xs rounded border border-border hover:bg-muted"
+          >
+            Migrate Previous Alumni Data
+          </button>
+        </div>
+      </div>
       <Section
         kind="features"
         title="Features"
@@ -142,18 +292,22 @@ export default function LandingAdminClient({ token }) {
       {/* Alumni Members */}
       <Section
         kind="alumni_member"
-        title="Alumni Members"
+        title="Alumni Directory Members"
         items={data.alumni_members || []}
         fields={[
-          ["batch_id", "Batch ID"],
+          ["batch_id", "Batch"],
           ["full_name", "Full Name"],
           ["role", "Role"],
-          ["current_position", "Current Position"],
-          ["bio", "Bio"],
+          ["current_company", "Current Company"],
+          ["location", "Location"],
           ["image_url", "Image URL"],
           ["linkedin_url", "LinkedIn URL"],
-          ["github_url", "GitHub URL"],
-          ["highlight", "Highlight"],
+          ["email", "Email"],
+          ["facebook_url", "Facebook URL"],
+          ["phone", "Phone"],
+          ["career_path", "Career Path (use ->)"],
+          ["bio_summary", "Bio Summary"],
+          ["highlight", "Show on Landing"],
           ["sort_order", "Sort Order"],
           ["is_active", "Active"],
         ]}
@@ -161,22 +315,6 @@ export default function LandingAdminClient({ token }) {
         onUpdate={(b) => adminFetch("/landing/admin/alumni/member/update", b)}
         onDelete={(b) => adminFetch("/landing/admin/alumni/member/delete", b)}
         batches={data.alumni_batches || []}
-      />
-      <Section
-        kind="landing_alumni"
-        title="Landing Alumni (Testimonials)"
-        items={data.testimonials}
-        fields={[
-          ["name", "Name"],
-          ["title", "Tagline"],
-          ["quote", "Quote"],
-          ["image_url", "Image URL"],
-          ["position", "Position"],
-          ["active", "Active"],
-        ]}
-        onCreate={(b) => adminFetch("/landing/admin/alumni/create", b)}
-        onUpdate={(b) => adminFetch("/landing/admin/alumni/update", b)}
-        onDelete={(b) => adminFetch("/landing/admin/alumni/delete", b)}
       />
       {loading && (
         <div className="fixed bottom-4 right-4 px-4 py-2 rounded bg-primary text-primary-foreground shadow">
@@ -260,38 +398,28 @@ function Section({
         break;
       case "alumni_member":
         ensure(val("batch_id").length > 0, "batch_id", "Required");
+        if (val("batch_id") && Array.isArray(batches)) {
+          const found = batches.some((b) => String(b.id) === val("batch_id"));
+          ensure(found, "batch_id", "Select a valid batch");
+        }
         ensure(val("full_name").length > 0, "full_name", "Required");
-        ensure(
-          val("current_position").length > 0,
-          "current_position",
-          "Required"
-        );
+        ensure(val("role").length > 0, "role", "Required");
+        ensure(val("current_company").length > 0, "current_company", "Required");
+        if (val("email")) {
+          ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val("email")), "email", "Invalid email");
+        }
+        if (val("phone")) {
+          ensure(/^[0-9+()\-\s]{6,20}$/.test(val("phone")), "phone", "Invalid phone");
+        }
         if (val("image_url"))
           ensure(urlOk(val("image_url")), "image_url", "Invalid URL");
         if (val("linkedin_url"))
           ensure(urlOk(val("linkedin_url")), "linkedin_url", "Invalid URL");
-        if (val("github_url"))
-          ensure(urlOk(val("github_url")), "github_url", "Invalid URL");
-        if (val("bio"))
-          ensure(val("bio").length <= 800, "bio", "Max 800 chars");
+        if (val("facebook_url"))
+          ensure(urlOk(val("facebook_url")), "facebook_url", "Invalid URL");
+        if (val("bio_summary"))
+          ensure(val("bio_summary").length <= 800, "bio_summary", "Max 800 chars");
         ensure(intPattern.test(val("sort_order")), "sort_order", "Integer");
-        break;
-      case "landing_alumni":
-        ensure(val("name").length > 0, "name", "Required");
-        ensure(val("title").length > 0, "title", "Required");
-        ensure(val("quote").length > 0, "quote", "Required");
-        if (val("image_url")) {
-          try {
-            new URL(val("image_url"));
-          } catch {
-            e.image_url = "Invalid URL";
-          }
-        }
-        ensure(
-          intPattern.test(val("position")),
-          "position",
-          "Integer required"
-        );
         break;
     }
     const boolFields = ["active", "is_active", "highlight"];
@@ -331,11 +459,15 @@ function Section({
   function submit() {
     const errs = validate(form);
     if (Object.keys(errs).length > 0) return;
-    const body = { ...form };
+    let body = { ...form };
     ["active", "is_active", "highlight"].forEach((k) => {
       if (k in body) body[k] = body[k] === "true";
     });
-    if (editId) body.id = editId;
+    if (kind === "alumni_member") {
+      body = buildAlumniMemberPayload(body, editId);
+    } else if (editId) {
+      body.id = editId;
+    }
     (editId ? onUpdate(body) : onCreate(body)).then(() => clear());
   }
   const hasErrors = Object.keys(errors).length > 0;
@@ -369,7 +501,9 @@ function Section({
                   <td key={k} className="p-2 max-w-xs truncate">
                     {["active", "is_active", "highlight"].includes(k)
                       ? String(it[k])
-                      : String(it[k] ?? "")}
+                      : kind === "alumni_member" && k === "batch_id"
+                        ? String(it.batch_label ?? it[k] ?? "")
+                        : String(it[k] ?? "")}
                   </td>
                 ))}
                 <td className="p-2 flex gap-2">
@@ -450,7 +584,7 @@ function Section({
                   <option value="true">true</option>
                   <option value="false">false</option>
                 </select>
-              ) : k === "bio" ? (
+              ) : ["bio", "bio_summary", "career_path"].includes(k) ? (
                 <textarea
                   name={k}
                   value={form[k] || ""}

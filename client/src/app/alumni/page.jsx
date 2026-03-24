@@ -16,6 +16,5 @@ async function fetchAlumni() {
 
 export default async function AlumniPage() {
   const { batches, error } = await fetchAlumni();
-  console.log(batches, error);
   return <AlumniClient initialBatches={batches || []} loadError={error} />;
 }
