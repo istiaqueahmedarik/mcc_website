@@ -1,5 +1,4 @@
 import {
-  adminApproveManualTeam,
   adminFinalizeTeamCollection,
   adminGetCollectionDetail,
   adminListTeamRequests,
@@ -10,13 +9,13 @@ import {
   adminUnfinalizeTeamCollection,
   publicFinalizedTeamsByContest,
 } from "@/actions/team_collection";
+import ManualTeamCreateFloatingButton from "@/components/ManualTeamCreateFloatingButton";
 import ProgressLink from "@/components/ProgressLink";
 import { TeamActionForm } from "@/components/TeamActionForm";
 import TeamCardActionsInline from "@/components/TeamCardActionsInline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { get_with_token } from "@/lib/action";
 import {
@@ -24,11 +23,8 @@ import {
   CheckCircle2,
   Clock,
   FastForward,
-  FileText,
   LinkIcon,
-  Plus,
-  Settings,
-  Users,
+  Settings
 } from "lucide-react";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -48,6 +44,54 @@ async function fetchPublicProfile(vjudge) {
     return await response.json();
   } catch {
     return { error: "failed" };
+  }
+}
+
+async function fetchLatestRoomUserScores(roomId) {
+  if (!roomId) return new Map();
+  try {
+    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+    const res = await fetch(`${base}/public-contest-report/all`, {
+      cache: "no-store",
+    });
+    const data = await res.json();
+    const reports = Array.isArray(data?.result) ? data.result : [];
+    const roomReports = reports.filter(
+      (r) => String(r?.Shared_contest_id) === String(roomId)
+    );
+    if (!roomReports.length) return new Map();
+
+    const latest = roomReports.sort((a, b) => {
+      const aTs = new Date(a?.created_at || a?.Updated_at || 0).getTime();
+      const bTs = new Date(b?.created_at || b?.Updated_at || 0).getTime();
+      return bTs - aTs;
+    })[0];
+
+    let parsed = {};
+    try {
+      parsed = JSON.parse(latest?.JSON_string || "{}");
+    } catch {
+      parsed = {};
+    }
+
+    const users = Array.isArray(parsed?.users) ? parsed.users : [];
+    const scoreMap = new Map();
+    for (const u of users) {
+      const username = String(u?.username || "").trim();
+      if (!username) continue;
+      const score =
+        typeof u?.effectiveSolved === "number"
+          ? u.effectiveSolved
+          : typeof u?.totalSolved === "number"
+            ? u.totalSolved
+            : typeof u?.solved === "number"
+              ? u.solved
+              : null;
+      if (typeof score === "number") scoreMap.set(username, score);
+    }
+    return scoreMap;
+  } catch {
+    return new Map();
   }
 }
 
@@ -81,6 +125,11 @@ export default async function Page({ params, searchParams }) {
     );
 
   const { collection, rankOrder, choices, teams } = detail.result || {};
+  const roomUserScores = await fetchLatestRoomUserScores(collection?.room_id);
+  const normalizeTitle = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase();
   const finalizedBlock = (finalizedRes?.result || []).find(
     (b) => String(b?.collection_id) === String(id)
   );
@@ -94,15 +143,60 @@ export default async function Page({ params, searchParams }) {
     if (score !== null && t?.id != null)
       finalizedScoreById.set(String(t.id), score);
     if (score !== null && t?.team_title)
-      finalizedScoreByTitle.set(String(t.team_title).toLowerCase(), score);
+      finalizedScoreByTitle.set(normalizeTitle(t.team_title), score);
   }
   const getTeamScore = (team) => {
     const byId = team?.id != null ? finalizedScoreById.get(String(team.id)) : null;
     if (typeof byId === "number") return byId;
     if (!team?.team_title) return null;
-    const byTitle = finalizedScoreByTitle.get(String(team.team_title).toLowerCase());
+    const byTitle = finalizedScoreByTitle.get(normalizeTitle(team.team_title));
     return typeof byTitle === "number" ? byTitle : null;
   };
+
+  const getSubmissionAvgScore = (ch) => {
+    const submitterVj = String(ch?.user_vjudge_id || ch?.vjudge_id || "").trim();
+    const memberIds = (Array.isArray(ch?.ordered_choices) ? ch.ordered_choices : [])
+      .map((m) => String(m || "").trim())
+      .filter(Boolean)
+      .slice(0, 2);
+
+    const usersForAverage = [submitterVj, ...memberIds].filter(Boolean);
+    const scores = usersForAverage
+      .map((vj) => roomUserScores.get(vj))
+      .filter((s) => typeof s === "number");
+
+    if (!scores.length) return null;
+    const sum = scores.reduce((acc, cur) => acc + cur, 0);
+    return sum / scores.length;
+  };
+
+  const sortedChoices = [...(choices || [])]
+    .map((ch) => ({
+      ...ch,
+      _score: getSubmissionAvgScore(ch),
+    }))
+    .sort((a, b) => {
+      const aScore = a?._score;
+      const bScore = b?._score;
+
+      if (typeof aScore === "number" && typeof bScore === "number") {
+        if (bScore !== aScore) return bScore - aScore;
+        return String(a?.team_title || "").localeCompare(
+          String(b?.team_title || ""),
+          undefined,
+          { sensitivity: "base" }
+        );
+      }
+
+      if (typeof aScore === "number") return -1;
+      if (typeof bScore === "number") return 1;
+
+      return String(a?.team_title || "").localeCompare(
+        String(b?.team_title || ""),
+        undefined,
+        { sensitivity: "base" }
+      );
+    });
   const sortedTeams = [...(teams || [])].sort((a, b) => {
     const aScore = getTeamScore(a);
     const bScore = getTeamScore(b);
@@ -140,7 +234,6 @@ export default async function Page({ params, searchParams }) {
     "submissions",
     "auto-preview",
     "manual-requests",
-    "manual-creation",
     "participants",
   ];
   const activeSection = tabOptions.includes(resolvedSearchParams?.section)
@@ -150,6 +243,26 @@ export default async function Page({ params, searchParams }) {
   for (const t of teams || []) {
     for (const m of t?.member_vjudge_ids || []) allTeamUserIds.add(String(m));
     if (t?.coach_vjudge_id) allTeamUserIds.add(String(t.coach_vjudge_id));
+  }
+  for (const ch of choices || []) {
+    const submitter = ch?.user_vjudge_id || ch?.vjudge_id;
+    if (submitter) allTeamUserIds.add(String(submitter));
+    const ordered = Array.isArray(ch?.ordered_choices) ? ch.ordered_choices : [];
+    for (const m of ordered) {
+      if (m) allTeamUserIds.add(String(m));
+    }
+  }
+  for (const vj of rankOrder || []) {
+    if (vj) allTeamUserIds.add(String(vj));
+  }
+  for (const req of teamRequests || []) {
+    if (req?.vjudge_id) allTeamUserIds.add(String(req.vjudge_id));
+    const requestedMembers = Array.isArray(req?.desired_member_vjudge_ids)
+      ? req.desired_member_vjudge_ids
+      : [];
+    for (const m of requestedMembers) {
+      if (m) allTeamUserIds.add(String(m));
+    }
   }
   const teamProfilesArr = await Promise.all(
     Array.from(allTeamUserIds).map(async (vj) => ({
@@ -165,7 +278,6 @@ export default async function Page({ params, searchParams }) {
     submissions: choices?.length || 0,
     autoPreview: autoTeams?.length || 0,
     manualRequests: teamRequests?.length || 0,
-    manualCreation: manualTeams?.length || 0,
     participants: rankOrder?.length || 0,
   };
 
@@ -177,17 +289,6 @@ export default async function Page({ params, searchParams }) {
   async function unfinalize() {
     "use server";
     await adminUnfinalizeTeamCollection(id);
-    revalidatePath(`/admin/team-collection/${id}`);
-  }
-
-  async function approve(formData) {
-    "use server";
-    const title = formData.get("team_title");
-    const members = (formData.get("members") || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    await adminApproveManualTeam(id, title, members);
     revalidatePath(`/admin/team-collection/${id}`);
   }
 
@@ -398,15 +499,6 @@ export default async function Page({ params, searchParams }) {
               Team requests{tabCounts.manualRequests ? ` (${tabCounts.manualRequests})` : ""}
             </Link>
             <Link
-              href={`/admin/team-collection/${id}?section=manual-creation`}
-              className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors duration-200 ${activeSection === "manual-creation"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-            >
-              Team creation(Admin){tabCounts.manualCreation ? ` (${tabCounts.manualCreation})` : ""}
-            </Link>
-            <Link
               href={`/admin/team-collection/${id}?section=participants`}
               className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors duration-200 ${activeSection === "participants"
                 ? "bg-primary text-primary-foreground"
@@ -493,7 +585,7 @@ export default async function Page({ params, searchParams }) {
                                   <div className="text-sm space-y-1">
                                     <div>{coachProfile?.full_name || "-"}</div>
                                     <div>{coachProfile?.batch_name || "-"}</div>
-                                    
+
                                   </div>
                                 </div>
                               ) : (
@@ -567,41 +659,120 @@ export default async function Page({ params, searchParams }) {
         )}
 
         {activeSection === "submissions" && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <FileText className="h-5 w-5 text-accent" />
-                Submissions
-                <Badge variant="secondary" className="ml-auto">
-                  {choices?.length || 0} submissions
-                </Badge>
-              </CardTitle>
+          <Card className="overflow-hidden border-0">
+            <CardHeader className="bg-muted/30 border-0 items-center">
+              <h2 className="flex text-center items-center text-xl">
+                Team choice submissions by participants
+              </h2>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {choices?.map((ch) => (
-                  <div
-                    key={ch.id}
-                    className="p-4 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/40 transition-colors"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="font-semibold text-foreground">
-                        {ch.full_name || ch.vjudge_id}
+            <CardContent className="">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {sortedChoices?.map((ch) => {
+                  const submitterVj = String(ch?.user_vjudge_id || ch?.vjudge_id || "");
+                  const submitterProfile = submitterVj
+                    ? teamProfileMap.get(submitterVj) || {}
+                    : {};
+                  const submitterScore = submitterVj
+                    ? roomUserScores.get(submitterVj)
+                    : null;
+                  const memberIds = (Array.isArray(ch?.ordered_choices) ? ch.ordered_choices : [])
+                    .map((m) => String(m || "").trim())
+                    .filter(Boolean)
+                    .slice(0, 5);
+
+                  return (
+                    <div
+                      key={ch.id}
+                      className="rounded-xl border border-border/50 p-3 bg-muted/10 space-y-3"
+                    >
+                      <div className="rounded-lg bg-background/60 space-y-2">
+                        <div className="flex items-center gap-2 flex-col">
+                          <span className="text-base font-semibold text-foreground">
+                            {ch?.team_title || "Untitled Team"}
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Score: {typeof ch?._score === "number" ? ch._score.toFixed(2) : "Pending"}
+                          </Badge>
+                        </div>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        {ch.team_title}
-                      </Badge>
+
+                      <div className="border-b-2 flex flex-col justify-center items-center border-border/80 bg-background/60 space-y-2 p-2">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Submitted By
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-full overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
+                            {submitterProfile?.profile_pic ? (
+                              <Image
+                                src={submitterProfile.profile_pic}
+                                alt={submitterProfile?.full_name || submitterVj || "Submitter"}
+                                width={44}
+                                height={44}
+                                className="w-11 h-11 object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">N/A</span>
+                            )}
+                          </div>
+                          <div className="text-sm space-y-0.5">
+                            <div>{submitterProfile?.full_name || ch?.full_name || "-"} </div>
+                            <div className="text-xs text-muted-foreground">{submitterProfile?.batch_name || "-"}</div>
+                            <div className="text-xs text-muted-foreground">
+                              Score: {typeof submitterScore === "number" ? submitterScore.toFixed(2) : "-"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg p-1 bg-background/60 space-y-2">
+                        <div className="text-xs text-center uppercase tracking-wide text-muted-foreground">
+                          Other Members
+                        </div>
+                        {memberIds.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {memberIds.map((vj, idx) => {
+                              const p = teamProfileMap.get(vj) || {};
+                              const memberScore = roomUserScores.get(vj);
+                              return (
+                                <div
+                                  key={`${ch.id}_${vj}_${idx}`}
+                                  className="rounded-md border-b border-border/40 p-1.5 bg-muted/20"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-full overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
+                                      {p?.profile_pic ? (
+                                        <Image
+                                          src={p.profile_pic}
+                                          alt={p?.full_name || vj}
+                                          width={36}
+                                          height={36}
+                                          className="w-9 h-9 object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-[10px] text-muted-foreground">N/A</span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm leading-tight">
+                                      <div>{p?.full_name || vj}</div>
+                                      <div className="text-xs text-muted-foreground">{p?.batch_name || "-"}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Score: {typeof memberScore === "number" ? memberScore.toFixed(2) : "-"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No members found.</div>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Choices:</span>{" "}
-                      {Array.isArray(ch.ordered_choices)
-                        ? ch.ordered_choices.join(", ")
-                        : "None"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {!choices?.length && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
                     No submissions received yet.
                   </div>
                 )}
@@ -611,39 +782,88 @@ export default async function Page({ params, searchParams }) {
         )}
 
         {activeSection === "auto-preview" && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Settings className="h-5 w-5 text-accent" />
-                Auto-Generated Preview
-                <Badge variant="secondary" className="ml-auto">
-                  {autoTeams.length} teams
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {autoTeams.map((t, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-xl bg-muted/20 border border-border/50"
-                  >
-                    <h3 className="font-semibold mb-2">{t.title}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {t.members.map((member) => (
-                        <Badge
-                          key={member}
-                          variant="outline"
-                          className="px-3 py-1"
-                        >
-                          {member}
-                        </Badge>
-                      ))}
+          <Card className="overflow-hidden border-0">
+              <CardHeader className="bg-muted/30 border-0 items-center">
+                <h2 className="flex text-center items-center text-xl">
+                  Auto generated team preview
+                </h2>
+              </CardHeader>
+            <CardContent className="">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {autoTeams.map((t, idx) => {
+                  const memberIds = (Array.isArray(t?.members) ? t.members : [])
+                    .map((m) => String(m || "").trim())
+                    .filter(Boolean)
+                    .slice(0, 3);
+                  const scoreValues = memberIds
+                    .map((vj) => roomUserScores.get(vj))
+                    .filter((s) => typeof s === "number");
+                  const teamScore = scoreValues.length
+                    ? scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length
+                    : null;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-border/50 p-3 bg-muted/10 space-y-3"
+                    >
+                      <div className="rounded-lg bg-background/60 space-y-2">
+                        <div className="flex items-center gap-2 flex-col">
+                          <span className="text-base font-semibold text-foreground text-center">
+                            {t?.title || "Untitled Team"}
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            Score: {typeof teamScore === "number" ? teamScore.toFixed(2) : "Pending"}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg p-1 bg-background/60 space-y-2">
+                        {memberIds.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {memberIds.map((vj, memberIdx) => {
+                              const p = teamProfileMap.get(vj) || {};
+                              const memberScore = roomUserScores.get(vj);
+                              return (
+                                <div
+                                  key={`${idx}_${vj}_${memberIdx}`}
+                                  className="rounded-md border-b border-border/40 p-1.5 bg-muted/20"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-full overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
+                                      {p?.profile_pic ? (
+                                        <Image
+                                          src={p.profile_pic}
+                                          alt={p?.full_name || vj}
+                                          width={36}
+                                          height={36}
+                                          className="w-9 h-9 object-cover"
+                                        />
+                                      ) : (
+                                        <span className="text-[10px] text-muted-foreground">N/A</span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm leading-tight">
+                                      <div>{p?.full_name || vj}</div>
+                                      <div className="text-xs text-muted-foreground">{p?.batch_name || "-"}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Score: {typeof memberScore === "number" ? memberScore.toFixed(2) : "-"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No members found.</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {!autoTeams.length && (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="col-span-full text-center py-8 text-muted-foreground">
                     No auto teams can be formed with current submissions.
                   </div>
                 )}
@@ -653,19 +873,32 @@ export default async function Page({ params, searchParams }) {
         )}
 
         {activeSection === "manual-requests" && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <FileText className="h-5 w-5 text-accent" />
+          <Card className="overflow-hidden border-0">
+            <CardHeader className="bg-muted/30 border-0 items-center">
+              <h2 className="flex items-center gap-2 text-xl">
                 Manual Team Requests
-                <Badge variant="secondary" className="ml-auto">
-                  {teamRequests.length}
-                </Badge>
-              </CardTitle>
+              </h2>
             </CardHeader>
-            <CardContent className="p-6 space-y-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {teamRequests.map((req) => (
-                <ManualRequestItem key={req.id} request={req} collectionId={id} />
+                (() => {
+                  const requestedMembers = Array.isArray(req?.desired_member_vjudge_ids)
+                    ? req.desired_member_vjudge_ids.map((m) => String(m))
+                    : [];
+                  const memberProfiles = requestedMembers.map((vj) => ({
+                    vjudge_id: vj,
+                    ...(teamProfileMap.get(vj) || {}),
+                  }));
+                  return (
+                    <ManualRequestItem
+                      key={req.id}
+                      request={req}
+                      collectionId={id}
+                      profile={teamProfileMap.get(String(req?.vjudge_id || "")) || {}}
+                      memberProfiles={memberProfiles}
+                    />
+                  );
+                })()
               ))}
               {!teamRequests.length && (
                 <div className="text-center py-12 text-muted-foreground text-sm">
@@ -676,88 +909,59 @@ export default async function Page({ params, searchParams }) {
           </Card>
         )}
 
-        {activeSection === "manual-creation" && (
-          <Card className="overflow-hidden border-0 shadow-lg bg-gradient-to-br from-background to-muted/20">
-            <CardHeader className="bg-gradient-to-r from-muted/40 to-muted/20 border-b border-border/30">
-              <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="p-2 rounded-xl bg-accent/10 border border-accent/20">
-                  <Plus className="h-5 w-5 text-accent" />
-                </div>
-                Create Team Manually
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8">
-              <TeamActionForm
-                action={approve}
-                pending="Creating team..."
-                success="Team created"
-                error="Failed to create team"
-                resetOnSuccess={true}
-              >
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground/80 tracking-wide">
-                      Team Name
-                    </label>
-                    <Input
-                      name="team_title"
-                      placeholder="Enter team name"
-                      className="h-12 rounded-2xl border-2 border-border/50 bg-background/50 backdrop-blur-sm transition-all duration-200 focus:border-accent/50 focus:shadow-lg focus:shadow-accent/10 hover:border-border/70 text-base"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground/80 tracking-wide">
-                      Team Members
-                    </label>
-                    <Input
-                      name="members"
-                      placeholder="Comma-separated member IDs"
-                      className="h-12 rounded-2xl border-2 border-border/50 bg-background/50 backdrop-blur-sm transition-all duration-200 focus:border-accent/50 focus:shadow-lg focus:shadow-accent/10 hover:border-border/70 text-base"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end pt-4">
-                  <Button
-                    type="submit"
-                    className="h-12 px-8 rounded-2xl bg-gradient-to-r from-accent to-accent/90 hover:from-accent/90 hover:to-accent/80 shadow-lg shadow-accent/20 transition-all duration-200 hover:shadow-xl hover:shadow-accent/30 hover:scale-[1.02] gap-3 text-base font-medium"
-                  >
-                    <Plus className="h-5 w-5" />
-                    Create Team
-                  </Button>
-                </div>
-              </TeamActionForm>
-            </CardContent>
-          </Card>
-        )}
-
         {activeSection === "participants" && (
-          <Card className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Users className="h-5 w-5 text-accent" />
+          <Card className="overflow-hidden border-0">
+            <CardHeader className="bg-muted/30 border-0 items-center">
+              <h2 className="flex items-center gap-2 text-xl">
                 Participants
-                <Badge variant="secondary" className="ml-auto">
-                  {rankOrder?.length || 0} total
-                </Badge>
-              </CardTitle>
+              </h2>
             </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {rankOrder?.map((u, i) => (
-                  <div
-                    key={u}
-                    className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/40 transition-colors"
-                  >
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
-                      <span className="text-sm font-mono font-semibold text-accent">
-                        {i + 1}
-                      </span>
+            <CardContent className="">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                {rankOrder?.map((u, i) => {
+                  const p = teamProfileMap.get(String(u)) || {};
+                  const participantScore = roomUserScores.get(String(u));
+                  return (
+                    <div
+                      key={u}
+                      className="rounded-xl border border-border/50 p-3 bg-muted/10 space-y-3"
+                    >
+                      {/* <div className="flex items-center justify-between">
+                        <Badge variant="outline">Rank #{i + 1}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Score: {typeof participantScore === "number" ? participantScore.toFixed(2) : "-"}
+                        </Badge>
+                      </div> */}
+
+                      <div className="rounded-lg bg-background/60">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full overflow-hidden  bg-muted flex items-center justify-center">
+                            {p?.profile_pic ? (
+                              <Image
+                                src={p.profile_pic}
+                                alt={p?.full_name || String(u)}
+                                width={48}
+                                height={48}
+                                className="w-12 h-12 object-cover"
+                              />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">N/A</span>
+                            )}
+                          </div>
+                          <div className="text-sm space-y-0.5 min-w-0">
+                            <div className="font-medium truncate">{p?.full_name || String(u)}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {p?.batch_name || "-"}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              Score: {typeof participantScore === "number" ? participantScore.toFixed(2) : "-"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="truncate font-medium" title={u}>
-                      {u}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
                 {!rankOrder?.length && (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
                     No participants registered yet.
@@ -768,6 +972,8 @@ export default async function Page({ params, searchParams }) {
           </Card>
         )}
       </div>
+
+      <ManualTeamCreateFloatingButton collectionId={id} />
     </div>
   );
 }
@@ -836,7 +1042,7 @@ function AddMemberForm({ collectionId, teamTitle, rankOrder, existing }) {
   );
 }
 
-function ManualRequestItem({ request, collectionId }) {
+function ManualRequestItem({ request, collectionId, profile, memberProfiles = [] }) {
   async function toggleProcessed() {
     "use server";
     await adminProcessTeamRequest(request.id, !request.processed);
@@ -847,59 +1053,105 @@ function ManualRequestItem({ request, collectionId }) {
     await adminProcessTeamRequest(request.id, true, true);
     revalidatePath(`/admin/team-collection/${collectionId}`);
   }
+
+  const otherMembers = (memberProfiles || [])
+    .filter((m) => String(m?.vjudge_id || "") !== String(request?.vjudge_id || ""))
+    .slice(0, 2);
+
   return (
-    <div className="p-4 rounded-xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 rounded-md text-xs font-mono bg-accent/10 text-accent">
-              {new Date(request.created_at).toLocaleString()}
-            </span>
-            {request.processed && (
-              <span className="px-2 py-0.5 rounded-md text-xs bg-green-100 text-green-700 border border-green-300">
-                Processed
-              </span>
-            )}
-          </div>
-          <div className="text-sm font-medium">
-            From: {request.vjudge_id || "unknown"}
-          </div>
-          <div className="text-sm">
-            Proposed Title:{" "}
-            <span className="font-semibold">
-              {request.proposed_team_title || "—"}
-            </span>
-          </div>
-          <div className="text-sm">
-            Members:{" "}
-            {Array.isArray(request.desired_member_vjudge_ids)
-              ? request.desired_member_vjudge_ids.join(", ")
-              : ""}
-          </div>
-          {request.note && (
-            <div className="text-xs text-muted-foreground whitespace-pre-line border-l-2 border-accent/40 pl-3">
-              {request.note}
+    <div className="rounded-xl  border border-border/50 p-2 bg-muted/10 space-y-3">
+      <div className="rounded-lg p-3 bg-background/60 space-y-2">
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-center text-xl font-bold">{request.proposed_team_title || "—"}</h2>
+          <span className="text-xs text-muted-foreground truncate">{new Date(request.created_at).toLocaleString()}</span>
+          <Badge
+            variant={request?.processed ? "default" : "outline"}
+            className={request?.processed ? "bg-green-100 text-green-800 border-green-200" : ""}
+          >
+            {request?.processed ? "Approved" : "Not Approved"}
+          </Badge>
+        </div>
+
+        <div className="pt-1">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
+              {profile?.profile_pic ? (
+                <Image
+                  src={profile.profile_pic}
+                  alt={profile?.full_name || request.vjudge_id || "Requester"}
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 object-cover"
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">N/A</span>
+              )}
             </div>
+            <div className="text-sm leading-tight min-w-0">
+              <div className="font-medium truncate">{profile?.full_name || request.vjudge_id || "unknown"}</div>
+              <div className="text-xs text-muted-foreground truncate">{profile?.batch_name || "-"}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-1 border-t-2 border-border/50">
+          {otherMembers.length > 0 ? (
+            <div className="space-y-2">
+              {otherMembers.map((m, idx) => (
+                <div
+                  key={`${request.id}_${m.vjudge_id || idx}`}
+                  className="rounded-md border-b border-border/40 p-2"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border border-border/50 bg-muted flex items-center justify-center">
+                      {m?.profile_pic ? (
+                        <Image
+                          src={m.profile_pic}
+                          alt={m?.full_name || m?.vjudge_id || "Member"}
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">N/A</span>
+                      )}
+                    </div>
+                    <div className="text-sm leading-tight min-w-0">
+                      <div className="font-medium truncate">{m?.full_name || m?.vjudge_id || "-"}</div>
+                      <div className="text-xs text-muted-foreground truncate">{m?.batch_name || "-"}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">No other members listed.</div>
           )}
         </div>
-        <div className="flex gap-2 md:flex-col">
-          <form action={toggleProcessed}>
-            <button
-              type="submit"
-              className="px-3 py-2 rounded-lg text-xs font-medium border bg-background hover:bg-muted/40"
-            >
-              {request.processed ? "Mark Unprocessed" : "Mark Processed"}
-            </button>
-          </form>
-          <form action={approveDirect}>
-            <button
-              type="submit"
-              className="px-3 py-2 rounded-lg text-xs font-medium border bg-accent text-accent-foreground hover:opacity-90"
-            >
-              Approve & Create Team
-            </button>
-          </form>
+
+        <div className="pt-1 border-t border-border/40 text-sm text-muted-foreground whitespace-pre-line">
+          {/* <span className="text-foreground/80">Reason:</span>{" "} */}
+          {request.note || "No reason provided."}
         </div>
+      </div>
+
+      <div className="flex gap-2 pt-1 items-center justify-center">
+        <form action={toggleProcessed}>
+          <button
+            type="submit"
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-black bg-black text-white hover:bg-black/90 transition-colors"
+          >
+            {request.processed ? "Mark Unprocessed" : "Mark Processed"}
+          </button>
+        </form>
+        <form action={approveDirect}>
+          <button
+            type="submit"
+            className="px-3 py-2 rounded-lg text-xs font-medium border border-black bg-black text-white hover:bg-black/90 transition-colors"
+          >
+            Approve Team
+          </button>
+        </form>
       </div>
     </div>
   );

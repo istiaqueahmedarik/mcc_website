@@ -327,7 +327,7 @@ export const searchUsers = async (c: any) => {
   try {
     const like = `%${query.replace(/%/g, "")}%`;
     const rows = await sql`
-      SELECT id, full_name, email, vjudge_id
+      SELECT id, full_name, email, vjudge_id, profile_pic, batch_name
       FROM users
       WHERE (full_name ILIKE ${like} OR email ILIKE ${like} OR vjudge_id ILIKE ${like})
       ORDER BY full_name NULLS LAST
