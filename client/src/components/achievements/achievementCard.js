@@ -1,9 +1,31 @@
 import { deleteAchievement } from "@/lib/action";
 import { format } from "date-fns";
-import { CalendarDays, ArrowUpRight, Trophy } from "lucide-react";
+import { CalendarDays, ArrowUpRight, Trophy, Tag } from "lucide-react";
 import Image from "next/image";
 import DeleteComp from "../deleteComp";
 import ProgressLink from "../ProgressLink";
+
+const normalizeTags = (rawTags) => {
+  if (Array.isArray(rawTags)) {
+    return rawTags
+      .map((tag) => {
+        if (typeof tag === "string") return tag.trim();
+        if (typeof tag?.name === "string") return tag.name.trim();
+        if (typeof tag?.tag === "string") return tag.tag.trim();
+        return "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof rawTags === "string") {
+    return rawTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
 
 export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess, index = 0 }) {
   const glowColors = [
@@ -32,6 +54,7 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
   ];
 
   const colorIdx = index % glowColors.length;
+  const tags = normalizeTags(achievement?.tag_names ?? achievement?.tags ?? []);
 
   return (
     <div
@@ -88,6 +111,28 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
         <h2 className="font-semibold text-[15px] text-white leading-snug line-clamp-2 tracking-tight">
           {achievement.title}
         </h2>
+
+        {tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-wider text-white/55">
+              <Tag className="h-3 w-3" />
+              Tags
+            </span>
+            {tags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/70"
+              >
+                {tag}
+              </span>
+            ))}
+            {tags.length > 3 && (
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+                +{tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* CTA */}
         <div className="translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out">

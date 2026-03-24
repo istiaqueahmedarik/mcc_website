@@ -7,6 +7,7 @@ import {
   getAchievementNumber,
   insertAchievement,
   updateAchievement,
+  getAchievementTags,
 } from '../controllers/achievementController'
 
 const route = new Hono()
@@ -24,4 +25,5 @@ route.post('/insert/delete', deleteAchievement)
 route.get('/get_achievements', getAchievements)
 route.post('/get_achievement', getAchievement)
 route.get('/get_achievement_number', getAchievementNumber)
+route.get('/get_tags', getAchievementTags)
 export default route

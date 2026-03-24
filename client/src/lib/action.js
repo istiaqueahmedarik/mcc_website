@@ -141,6 +141,14 @@ export async function uploadImage(folder, uId, file, bucket) {
   return { data, url };
 }
 
+export async function getAchievementTags() {
+  // console.log("Getting achievement tags");
+  const response = await get("achieve/get_tags");
+  // console.log("Tags response:", response);
+  if (response.error) return response.error;
+  return { success: true, tags: response.result || [] };
+}
+
 export async function createAchievement(prevState, formData) {
   let raw = Object.fromEntries(formData);
 
@@ -198,7 +206,7 @@ export async function updateAchievement(prevState, formData) {
   // console.log('imgurl: ', prevState.imgurl)
 
   // return {}
-
+  // console.log("Updating achievement with data:", raw);
   const response = await post_with_token("achieve/insert/update", raw);
   if (response.error)
     return {
