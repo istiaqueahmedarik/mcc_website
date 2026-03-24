@@ -1,24 +1,80 @@
 "use client";
 import React from "react";
-import { Award, GraduationCap, Sparkles, Search } from "lucide-react";
+import {
+  Award,
+  Briefcase,
+  Building2,
+  Facebook,
+  GraduationCap,
+  Linkedin,
+  Mail,
+  MapPin,
+  Phone,
+  Search,
+  Sparkles,
+} from "lucide-react";
 import MccLogo from "@/components/IconChanger/MccLogo";
 
 function highlight(text, q) {
-  if (!q) return text;
-  const idx = text.toLowerCase().indexOf(q.toLowerCase());
-  if (idx === -1) return text;
+  const safe = String(text || "");
+  if (!q) return safe;
+  const idx = safe.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return safe;
   return (
     <>
-      {text.slice(0, idx)}
+      {safe.slice(0, idx)}
       <span className="bg-[hsl(var(--alumni-gold)/0.25)]">
-        {text.slice(idx, idx + q.length)}
+        {safe.slice(idx, idx + q.length)}
       </span>
-      {text.slice(idx + q.length)}
+      {safe.slice(idx + q.length)}
     </>
   );
 }
 
+function toCareerPath(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === "string") {
+    return value
+      .split(/->|→|\|/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeMember(member) {
+  const careerPath = toCareerPath(member.career_path);
+  return {
+    ...member,
+    current_company: member.current_company || "",
+    location: member.location || "",
+    email: member.email || "",
+    phone: member.phone || "",
+    linkedin_url: member.linkedin_url || "",
+    facebook_url: member.facebook_url || "",
+    career_path: careerPath,
+  };
+}
+
+function matchesQuery(member, query) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  const targets = [
+    member.name,
+    member.role,
+    member.now,
+    member.current_company,
+    member.location,
+    member.email,
+    member.phone,
+    ...(member.career_path || []),
+  ];
+  return targets.some((v) => String(v || "").toLowerCase().includes(q));
+}
+
 function MemberCard({ m, query }) {
+  const careerPath = m.career_path || [];
+
   return (
     <div
       key={m.id || m.name}
@@ -47,9 +103,86 @@ function MemberCard({ m, query }) {
             )}
           </div>
         </div>
-        {m.now && (
-          <div className="text-xs md:text-sm text-muted-foreground leading-relaxed">
-            {highlight(m.now, query)}
+        {(m.now || m.current_company || m.role || m.location) && (
+          <div className="text-xs md:text-sm text-muted-foreground leading-relaxed grid gap-1">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
+              <span>
+                Current Company: {highlight(m.current_company || m.now, query)}
+              </span>
+            </div>
+            {m.role && (
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
+                <span>Role: {highlight(m.role, query)}</span>
+              </div>
+            )}
+            {m.location && (
+              <div className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
+                <span>Location: {highlight(m.location, query)}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {(m.linkedin_url || m.email || m.facebook_url || m.phone) && (
+          <div className="pt-2 border-t border-border/60">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+              Contact & Social Links
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {m.linkedin_url && (
+                <a
+                  href={m.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
+                >
+                  <Linkedin className="h-3.5 w-3.5" /> LinkedIn
+                </a>
+              )}
+              {m.email && (
+                <a
+                  href={`mailto:${m.email}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
+                >
+                  <Mail className="h-3.5 w-3.5" /> Email
+                </a>
+              )}
+              {m.facebook_url && (
+                <a
+                  href={m.facebook_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
+                >
+                  <Facebook className="h-3.5 w-3.5" /> Facebook
+                </a>
+              )}
+              {m.phone && (
+                <a
+                  href={`tel:${m.phone}`}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
+                >
+                  <Phone className="h-3.5 w-3.5" /> Phone
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+        {careerPath.length > 0 && (
+          <div className="pt-2 border-t border-border/60">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+              Career Path
+            </p>
+            <p className="text-xs leading-relaxed">
+              {careerPath.map((step, idx) => (
+                <React.Fragment key={`${step}-${idx}`}>
+                  {idx > 0 && <span className="text-muted-foreground"> {"→"} </span>}
+                  <span>{highlight(step, query)}</span>
+                </React.Fragment>
+              ))}
+            </p>
           </div>
         )}
       </div>
@@ -65,13 +198,7 @@ function MemberCard({ m, query }) {
 }
 
 function BatchBlock({ batch, query }) {
-  const filteredMembers = batch.members.filter((m) => {
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return [m.name, m.role, m.now].some(
-      (v) => v && v.toLowerCase().includes(q)
-    );
-  });
+  const filteredMembers = batch.members.filter((m) => matchesQuery(m, query));
   if (filteredMembers.length === 0) return null;
   return (
     <div className="space-y-6">
@@ -112,20 +239,46 @@ function useDebounce(value, delay) {
 
 export default function AlumniClient({ initialBatches, loadError }) {
   const [query, setQuery] = React.useState("");
+  const [batchFilter, setBatchFilter] = React.useState("all");
   const debounced = useDebounce(query, 200);
+
+  const normalizedBatches = React.useMemo(
+    () =>
+      (initialBatches || []).map((batch) => ({
+        ...batch,
+        members: (batch.members || []).map((m) => normalizeMember(m)),
+      })),
+    [initialBatches]
+  );
+
+  const batchOptions = React.useMemo(
+    () =>
+      normalizedBatches.map((b) => ({
+        id: String(b.id || b.batch),
+        label: `${b.batch} (${b.year})`,
+      })),
+    [normalizedBatches]
+  );
+
   const visible = React.useMemo(() => {
-    if (!debounced) return initialBatches;
+    const source =
+      batchFilter === "all"
+        ? normalizedBatches
+        : normalizedBatches.filter(
+            (b) => String(b.id || b.batch) === batchFilter
+          );
+
+    if (!debounced) return source;
     const q = debounced.toLowerCase();
-    return initialBatches.filter((b) => {
+    return source.filter((b) => {
       const inBatch = [b.batch, b.motto, String(b.year)].some(
-        (v) => v && v.toLowerCase().includes(q)
+        (v) => String(v || "").toLowerCase().includes(q)
       );
       if (inBatch) return true;
-      return b.members.some((m) =>
-        [m.name, m.role, m.now].some((v) => v && v.toLowerCase().includes(q))
-      );
+      return b.members.some((m) => matchesQuery(m, q));
     });
-  }, [initialBatches, debounced]);
+  }, [batchFilter, debounced, normalizedBatches]);
+
   return (
     <div className="relative w-full flex flex-col items-center pb-32">
       <section className="alumni-hero relative w-full overflow-hidden pt-28 pb-16 flex flex-col items-center text-center">
@@ -155,6 +308,20 @@ export default function AlumniClient({ initialBatches, loadError }) {
               placeholder="Search by name, role, position, batch, motto..."
               className="w-full pl-9 pr-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
             />
+          </div>
+          <div className="w-full max-w-md mx-auto">
+            <select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+              className="w-full px-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
+            >
+              <option value="all">All batches</option>
+              {batchOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
           </div>
           {loadError && (
             <div className="text-xs text-red-500">
