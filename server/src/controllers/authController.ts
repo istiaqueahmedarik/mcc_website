@@ -21,14 +21,14 @@ export const signup = async (c: any) => {
     mist_id_card,
     email,
     phone,
-    password
+    password,
   );
   try {
     // Validate password length
     if (!password || password.length < 8) {
       return c.json(
         { error: "Password must be at least 8 characters long" },
-        400
+        400,
       );
     }
 
@@ -40,8 +40,8 @@ export const signup = async (c: any) => {
     const result =
       await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
         VALUES (${full_name}, ${profile_pic}, ${Number(
-        mist_id
-      )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
+          mist_id,
+        )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
         RETURNING *`;
     return c.json({ result });
   } catch (error: any) {
@@ -54,17 +54,17 @@ export const signup = async (c: any) => {
     ) {
       return c.json(
         { error: "Database connection issue. Please try again." },
-        503
+        503,
       );
     }
     if (error.code === "26000") {
       // Prepared statement error
       console.error(
-        "Prepared statement error - this should not happen with transaction mode"
+        "Prepared statement error - this should not happen with transaction mode",
       );
       return c.json(
         { error: "Database configuration issue. Please contact support." },
-        500
+        500,
       );
     }
     if (error.code === "23505") {
@@ -104,17 +104,17 @@ export const login = async (c: any) => {
     ) {
       return c.json(
         { error: "Database connection issue. Please try again." },
-        503
+        503,
       );
     }
     if (error.code === "26000") {
       // Prepared statement error
       console.error(
-        "Prepared statement error - this should not happen with transaction mode"
+        "Prepared statement error - this should not happen with transaction mode",
       );
       return c.json(
         { error: "Database configuration issue. Please contact support." },
-        500
+        500,
       );
     }
 
@@ -153,9 +153,25 @@ export const getPublicProfileByVjudge = async (c: any) => {
   if (!vjudge) return c.json({ error: "Missing vjudge id" }, 400);
   try {
     const rows = await sql`
-  select id, full_name, profile_pic, email, phone, created_at, vjudge_id, vjudge_verified, cf_id, cf_verified, codechef_id, atcoder_id, tshirt_size, mist_id_card, mist_id
-      from users
-      where vjudge_id = ${vjudge}
+  select
+      u.id,
+      u.full_name,
+      u.profile_pic,
+      u.email,
+      u.phone,
+      u.created_at,
+      u.vjudge_id,
+      u.vjudge_verified,
+      u.cf_id,
+      u.cf_verified,
+      u.codechef_id,
+      u.atcoder_id,
+      u.tshirt_size,
+      u.mist_id_card,
+      u.mist_id,
+      u.batch_name
+      from users u
+      where lower(u.vjudge_id) = lower(${vjudge})
       limit 1
     `;
     if (rows.length === 0) return c.json({ error: "Not found" }, 404);
@@ -178,6 +194,7 @@ export const getPublicProfileByVjudge = async (c: any) => {
         tshirt_size: u.tshirt_size,
         mist_id_card: u.mist_id_card,
         mist_id: u.mist_id,
+        batch_name: u.batch_name || null,
       },
     });
   } catch (e: any) {
@@ -187,17 +204,17 @@ export const getPublicProfileByVjudge = async (c: any) => {
     if (e.code === "CONNECTION_CLOSED" || e.code === "CONNECTION_ENDED") {
       return c.json(
         { error: "Database connection issue. Please try again." },
-        503
+        503,
       );
     }
     if (e.code === "26000") {
       // Prepared statement error
       console.error(
-        "Prepared statement error - this should not happen with transaction mode"
+        "Prepared statement error - this should not happen with transaction mode",
       );
       return c.json(
         { error: "Database configuration issue. Please contact support." },
-        500
+        500,
       );
     }
 
@@ -312,7 +329,7 @@ Military Institute of Science and Technology`,
             </div>
           </div>
         </div>
-      `
+      `,
     );
     return c.json({ result });
   } catch (error) {
@@ -403,7 +420,7 @@ Military Institute of Science and Technology`,
             </div>
           </div>
         </div>
-      `
+      `,
     );
     return c.json({ result });
   } catch (error) {
@@ -518,7 +535,7 @@ Military Institute of Science and Technology`,
             </div>
           </div>
         </div>
-      `
+      `,
     );
 
     return c.json({ message: "OTP sent to your email successfully" });
@@ -541,7 +558,7 @@ export const verifyOTP = async (c: any) => {
     if (!otpData) {
       return c.json(
         { error: "No OTP found for this email. Please request a new OTP." },
-        400
+        400,
       );
     }
 
@@ -549,7 +566,7 @@ export const verifyOTP = async (c: any) => {
       otpStore.delete(email);
       return c.json(
         { error: "OTP has expired. Please request a new OTP." },
-        400
+        400,
       );
     }
 
@@ -578,7 +595,7 @@ export const resetPassword = async (c: any) => {
   if (password.length < 8) {
     return c.json(
       { error: "Password must be at least 8 characters long" },
-      400
+      400,
     );
   }
 
@@ -588,7 +605,7 @@ export const resetPassword = async (c: any) => {
     if (!otpData) {
       return c.json(
         { error: "No OTP found for this email. Please request a new OTP." },
-        400
+        400,
       );
     }
 
@@ -596,14 +613,14 @@ export const resetPassword = async (c: any) => {
       otpStore.delete(email);
       return c.json(
         { error: "OTP has expired. Please request a new OTP." },
-        400
+        400,
       );
     }
 
     if (otpData.otp !== otp || !otpData.verified) {
       return c.json(
         { error: "OTP not verified. Please verify your OTP first." },
-        400
+        400,
       );
     }
 
