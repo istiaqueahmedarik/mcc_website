@@ -95,6 +95,14 @@ export async function adminDeleteTeamCollection(collection_id){
   return await post_with_token('team-collection/admin/delete', { collection_id })
 }
 
+export async function adminRenameTeamCollection(collection_id, title){
+  return await post_with_token('team-collection/admin/rename', { collection_id, title })
+}
+
+export async function adminCopyTeamCollection(collection_id, title){
+  return await post_with_token('team-collection/admin/copy', { collection_id, title })
+}
+
 export async function adminGetCollectionDetail(collection_id){
   return await post_with_token('team-collection/admin/detail', { collection_id })
 }

@@ -1,5 +1,21 @@
 import sql from '../db'
 
+function parseBioMeta(raw: any) {
+    if (!raw) return {}
+    if (typeof raw === 'object') return raw
+    if (typeof raw !== 'string') return {}
+
+    const text = raw.trim()
+    if (!text) return {}
+    try {
+        const parsed = JSON.parse(text)
+        if (parsed && typeof parsed === 'object') return parsed
+    } catch {
+        return { about: text }
+    }
+    return {}
+}
+
 // Utility to check admin based on jwtPayload in context
 async function requireAdmin(c: any) {
     const { id, email } = c.get('jwtPayload') || {}
@@ -13,10 +29,59 @@ async function requireAdmin(c: any) {
 
 export const getLandingPublic = async (c: any) => {
     try {
-        const features = await sql`select id, title, description, position from landing_features where active = true order by position, id`
-        const stats = await sql`select id, title, value, suffix, position from landing_stats where active = true order by position, id`
-        const timeline = await sql`select id, year, title, body, position from landing_timeline where active = true order by position, id`
-        const alumni = await sql`select id, name, title, quote, image_url, position from landing_testimonials where active = true order by position, id`
+        const [features, stats, timeline, highlightedMembers] = await Promise.all([
+            sql`select id, title, description, position from landing_features where active = true order by position, id`,
+            sql`select id, title, value, suffix, position from landing_stats where active = true order by position, id`,
+            sql`select id, year, title, body, position from landing_timeline where active = true order by position, id`,
+            sql`
+                select
+                    m.id,
+                    m.full_name,
+                    m.role,
+                    m.current_position,
+                    m.bio,
+                    m.image_url,
+                    m.sort_order,
+                    b.label as batch_label,
+                    b.year as batch_year
+                from alumni_member m
+                left join alumni_batch b on b.id = m.batch_id
+                where m.is_active = true
+                  and m.highlight = true
+                order by m.sort_order, m.id
+                        `
+        ])
+
+        const unifiedAlumni = highlightedMembers.map((m: any, idx: number) => {
+            const meta = parseBioMeta(m.bio)
+            const company = (meta.current_company ?? meta.company ?? '').toString().trim()
+            const role = (m.role ?? '').toString().trim()
+            const batchTitle = m.batch_label
+                ? `${m.batch_label}${m.batch_year ? ` (${m.batch_year})` : ''}`
+                : 'MIST Alumni'
+
+            const title = company
+                ? `${batchTitle} • ${role || 'Alumni'} @ ${company}`
+                : `${batchTitle} • ${role || 'Alumni'}`
+
+            return {
+                id: `member-${m.id}`,
+                name: m.full_name,
+                title,
+                quote: (meta.about ?? meta.bio_summary ?? role ?? 'Alumni spotlight').toString(),
+                image_url: m.image_url,
+                position: Number.isFinite(Number(m.sort_order)) ? Number(m.sort_order) : idx + 1,
+                company,
+                role,
+            }
+        })
+
+        const alumni = unifiedAlumni.sort((a, b) => {
+            const pa = Number.isFinite(Number(a.position)) ? Number(a.position) : 0
+            const pb = Number.isFinite(Number(b.position)) ? Number(b.position) : 0
+            return pa - pb
+        })
+
         return c.json({ features, stats, timeline, alumni })
     } catch (e) {
         console.error('Landing public data load failed:', e)
@@ -42,7 +107,7 @@ async function insertRow(table: string, fields: Record<string, any>) {
     return await sql`INSERT INTO ${sql(table)} (${colsFragment}) VALUES (${valsFragment}) RETURNING *`
 }
 
-async function updateRow(table: string, id: number, fields: Record<string, any>) {
+async function updateRow(table: string, id: number | string, fields: Record<string, any>) {
     const entries = Object.entries(fields)
     if (entries.length === 0) return []
     const fragments = entries.map(([k, v]) => sql`${sql(k)} = ${v}`)
@@ -55,7 +120,7 @@ async function updateRow(table: string, id: number, fields: Record<string, any>)
     return await sql`UPDATE ${sql(table)} SET ${setFragment} WHERE id = ${id} RETURNING *`
 }
 
-async function deleteRow(table: string, id: number) {
+async function deleteRow(table: string, id: number | string) {
     return await sql`DELETE FROM ${sql(table)} WHERE id = ${id} RETURNING *`
 }
 
@@ -84,7 +149,7 @@ function makeCrud(table: string, allowedInsert: string[], allowedUpdate: string[
             const data: Record<string, any> = {}
             for (const k of allowedUpdate) if (k in rest) data[k] = (rest as any)[k]
             try {
-                const rows = await updateRow(table, Number(id), data)
+                const rows = await updateRow(table, id, data)
                 return c.json({ result: rows[0] })
             } catch (e) {
                 console.error(e)
@@ -98,7 +163,7 @@ function makeCrud(table: string, allowedInsert: string[], allowedUpdate: string[
             const { id } = body
             if (!id) return c.json({ error: 'Missing id' }, 400)
             try {
-                const rows = await deleteRow(table, Number(id))
+                const rows = await deleteRow(table, id)
                 return c.json({ result: rows[0] })
             } catch (e) {
                 console.error(e)
@@ -134,13 +199,13 @@ function makeCrudWithOrder(table: string, allowedInsert: string[], allowedUpdate
             if (!admin) return c.json({ error: 'Unauthorized' }, 401)
             const body = await c.req.json(); const { id, ...rest } = body; if (!id) return c.json({ error: 'Missing id' }, 400)
             const data: Record<string, any> = {}; for (const k of allowedUpdate) if (k in rest) data[k] = (rest as any)[k]
-            try { const rows = await updateRow(table, Number(id), data); return c.json({ result: rows[0] }) } catch (e) { console.error(e); return c.json({ error: 'Update failed' }, 400) }
+            try { const rows = await updateRow(table, id, data); return c.json({ result: rows[0] }) } catch (e) { console.error(e); return c.json({ error: 'Update failed' }, 400) }
         },
         delete: async (c: any) => {
             const admin = await requireAdmin(c)
             if (!admin) return c.json({ error: 'Unauthorized' }, 401)
             const body = await c.req.json(); const { id } = body; if (!id) return c.json({ error: 'Missing id' }, 400)
-            try { const rows = await deleteRow(table, Number(id)); return c.json({ result: rows[0] }) } catch (e) { console.error(e); return c.json({ error: 'Delete failed' }, 400) }
+            try { const rows = await deleteRow(table, id); return c.json({ result: rows[0] }) } catch (e) { console.error(e); return c.json({ error: 'Delete failed' }, 400) }
         },
         list: async (c: any) => {
             const admin = await requireAdmin(c)
@@ -164,11 +229,6 @@ export const timelineCrud = makeCrud(
     'landing_timeline',
     ['year', 'title', 'body', 'position', 'active'],
     ['year', 'title', 'body', 'position', 'active'],
-)
-export const alumniCrud = makeCrud(
-    'landing_testimonials',
-    ['name', 'title', 'quote', 'image_url', 'position', 'active'],
-    ['name', 'title', 'quote', 'image_url', 'position', 'active'],
 )
 export const alumniBatchCrud = makeCrudWithOrder(
     'alumni_batch',

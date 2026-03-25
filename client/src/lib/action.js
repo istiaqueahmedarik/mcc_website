@@ -118,10 +118,17 @@ export const post_with_token = cache(async (url, data) => {
     const json = await response.json();
     return json;
   } catch (error) {
-    console.error("Error:", error);
-    return {
-      error: "An error occurred",
-    };
+    // If JSON parse fails, try to read text to surface the server response
+    try {
+      const text = await response.text();
+      console.error("Non-JSON response:", text);
+      return { error: text || "An error occurred" };
+    } catch (inner) {
+      console.error("Error:", error, inner);
+      return {
+        error: "An error occurred",
+      };
+    }
   }
 });
 
