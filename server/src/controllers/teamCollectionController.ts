@@ -554,18 +554,78 @@ export const finalizeCollection = async (c: any) => {
           const userRows =
             await sql`SELECT email, full_name, vjudge_id FROM users WHERE vjudge_id = ANY(${uniqueMembers})`;
           const clientUrl = process.env.CLIENT_URL || "";
+          const websiteUrl =
+          process.env.WEBSITE_URL ||
+          process.env.NEXT_PUBLIC_WEBSITE_URL ||
+          "https://computerclub.mist.ac.bd";
+          const facebookUrl =
+          process.env.FACEBOOK_URL ||
+            process.env.NEXT_PUBLIC_FACEBOOK_URL ||
+            "";
+          const linkedinUrl =
+            process.env.LINKEDIN_URL ||
+            process.env.NEXT_PUBLIC_LINKEDIN_URL ||
+            "";
+          const discordUrl =
+            process.env.DISCORD_URL ||
+            process.env.NEXT_PUBLIC_DISCORD_URL ||
+            "";
+            
+            const dashboardUrl = websiteUrl ? `${websiteUrl}/finalized-teams/${collection_id}` : "";
+          const escapeHtml = (value: string) =>
+            String(value || "")
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/\"/g, "&quot;")
+              .replace(/'/g, "&#39;");
+
           await Promise.all(
             userRows.map(async (u: any) => {
               if (!u.email) return;
               const info = memberToTeam[String(u.vjudge_id)];
               if (!info) return;
+              const recipientName = u.full_name || u.vjudge_id;
+              const safeRecipientName = escapeHtml(recipientName);
+              const safeTeamTitle = escapeHtml(info.title);
+              const safeMembers = info.members.map((m) => escapeHtml(m));
+
               const subject = `Your Team Has Been Finalized: ${info.title}`;
-              const text = `Hello ${u.full_name || u.vjudge_id},\n\nYour team '${info.title}' has been finalized.\nMembers: ${info.members.join(", ")}\n\nGood luck!`;
-              const html = `<p>Hello <strong>${u.full_name || u.vjudge_id}</strong>,</p>
-<p>Your team <strong>${info.title}</strong> has been <strong>finalized</strong>.</p>
-<p><strong>Members (${info.members.length}):</strong><br/>${info.members.map((m) => `<code>${m}</code>`).join(", ")}</p>
-<p>You can view your teams on the platform.<br/>${clientUrl ? `<a href="${clientUrl}/my_dashboard" target="_blank">Open Dashboard</a>` : ""}</p>
-<p>Good luck!</p>`;
+              const text = `Hello ${recipientName},
+
+We are pleased to inform you that your team has been finalized.
+
+Team: ${info.title}
+Members (${info.members.length}): ${info.members.join(", ")}
+${
+  dashboardUrl
+    ? `
+Dashboard: ${dashboardUrl}`
+    : ""
+}
+
+Please review your team details and stay tuned for further updates.
+
+Regards,
+MIST Computer Club
+
+Social Medias:
+Website: computerclub.mist.ac.bd
+Facebook: MIST Computer Club${facebookUrl ? ` (${facebookUrl})` : ""}
+LinkedIn: MIST Computer Club${linkedinUrl ? ` (${linkedinUrl})` : ""}
+Discord: MIST Computer Club${discordUrl ? ` (${discordUrl})` : ""}`;
+              const html = `<p>Hello <strong>${safeRecipientName}</strong>,</p>
+<p>We are pleased to inform you that your team has been finalized.</p>
+<p><strong>Team:</strong> ${safeTeamTitle}<br/>
+<strong>Members (${info.members.length}):</strong> ${safeMembers.join(", ")}</p>
+${dashboardUrl ? `<p>Dashboard: <a href="${escapeHtml(dashboardUrl)}" target="_blank">${escapeHtml(dashboardUrl)}</a></p>` : ""}
+<p>Please review your team details and stay tuned for further updates.</p>
+<p>Regards,<br/><strong>MIST Computer Club</strong></p>
+<p><strong>Social Medias:</strong><br/>
+Website: <a href="${escapeHtml(websiteUrl)}" target="_blank">computerclub.mist.ac.bd</a><br/>
+Facebook: ${facebookUrl ? `<a href="${escapeHtml(facebookUrl)}" target="_blank">facebook/mcc</a>` : "facebook/mcc"}<br/>
+LinkedIn: ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank">linkedin/mcc</a>` : "linkedin/mcc"}<br/>
+Discord: ${discordUrl ? `<a href="${escapeHtml(discordUrl)}" target="_blank">discord/mcc</a>` : "discord/mcc"}</p>`;
               try {
                 await sendEmail(u.email, subject, text, html);
               } catch (e) {
@@ -935,12 +995,9 @@ export const adminAssignCoach = async (c: any) => {
   } catch (e) {
     console.error("coach_vjudge_id column ensure failed", e);
   }
-  // Only allow assigning coach after collection finalized
   const coll =
-    await sql`SELECT finalized FROM public.team_collections WHERE id=${collection_id} LIMIT 1`;
+    await sql`SELECT id FROM public.team_collections WHERE id=${collection_id} LIMIT 1`;
   if (coll.length === 0) return c.json({ error: "Collection not found" }, 404);
-  if (!coll[0].finalized)
-    return c.json({ error: "Collection not finalized" }, 400);
   const trows =
     await sql`SELECT * FROM public.team_collection_teams WHERE collection_id=${collection_id} AND team_title=${team_title} LIMIT 1`;
   if (trows.length === 0) return c.json({ error: "Team not found" }, 404);
@@ -1069,13 +1126,61 @@ export const adminStartPhase2 = async (c: any) => {
     const clientUrl =
       process.env.NEXT_PUBLIC_CLIENT_URL ||
       "https://mistcomputerclub.vercel.app";
+    const websiteUrl =
+      process.env.WEBSITE_URL ||
+      process.env.NEXT_PUBLIC_WEBSITE_URL ||
+      "https://computerclub.mist.ac.bd";
+    const facebookUrl =
+      process.env.FACEBOOK_URL || process.env.NEXT_PUBLIC_FACEBOOK_URL || "";
+    const linkedinUrl =
+      process.env.LINKEDIN_URL || process.env.NEXT_PUBLIC_LINKEDIN_URL || "";
+    const discordUrl =
+      process.env.DISCORD_URL || process.env.NEXT_PUBLIC_DISCORD_URL || "";
+
+    const escapeHtml = (value: string) =>
+      String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     await Promise.all(
       part.map(async (u: any) => {
         try {
           const subject = `Team Selection Phase Started${col.title ? ": " + col.title : ""}`;
-          const link = `${clientUrl}/team/${col.token}`;
-          const text = `Hello ${u.full_name || u.vjudge_id},\n\nPhase 2 (team selection) has begun. Submit your preferences now.\n${link}`;
-          const html = `<p>Hello <strong>${u.full_name || u.vjudge_id}</strong>,</p><p>Phase 2 (team selection) has begun for <strong>${col.title || "a contest"}</strong>.</p><p><a href="${link}" target="_blank">Open Team Selection</a></p>`;
+          const link = `${websiteUrl}/team/${col.token}`;
+          const recipientName = u.full_name || u.vjudge_id;
+          const safeRecipientName = escapeHtml(recipientName);
+          const safeContestTitle = escapeHtml(col.title || "Contest");
+          const safeLink = escapeHtml(link);
+          const socialText = `
+
+Social Medias:
+Website: computerclub.mist.ac.bd
+Facebook: MIST Computer Club${facebookUrl ? ` (${facebookUrl})` : ""}
+LinkedIn: MIST Computer Club${linkedinUrl ? ` (${linkedinUrl})` : ""}
+Discord: MIST Computer Club${discordUrl ? ` (${discordUrl})` : ""}`;
+
+          const text = `Hello ${recipientName},
+
+Phase 2 (team selection) has now started${col.title ? ` for ${col.title}` : ""}.
+
+Please submit your team preferences as soon as possible:
+${link}
+
+Regards,
+MIST Computer Club${socialText}`;
+          const html = `<p>Hello <strong>${safeRecipientName}</strong>,</p>
+<p>Phase 2 (team selection) has now started${col.title ? ` for <strong>${safeContestTitle}</strong>` : ""}.</p>
+<p>Please submit your team preferences as soon as possible:<br/>
+<a href="${safeLink}" target="_blank">${safeLink}</a></p>
+<p>Regards,<br/><strong>MIST Computer Club</strong></p>
+<p><strong>Social Medias:</strong><br/>
+Website: <a href="${escapeHtml(websiteUrl)}" target="_blank">computerclub.mist.ac.bd</a><br/>
+Facebook: ${facebookUrl ? `<a href="${escapeHtml(facebookUrl)}" target="_blank">facebook/mcc</a>` : "facebook/mcc"}<br/>
+LinkedIn: ${linkedinUrl ? `<a href="${escapeHtml(linkedinUrl)}" target="_blank">linkedin/mcc</a>` : "linkedin/mcc"}<br/>
+Discord: ${discordUrl ? `<a href="${escapeHtml(discordUrl)}" target="_blank">discord/mcc</a>` : "discord/mcc"}</p>`;
           await sendEmail(u.email, subject, text, html);
         } catch (e) {
           console.error("Phase2 email fail", u.email, e);

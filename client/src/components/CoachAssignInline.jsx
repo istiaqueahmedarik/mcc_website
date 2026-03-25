@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { UserPlus, Search } from 'lucide-react'
+import { Search, UserPlus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 export default function CoachAssignInline({ teamTitle, initialCoach, collectionId }) {
   const router = useRouter()
@@ -36,7 +36,8 @@ export default function CoachAssignInline({ teamTitle, initialCoach, collectionI
     const tid = toast.loading('Assigning coach...')
     try {
       const { adminAssignCoach } = await import('@/actions/team_collection')
-      await adminAssignCoach(collectionId, teamTitle, userIdentifier)
+      const res = await adminAssignCoach(collectionId, teamTitle, userIdentifier)
+      if (res?.error) throw new Error(res.error)
       setCoach(userIdentifier)
       console.log(coach);
       setOpen(false)
@@ -45,7 +46,7 @@ export default function CoachAssignInline({ teamTitle, initialCoach, collectionI
       toast.success(userIdentifier ? 'Coach assigned' : 'Coach removed', { id: tid })
     } catch (e){
       console.error(e)
-      toast.error('Failed to assign coach', { id: tid })
+      toast.error(e?.message || 'Failed to assign coach', { id: tid })
     } finally { setPending(false) }
   }
 

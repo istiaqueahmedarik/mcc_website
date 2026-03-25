@@ -2,12 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Edit3, Search, Trash2, UserCog, UserMinus, UserPlus } from "lucide-react";
@@ -27,6 +28,7 @@ export default function TeamCardActionsInline({
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [memberList, setMemberList] = useState((members || []).map(String));
   const [coach, setCoach] = useState(coachVjudgeId ? String(coachVjudgeId) : "");
   const [newTitle, setNewTitle] = useState(teamTitle || "");
@@ -64,9 +66,7 @@ export default function TeamCardActionsInline({
   const memberSet = useMemo(() => new Set(memberList.map(String)), [memberList]);
 
   async function deleteTeam() {
-    if (!window.confirm(`Delete team \"${teamTitle}\"? This cannot be undone.`)) {
-      return;
-    }
+    setConfirmDeleteOpen(false);
     setPending(true);
     const tid = toast.loading("Deleting team...");
     try {
@@ -148,13 +148,14 @@ export default function TeamCardActionsInline({
     const tid = toast.loading("Assigning coach...");
     try {
       const { adminAssignCoach } = await import("@/actions/team_collection");
-      await adminAssignCoach(collectionId, teamTitle, vj);
+      const res = await adminAssignCoach(collectionId, teamTitle, vj);
+      if (res?.error) throw new Error(res.error);
       setCoach(vj);
       toast.success("Coach assigned", { id: tid });
       router.refresh();
     } catch (e) {
       console.error(e);
-      toast.error("Failed to assign coach", { id: tid });
+      toast.error(e?.message || "Failed to assign coach", { id: tid });
     } finally {
       setPending(false);
     }
@@ -165,13 +166,14 @@ export default function TeamCardActionsInline({
     const tid = toast.loading("Removing coach...");
     try {
       const { adminAssignCoach } = await import("@/actions/team_collection");
-      await adminAssignCoach(collectionId, teamTitle, "");
+      const res = await adminAssignCoach(collectionId, teamTitle, "");
+      if (res?.error) throw new Error(res.error);
       setCoach("");
       toast.success("Coach removed", { id: tid });
       router.refresh();
     } catch (e) {
       console.error(e);
-      toast.error("Failed to remove coach", { id: tid });
+      toast.error(e?.message || "Failed to remove coach", { id: tid });
     } finally {
       setPending(false);
     }
@@ -359,7 +361,7 @@ export default function TeamCardActionsInline({
               type="button"
               variant="outline"
               size="sm"
-              onClick={deleteTeam}
+              onClick={() => setConfirmDeleteOpen(true)}
               disabled={pending}
               className="h-8 px-3 gap-1 text-destructive"
             >
@@ -368,6 +370,35 @@ export default function TeamCardActionsInline({
           </div>
         </div>
       </DialogContent>
+
+      <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete team?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete "{teamTitle}" and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmDeleteOpen(false)}
+              disabled={pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={deleteTeam}
+              disabled={pending}
+            >
+              Yes, delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

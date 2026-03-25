@@ -19,6 +19,8 @@ import {
 import { CollectionCopyButton } from "@/components/CollectionCopyButton";
 import { CollectionNameEditor } from "@/components/CollectionNameEditor";
 import { TeamActionForm } from "@/components/TeamActionForm";
+import { TeamCollectionTabs } from "@/components/TeamCollectionTabs";
+import TransitionButton from "@/components/TransitionButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -230,38 +232,12 @@ export default async function Page({ searchParams }) {
       <div className="mx-auto px-12 lg:px-16 py-2 space-y-8">
         <section className="item-center">
           <div className="flex justify-center">
-            <div className="inline-flex rounded-2xl border border-border bg-card p-1 shadow-sm">
-            <Link
-              href="/admin/team-collection?tab=collecting"
-              className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors duration-200 ${
-                activeTab === "collecting"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              In progress ({collectingCollections.length})
-            </Link>
-            <Link
-              href="/admin/team-collection?tab=finalized"
-              className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors duration-200 ${
-                activeTab === "finalized"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              Finalized ({finalizedCollections.length})
-            </Link>
-            <Link
-              href="/admin/team-collection?tab=start"
-              className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors duration-200 ${
-                activeTab === "start"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              Start New ({rooms.length})
-            </Link>
-            </div>
+            <TeamCollectionTabs
+              activeTab={activeTab}
+              collectingCount={collectingCollections.length}
+              finalizedCount={finalizedCollections.length}
+              startCount={rooms.length}
+            />
           </div>
 
           {(activeTab === "collecting" || activeTab === "finalized") && (
@@ -420,13 +396,13 @@ export default async function Page({ searchParams }) {
                       </div>
 
                       <div className="flex flex-wrap gap-2 pt-2 border-t border-border/70">
-                        <Link
+                        <TransitionButton
                           href={`/admin/team-collection/${col.id}`}
-                          className="px-4 py-2 rounded-full bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm font-semibold transition-colors duration-200 flex items-center gap-2"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Details
-                        </Link>
+                          idleText="Details"
+                          pendingText="Opening details..."
+                          icon={<Eye className="w-4 h-4" />}
+                          className="px-4 py-2 rounded-md bg-secondary hover:bg-secondary/80 text-secondary-foreground text-sm font-semibold transition-colors duration-200"
+                        />
 
                         {!col.finalized &&
                           (col.is_open ? (
@@ -437,7 +413,7 @@ export default async function Page({ searchParams }) {
                               error="Failed to stop"
                             >
                               <input type="hidden" name="id" value={col.id} />
-                              <button className="px-4 py-2 rounded-full bg-chart-5/20 hover:bg-chart-5/30 text-chart-5 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
+                              <button className="px-4 py-2 rounded-md bg-chart-5/20 hover:bg-chart-5/30 text-chart-5 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
                                 <Square className="w-4 h-4" />
                                 Stop
                               </button>
@@ -450,7 +426,7 @@ export default async function Page({ searchParams }) {
                               error="Failed to reopen"
                             >
                               <input type="hidden" name="id" value={col.id} />
-                              <button className="px-4 py-2 rounded-full bg-chart-1/20 hover:bg-chart-1/30 text-chart-1 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
+                              <button className="px-4 py-2 rounded-md bg-chart-1/20 hover:bg-chart-1/30 text-chart-1 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
                                 <Play className="w-4 h-4" />
                                 Reopen
                               </button>
@@ -465,7 +441,7 @@ export default async function Page({ searchParams }) {
                             error="Failed to finalize"
                           >
                             <input type="hidden" name="id" value={col.id} />
-                            <button className="px-4 py-2 rounded-full bg-chart-2/20 hover:bg-chart-2/30 text-chart-2 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
+                            <button className="px-4 py-2 rounded-md bg-chart-2/20 hover:bg-chart-2/30 text-chart-2 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
                               <CheckCircle className="w-4 h-4" />
                               Finalize
                             </button>
@@ -480,7 +456,7 @@ export default async function Page({ searchParams }) {
                             error="Failed to unfinalize"
                           >
                             <input type="hidden" name="id" value={col.id} />
-                            <button className="px-4 py-2 rounded-full bg-chart-5/20 hover:bg-chart-5/30 text-chart-5 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
+                            <button className="px-4 py-2 rounded-md bg-chart-5/20 hover:bg-chart-5/30 text-chart-5 text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
                               <Unlock className="w-4 h-4" />
                               Unfinalize
                             </button>
@@ -492,9 +468,17 @@ export default async function Page({ searchParams }) {
                           pending="Deleting..."
                           success="Collection deleted"
                           error="Failed to delete"
+                          confirmConfig={{
+                            title: "Delete collection?",
+                            description:
+                              "This will permanently remove the collection and cannot be undone.",
+                            confirmText: "Yes, delete",
+                            cancelText: "Cancel",
+                            confirmVariant: "destructive",
+                          }}
                         >
                           <input type="hidden" name="id" value={col.id} />
-                          <button className="px-4 py-2 rounded-full bg-destructive/20 hover:bg-destructive/30 text-destructive text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
+                          <button className="px-4 py-2 rounded-md bg-destructive/20 hover:bg-destructive/30 text-destructive text-sm font-semibold transition-colors duration-200 flex items-center gap-2">
                             <Trash2 className="w-4 h-4" />
                             Delete
                           </button>
@@ -603,9 +587,10 @@ export default async function Page({ searchParams }) {
                         <TeamActionForm
                           action={start}
                           key={r.id}
-                          pending="Starting..."
-                          success="Collection started"
+                          pending="Transitioning..."
+                          success="Moved to In Progress"
                           error="Failed to start"
+                          redirectTo="/admin/team-collection?tab=collecting"
                         >
                           <input type="hidden" name="room_id" value={r.id} />
                           <input
@@ -635,7 +620,7 @@ export default async function Page({ searchParams }) {
                               <div className="mt-auto">
                                 <Button type="submit" className="w-full">
                                   <Play className="w-4 h-4" />
-                                  Start Collection
+                                  Start collection
                                 </Button>
                               </div>
                             </CardContent>
