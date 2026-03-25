@@ -135,9 +135,9 @@ export default function InfiniteScrollAchievements({
     return (
         <div className="w-full space-y-8">
             {/* Tag filter */}
-            <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="flex flex-col gap-3 rounded-2xl border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.02] dark:bg-white/[0.02] p-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-[11px] font-mono text-white/50 tracking-widest uppercase">
+                    <span className="text-[11px] font-mono text-zinc-500 dark:text-white/50 tracking-widest uppercase">
                         Filter by tag
                     </span>
                 </div>
@@ -149,8 +149,8 @@ export default function InfiniteScrollAchievements({
                             onClick={() => setSelectedTags([])}
                             className={`rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors ${
                                 selectedTags.length === 0
-                                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
-                                    : 'bg-white/[0.04] text-white/70 border border-white/10 hover:bg-white/[0.08]'
+                                    ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/40 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-400/40'
+                                    : 'bg-zinc-900/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-white/70 border border-zinc-900/10 dark:border-white/10 hover:bg-zinc-900/[0.08] dark:hover:bg-white/[0.08]'
                             }`}
                         >
                             All
@@ -163,8 +163,8 @@ export default function InfiniteScrollAchievements({
                                 aria-pressed={selectedTags.includes(tag)}
                                 className={`rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition-colors ${
                                     selectedTags.includes(tag)
-                                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
-                                        : 'bg-white/[0.04] text-white/70 border border-white/10 hover:bg-white/[0.08]'
+                                        ? 'bg-cyan-500/15 text-cyan-700 border border-cyan-500/40 dark:bg-cyan-500/20 dark:text-cyan-300 dark:border-cyan-400/40'
+                                        : 'bg-zinc-900/[0.04] dark:bg-white/[0.04] text-zinc-700 dark:text-white/70 border border-zinc-900/10 dark:border-white/10 hover:bg-zinc-900/[0.08] dark:hover:bg-white/[0.08]'
                                 }`}
                             >
                                 {tag}
@@ -176,13 +176,13 @@ export default function InfiniteScrollAchievements({
 
             {/* Count indicator */}
             <div className="flex items-center gap-3">
-                <span className="text-xs font-mono text-white tracking-widest uppercase">
+                <span className="text-xs font-mono text-zinc-700 dark:text-white tracking-widest uppercase">
                     {filteredAchievements.length}
                     {selectedTags.length === 0
                         ? ` / ${totalCount} loaded`
                         : ` matches ${selectedTags.length} selected tag${selectedTags.length > 1 ? 's' : ''}`}
                 </span>
-                <div className="flex-1 h-px bg-white/[0.06]">
+                <div className="flex-1 h-px bg-zinc-900/[0.12] dark:bg-white/[0.06]">
                     <div
                         className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-all duration-700 ease-out rounded-full"
                         style={{
@@ -220,7 +220,7 @@ export default function InfiniteScrollAchievements({
             </div>
 
             {!loading && filteredAchievements.length === 0 && (
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-white/60">
+                <div className="rounded-xl border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.02] dark:bg-white/[0.02] p-6 text-center text-sm text-zinc-600 dark:text-white/60">
                     No achievements found for this tag yet.
                 </div>
             )}
@@ -234,7 +234,7 @@ export default function InfiniteScrollAchievements({
                         <div className="w-8 h-8 rounded-full border border-white/10" />
                         <Loader2 className="w-8 h-8 animate-spin text-violet-400 absolute inset-0" />
                     </div>
-                    <span className="text-xs text-white/30 tracking-widest uppercase font-mono animate-pulse">Loading</span>
+                    <span className="text-xs text-zinc-500 dark:text-white/30 tracking-widest uppercase font-mono animate-pulse">Loading</span>
                 </div>
             )}
 
@@ -242,9 +242,9 @@ export default function InfiniteScrollAchievements({
             {!hasMore && filteredAchievements.length > 0 && (
                 <div className="flex flex-col items-center gap-3 py-10">
                     <div className="flex items-center gap-4 w-full max-w-xs">
-                        <div className="flex-1 h-px bg-white/[0.08]" />
-                        <span className="text-[11px] font-mono text-white/40 tracking-widest uppercase">All caught up</span>
-                        <div className="flex-1 h-px bg-white/[0.08]" />
+                        <div className="flex-1 h-px bg-zinc-900/[0.12] dark:bg-white/[0.08]" />
+                        <span className="text-[11px] font-mono text-zinc-500 dark:text-white/40 tracking-widest uppercase">All caught up</span>
+                        <div className="flex-1 h-px bg-zinc-900/[0.12] dark:bg-white/[0.08]" />
                     </div>
                 </div>
             )}

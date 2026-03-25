@@ -428,7 +428,7 @@ export default function Home() {
         <div className="flex flex-col items-center">
           <AchievementPage />
           <Link href="/achievements" className="mt-8">
-            <Button>See all</Button>
+            <Button className="dark:bg-white dark:text-black text-white bg-blue-500 hover:bg-blue-700">See all</Button>
           </Link>
         </div>
       </section>

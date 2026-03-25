@@ -18,7 +18,7 @@ export const insertAchievement = async (c: any) => {
   if (result.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { title, image, description, date, tags } = await c.req.json()
+  const { title, image, description, date, tags, intro } = await c.req.json()
 
   let parsedTags: string[] = [];
   if (typeof tags === "string") {
@@ -34,8 +34,8 @@ export const insertAchievement = async (c: any) => {
 
       // Insert achievement
       const result1 = await sql`
-        INSERT INTO achievements (title, image, description, date)
-        VALUES (${title}, ${image}, ${description}, ${new Date(date).toISOString()})
+        INSERT INTO achievements (title, image, description, date, intro)
+        VALUES (${title}, ${image}, ${description}, ${new Date(date).toISOString()}, ${intro})
         RETURNING id
       `;
 
@@ -79,7 +79,7 @@ export const updateAchievement = async (c: any) => {
   if (result.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { ach_id, title, image, description, date, tags } = await c.req.json()
+  const { ach_id, title, image, description, date, tags, intro } = await c.req.json()
 
   let parsedTags: string[] = [];
   if (typeof tags === "string") {
@@ -96,7 +96,7 @@ export const updateAchievement = async (c: any) => {
       // Update achievement
       await sql`
         UPDATE achievements
-        SET title = ${title}, image = ${image}, description = ${description}, date = ${new Date(date).toISOString()}
+        SET title = ${title}, image = ${image}, description = ${description}, date = ${new Date(date).toISOString()}, intro = ${intro}
         WHERE id = ${ach_id}
       `;
 

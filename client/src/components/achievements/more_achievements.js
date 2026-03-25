@@ -30,7 +30,7 @@ export default function MoreAchievements({
                         className={cn(
                             "group relative h-40 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300",
                             featuredIndex === index
-                                ? "ring-2 ring-primary scale-105"
+                                ? "ring-2 ring-sky-600 dark:ring-primary scale-105"
                                 : "hover:scale-105"
                         )}
                     >

@@ -75,7 +75,7 @@ export default function FeaturedAchievement( { featuredAchievement}) {
                     
                     <ProgressLink
                         href={`/achievements/${featuredAchievement.id}`}
-                        className="inline-flex items-center justify-center rounded-xl bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg w-fit"
+                        className="inline-flex items-center justify-center rounded-xl px-8 py-3 text-sm font-semibold text-primary-foreground transition-colors dark:bg-primary dark:hover:bg-primary/90 bg-blue-500 hover:bg-blue-700 shadow-lg w-fit"
                     >
                         View Full Details
                     </ProgressLink>

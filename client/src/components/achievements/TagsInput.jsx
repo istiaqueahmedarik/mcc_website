@@ -2,7 +2,8 @@
 
 import { getAchievementTags } from '@/lib/action'
 import { Label } from '@/components/ui/label'
-import { useEffect, useState } from 'react'
+import { Tag } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 const normalizeTags = (raw) => {
   if (!Array.isArray(raw)) return []
@@ -31,6 +32,7 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [highlightedTagIndex, setHighlightedTagIndex] = useState(-1)
   const [availableTags, setAvailableTags] = useState([])
+  const suggestionRefs = useRef([])
 
   const filteredTags = availableTags.filter((tag) => {
     const normalizedInput = tagInput.trim().toUpperCase()
@@ -63,6 +65,14 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
       setHighlightedTagIndex(0)
     }
   }, [filteredTags, highlightedTagIndex])
+
+  useEffect(() => {
+    if (!showSuggestions || highlightedTagIndex < 0) return
+    const activeSuggestion = suggestionRefs.current[highlightedTagIndex]
+    if (activeSuggestion) {
+      activeSuggestion.scrollIntoView({ block: 'nearest' })
+    }
+  }, [highlightedTagIndex, showSuggestions])
 
   const addTag = (value) => {
     const tag = value.trim().toUpperCase()
@@ -139,6 +149,7 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
             key={tag}
             className="flex items-center gap-1 bg-zinc-200 dark:bg-zinc-700 px-2 py-1 rounded-md text-sm"
           >
+            <Tag className='h-3.5 w-3.5'/>
             <span>{tag}</span>
             <button
               type="button"
@@ -176,6 +187,9 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
               filteredTags.map((tag, index) => (
                 <div
                   key={tag}
+                  ref={(el) => {
+                    suggestionRefs.current[index] = el
+                  }}
                   onMouseEnter={() => setHighlightedTagIndex(index)}
                   onMouseDown={(e) => {
                     e.preventDefault()
@@ -187,11 +201,15 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
                       : 'hover:bg-gray-100 dark:hover:bg-zinc-700'
                   }`}
                 >
-                  {tag}
+                  <span className="inline-flex items-center gap-2">
+                    <Tag className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
+                    {tag}
+                  </span>
                 </div>
               ))
             ) : (
-              <div className="px-3 py-2 text-sm text-gray-400">
+              <div className="px-3 py-2 text-sm text-gray-400 inline-flex items-center gap-2">
+                <Tag className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-300" />
                 Press Enter to create "{tagInput}"
               </div>
             )}
