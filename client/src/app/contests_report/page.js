@@ -24,7 +24,7 @@ export default async function LoginPage() {
         "use server";
         const session = String(formData.get("session") || "").trim();
         if (!session) return;
-        cookies().set('vj_session', session, { httpOnly: true, path: '/', sameSite: 'lax' });
+        (await cookies()).set('vj_session', session, { httpOnly: true, path: '/', sameSite: 'lax' });
         redirect("/contests_report/details");
     }
 
