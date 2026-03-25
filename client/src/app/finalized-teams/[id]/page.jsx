@@ -1,15 +1,15 @@
 import { publicFinalizedTeamsByContest } from "@/actions/team_collection";
+import DeferredImage from "@/components/DeferredImage";
 import ProgressLink from "@/components/ProgressLink";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { get_with_token } from "@/lib/action";
-import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +65,8 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
     );
   }
 
+  console.log("Finalized collection details:", block);
+
   const isAdmin = !!me?.admin;
 
   const memberSet = new Set();
@@ -80,6 +82,9 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
   const profileMap = new Map(
     profilesArr.map((p) => [p.vj, p.data?.result || {}])
   );
+
+  console.log("Profiles loaded for finalized teams:", profileMap);
+  console.log("ProfileArr:", profilesArr);
 
   const yearNow = new Date().getFullYear();
   const deriveLevel = (mistId) => {
@@ -118,10 +123,9 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                 <TableRow className="bg-muted/40">
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead className="w-24 text-center">Team</TableHead>
-                  <TableHead className="w-24">Score</TableHead>
                   <TableHead className="w-40">Members</TableHead>
-                  <TableHead className="w-28">ID</TableHead>
-                  <TableHead className="w-16">Level</TableHead>
+                  <TableHead className="w-28">Contacts</TableHead>
+                  <TableHead className="w-16">Student ID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,26 +149,19 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                         {mi === 0 && (
                           <TableCell
                             rowSpan={t.members.length}
-                            className="align-middle text-center text-[16px] font-semibold"
+                            className="align-middle text-center"
                           >
-                            <ProgressLink
-                              href={`/team/final/${t.id}`}
-                              className="font-medium hover:text-primary transition-colors inline-block"
-                            >
-                              {t.team_title}
-                            </ProgressLink>
-                          </TableCell>
-                        )}
-                        {mi === 0 && (
-                          <TableCell rowSpan={t.members.length}>
-                            <span className="inline-flex items-center gap-1 font-medium">
-                              {calculateScore(t.combined_score)}
-                              {top && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">
-                                  Top
-                                </span>
-                              )}
-                            </span>
+                            <div className="space-y-1">
+                              <ProgressLink
+                                href={`/team/final/${t.id}`}
+                                className="font-semibold text-sm hover:text-primary inline-block"
+                              >
+                                {t.team_title}
+                              </ProgressLink>
+                              <div className="text-xs text-muted-foreground">
+                                Score: {calculateScore(t.combined_score)}
+                              </div>
+                            </div>
                           </TableCell>
                         )}
                         <TableCell>
@@ -172,35 +169,32 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                             href={`/profile/${encodeURIComponent(m)}`}
                             className="flex items-center gap-2 hover:text-primary"
                           >
-                            <span className="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
-                              {img ? (
-                                <Image
-                                  src={img}
-                                  alt={display}
-                                  fill
-                                  sizes="24px"
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
-                                  {display.charAt(0).toUpperCase()}
-                                </span>
-                              )}
+                            <span className="relative w-7 h-7 rounded-full overflow-hidden ring-2 ring-background/60">
+                              <DeferredImage
+                                src={img}
+                                alt={display}
+                                sizes="28px"
+                                className="object-cover"
+                                fallback={
+                                  <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
+                                    {display.charAt(0).toUpperCase()}
+                                  </span>
+                                }
+                              />
                             </span>
                             <div className="flex flex-col">
-                              <span className="truncate max-w-[8rem] text-[14px]">
-                                {display}
-                              </span>
-                              <span className="text-muted-foreground/90 text-[12px]">
-                                {p.email}
+                              <span className="truncate w-full">{display}</span>
+                              <span className="text-muted-foreground/90 text-xs">
+                                {p.batch_name || "-"}
                               </span>
                             </div>
                           </ProgressLink>
                         </TableCell>
-                        <TableCell className="text-muted-foreground/90">
-                          {p.mist_id || "-"}
+                        <TableCell>
+                          <div>{p.email || "-"}</div>
+                          <div>{p.phone || "-"}</div>
                         </TableCell>
-                        <TableCell>{deriveLevel(p.mist_id)}</TableCell>
+                        <TableCell>{p.mist_id || "-"}</TableCell>
                       </TableRow>
                     );
                   });
@@ -212,7 +206,7 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
 
         {isAdmin && (
           <div className="rounded-xl border border-border/60 bg-card/40 backdrop-blur shadow-inner overflow-hidden">
-            <div className="px-4 pt-4 pb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="px-4 pt-4 pb-2 text-xs text-center font-medium uppercase tracking-wider text-muted-foreground">
               Admin Detailed View
             </div>
             <Table className="text-[13px]">
@@ -221,9 +215,8 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead className="w-48 text-center">Team</TableHead>
                   <TableHead className="w-auto">Members</TableHead>
-                  <TableHead className="w-28">ID</TableHead>
-                  <TableHead className="w-16">Level</TableHead>
-                  <TableHead className="w-28">Contact</TableHead>
+                  <TableHead className="w-28">Contacts</TableHead>
+                  <TableHead className="w-28">Student ID</TableHead>
                   <TableHead className="w-48">Coach Information</TableHead>
                 </TableRow>
               </TableHeader>
@@ -272,31 +265,31 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                             className="flex items-center gap-2 hover:text-primary"
                           >
                             <span className="relative w-7 h-7 rounded-full overflow-hidden ring-2 ring-background/60">
-                              {img ? (
-                                <Image
-                                  src={img}
-                                  alt={display}
-                                  fill
-                                  sizes="28px"
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
-                                  {display.charAt(0).toUpperCase()}
-                                </span>
-                              )}
+                              <DeferredImage
+                                src={img}
+                                alt={display}
+                                sizes="28px"
+                                className="object-cover"
+                                fallback={
+                                  <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
+                                    {display.charAt(0).toUpperCase()}
+                                  </span>
+                                }
+                              />
                             </span>
                             <div className="flex flex-col">
-                              <span className="truncate max-w-[9rem]">{display}</span>
-                              <span className="text-muted-foreground/90">
-                                {p.email || "-"}
+                              <span className="truncate w-full">{display}</span>
+                              <span className="text-muted-foreground/90 text-xs">
+                                {p.batch_name || "-"}
                               </span>
                             </div>
                           </ProgressLink>
                         </TableCell>
+                        <TableCell>
+                          <div>{p.email || "-"}</div>
+                          <div>{p.phone || "-"}</div>
+                        </TableCell>
                         <TableCell>{p.mist_id || "-"}</TableCell>
-                        <TableCell>{deriveLevel(p.mist_id)}</TableCell>
-                        <TableCell>{p.phone || "-"}</TableCell>
                         {mi === 0 && (
                           <TableCell
                             rowSpan={t.members.length}
@@ -310,23 +303,19 @@ export default async function FinalizedTeamsCollectionDetailsPage({ params }) {
                                 className="mb-1 flex items-center gap-2"
                               >
                                 <span className="relative w-10 h-10 rounded-full overflow-hidden ring-2 ring-background/60 shadow-sm">
-                                  {coachProfile.profile_pic ? (
-                                    <Image
-                                      src={coachProfile.profile_pic}
-                                      alt={
-                                        coachProfile.full_name || t.coach_vjudge_id
-                                      }
-                                      fill
-                                      sizes="28px"
-                                      className="object-cover"
-                                    />
-                                  ) : (
-                                    <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
-                                      {(coachProfile.full_name || t.coach_vjudge_id)
-                                        .charAt(0)
-                                        .toUpperCase()}
-                                    </span>
-                                  )}
+                                  <DeferredImage
+                                    src={coachProfile.profile_pic}
+                                    alt={coachProfile.full_name || t.coach_vjudge_id}
+                                    sizes="28px"
+                                    className="object-cover"
+                                    fallback={
+                                      <span className="w-full h-full flex items-center justify-center text-[10px] font-semibold bg-muted/70">
+                                        {(coachProfile.full_name || t.coach_vjudge_id)
+                                          .charAt(0)
+                                          .toUpperCase()}
+                                      </span>
+                                    }
+                                  />
                                 </span>
                                 <div className="flex flex-col">
                                   <span className="truncate max-w-[12rem]">

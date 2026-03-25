@@ -1,7 +1,6 @@
 import { publicFinalizedTeamsByContest } from "@/actions/team_collection";
-import ProgressLink from "@/components/ProgressLink";
+import TransitionButton from "@/components/TransitionButton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,15 +8,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cos } from "three/src/nodes/math/MathNode";
-import { fi } from "zod/v4/locales";
 
 export const dynamic = "force-dynamic";
 
 export default async function FinalizedTeamsByContestPage() {
   const res = await publicFinalizedTeamsByContest();
   const blocks = res?.result || [];
-  console.log("Raw finalized teams by contest data:", blocks);
+
+  const formatDate = (value) => {
+    if (!value) return "Unknown date";
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "Unknown date";
+    return date.toLocaleString();
+  };
+
   const parsed = blocks
     .map((block) => {
       const teams = Array.isArray(block?.teams) ? block.teams : [];
@@ -34,14 +38,12 @@ export default async function FinalizedTeamsByContestPage() {
         id: block?.collection_id,
         title: block?.collection_title || "Untitled Collection",
         roomName: block?.room_name || "Unknown Room",
-        finalizedAt: block?.finalized_at ? new Date(block.finalized_at) : null,
+        finalizedAt: block?.finalized_at || null,
         teamCount: teams.length,
         participantCount: participants.size,
       };
     })
     .filter((item) => item.id !== undefined && item.id !== null);
-
-  console.log("Parsed finalized teams by contest:", parsed);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background py-12">
@@ -78,20 +80,13 @@ export default async function FinalizedTeamsByContestPage() {
                   </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Finalized on:{" "}
-                  {item.finalizedAt
-                    ? item.finalizedAt.toLocaleString()
-                    : "Unknown date"}
+                  Finalized on: {formatDate(item.finalizedAt)}
                 </div>
               </CardContent>
               <CardContent className="flex-1 flex flex-col gap-3">
-                <Button asChild className="w-full mt-auto">
-                  <ProgressLink
-                    href={`/finalized-teams/${encodeURIComponent(item.id)}`}
-                  >
-                    Full Details
-                  </ProgressLink>
-                </Button>
+                <TransitionButton
+                  href={`/finalized-teams/${encodeURIComponent(item.id)}`}
+                />
               </CardContent>
             </Card>
           ))}

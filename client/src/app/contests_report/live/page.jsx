@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import TransitionButton from '@/components/TransitionButton'
 
 async function fetchAllSharedReports(){
   try{
@@ -70,9 +71,11 @@ export default async function PublicSharedReportsPage(){
                   </div>
                   <div className="text-xs text-muted-foreground">Last updated: {item.updated}</div>
                   <div className="mt-auto">
-                    <Link href={`/contests_report/live/${encodeURIComponent(item.id)}`}>
-                      <Button className="w-full">View Live Report</Button>
-                    </Link>
+                    <TransitionButton
+                      href={`/contests_report/live/${encodeURIComponent(item.id)}`}
+                      idleText="View live report"
+                      pendingText="Opening report..."
+                    />
                   </div>
                 </CardContent>
               </Card>
