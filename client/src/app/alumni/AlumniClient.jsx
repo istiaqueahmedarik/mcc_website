@@ -1,370 +1,175 @@
 "use client";
+
 import React from "react";
-import {
-  Award,
-  Briefcase,
-  Building2,
-  Facebook,
-  GraduationCap,
-  Linkedin,
-  Mail,
-  MapPin,
-  Phone,
-  Search,
-  Sparkles,
-} from "lucide-react";
-import MccLogo from "@/components/IconChanger/MccLogo";
-
-function highlight(text, q) {
-  const safe = String(text || "");
-  if (!q) return safe;
-  const idx = safe.toLowerCase().indexOf(q.toLowerCase());
-  if (idx === -1) return safe;
-  return (
-    <>
-      {safe.slice(0, idx)}
-      <span className="bg-[hsl(var(--alumni-gold)/0.25)]">
-        {safe.slice(idx, idx + q.length)}
-      </span>
-      {safe.slice(idx + q.length)}
-    </>
-  );
-}
-
-function toCareerPath(value) {
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (typeof value === "string") {
-    return value
-      .split(/->|→|\|/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-  return [];
-}
+import { Filter, Search } from "lucide-react";
+import AlumniMemberCard from "@/components/alumni/AlumniMemberCard";
 
 function normalizeMember(member) {
-  const careerPath = toCareerPath(member.career_path);
   return {
     ...member,
-    current_company: member.current_company || "",
-    location: member.location || "",
-    email: member.email || "",
-    phone: member.phone || "",
+    name: member.name || "",
+    batch: member.batch || "",
+    company_name: member.company_name || member.current_company || "",
+    designation: member.designation || "",
+    position_in_club: member.position_in_club || member.role || "",
+    headline:
+      member.designation && (member.company_name || member.current_company)
+        ? `${member.designation} @ ${member.company_name || member.current_company}`
+        : member.now || member.current_position || "",
+    image_url: member.image_url || "",
     linkedin_url: member.linkedin_url || "",
     facebook_url: member.facebook_url || "",
-    career_path: careerPath,
+    email: member.email || "",
+    phone: member.phone || "",
+    location: member.location || "",
+    bio_summary: member.bio_summary || "",
+    career_path: member.career_path || [],
+    role: member.role || "",
+    now: member.now || "",
+    highlight: member.highlight || false,
+    bio: member.bio_summary || "", // Mapping for card compatibility
   };
 }
 
-function matchesQuery(member, query) {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  const targets = [
-    member.name,
-    member.role,
-    member.now,
-    member.current_company,
-    member.location,
-    member.email,
-    member.phone,
-    ...(member.career_path || []),
-  ];
-  return targets.some((v) => String(v || "").toLowerCase().includes(q));
-}
-
-function MemberCard({ m, query }) {
-  const careerPath = m.career_path || [];
-
-  return (
-    <div
-      key={m.id || m.name}
-      className={
-        "alumni-batch-card group p-5 border-border/60 " +
-        (m.highlight ? "ring-1 ring-[hsl(var(--alumni-gold))]/50" : "")
-      }
-    >
-      <div className="relative z-10 flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          {m.image_url && (
-            <img
-              src={m.image_url}
-              alt={m.name}
-              className="w-12 h-12 rounded object-cover border border-border/60"
-            />
-          )}
-          <div className="flex flex-col">
-            <span className="font-semibold text-base md:text-lg leading-snug alumni-name group-hover:drop-shadow-sm transition-all">
-              {highlight(m.name, query)}
-            </span>
-            {m.role && (
-              <span className="text-[11px] tracking-wider text-muted-foreground/70 uppercase mt-1">
-                {highlight(m.role, query)}
-              </span>
-            )}
-          </div>
-        </div>
-        {(m.now || m.current_company || m.role || m.location) && (
-          <div className="text-xs md:text-sm text-muted-foreground leading-relaxed grid gap-1">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-              <span>
-                Current Company: {highlight(m.current_company || m.now, query)}
-              </span>
-            </div>
-            {m.role && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-                <span>Role: {highlight(m.role, query)}</span>
-              </div>
-            )}
-            {m.location && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-                <span>Location: {highlight(m.location, query)}</span>
-              </div>
-            )}
-          </div>
-        )}
-        {(m.linkedin_url || m.email || m.facebook_url || m.phone) && (
-          <div className="pt-2 border-t border-border/60">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-              Contact & Social Links
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {m.linkedin_url && (
-                <a
-                  href={m.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Linkedin className="h-3.5 w-3.5" /> LinkedIn
-                </a>
-              )}
-              {m.email && (
-                <a
-                  href={`mailto:${m.email}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Mail className="h-3.5 w-3.5" /> Email
-                </a>
-              )}
-              {m.facebook_url && (
-                <a
-                  href={m.facebook_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Facebook className="h-3.5 w-3.5" /> Facebook
-                </a>
-              )}
-              {m.phone && (
-                <a
-                  href={`tel:${m.phone}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Phone className="h-3.5 w-3.5" /> Phone
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-        {careerPath.length > 0 && (
-          <div className="pt-2 border-t border-border/60">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-              Career Path
-            </p>
-            <p className="text-xs leading-relaxed">
-              {careerPath.map((step, idx) => (
-                <React.Fragment key={`${step}-${idx}`}>
-                  {idx > 0 && <span className="text-muted-foreground"> {"→"} </span>}
-                  <span>{highlight(step, query)}</span>
-                </React.Fragment>
-              ))}
-            </p>
-          </div>
-        )}
-      </div>
-      <div
-        className="absolute -top-12 -right-10 w-40 h-40 opacity-0 group-hover:opacity-70 transition-opacity duration-500 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(circle at center, hsl(var(--alumni-gold)/0.55), transparent 70%)",
-        }}
-      />
-    </div>
+function toFlatMembers(batches) {
+  return (batches || []).flatMap((batch) =>
+    (batch.members || []).map((m) =>
+      normalizeMember({
+        ...m,
+        batch_id: batch.id,
+        batch: batch.batch || batch.label || String(batch.year),
+        batch_year: batch.year,
+      })
+    )
   );
 }
 
-function BatchBlock({ batch, query }) {
-  const filteredMembers = batch.members.filter((m) => matchesQuery(m, query));
-  if (filteredMembers.length === 0) return null;
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-3">
-            <GraduationCap className="h-7 w-7 text-[hsl(var(--alumni-gold))]" />{" "}
-            {highlight(batch.batch, query)}
-          </h2>
-          {batch.motto && (
-            <p className="text-xs md:text-sm text-muted-foreground mt-1 uppercase tracking-wider">
-              {highlight(batch.motto, query)}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[10px] tracking-widest font-semibold text-muted-foreground/70">
-          <Award className="h-4 w-4 text-[hsl(var(--alumni-gold))]" />{" "}
-          Celebrating Contributions
-        </div>
-      </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMembers.map((m) => (
-          <MemberCard key={m.id || m.name} m={m} query={query} />
-        ))}
-      </div>
-    </div>
-  );
+function matchText(value, query) {
+  return String(value || "").toLowerCase().includes(query.toLowerCase());
 }
 
-function useDebounce(value, delay) {
-  const [d, setD] = React.useState(value);
-  React.useEffect(() => {
-    const id = setTimeout(() => setD(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return d;
+function uniqueSorted(values) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
 export default function AlumniClient({ initialBatches, loadError }) {
   const [query, setQuery] = React.useState("");
   const [batchFilter, setBatchFilter] = React.useState("all");
-  const debounced = useDebounce(query, 200);
+  const [companyFilter, setCompanyFilter] = React.useState("all");
+  const [designationFilter, setDesignationFilter] = React.useState("all");
+  const [clubPositionFilter, setClubPositionFilter] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("name");
 
-  const normalizedBatches = React.useMemo(
-    () =>
-      (initialBatches || []).map((batch) => ({
-        ...batch,
-        members: (batch.members || []).map((m) => normalizeMember(m)),
-      })),
-    [initialBatches]
-  );
+  const members = React.useMemo(() => toFlatMembers(initialBatches), [initialBatches]);
 
   const batchOptions = React.useMemo(
-    () =>
-      normalizedBatches.map((b) => ({
-        id: String(b.id || b.batch),
-        label: `${b.batch} (${b.year})`,
-      })),
-    [normalizedBatches]
+    () => uniqueSorted(members.map((m) => m.batch)),
+    [members]
+  );
+  const companyOptions = React.useMemo(
+    () => uniqueSorted(members.map((m) => m.company_name)),
+    [members]
+  );
+  const designationOptions = React.useMemo(
+    () => uniqueSorted(members.map((m) => m.designation)),
+    [members]
+  );
+  const clubPositionOptions = React.useMemo(
+    () => uniqueSorted(members.map((m) => m.position_in_club)),
+    [members]
   );
 
-  const visible = React.useMemo(() => {
-    const source =
-      batchFilter === "all"
-        ? normalizedBatches
-        : normalizedBatches.filter(
-            (b) => String(b.id || b.batch) === batchFilter
-          );
-
-    if (!debounced) return source;
-    const q = debounced.toLowerCase();
-    return source.filter((b) => {
-      const inBatch = [b.batch, b.motto, String(b.year)].some(
-        (v) => String(v || "").toLowerCase().includes(q)
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = members.filter((m) => {
+      if (batchFilter !== "all" && m.batch !== batchFilter) return false;
+      if (companyFilter !== "all" && m.company_name !== companyFilter) return false;
+      if (designationFilter !== "all" && m.designation !== designationFilter) return false;
+      if (clubPositionFilter !== "all" && m.position_in_club !== clubPositionFilter) return false;
+      if (!q) return true;
+      return (
+        matchText(m.name, q) ||
+        matchText(m.headline, q) ||
+        matchText(m.company_name, q) ||
+        matchText(m.designation, q) ||
+        matchText(m.position_in_club, q) ||
+        matchText(m.batch, q)
       );
-      if (inBatch) return true;
-      return b.members.some((m) => matchesQuery(m, q));
     });
-  }, [batchFilter, debounced, normalizedBatches]);
+
+    list = [...list].sort((a, b) => {
+      if (sortBy === "batch") return Number(b.batch_year || 0) - Number(a.batch_year || 0);
+      if (sortBy === "company") return a.company_name.localeCompare(b.company_name);
+      if (sortBy === "designation") return a.designation.localeCompare(b.designation);
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [members, query, batchFilter, companyFilter, designationFilter, clubPositionFilter, sortBy]);
 
   return (
-    <div className="relative w-full flex flex-col items-center pb-32">
-      <section className="alumni-hero relative w-full overflow-hidden pt-28 pb-16 flex flex-col items-center text-center">
-        <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_center,black,transparent_75%)]" />
-        <div className="relative flex flex-col items-center gap-6 px-4 max-w-4xl">
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] font-medium text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-[hsl(var(--alumni-gold))]" />{" "}
-              Honor Roll
-            </span>
-            <span className="h-px w-8 bg-gradient-to-r from-transparent via-border to-transparent" />
-            <span>Legacy</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-            <span className="alumni-name">Our Distinguished Alumni</span>
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed">
-            A tribute to the minds who built, guided & elevated this community.
-            Their journeys continue to inspire every new cohort of builders &
-            problem solvers.
-          </p>
-          <div className="w-full max-w-md mx-auto relative">
+    <div className="w-full max-w-7xl mx-auto px-4 py-12 md:py-16">
+      <header className="mb-8 md:mb-10">
+        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Alumni Directory</h1>
+        <p className="mt-2 text-sm md:text-base text-muted-foreground">
+          Explore our alumni by batch, company, designation, and club position.
+        </p>
+      </header>
+
+      <section className="border rounded-lg p-4 md:p-5 mb-8 bg-card">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+          <div className="lg:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, role, position, batch, motto..."
-              className="w-full pl-9 pr-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
+              placeholder="Search alumni..."
+              className="w-full pl-9 pr-3 py-2 rounded-md border bg-background text-sm"
             />
           </div>
-          <div className="w-full max-w-md mx-auto">
-            <select
-              value={batchFilter}
-              onChange={(e) => setBatchFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
-            >
-              <option value="all">All batches</option>
-              {batchOptions.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {loadError && (
-            <div className="text-xs text-red-500">
-              Failed to load alumni ({loadError})
-            </div>
-          )}
+          <Select value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
+          <Select value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
+          <Select value={designationFilter} onChange={setDesignationFilter} options={designationOptions} label="Designation" />
+          <Select value={clubPositionFilter} onChange={setClubPositionFilter} options={clubPositionOptions} label="Club Position" />
         </div>
-        <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[110%] h-48 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-      </section>
-      <section className="relative w-full max-w-7xl px-4 mt-10">
-        <div className="grid gap-16">
-          {visible.map((b) => (
-            <BatchBlock key={b.id || b.batch} batch={b} query={debounced} />
-          ))}
-          {visible.length === 0 && (
-            <div className="text-center text-sm text-muted-foreground py-20">
-              No matches
-            </div>
-          )}
+        <div className="mt-3 flex items-center gap-3">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 rounded-md border bg-background text-sm"
+          >
+            <option value="name">Sort: Name</option>
+            <option value="batch">Sort: Batch</option>
+            <option value="company">Sort: Company</option>
+            <option value="designation">Sort: Designation</option>
+          </select>
         </div>
       </section>
-      <section className="relative mt-28 w-full max-w-5xl px-4">
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[hsl(var(--alumni-royal-fade)/0.8)] via-background to-background p-10 flex flex-col md:flex-row items-center gap-8">
-          <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_70%_30%,black,transparent_70%)]">
-            <div className="absolute right-10 top-10 w-56 h-56 rounded-full bg-[hsl(var(--alumni-gold)/0.12)] blur-2xl" />
-          </div>
-          <div className="relative flex-1 space-y-4">
-            <h3 className="text-2xl md:text-3xl font-bold leading-tight">
-              Inspiring the Next Generation
-            </h3>
-            <p className="text-sm md:text-base text-muted-foreground max-w-lg">
-              Have a story or update to share? Help us keep the legacy timeline
-              alive & motivate future innovators.
-            </p>
-            <button className="px-5 py-2 rounded-md text-sm font-medium bg-[hsl(var(--alumni-gold))] text-black hover:brightness-110 transition">
-              Contact us
-            </button>
-          </div>
-          <div className="relative">
-            <MccLogo w={160} h={160} />
-          </div>
-        </div>
+
+      {loadError && <p className="text-sm text-red-500 mb-4">Failed to load alumni: {loadError}</p>}
+
+      <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filtered.map((m) => (
+          <AlumniMemberCard key={m.id} member={m} query={query} variant="default" />
+        ))}
       </section>
+
+      {filtered.length === 0 && (
+        <div className="text-center text-sm text-muted-foreground py-16">No alumni found for selected filters.</div>
+      )}
     </div>
+  );
+}
+
+function Select({ value, onChange, options, label }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="px-3 py-2 rounded-md border bg-background text-sm">
+      <option value="all">{label}: All</option>
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
   );
 }

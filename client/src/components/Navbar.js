@@ -58,6 +58,7 @@ const Navbar = async () => {
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
+    { href: '/admin/alumni', icon: Users, label: 'Manage Alumni' },
     // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
     { href: '/contests_report', icon: Code, label: 'Generate Contest Report' },

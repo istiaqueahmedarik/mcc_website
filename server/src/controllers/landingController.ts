@@ -238,7 +238,7 @@ export const alumniBatchCrud = makeCrudWithOrder(
 )
 export const alumniMemberCrud = makeCrudWithOrder(
     'alumni_member',
-    ['batch_id', 'full_name', 'role', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
-    ['batch_id', 'full_name', 'role', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
+    ['batch_id', 'full_name', 'role', 'position_in_club', 'designation', 'company_name', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
+    ['batch_id', 'full_name', 'role', 'position_in_club', 'designation', 'company_name', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
     'sort_order'
 )
