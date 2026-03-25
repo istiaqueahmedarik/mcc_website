@@ -90,6 +90,10 @@ export const updateAchievement = async (c: any) => {
   }
   const { ach_id, title, image, description, date, tags, intro, is_Featured } = await c.req.json()
 
+  if (!ach_id) {
+    return c.json({ error: 'ach_id is required' }, 400)
+  }
+
   let parsedTags: string[] = [];
   if (typeof tags === "string") {
     try {

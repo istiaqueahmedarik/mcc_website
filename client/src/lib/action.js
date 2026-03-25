@@ -189,7 +189,7 @@ export async function createAchievement(prevState, formData) {
 export async function updateAchievement(prevState, formData) {
   let raw = Object.fromEntries(formData);
   console.log("raw h123: ", raw);
-  raw.ach_id = prevState.ach_id;
+  raw.ach_id = raw.ach_id || prevState.ach_id || prevState.id;
   if (raw.image.size > 0) {
     const { url, error } = await uploadImage(
       "achievements",
@@ -205,7 +205,7 @@ export async function updateAchievement(prevState, formData) {
     }
     raw.image = url;
   } else {
-    raw.image = prevState.imgurl;
+    raw.image = prevState.imgurl || prevState.imageurl;
   }
 
   console.log("raw: ", raw);
@@ -220,10 +220,12 @@ export async function updateAchievement(prevState, formData) {
       success: false,
       message: response.error,
     };
-  revalidatePath(`/achievements/${raw.id}/edit`);
+  revalidatePath(`/achievements/${raw.ach_id}/edit`);
   return {
     success: true,
     message: "Achievement updated successfully",
+    ach_id: raw.ach_id,
+    imgurl: raw.image,
     id: raw.ach_id,
     imageurl: raw.image,
   };
