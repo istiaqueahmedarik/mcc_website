@@ -2,12 +2,27 @@
 import { cn } from '@/lib/utils'
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 
 const ThemeChanger = () => {
   const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   function handleClick() {
-    theme
+    if (!mounted) return
     setTheme(theme === 'light' ? 'dark' : 'light')
+  }
+
+  if (!mounted) {
+    return (
+      <div className="cursor-pointer" aria-hidden>
+        <Sun />
+      </div>
+    )
   }
 
   return (

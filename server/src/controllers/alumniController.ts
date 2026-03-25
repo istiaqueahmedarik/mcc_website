@@ -13,40 +13,6 @@ async function getAlumniMemberColumns() {
   return alumniMemberColumnsCache
 }
 
-function parseBioMeta(raw: any) {
-  if (!raw) return {}
-  if (typeof raw === 'object') return raw
-  if (typeof raw !== 'string') return {}
-
-  const text = raw.trim()
-  if (!text) return {}
-
-  try {
-    const parsed = JSON.parse(text)
-    if (parsed && typeof parsed === 'object') return parsed
-  } catch {
-    return { about: text }
-  }
-  return {}
-}
-
-function normalizeCareerPath(meta: Record<string, any>, company: string | null) {
-  const raw = meta.career_path ?? meta.careerPath ?? null
-  let list: string[] = []
-
-  if (Array.isArray(raw)) {
-    list = raw.map(v => String(v ?? '').trim()).filter(Boolean)
-  } else if (typeof raw === 'string') {
-    list = raw.split(/->|→|\|/).map(v => v.trim()).filter(Boolean)
-  }
-
-  if (list.length === 0) list = company ? ['MIST', company] : ['MIST']
-  if (list.length > 0 && list[0].toLowerCase() !== 'mist') list = ['MIST', ...list]
-  if (company && list[list.length - 1]?.toLowerCase() !== company.toLowerCase()) list.push(company)
-
-  return list
-}
-
 async function requireAdmin(c: any) {
   const { id, email } = c.get('jwtPayload') || {}
   if (!id || !email) return null
@@ -55,72 +21,95 @@ async function requireAdmin(c: any) {
   return user[0]
 }
 
-function buildAlumniPayload(row: any) {
-  const meta = parseBioMeta(row.bio)
-  const company = (row.company_name ?? meta.current_company ?? meta.company ?? '').toString().trim() || null
-  const designation = (row.designation ?? meta.designation ?? '').toString().trim() || null
-  const positionInClub = (row.position_in_club ?? row.role ?? '').toString().trim() || null
-  const location = (meta.location ?? '').toString().trim() || null
-  const email = (meta.email ?? '').toString().trim() || null
-  const phone = (meta.phone ?? '').toString().trim() || null
-  const linkedinUrl = (meta.linkedin_url ?? row.linkedin_url ?? '').toString().trim() || null
-  const githubOrFacebook = (row.github_url ?? '').toString().trim()
-  const facebookFromMeta = (meta.facebook_url ?? meta.facebook ?? '').toString().trim()
-  const facebookUrl = facebookFromMeta || (githubOrFacebook.includes('facebook.com') ? githubOrFacebook : null)
-  const headline = designation && company ? `${designation} @ ${company}` : row.current_position
+function toNullableText(value: any) {
+  const text = String(value ?? '').trim()
+  return text ? text : null
+}
+
+function toNullableYear(value: any) {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isInteger(num)) return null
+  return num
+}
+
+function buildPublicMemberPayload(row: any) {
+  const designation = toNullableText(row.designation)
+  const company = toNullableText(row.company_name)
 
   return {
     id: row.id,
     name: row.full_name,
-    role: positionInClub,
-    position_in_club: positionInClub,
+    position_in_club: toNullableText(row.position_in_club),
+    club_position_year: toNullableYear(row.club_position_year),
     designation,
     company_name: company,
-    now: headline,
-    current_position: row.current_position,
-    current_company: company,
-    location,
-    email,
-    phone,
-    linkedin_url: linkedinUrl,
-    facebook_url: facebookUrl,
-    career_path: normalizeCareerPath(meta, company),
-    bio_summary: (meta.about ?? meta.bio_summary ?? '').toString().trim() || null,
-    image_url: row.image_url,
-    highlight: row.highlight,
-    sort_order: row.sort_order,
+    headline: designation && company ? `${designation} @ ${company}` : (designation || company || null),
+    image_url: toNullableText(row.image_url),
+    linkedin_url: toNullableText(row.linkedin_url),
+    cf_handle: toNullableText(row.cf_handle),
+    highlight: Boolean(row.highlight),
   }
 }
 
 export const getAlumniPublic = async (c: any) => {
   try {
     const columns = await getAlumniMemberColumns()
-    const hasProfessionalFields =
-      columns.has('position_in_club') && columns.has('designation') && columns.has('company_name')
+    const positionExpr = columns.has('position_in_club')
+      ? sql`position_in_club`
+      : columns.has('role')
+        ? sql`role`
+        : sql`null`
+    const clubYearExpr = columns.has('club_position_year') ? sql`club_position_year` : sql`null`
+    const designationExpr = columns.has('designation')
+      ? sql`designation`
+      : columns.has('current_position')
+        ? sql`nullif(split_part(current_position, ' @ ', 1), '')`
+        : sql`null`
+    const companyExpr = columns.has('company_name')
+      ? sql`company_name`
+      : columns.has('current_position')
+        ? sql`nullif(split_part(current_position, ' @ ', 2), '')`
+        : sql`null`
+    const cfExpr = columns.has('cf_handle') ? sql`cf_handle` : sql`null`
+    const highlightExpr = columns.has('highlight') ? sql`highlight` : sql`false`
 
     const [batches, members] = await Promise.all([
-      sql`select id, year, label, motto, sort_order from alumni_batch where is_active = true order by year desc, id desc`,
-      hasProfessionalFields
-        ? sql`select id, batch_id, full_name, role, position_in_club, designation, company_name, current_position, bio, image_url, linkedin_url, github_url, highlight, sort_order from alumni_member where is_active = true order by full_name, id`
-        : sql`select id, batch_id, full_name, role, current_position, bio, image_url, linkedin_url, github_url, highlight, sort_order from alumni_member where is_active = true order by full_name, id`,
+      sql`select id, year, label, motto from alumni_batch order by year desc, id desc`,
+      sql`
+        select
+          id,
+          batch_id,
+          full_name,
+          ${positionExpr} as position_in_club,
+          ${clubYearExpr} as club_position_year,
+          ${designationExpr} as designation,
+          ${companyExpr} as company_name,
+          image_url,
+          linkedin_url,
+          ${cfExpr} as cf_handle,
+          ${highlightExpr} as highlight
+        from alumni_member
+        order by full_name, id
+      `,
     ])
 
     const membersByBatch: Record<string, any[]> = {}
-    for (const m of members) {
-      const bid = String(m.batch_id)
-      if (!membersByBatch[bid]) membersByBatch[bid] = []
-      membersByBatch[bid].push(buildAlumniPayload(m))
+    for (const row of members) {
+      const key = String(row.batch_id)
+      if (!membersByBatch[key]) membersByBatch[key] = []
+      membersByBatch[key].push(buildPublicMemberPayload(row))
     }
 
-    const result = batches.map(b => ({
-      id: b.id,
-      year: b.year,
-      batch: b.label || `Batch ${b.year}`,
-      label: b.label,
-      motto: b.motto,
-      sort_order: b.sort_order,
-      members: (membersByBatch[String(b.id)] || []).sort((a, x) => a.name.localeCompare(x.name)),
+    const result = batches.map((batch) => ({
+      id: batch.id,
+      year: batch.year,
+      batch: batch.label || `Batch ${batch.year}`,
+      label: batch.label,
+      motto: batch.motto,
+      members: (membersByBatch[String(batch.id)] || []).sort((a, b) => a.name.localeCompare(b.name)),
     }))
+
     return c.json({ batches: result })
   } catch (e) {
     console.error(e)
@@ -146,8 +135,8 @@ export const createAdminAlumniBatch = async (c: any) => {
   try {
     const body = await c.req.json()
     const result = await sql`
-      insert into alumni_batch (year, label, motto, is_active)
-      values (${body.year}, ${body.label}, ${body.motto || null}, ${body.is_active ?? true})
+      insert into alumni_batch (year, label, motto)
+      values (${toNullableYear(body.year)}, ${toNullableText(body.label)}, ${toNullableText(body.motto)})
       returning *
     `
     return c.json({ result: result[0] })
@@ -166,10 +155,9 @@ export const updateAdminAlumniBatch = async (c: any) => {
     const result = await sql`
       update alumni_batch
       set
-        year = ${body.year},
-        label = ${body.label},
-        motto = ${body.motto || null},
-        is_active = ${body.is_active ?? true}
+        year = ${toNullableYear(body.year)},
+        label = ${toNullableText(body.label)},
+        motto = ${toNullableText(body.motto)}
       where id = ${body.id}
       returning *
     `
@@ -211,26 +199,38 @@ export const createAdminAlumniMember = async (c: any) => {
   if (!admin) return c.json({ error: 'Unauthorized' }, 401)
   try {
     const columns = await getAlumniMemberColumns()
-    const hasProfessionalFields =
-      columns.has('position_in_club') && columns.has('designation') && columns.has('company_name')
     const body = await c.req.json()
-    const role = body.position_in_club || body.role || null
-    const currentPosition = body.current_position || [body.designation, body.company_name].filter(Boolean).join(' @ ')
-    const result = hasProfessionalFields
-      ? await sql`
-          insert into alumni_member
-          (batch_id, full_name, role, position_in_club, designation, company_name, current_position, bio, image_url, linkedin_url, github_url, highlight, is_active)
-          values
-          (${body.batch_id}, ${body.full_name}, ${role}, ${body.position_in_club || null}, ${body.designation || null}, ${body.company_name || null}, ${currentPosition || null}, ${body.bio || null}, ${body.image_url || null}, ${body.linkedin_url || null}, ${body.github_url || null}, ${body.highlight ?? false}, ${body.is_active ?? true})
-          returning *
-        `
-      : await sql`
-          insert into alumni_member
-          (batch_id, full_name, role, current_position, bio, image_url, linkedin_url, github_url, highlight, is_active)
-          values
-          (${body.batch_id}, ${body.full_name}, ${role}, ${currentPosition || null}, ${body.bio || null}, ${body.image_url || null}, ${body.linkedin_url || null}, ${body.github_url || null}, ${body.highlight ?? false}, ${body.is_active ?? true})
-          returning *
-        `
+    const positionInClub = toNullableText(body.position_in_club)
+    const designation = toNullableText(body.designation)
+    const companyName = toNullableText(body.company_name)
+    const currentPosition = [designation, companyName].filter(Boolean).join(' @ ') || null
+
+    const data: Record<string, any> = {
+      batch_id: body.batch_id,
+      full_name: toNullableText(body.full_name),
+      image_url: toNullableText(body.image_url),
+      linkedin_url: toNullableText(body.linkedin_url),
+      highlight: body.highlight ?? false,
+    }
+
+    if (columns.has('position_in_club')) data.position_in_club = positionInClub
+    else if (columns.has('role')) data.role = positionInClub
+    if (columns.has('club_position_year')) data.club_position_year = toNullableYear(body.club_position_year)
+    if (columns.has('designation')) data.designation = designation
+    if (columns.has('company_name')) data.company_name = companyName
+    if (columns.has('current_position')) data.current_position = currentPosition
+    if (columns.has('cf_handle')) data.cf_handle = toNullableText(body.cf_handle)
+
+    const cols = Object.keys(data)
+    const vals = Object.values(data)
+    let colFrag: any = sql``
+    let valFrag: any = sql``
+    cols.forEach((col, idx) => {
+      colFrag = idx === 0 ? sql`${sql(col)}` : sql`${colFrag}, ${sql(col)}`
+      valFrag = idx === 0 ? sql`${vals[idx]}` : sql`${valFrag}, ${vals[idx]}`
+    })
+
+    const result = await sql`insert into alumni_member (${colFrag}) values (${valFrag}) returning *`
     return c.json({ result: result[0] })
   } catch (e) {
     console.error(e)
@@ -243,48 +243,37 @@ export const updateAdminAlumniMember = async (c: any) => {
   if (!admin) return c.json({ error: 'Unauthorized' }, 401)
   try {
     const columns = await getAlumniMemberColumns()
-    const hasProfessionalFields =
-      columns.has('position_in_club') && columns.has('designation') && columns.has('company_name')
     const body = await c.req.json()
     if (!body.id) return c.json({ error: 'Missing id' }, 400)
-    const role = body.position_in_club || body.role || null
-    const currentPosition = body.current_position || [body.designation, body.company_name].filter(Boolean).join(' @ ')
-    const result = hasProfessionalFields
-      ? await sql`
-          update alumni_member
-          set
-            batch_id = ${body.batch_id},
-            full_name = ${body.full_name},
-            role = ${role},
-            position_in_club = ${body.position_in_club || null},
-            designation = ${body.designation || null},
-            company_name = ${body.company_name || null},
-            current_position = ${currentPosition || null},
-            bio = ${body.bio || null},
-            image_url = ${body.image_url || null},
-            linkedin_url = ${body.linkedin_url || null},
-            github_url = ${body.github_url || null},
-            highlight = ${body.highlight ?? false},
-            is_active = ${body.is_active ?? true}
-          where id = ${body.id}
-          returning *
-        `
-      : await sql`
-          update alumni_member
-          set
-            batch_id = ${body.batch_id},
-            full_name = ${body.full_name},
-            role = ${role},
-            current_position = ${currentPosition || null},
-            bio = ${body.bio || null},
-            image_url = ${body.image_url || null},
-            linkedin_url = ${body.linkedin_url || null},
-            github_url = ${body.github_url || null},
-            highlight = ${body.highlight ?? false},
-            is_active = ${body.is_active ?? true}
-          where id = ${body.id}
-          returning *
-        `
+    const positionInClub = toNullableText(body.position_in_club)
+    const designation = toNullableText(body.designation)
+    const companyName = toNullableText(body.company_name)
+    const currentPosition = [designation, companyName].filter(Boolean).join(' @ ') || null
+
+    const data: Record<string, any> = {
+      batch_id: body.batch_id,
+      full_name: toNullableText(body.full_name),
+      image_url: toNullableText(body.image_url),
+      linkedin_url: toNullableText(body.linkedin_url),
+      highlight: body.highlight ?? false,
+    }
+
+    if (columns.has('position_in_club')) data.position_in_club = positionInClub
+    else if (columns.has('role')) data.role = positionInClub
+    if (columns.has('club_position_year')) data.club_position_year = toNullableYear(body.club_position_year)
+    if (columns.has('designation')) data.designation = designation
+    if (columns.has('company_name')) data.company_name = companyName
+    if (columns.has('current_position')) data.current_position = currentPosition
+    if (columns.has('cf_handle')) data.cf_handle = toNullableText(body.cf_handle)
+
+    const entries = Object.entries(data)
+    let setFrag: any = sql``
+    entries.forEach(([k, v], idx) => {
+      const frag = sql`${sql(k)} = ${v}`
+      setFrag = idx === 0 ? frag : sql`${setFrag}, ${frag}`
+    })
+
+    const result = await sql`update alumni_member set ${setFrag} where id = ${body.id} returning *`
     return c.json({ result: result[0] })
   } catch (e) {
     console.error(e)
