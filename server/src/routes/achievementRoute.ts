@@ -1,29 +1,30 @@
-import { Hono } from 'hono'
-import { jwt } from 'hono/jwt'
+import { Hono } from "hono";
+import { jwt } from "hono/jwt";
 import {
   deleteAchievement,
   getAchievement,
-  getAchievements,
   getAchievementNumber,
+  getAchievements,
+  getAchievementTags,
   insertAchievement,
   updateAchievement,
-  getAchievementTags,
-} from '../controllers/achievementController'
+} from "../controllers/achievementController";
 
-const route = new Hono()
+const route = new Hono();
 
 route.use(
-  '/insert/*',
+  "/insert/*",
   jwt({
-    secret: process.env.SECRET || '',
+    secret: process.env.SECRET || "",
+    alg: "HS256",
   }),
-)
+);
 
-route.post('/insert', insertAchievement)
-route.post('/insert/update', updateAchievement)
-route.post('/insert/delete', deleteAchievement)
-route.get('/get_achievements', getAchievements)
-route.post('/get_achievement', getAchievement)
-route.get('/get_achievement_number', getAchievementNumber)
-route.get('/get_tags', getAchievementTags)
-export default route
+route.post("/insert", insertAchievement);
+route.post("/insert/update", updateAchievement);
+route.post("/insert/delete", deleteAchievement);
+route.get("/get_achievements", getAchievements);
+route.post("/get_achievement", getAchievement);
+route.get("/get_achievement_number", getAchievementNumber);
+route.get("/get_tags", getAchievementTags);
+export default route;

@@ -1,5 +1,5 @@
-import { Hono } from 'hono'
-import { jwt } from 'hono/jwt'
+import { Hono } from "hono";
+import { jwt } from "hono/jwt";
 import {
   addBatchMembers,
   deleteBatch,
@@ -11,26 +11,27 @@ import {
   getBatchUsers,
   insertBatch,
   removeBatchMembers,
-} from '../controllers/batchController'
+} from "../controllers/batchController";
 
-const route = new Hono()
+const route = new Hono();
 
 route.use(
-  '/*',
+  "/*",
   jwt({
-    secret: process.env.SECRET || '',
+    secret: process.env.SECRET || "",
+    alg: "HS256",
   }),
-)
+);
 
-route.post('/insert', insertBatch)
-route.get('/all', getAllBatches)
-route.post('/get_batch', getBatch)
-route.post('/get_ins', getBatchInstrucotrs)
-route.post('/edit', editBatch)
-route.post('/get_batch_non_users', getBatchNonUsers)
-route.post('/get_batch_users', getBatchUsers)
-route.post('/add_members', addBatchMembers)
-route.post('/remove_members', removeBatchMembers)
-route.post('/delete', deleteBatch)
+route.post("/insert", insertBatch);
+route.get("/all", getAllBatches);
+route.post("/get_batch", getBatch);
+route.post("/get_ins", getBatchInstrucotrs);
+route.post("/edit", editBatch);
+route.post("/get_batch_non_users", getBatchNonUsers);
+route.post("/get_batch_users", getBatchUsers);
+route.post("/add_members", addBatchMembers);
+route.post("/remove_members", removeBatchMembers);
+route.post("/delete", deleteBatch);
 
-export default route
+export default route;

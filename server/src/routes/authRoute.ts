@@ -21,6 +21,7 @@ route.use(
   "/user/*",
   jwt({
     secret: process.env.SECRET || "",
+    alg: "HS256",
   }),
 );
 
