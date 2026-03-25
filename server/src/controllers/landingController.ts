@@ -1,19 +1,16 @@
 import sql from '../db'
 
-function parseBioMeta(raw: any) {
-    if (!raw) return {}
-    if (typeof raw === 'object') return raw
-    if (typeof raw !== 'string') return {}
+let alumniMemberColumnsCache: Set<string> | null = null
 
-    const text = raw.trim()
-    if (!text) return {}
-    try {
-        const parsed = JSON.parse(text)
-        if (parsed && typeof parsed === 'object') return parsed
-    } catch {
-        return { about: text }
-    }
-    return {}
+async function getAlumniMemberColumns() {
+    if (alumniMemberColumnsCache) return alumniMemberColumnsCache
+    const rows = await sql`
+        select column_name
+        from information_schema.columns
+        where table_name = 'alumni_member'
+    `
+    alumniMemberColumnsCache = new Set(rows.map((r: any) => r.column_name))
+    return alumniMemberColumnsCache
 }
 
 // Utility to check admin based on jwtPayload in context
@@ -29,6 +26,25 @@ async function requireAdmin(c: any) {
 
 export const getLandingPublic = async (c: any) => {
     try {
+        const columns = await getAlumniMemberColumns()
+        const positionExpr = columns.has('position_in_club')
+            ? sql`position_in_club`
+            : columns.has('role')
+                ? sql`role`
+                : sql`null`
+        const clubYearExpr = columns.has('club_position_year') ? sql`club_position_year` : sql`null`
+        const designationExpr = columns.has('designation')
+            ? sql`designation`
+            : columns.has('current_position')
+                ? sql`nullif(split_part(current_position, ' @ ', 1), '')`
+                : sql`null`
+        const companyExpr = columns.has('company_name')
+            ? sql`company_name`
+            : columns.has('current_position')
+                ? sql`nullif(split_part(current_position, ' @ ', 2), '')`
+                : sql`null`
+        const highlightWhere = columns.has('highlight') ? sql`where m.highlight = true` : sql``
+
         const [features, stats, timeline, highlightedMembers] = await Promise.all([
             sql`select id, title, description, position from landing_features where active = true order by position, id`,
             sql`select id, title, value, suffix, position from landing_stats where active = true order by position, id`,
@@ -37,49 +53,45 @@ export const getLandingPublic = async (c: any) => {
                 select
                     m.id,
                     m.full_name,
-                    m.role,
-                    m.current_position,
-                    m.bio,
+                    ${positionExpr} as position_in_club,
+                    ${clubYearExpr} as club_position_year,
+                    ${designationExpr} as designation,
+                    ${companyExpr} as company_name,
                     m.image_url,
-                    m.sort_order,
                     b.label as batch_label,
                     b.year as batch_year
                 from alumni_member m
                 left join alumni_batch b on b.id = m.batch_id
-                where m.is_active = true
-                  and m.highlight = true
-                order by m.sort_order, m.id
-                        `
+                ${highlightWhere}
+                order by b.year desc, m.full_name, m.id
+            `
         ])
 
-        const unifiedAlumni = highlightedMembers.map((m: any, idx: number) => {
-            const meta = parseBioMeta(m.bio)
-            const company = (meta.current_company ?? meta.company ?? '').toString().trim()
-            const role = (m.role ?? '').toString().trim()
+        const alumni = highlightedMembers.map((m: any) => {
+            const designation = (m.designation ?? '').toString().trim()
+            const company = (m.company_name ?? '').toString().trim()
+            const positionInClub = (m.position_in_club ?? '').toString().trim()
+            const clubYear = Number.isInteger(Number(m.club_position_year)) ? Number(m.club_position_year) : null
+
             const batchTitle = m.batch_label
                 ? `${m.batch_label}${m.batch_year ? ` (${m.batch_year})` : ''}`
                 : 'MIST Alumni'
 
-            const title = company
-                ? `${batchTitle} • ${role || 'Alumni'} @ ${company}`
-                : `${batchTitle} • ${role || 'Alumni'}`
+            const titleCore = designation && company
+                ? `${designation} @ ${company}`
+                : (designation || company || 'Alumni')
 
             return {
                 id: `member-${m.id}`,
                 name: m.full_name,
-                title,
-                quote: (meta.about ?? meta.bio_summary ?? role ?? 'Alumni spotlight').toString(),
+                title: `${batchTitle} • ${titleCore}`,
+                quote: positionInClub
+                    ? `${positionInClub}${clubYear ? ` ${clubYear}` : ''}`
+                    : 'Alumni spotlight',
                 image_url: m.image_url,
-                position: Number.isFinite(Number(m.sort_order)) ? Number(m.sort_order) : idx + 1,
                 company,
-                role,
+                role: designation || 'Alumni',
             }
-        })
-
-        const alumni = unifiedAlumni.sort((a, b) => {
-            const pa = Number.isFinite(Number(a.position)) ? Number(a.position) : 0
-            const pb = Number.isFinite(Number(b.position)) ? Number(b.position) : 0
-            return pa - pb
         })
 
         return c.json({ features, stats, timeline, alumni })
@@ -111,7 +123,6 @@ async function updateRow(table: string, id: number | string, fields: Record<stri
     const entries = Object.entries(fields)
     if (entries.length === 0) return []
     const fragments = entries.map(([k, v]) => sql`${sql(k)} = ${v}`)
-    // Manually interleave commas
     let setFragment: any = sql``
     fragments.forEach((frag, idx) => {
         if (idx === 0) setFragment = frag
@@ -232,13 +243,13 @@ export const timelineCrud = makeCrud(
 )
 export const alumniBatchCrud = makeCrudWithOrder(
     'alumni_batch',
-    ['year', 'label', 'motto', 'sort_order', 'is_active'],
-    ['year', 'label', 'motto', 'sort_order', 'is_active'],
+    ['year', 'label', 'motto', 'sort_order'],
+    ['year', 'label', 'motto', 'sort_order'],
     'sort_order'
 )
 export const alumniMemberCrud = makeCrudWithOrder(
     'alumni_member',
-    ['batch_id', 'full_name', 'role', 'position_in_club', 'designation', 'company_name', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
-    ['batch_id', 'full_name', 'role', 'position_in_club', 'designation', 'company_name', 'current_position', 'bio', 'image_url', 'linkedin_url', 'github_url', 'highlight', 'sort_order', 'is_active'],
-    'sort_order'
+    ['batch_id', 'full_name', 'position_in_club', 'club_position_year', 'designation', 'company_name', 'image_url', 'linkedin_url', 'cf_handle', 'highlight'],
+    ['batch_id', 'full_name', 'position_in_club', 'club_position_year', 'designation', 'company_name', 'image_url', 'linkedin_url', 'cf_handle', 'highlight'],
+    'full_name'
 )
