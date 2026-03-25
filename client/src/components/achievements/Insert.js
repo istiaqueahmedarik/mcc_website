@@ -154,6 +154,7 @@ const NHEFPage = () => {
       submitIdleText="Create Achievement"
       submitPendingText="Submitting..."
       imageHelperText="This field is auto-filled after upload. Keep the thumbnail image upload last so the most recent URL is used as thumbnail automatically."
+      isFeaturedDefaultChecked={false}
     />
   )
 }

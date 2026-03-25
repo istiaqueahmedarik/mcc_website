@@ -128,6 +128,7 @@ export default function Edit({ achievement }) {
   }, [uploadedImageUrl])
 
   const initialTags = Array.isArray(achievement.tag_names) ? achievement.tag_names : []
+  const isFeaturedDefaultChecked = achievement?.is_featured === true || achievement?.is_featured === 1;
 
   return (
     <AchievementFormShell
@@ -159,6 +160,7 @@ export default function Edit({ achievement }) {
       submitIdleText="Save Changes"
       submitPendingText="Saving..."
       imageHelperText="URL is auto-filled after upload. Keep thumbnail upload as the final image update if you want it as the card thumbnail."
+      isFeaturedDefaultChecked={isFeaturedDefaultChecked}
     />
   )
 }

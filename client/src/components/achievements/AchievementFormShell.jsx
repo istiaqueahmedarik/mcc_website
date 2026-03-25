@@ -36,6 +36,7 @@ export default function AchievementFormShell({
   submitIdleText,
   submitPendingText,
   imageHelperText,
+  isFeaturedDefaultChecked = false,
 }) {
   const introValue = selectedBadge === 'Custom' ? customBadge.trim() : selectedBadge
   const badgePreviewText = introValue || selectedBadge
@@ -296,7 +297,21 @@ export default function AchievementFormShell({
               </div>
             </div>
 
-            <div className="col-span-full mt-2 flex flex-col-reverse gap-2 border-t border-[var(--ab-border)] pt-4 sm:flex-row sm:items-center sm:justify-end">
+            <div className="col-span-full mt-2 flex flex-col gap-3 border-t border-[var(--ab-border)] pt-4 sm:flex-row sm:items-center sm:justify-end">
+              <Label
+                htmlFor="is_Featured"
+                className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)] px-3 py-2 text-xs font-semibold text-[var(--ab-text)] [font-family:'Syne',sans-serif]"
+              >
+                <input
+                  id="is_Featured"
+                  name="is_Featured"
+                  type="checkbox"
+                  defaultChecked={isFeaturedDefaultChecked}
+                  className="h-4 w-4 rounded border-[var(--ab-border)] text-[var(--ab-accent)] focus:ring-[var(--ab-accent)]"
+                />
+                <span>Is Featured</span>
+              </Label>
+
               <Button
                 type="submit"
                 disabled={pending}

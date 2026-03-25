@@ -836,6 +836,12 @@ export async function getAchievementNumber() {
   return response?.result?.[0]?.count;
 }
 
+export async function getFeaturedAchievements(limit = 12) {
+  const response = await get(`achieve/get_featured_achievements?limit=${limit}`);
+  if (response?.error) return response.error;
+  return response?.result;
+}
+
 export async function getContestResults(contestId, sessionId) {
   if (!contestId || isNaN(Number(contestId))) {
     throw new Error("Invalid contest ID");

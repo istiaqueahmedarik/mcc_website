@@ -1,5 +1,5 @@
 "use client";
-import { getAchievements } from "@/lib/action";
+import { getFeaturedAchievements } from "@/lib/action";
 import { useCallback, useEffect, useState } from "react";
 import FeaturedAchievement from '@/components/achievements/featured_achievement';
 import MoreAchievements from '@/components/achievements/more_achievements';
@@ -13,7 +13,7 @@ export default function AchievementPage() {
   useEffect(() => {
     const fetchAchievements = async () => {
       try {
-        const data = await getAchievements(12);
+        const data = await getFeaturedAchievements(12);
         setAchievements(data);
       } catch (error) {
         console.error("Error fetching achievements:", error);

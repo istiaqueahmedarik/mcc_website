@@ -18,7 +18,7 @@ export const insertAchievement = async (c: any) => {
   if (result.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { title, image, description, date, tags, intro } = await c.req.json()
+  const { title, image, description, date, tags, intro, is_Featured } = await c.req.json()
 
   let parsedTags: string[] = [];
   if (typeof tags === "string") {
@@ -40,6 +40,15 @@ export const insertAchievement = async (c: any) => {
       `;
 
       const achId = result1[0].id;
+
+      //If is_Featured is true, insert achId into featured_achievements
+      if (is_Featured) {
+        await sql`
+          INSERT INTO featured_achievements (achievement_id)
+          VALUES (${achId})
+          ON CONFLICT DO NOTHING
+        `;
+      }
 
       // Insert tags
       await sql`
@@ -79,7 +88,7 @@ export const updateAchievement = async (c: any) => {
   if (result.length === 0) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  const { ach_id, title, image, description, date, tags, intro } = await c.req.json()
+  const { ach_id, title, image, description, date, tags, intro, is_Featured } = await c.req.json()
 
   let parsedTags: string[] = [];
   if (typeof tags === "string") {
@@ -99,6 +108,19 @@ export const updateAchievement = async (c: any) => {
         SET title = ${title}, image = ${image}, description = ${description}, date = ${new Date(date).toISOString()}, intro = ${intro}
         WHERE id = ${ach_id}
       `;
+
+      // Insert into featured_achievements if is_Featured is true, otherwise delete from featured_achievements
+      if (is_Featured) {
+        await sql`
+          INSERT INTO featured_achievements (achievement_id)
+          VALUES (${ach_id})
+          ON CONFLICT DO NOTHING
+        `;
+      } else {
+        await sql`
+          DELETE FROM featured_achievements WHERE achievement_id = ${ach_id}
+        `;
+      }
 
       // Insert tags
       await sql`
@@ -160,7 +182,8 @@ export const getAchievements = async (c: any) => {
   try {
     const result = await sql`
       SELECT pagination.*,
-        COALESCE(t.tag_names, '{}'::text[]) AS tag_names
+      COALESCE(t.tag_names, '{}'::text[]) AS tag_names,
+      (f.achievement_id IS NOT NULL) AS is_featured
       FROM (
         SELECT *
         FROM achievements
@@ -168,6 +191,10 @@ export const getAchievements = async (c: any) => {
         LIMIT ${limit}
         OFFSET ${offset}
       ) pagination
+
+      LEFT JOIN featured_achievements f
+        ON pagination.id = f.achievement_id
+
       LEFT JOIN (
         SELECT 
           achievement_tags.achievement_id,
@@ -178,7 +205,8 @@ export const getAchievements = async (c: any) => {
         GROUP BY achievement_tags.achievement_id
       ) t
       ON pagination.id = t.achievement_id
-      ORDER BY pagination.date DESC, pagination.id DESC
+
+      ORDER BY pagination.date DESC, pagination.id DESC;
     `;
     // console.log('result: ', result);
     return c.json({ result });
@@ -193,16 +221,26 @@ export const getAchievement = async (c: any) => {
   const { id } = await c.req.json()
   try {
     const result = await sql`
-      SELECT 
-        achievements.*,
-        COALESCE(ARRAY_AGG(tags.name) FILTER (WHERE tags.name IS NOT NULL), '{}'::text[]) AS tag_names
+      SELECT achievements.*,
+        COALESCE(
+          ARRAY_AGG(tags.name) FILTER (WHERE tags.name IS NOT NULL),
+          '{}'::text[]
+        ) AS tag_names,
+        (f.achievement_id IS NOT NULL) AS is_featured
       FROM achievements
+
+      LEFT JOIN featured_achievements f
+        ON achievements.id = f.achievement_id
+
       LEFT JOIN achievement_tags 
         ON achievements.id = achievement_tags.achievement_id
+
       LEFT JOIN tags 
         ON tags.id = achievement_tags.tag_id
+
       WHERE achievements.id = ${id}
-      GROUP BY achievements.id
+
+      GROUP BY achievements.id, f.achievement_id;
     `
     // console.log('result: ', result)
     return c.json({ result })
@@ -217,6 +255,27 @@ export const getAchievementNumber = async (c: any) => {
     const result = await sql`SELECT COUNT(*) FROM achievements`
     return c.json({ result })
   } catch (error) {
+    console.log('error: ', error)
+    return c.json({ error: 'error' }, 400)
+  }
+}
+
+export const getFeaturedAchievements = async (c: any) => {
+  const limit = c.req.query('limit') || '12'
+  // console.log('getFeaturedAchievements called with limit: ', limit)
+  try {
+    const result = await sql`
+      SELECT a.*
+      FROM achievements a
+      JOIN featured_achievements f
+      ON a.id = f.achievement_id
+      ORDER BY f.created_at DESC
+      LIMIT ${limit};
+    `;
+    // console.log('result: ', result)
+    return c.json({ result })
+  }
+  catch (error) {
     console.log('error: ', error)
     return c.json({ error: 'error' }, 400)
   }
