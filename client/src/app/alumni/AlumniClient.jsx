@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/action";
@@ -58,7 +65,9 @@ export default function AlumniClient({ initialBatches, loadError }) {
 
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
   const [memberDialogOpen, setMemberDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [editingMemberId, setEditingMemberId] = React.useState(null);
+  const [memberToDelete, setMemberToDelete] = React.useState(null);
 
   const [batchForm, setBatchForm] = React.useState({ year: "", label: "", motto: "" });
   const [memberForm, setMemberForm] = React.useState({
@@ -79,6 +88,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
   const batchOptions = React.useMemo(() => [...new Set(members.map((m) => m.batch).filter(Boolean))].sort(), [members]);
   const companyOptions = React.useMemo(() => [...new Set(members.map((m) => m.company_name).filter(Boolean))].sort(), [members]);
   const positionOptions = React.useMemo(() => [...new Set(members.map((m) => m.position_in_club).filter(Boolean))].sort(), [members]);
+  const designationOptions = React.useMemo(() => [...new Set(members.map((m) => m.designation).filter(Boolean))].sort(), [members]);
 
   React.useEffect(() => {
     setIsAdmin(isAdminClient());
@@ -233,17 +243,24 @@ export default function AlumniClient({ initialBatches, loadError }) {
     }
   }
 
-  async function handleDelete(member) {
+  async function handleDeleteClick(member) {
     if (!member?.id) return;
-    if (!window.confirm(`Delete ${member.name}?`)) return;
+    setMemberToDelete(member);
+    setDeleteDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!memberToDelete?.id) return;
     setLoading(true);
     const tid = toast.loading("Deleting alumni...");
     try {
       const { deleteAdminAlumniMember } = await import("@/actions/alumni");
-      const res = await deleteAdminAlumniMember({ id: member.id });
+      const res = await deleteAdminAlumniMember({ id: memberToDelete.id });
       if (res?.error) throw new Error(res.error);
       await refreshPublic();
       toast.success("Alumni deleted", { id: tid });
+      setDeleteDialogOpen(false);
+      setMemberToDelete(null);
     } catch (e) {
       toast.error(e?.message || "Failed to delete alumni", { id: tid });
     } finally {
@@ -253,6 +270,16 @@ export default function AlumniClient({ initialBatches, loadError }) {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-12 md:py-16">
+      <datalist id="companies-list">
+        {companyOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+      <datalist id="designations-list">
+        {designationOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+      <datalist id="positions-list">
+        {positionOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+
       <header className="mb-8">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -305,7 +332,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
                     <Plus className="h-4 w-4" /> Add Alumni
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingMemberId ? "Edit Alumni" : "Add Alumni"}</DialogTitle>
                     <DialogDescription>Fill requested alumni information.</DialogDescription>
@@ -318,26 +345,39 @@ export default function AlumniClient({ initialBatches, loadError }) {
                     </div>
                     <div>
                       <Label>Batch</Label>
-                      <select
+                      <Select
                         value={memberForm.batch_id}
-                        onChange={(e) => setMemberForm((p) => ({ ...p, batch_id: e.target.value }))}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        onValueChange={(val) => setMemberForm((p) => ({ ...p, batch_id: val }))}
                       >
-                        <option value="">Select batch</option>
-                        {(batches || []).map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.label} ({b.year})
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select batch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(batches || []).map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.label} ({b.year})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label>Current Position (e.g. SWE)</Label>
-                      <Input value={memberForm.designation} onChange={(e) => setMemberForm((p) => ({ ...p, designation: e.target.value }))} />
+                      <Input 
+                        value={memberForm.designation} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, designation: e.target.value }))}
+                        list="designations-list"
+                        placeholder="Software Engineer"
+                      />
                     </div>
                     <div>
                       <Label>Company (e.g. Google)</Label>
-                      <Input value={memberForm.company_name} onChange={(e) => setMemberForm((p) => ({ ...p, company_name: e.target.value }))} />
+                      <Input 
+                        value={memberForm.company_name} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, company_name: e.target.value }))}
+                        list="companies-list"
+                        placeholder="Google"
+                      />
                     </div>
                     <div>
                       <Label>Image URL</Label>
@@ -349,7 +389,12 @@ export default function AlumniClient({ initialBatches, loadError }) {
                     </div>
                     <div>
                       <Label>Club Position</Label>
-                      <Input value={memberForm.position_in_club} onChange={(e) => setMemberForm((p) => ({ ...p, position_in_club: e.target.value }))} placeholder="President" />
+                      <Input 
+                        value={memberForm.position_in_club} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, position_in_club: e.target.value }))} 
+                        list="positions-list"
+                        placeholder="President" 
+                      />
                     </div>
                     <div>
                       <Label>Club Position Year</Label>
@@ -388,16 +433,23 @@ export default function AlumniClient({ initialBatches, loadError }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search alumni..." className="pl-9" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
-          <Select value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
-          <Select value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
-          <Select value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
-            <option value="name">Sort: Name</option>
-            <option value="batch">Sort: Batch</option>
-            <option value="company">Sort: Company</option>
-            <option value="position">Sort: Position</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+          <FilterSelect value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
+          <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
+          <FilterSelect value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
+          
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger>
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Sort: Name</SelectItem>
+              <SelectItem value="batch">Sort: Batch</SelectItem>
+              <SelectItem value="company">Sort: Company</SelectItem>
+              <SelectItem value="position">Sort: Position</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             onClick={() => {
@@ -417,9 +469,28 @@ export default function AlumniClient({ initialBatches, loadError }) {
 
       <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((m) => (
-          <AlumniMemberCard key={m.id} member={m} canEdit={isAdmin} onEdit={openEdit} onDelete={handleDelete} />
+          <AlumniMemberCard key={m.id} member={m} canEdit={isAdmin} onEdit={openEdit} onDelete={handleDeleteClick} />
         ))}
       </section>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Alumni</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{memberToDelete?.name}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={loading}>
+              {loading ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {filtered.length === 0 && (
         <div className="text-center text-sm text-muted-foreground py-16">No alumni found.</div>
@@ -428,15 +499,20 @@ export default function AlumniClient({ initialBatches, loadError }) {
   );
 }
 
-function Select({ value, onChange, options, label }) {
+function FilterSelect({ value, onChange, options, label }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
-      <option value="all">{label}: All</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue placeholder={`${label}: All`} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">{label}: All</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

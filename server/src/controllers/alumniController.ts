@@ -1,16 +1,14 @@
 import sql from '../db'
 
-let alumniMemberColumnsCache: Set<string> | null = null
-
 async function getAlumniMemberColumns() {
-  if (alumniMemberColumnsCache) return alumniMemberColumnsCache
+  // Always fetch columns to ensure schema changes are picked up immediately
+  // In a high-traffic app we might cache this with a TTL, but for this admin function it's fine
   const rows = await sql`
     select column_name
     from information_schema.columns
     where table_name = 'alumni_member'
   `
-  alumniMemberColumnsCache = new Set(rows.map((r: any) => r.column_name))
-  return alumniMemberColumnsCache
+  return new Set(rows.map((r: any) => r.column_name))
 }
 
 async function requireAdmin(c: any) {
