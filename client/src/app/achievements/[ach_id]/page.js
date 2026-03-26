@@ -1,10 +1,11 @@
 import MarkdownRender from "@/components/MarkdownRenderer";
-import { getAchievementsById } from "@/lib/action";
+import { getAchievementsById, getRelatedAchievements } from "@/lib/action";
 import { formatRelative } from "date-fns";
 import { CalendarArrowUp, Tag, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
+import RelatedAchievements from "@/components/achievements/RelatedAchievements";
 
 const normalizeAchievementTags = (achievement) => {
   const rawTags = achievement?.tag_names ?? achievement?.tags ?? [];
@@ -30,34 +31,43 @@ const normalizeAchievementTags = (achievement) => {
 export default async function SingleAchievement({ params }) {
   const { ach_id } = await params;
   const achievementArr = await getAchievementsById(ach_id);
-  const achievement = achievementArr[0];
-  const tags = normalizeAchievementTags(achievement);
-  const cookieStore = await cookies();
-  const isAdmin = cookieStore.get("admin")?.value === "true";
 
   if (!Array.isArray(achievementArr) || achievementArr.length === 0) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground">
+      <div className="min-h-screen w-full flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0f]">
+        <div className="flex flex-col items-center gap-4 text-slate-500 dark:text-[#6b6b8a]">
           <span className="text-5xl">🏆</span>
-          <p className="font-semibold tracking-wide uppercase text-sm">Achievement Not Found</p>
+          <p
+            className="text-sm uppercase tracking-widest font-bold"
+            style={{ fontFamily: "'Syne', sans-serif" }}
+          >
+            Achievement Not Found
+          </p>
         </div>
       </div>
     );
   }
 
+  const achievement = achievementArr[0];
+  const tags = normalizeAchievementTags(achievement);
+  const cookieStore = await cookies();
+  const isAdmin = cookieStore.get("admin")?.value === "true";
+
+  const relatedResponse = await getRelatedAchievements(ach_id, 20);
+  const relatedAchievements = Array.isArray(relatedResponse) ? relatedResponse : [];
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-[#f1f0ff] font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0f] text-slate-900 dark:text-[#f1f0ff] font-sans relative overflow-x-hidden">
 
-      {/* Ambient background blobs */}
-      <div className="pointer-events-none fixed top-[-200px] left-[-200px] w-[700px] h-[700px] rounded-full bg-indigo-600/[0.06] blur-3xl z-0" />
-      <div className="pointer-events-none fixed bottom-[-200px] right-[-200px] w-[600px] h-[600px] rounded-full bg-amber-500/[0.04] blur-3xl z-0" />
+      {/* Ambient blobs */}
+      <div className="pointer-events-none fixed top-[-200px] left-[-200px] w-[700px] h-[700px] rounded-full bg-indigo-600/[0.12] dark:bg-indigo-600/[0.06] blur-3xl z-0" />
+      <div className="pointer-events-none fixed bottom-[-200px] right-[-200px] w-[600px] h-[600px] rounded-full bg-amber-500/[0.08] dark:bg-amber-500/[0.04] blur-3xl z-0" />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 py-12 pb-24 flex flex-col gap-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-12 pb-24">
 
-        {/* Top action bar */}
-        <div className="flex justify-end">
-          {isAdmin && (
+        {/* Admin edit button */}
+        {isAdmin && (
+          <div className="flex justify-end mb-6">
             <Link
               href={`/achievements/${ach_id}/edit`}
               className="inline-flex items-center gap-2 text-sm text-white rounded-lg px-5 py-2 font-bold uppercase tracking-wider transition-all hover:-translate-y-px"
@@ -70,140 +80,106 @@ export default async function SingleAchievement({ params }) {
               <Pencil size={13} />
               Edit
             </Link>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Hero Image */}
-        <div
-          className="relative w-full max-w-3xl mx-auto rounded-2xl overflow-hidden aspect-square border"
-          style={{ borderColor: "#2a2a38", background: "#111118" }}
-        >
-          {/* Gold shimmer top rule */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[2px] z-10"
-            style={{ background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }}
-          />
+        {/* Two-column layout */}
+        <div className="flex flex-col lg:flex-row gap-8 items-start">
 
-          <Image
-            src={achievement.image}
-            alt={achievement.title ?? "Achievement"}
-            width={1200}
-            height={1200}
-            className="w-full h-full object-contain"
-            priority
-          />
+          {/* LEFT: Image + Intro */}
+          <div className="w-full lg:w-[340px] xl:w-[380px] flex-shrink-0 flex flex-col gap-4">
+            <div
+              className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]"
+              style={{ aspectRatio: "1 / 1" }}
+            >
+              <div
+                className="absolute top-0 left-0 right-0 h-[2px] z-10"
+                style={{ background: "linear-gradient(90deg, transparent, #f59e0b, transparent)" }}
+              />
+              <Image
+                src={achievement.image}
+                alt={achievement.title ?? "Achievement"}
+                width={800}
+                height={800}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </div>
 
-          {/* Gradient overlay with title */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(10,10,15,0) 20%, rgba(10,10,15,0.55) 60%, rgba(10,10,15,0.97) 100%)",
-            }}
-          />
-
-          {/* Hero bottom content */}
-          <div className="absolute bottom-0 left-0 right-0 p-8 z-10">
             {achievement.intro && (
               <div
-                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold mb-4 border"
+                className="w-full rounded-xl border px-5 py-3 text-sm font-bold text-center"
                 style={{
                   fontFamily: "'Syne', sans-serif",
-                  background: "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(251,191,36,0.12))",
-                  borderColor: "rgba(245,158,11,0.35)",
-                  color: "#fbbf24",
+                  background: "linear-gradient(135deg, rgba(245,158,11,0.12), rgba(251,191,36,0.07))",
+                  borderColor: "rgba(245,158,11,0.28)",
+                  color: "#bd8d11",
+                  letterSpacing: "0.03em",
                 }}
               >
                 {achievement.intro}
               </div>
             )}
+          </div>
+
+          {/* RIGHT: Title, Date, Tags, Description */}
+          <div className="flex-1 min-w-0 flex flex-col gap-6">
             {achievement.title && (
               <h1
-                className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight"
+                className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-indigo-700 dark:from-[#f1f0ff] dark:to-[#a78bfa]"
                 style={{
                   fontFamily: "'Syne', sans-serif",
-                  background: "linear-gradient(120deg, #f1f0ff 50%, #a78bfa)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
                 }}
               >
                 {achievement.title}
               </h1>
             )}
-          </div>
-        </div>
 
-        {/* Date + Tags row */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Date pill */}
-          <div
-            className="inline-flex items-center gap-2 text-sm border rounded-lg px-4 py-2"
-            style={{
-              color: "#9090b0",
-              borderColor: "#2a2a38",
-              background: "#111118",
-            }}
-          >
-            <CalendarArrowUp size={14} className="text-amber-400" />
-            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.05em" }}>
-              {formatRelative(achievement.date, new Date())}
-            </span>
-          </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className="inline-flex items-center gap-2 text-sm border rounded-lg px-4 py-2 text-slate-600 dark:text-[#9090b0] border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]"
+              >
+                <CalendarArrowUp size={14} className="text-amber-400" />
+                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.05em" }}>
+                  {formatRelative(achievement.date, new Date())}
+                </span>
+              </div>
 
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => (
+              {tags.length > 0 && tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-all cursor-default hover:border-indigo-400/50"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-all cursor-default border-indigo-300/60 dark:border-[rgba(99,102,241,0.25)] text-indigo-700 dark:text-[#a78bfa] hover:border-indigo-400/60 dark:hover:border-indigo-400/50"
                   style={{
                     fontFamily: "'Syne', sans-serif",
-                    background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(167,139,250,0.1))",
-                    borderColor: "rgba(99,102,241,0.25)",
-                    color: "#a78bfa",
+                    background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(167,139,250,0.06))",
                   }}
                 >
+                  <Tag size={11} aria-hidden="true" />
                   {tag}
                 </span>
               ))}
             </div>
-          )}
-        </div>
 
-        {/* Divider */}
-        <div
-          className="h-px w-full"
-          style={{ background: "linear-gradient(90deg, transparent, #2a2a38, transparent)" }}
-        />
+            <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-[#2a2a38]" />
 
-        {/* Description */}
-        <div
-          className="rounded-2xl overflow-hidden border"
-          style={{ background: "#111118", borderColor: "#2a2a38" }}
-        >
-          {/* Toolbar header */}
-          <div
-            className="flex items-center justify-between px-5 py-3 border-b"
-            style={{ background: "#17171f", borderColor: "#2a2a38" }}
-          >
-            <span
-              className="text-xs font-bold uppercase tracking-widest"
-              style={{ fontFamily: "'Syne', sans-serif", color: "#6b6b8a" }}
-            >
-              Description
-            </span>
-            <Tag size={13} style={{ color: "#6b6b8a" }} />
-          </div>
-
-          {/* Body */}
-          <div
-            className="px-8 py-7 text-base leading-loose"
-            style={{ color: "#9090b0", fontWeight: 300 }}
-          >
-            <MarkdownRender content={achievement.description} />
+            <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#111118] border-slate-200 dark:border-[#2a2a38]">
+              <div
+                className="flex items-center justify-between px-5 py-3 border-b bg-slate-100 dark:bg-[#17171f] border-slate-200 dark:border-[#2a2a38]"
+              >
+                <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#6b6b8a]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                  Description
+                </span>
+                <Tag size={13} className="text-slate-500 dark:text-[#6b6b8a]" />
+              </div>
+              <div className="px-8 py-7 text-base leading-loose text-slate-600 dark:text-[#9090b0]" style={{ fontWeight: 300 }}>
+                <MarkdownRender content={achievement.description} />
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Related achievements */}
+        <RelatedAchievements achievements={relatedAchievements} />
 
       </div>
     </div>

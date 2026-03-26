@@ -1,6 +1,6 @@
 import { deleteAchievement } from "@/lib/action";
 import { format } from "date-fns";
-import { CalendarDays, ArrowUpRight, Trophy, Tag } from "lucide-react";
+import { CalendarDays, Trophy, Tag } from "lucide-react";
 import Image from "next/image";
 import DeleteComp from "../deleteComp";
 import ProgressLink from "../ProgressLink";
@@ -82,7 +82,7 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
 
         {/* Top bar: admin delete */}
         {isAdmin && (
-          <div className="absolute top-3 right-3 z-20">
+          <div className="absolute top-3 right-3 z-30">
             <DeleteComp
               delFunc={deleteAchievement}
               content={achievement}
@@ -114,53 +114,55 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
           {achievement.title}
         </h2>
 
-        {/* Intro message */}
-        {introMsg && (
-          <div className="relative overflow-hidden rounded-xl border border-zinc-900/10 dark:border-white/10 bg-gradient-to-br from-zinc-900/[0.05] to-zinc-900/[0.02] dark:from-white/[0.08] dark:to-white/[0.03] px-3 py-2.5">
-            <div className={`pointer-events-none absolute inset-y-0 left-0 w-1 ${accentColors[colorIdx]} opacity-80`} />
-            <p className="pl-2 text-[10px] uppercase tracking-wider text-zinc-500 dark:text-white/45">Summary</p>
-            <p className="mt-1 pl-2 text-[12px] leading-relaxed text-zinc-700 dark:text-white/80 line-clamp-2">
-              {introMsg}
-            </p>
+        {(tags.length > 0 || introMsg) && (
+          <div className="grid grid-cols-2 items-start gap-2.5">
+            <div className={introMsg ? "min-w-0" : "col-span-2 min-w-0"}>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-wider text-zinc-600 dark:text-white/55">
+                    <Tag className="h-3 w-3" />
+                    Tags
+                  </span>
+                  {tags.slice(0, 3).map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:text-white/70"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {tags.length > 3 && (
+                    <span className="rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 dark:text-white/55">
+                      +{tags.length - 3}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className={tags.length > 0 ? "min-w-0 flex justify-end" : "col-span-2 min-w-0 flex justify-end"}>
+              {introMsg && (
+                <div className="inline-flex w-fit max-w-full items-start gap-2 rounded-lg border border-zinc-900/10 bg-zinc-900/[0.04] px-2.5 py-1.5 dark:border-white/10 dark:bg-white/[0.05]">
+                  <span
+                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${accentColors[colorIdx]} opacity-90`}
+                  />
+                  <p className="text-[12px] leading-relaxed text-zinc-700 dark:text-white/80 break-words">
+                    {introMsg}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
-
-        {tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-wider text-zinc-600 dark:text-white/55">
-              <Tag className="h-3 w-3" />
-              Tags
-            </span>
-            {tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-700 dark:text-white/70"
-              >
-                {tag}
-              </span>
-            ))}
-            {tags.length > 3 && (
-              <span className="rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-600 dark:text-white/55">
-                +{tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* CTA */}
-        <div className="translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 ease-out">
-          <ProgressLink
-            href={`/achievements/${achievement.id}`}
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide
-              px-3 py-1.5 rounded-lg border border-zinc-900/10 dark:border-white/10
-              bg-zinc-900/[0.05] dark:bg-white/[0.05] hover:bg-zinc-900/[0.1] dark:hover:bg-white/10 text-zinc-700 dark:text-white/80 hover:text-zinc-900 dark:hover:text-white
-              backdrop-blur-sm transition-all duration-200`}
-          >
-            View Details
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </ProgressLink>
-        </div>
       </div>
+
+      <ProgressLink
+        href={`/achievements/${achievement.id}`}
+        className="absolute inset-0 z-20 rounded-2xl"
+        aria-label={`View details for ${achievement.title || "achievement"}`}
+      >
+        <span className="sr-only">View Details</span>
+      </ProgressLink>
     </div>
   );
 }

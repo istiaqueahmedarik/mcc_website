@@ -8,7 +8,8 @@ import {
   getAchievementTags,
   insertAchievement,
   updateAchievement,
-  getFeaturedAchievements
+  getFeaturedAchievements,
+  getRelatedAchievements,
 } from "../controllers/achievementController";
 
 const route = new Hono();
@@ -28,5 +29,6 @@ route.get("/get_achievements", getAchievements);
 route.post("/get_achievement", getAchievement);
 route.get("/get_achievement_number", getAchievementNumber);
 route.get("/get_featured_achievements", getFeaturedAchievements);
+route.post("/get_related_achievements", getRelatedAchievements);
 route.get("/get_tags", getAchievementTags);
 export default route;

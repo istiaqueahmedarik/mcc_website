@@ -1,8 +1,9 @@
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalendarIcon, Check, Copy, Link2, Trophy, Upload } from 'lucide-react'
+import { toast } from 'sonner'
 import EditorWrapper from '@/components/EditorWrapper'
 import TagsInput from '@/components/achievements/TagsInput'
 
@@ -40,6 +41,22 @@ export default function AchievementFormShell({
 }) {
   const introValue = selectedBadge === 'Custom' ? customBadge.trim() : selectedBadge
   const badgePreviewText = introValue || selectedBadge
+  const lastToastKeyRef = useRef('')
+
+  useEffect(() => {
+    if (!state?.message) return
+
+    const toastKey = `${state.success ? 'success' : 'error'}:${state.message}`
+    if (lastToastKeyRef.current === toastKey) return
+
+    lastToastKeyRef.current = toastKey
+
+    if (state.success) {
+      toast.success(state.message)
+    } else {
+      toast.error(state.message)
+    }
+  }, [state?.message, state?.success])
 
   return (
     <form action={formAction} className="min-h-screen">
@@ -156,8 +173,8 @@ export default function AchievementFormShell({
                 </div>
               </div>
 
-              <div className="space-y-10">
-                <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="space-y-2">
                   <Label
                     htmlFor="imageUrl"
                     className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
@@ -206,7 +223,7 @@ export default function AchievementFormShell({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
                     Tags
                   </Label>
@@ -215,7 +232,7 @@ export default function AchievementFormShell({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <Label
                     htmlFor="date"
                     className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
@@ -234,7 +251,7 @@ export default function AchievementFormShell({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
                     Intro Badge / Position
                   </Label>
@@ -276,6 +293,28 @@ export default function AchievementFormShell({
                     />
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
+                    Is Featured?
+                  </Label>
+                  <Label
+                    htmlFor="is_Featured"
+                    className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)] px-3 py-2 text-xs font-semibold text-[var(--ab-text)] [font-family:'Syne',sans-serif]"
+                  >
+                    <input
+                      id="is_Featured"
+                      name="is_Featured"
+                      type="checkbox"
+                      defaultChecked={isFeaturedDefaultChecked}
+                      className="h-4 w-4 rounded border-[var(--ab-border)] text-[var(--ab-accent)] focus:ring-[var(--ab-accent)]"
+                    />
+                    <span>Is Featured</span>
+                  </Label>
+                  <Label className="text-xs text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
+                    *Only featured achievements will be displayed in the main feed
+                  </Label>
+                </div>
               </div>
             </div>
 
@@ -297,21 +336,7 @@ export default function AchievementFormShell({
               </div>
             </div>
 
-            <div className="col-span-full mt-2 flex flex-col gap-3 border-t border-[var(--ab-border)] pt-4 sm:flex-row sm:items-center sm:justify-end">
-              <Label
-                htmlFor="is_Featured"
-                className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)] px-3 py-2 text-xs font-semibold text-[var(--ab-text)] [font-family:'Syne',sans-serif]"
-              >
-                <input
-                  id="is_Featured"
-                  name="is_Featured"
-                  type="checkbox"
-                  defaultChecked={isFeaturedDefaultChecked}
-                  className="h-4 w-4 rounded border-[var(--ab-border)] text-[var(--ab-accent)] focus:ring-[var(--ab-accent)]"
-                />
-                <span>Is Featured</span>
-              </Label>
-
+            <div className='col-span-full mt-2 flex flex-col gap-3 border-t border-[var(--ab-border)] pt-4 sm:flex-row sm:items-center sm:justify-end'>
               <Button
                 type="submit"
                 disabled={pending}
@@ -321,16 +346,6 @@ export default function AchievementFormShell({
               </Button>
             </div>
 
-            {state?.message && (
-              <div className="col-span-full">
-                <Alert
-                  variant={state.success ? 'success' : 'destructive'}
-                  className="border-[var(--ab-border)] bg-[var(--ab-surface)]"
-                >
-                  <AlertDescription>{state.message}</AlertDescription>
-                </Alert>
-              </div>
-            )}
           </div>
         </main>
       </div>

@@ -844,6 +844,14 @@ export async function getFeaturedAchievements(limit = 12) {
   return response?.result;
 }
 
+export async function getRelatedAchievements(ach_id, limit = 20) {
+  const response = await post(`achieve/get_related_achievements?limit=${limit}`, {
+    id: ach_id
+  });
+  if (response?.error) return response.error;
+  return response?.result;
+}
+
 export async function getContestResults(contestId, sessionId) {
   if (!contestId || isNaN(Number(contestId))) {
     throw new Error("Invalid contest ID");
