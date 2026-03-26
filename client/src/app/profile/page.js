@@ -44,13 +44,15 @@ export default async function page({ searchParams }) {
   const myTeams = myTeamsRes?.result || [];
   const coachedTeamsRes = user?.vjudge_id
     ? await post_with_token("team-collection/public/teams/coached-by-vjudge", {
-        vjudge_id: user.vjudge_id,
-      })
+      vjudge_id: user.vjudge_id,
+    })
     : { result: [] };
   const coachedTeams = coachedTeamsRes?.result || [];
   const participationCollectionsRes =
     await listActiveParticipationCollections();
   const participationCollections = participationCollectionsRes?.result || [];
+
+    console.log("User profile data:", user);
 
   return (
     <div
@@ -388,32 +390,34 @@ export default async function page({ searchParams }) {
           {/* Right Column - Main Content */}
           <main className="space-y-6">
             {/* Contest Participation */}
-            <section
-              className="profile-card"
-              aria-labelledby="participation-title"
-            >
-              <h2
-                id="participation-title"
-                className="flex items-center gap-2 text-xl font-bold mb-5"
-                style={{ color: "hsl(var(--profile-text))" }}
+            {participationCollections.length > 0 && (
+              <section
+                className="profile-card"
+                aria-labelledby="participation-title"
               >
-                <Award className="h-5 w-5" />
-                Contest Participation
-              </h2>
-              <div className="space-y-4">
-                {participationCollections.length === 0 && (
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "hsl(var(--profile-text-muted))" }}
-                  >
-                    No active participation windows.
-                  </p>
-                )}
-                {participationCollections.map((col) => (
-                  <ParticipationToggle key={col.id} col={col} />
-                ))}
-              </div>
-            </section>
+                <h2
+                  id="participation-title"
+                  className="flex items-center p-2 text-xl font-bold"
+                  style={{ color: "hsl(var(--profile-text))" }}
+                >
+                  <Award className="h-5 w-5" />
+                  Contest Participation
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {participationCollections.length === 0 && (
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "hsl(var(--profile-text-muted))" }}
+                    >
+                      No active participation windows.
+                    </p>
+                  )}
+                  {participationCollections.map((col) => (
+                    <ParticipationToggle key={col.id} col={col} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Competitive Programming Profiles */}
             <section
@@ -431,10 +435,14 @@ export default async function page({ searchParams }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {user.cf_id && (
                   <div className="flex items-start gap-4 group">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-red-600 dark:text-red-400">
-                        CF
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden">
+                      <Image
+                        src="/cf.png"
+                        alt="Codeforces"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -472,10 +480,14 @@ export default async function page({ searchParams }) {
                 )}
                 {!user.cf_id && (
                   <div className="flex items-start gap-4 group">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-red-600 dark:text-red-400">
-                        CF
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/cf.png"
+                        alt="Codeforces"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -539,10 +551,14 @@ export default async function page({ searchParams }) {
 
                 {user.vjudge_id && (
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 dark:from-purple-900/30 dark:to-fuchsia-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
-                        VJ
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/vj.jpg"
+                        alt="VJudge"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -605,10 +621,14 @@ export default async function page({ searchParams }) {
                 )}
                 {!user.vjudge_id && (
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 dark:from-purple-900/30 dark:to-fuchsia-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
-                        VJ
-                      </span>
+                    <div className="relative h-12 w-12 rounded-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/vj.jpg"
+                        alt="VJudge"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
