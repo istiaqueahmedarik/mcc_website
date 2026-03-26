@@ -27,6 +27,8 @@ module.exports = {
           "scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "card-glow": "card-glow 3s ease-in-out infinite",
+        "border-beam": "border-beam calc(var(--duration)*1s) infinite linear",
       },
       keyframes: {
         spotlight: {
@@ -67,6 +69,21 @@ module.exports = {
             height: "var(--radix-accordion-content-height)",
           },
           to: { height: "0" },
+        },
+        "card-glow": {
+          "0%, 100%": {
+            opacity: "0.3",
+            boxShadow: "0 0 5px 1px hsl(var(--primary) / 0.1)",
+          },
+          "50%": {
+            opacity: "1",
+            boxShadow: "0 0 20px 3px hsl(var(--primary) / 0.3)",
+          },
+        },
+        "border-beam": {
+          "100%": {
+            offsetDistance: "100%",
+          },
         },
       },
       colors: {

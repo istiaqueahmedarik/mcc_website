@@ -4,12 +4,39 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Linkedin, Pencil, Trash2 } from "lucide-react";
 import { SiCodeforces } from "react-icons/si";
+import { useEffect, useState } from "react";
 
 function avatarFallback(name) {
   return String(name || "A").trim().charAt(0).toUpperCase() || "A";
 }
 
-export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDelete }) {
+function BorderBeam({
+  className,
+  size = 200,
+  duration = 15,
+  anchor = 90,
+  borderWidth = 1.5,
+  colorFrom = "hsl(var(--primary))",
+  colorTo = "hsl(var(--primary) / 0.2)",
+  delay = 0,
+}) {
+  return (
+    <div
+      style={{
+        "--size": size,
+        "--duration": duration,
+        "--anchor": anchor,
+        "--border-width": borderWidth,
+        "--color-from": colorFrom,
+        "--color-to": colorTo,
+        "--delay": `-${delay}s`,
+      }}
+      className={`pointer-events-none absolute inset-0 rounded-[inherit] [border:calc(var(--border-width)*1px)_solid_transparent] ![mask-clip:padding-box,border-box] ![mask-composite:intersect] [mask:linear-gradient(transparent,transparent),linear-gradient(white,white)] after:absolute after:aspect-square after:w-[calc(var(--size)*1px)] after:animate-border-beam after:[animation-delay:var(--delay)] after:[background:linear-gradient(to_left,var(--color-from),var(--color-to),transparent)] after:[offset-anchor:calc(var(--anchor)*1%)_50%] after:[offset-path:rect(0_auto_auto_0_round_calc(var(--size)*1px))] ${className}`}
+    />
+  );
+}
+
+export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDelete, index = 0 }) {
   const {
     name,
     image_url,
@@ -26,8 +53,50 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
   const headline = [designation, company_name].filter(Boolean).join(" @ ");
   const cfUrl = cf_handle ? `https://codeforces.com/profile/${cf_handle}` : "";
 
+  // Staggered glow effect - each card glows at different intervals
+  const [isGlowing, setIsGlowing] = useState(false);
+  
+  useEffect(() => {
+    // Stagger start: each card starts its cycle with a delay based on index
+    const startDelay = (index % 9) * 400; // Stagger by 400ms, cycle through 9 cards
+    const glowDuration = 2000; // Glow stays on for 2 seconds
+    const cycleDuration = 6000; // Full cycle is 6 seconds
+    
+    const startTimeout = setTimeout(() => {
+      setIsGlowing(true);
+      
+      // Set up the repeating cycle
+      const interval = setInterval(() => {
+        setIsGlowing(true);
+        setTimeout(() => setIsGlowing(false), glowDuration);
+      }, cycleDuration);
+      
+      // Turn off initial glow after duration
+      setTimeout(() => setIsGlowing(false), glowDuration);
+      
+      return () => clearInterval(interval);
+    }, startDelay);
+    
+    return () => clearTimeout(startTimeout);
+  }, [index]);
+
   return (
-    <div className="group relative flex flex-col rounded-lg border border-border/50 bg-card p-4 shadow-sm transition-all hover:shadow-md hover:border-border/80">
+    <div className={`group relative flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-all duration-500 hover:shadow-md overflow-hidden ${
+      isGlowing 
+        ? 'border-primary/50 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.4)]' 
+        : 'border-border/50 hover:border-border/80'
+    }`}>
+      {/* Border beam effect when glowing */}
+      {isGlowing && (
+        <BorderBeam 
+          size={100} 
+          duration={2} 
+          delay={0}
+          colorFrom="hsl(var(--primary))"
+          colorTo="hsl(var(--primary) / 0.1)"
+        />
+      )}
+      
       {canEdit && (
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit?.(member)}>

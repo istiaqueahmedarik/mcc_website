@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { uploadImage } from "@/lib/action";
 
@@ -62,6 +62,14 @@ export default function AlumniClient({ initialBatches, loadError }) {
   const [positionFilter, setPositionFilter] = React.useState("all");
   const [sortBy, setSortBy] = React.useState("name");
   const [loading, setLoading] = React.useState(false);
+  const [filtersExpanded, setFiltersExpanded] = React.useState(false);
+
+  // Count active filters
+  const activeFilterCount = [
+    batchFilter !== "all" ? 1 : 0,
+    companyFilter !== "all" ? 1 : 0,
+    positionFilter !== "all" ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
 
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
   const [memberDialogOpen, setMemberDialogOpen] = React.useState(false);
@@ -428,48 +436,111 @@ export default function AlumniClient({ initialBatches, loadError }) {
         </div>
       </header>
 
-      <section className="border rounded-lg p-4 mb-8 bg-card space-y-3">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search alumni..." className="pl-9" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          <FilterSelect value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
-          <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
-          <FilterSelect value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
-          
+      <section className="mb-6">
+        {/* Main filter bar - compact single row */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              value={query} 
+              onChange={(e) => setQuery(e.target.value)} 
+              placeholder="Search alumni..." 
+              className="pl-9 h-9 bg-background/50" 
+            />
+            {query && (
+              <button 
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter toggle button */}
+          <Button
+            variant={filtersExpanded || activeFilterCount > 0 ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className="h-9 gap-1.5"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`} />
+          </Button>
+
+          {/* Sort dropdown - always visible */}
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sort by" />
+            <SelectTrigger className="h-9 w-auto min-w-[120px] bg-background/50">
+              <span className="text-muted-foreground text-xs mr-1">Sort:</span>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="name">Sort: Name</SelectItem>
-              <SelectItem value="batch">Sort: Batch</SelectItem>
-              <SelectItem value="company">Sort: Company</SelectItem>
-              <SelectItem value="position">Sort: Position</SelectItem>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="batch">Batch</SelectItem>
+              <SelectItem value="company">Company</SelectItem>
+              <SelectItem value="position">Position</SelectItem>
             </SelectContent>
           </Select>
 
-          <Button
-            variant="outline"
-            onClick={() => {
-              setQuery("");
-              setBatchFilter("all");
-              setCompanyFilter("all");
-              setPositionFilter("all");
-              setSortBy("name");
-            }}
-          >
-            Reset
-          </Button>
+          {/* Results count */}
+          <span className="text-xs text-muted-foreground ml-auto">
+            {filtered.length} {filtered.length === 1 ? 'alumni' : 'alumni'}
+          </span>
         </div>
+
+        {/* Expandable filter panel */}
+        {filtersExpanded && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
+            <FilterSelect value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
+            <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
+            <FilterSelect value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
+            
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setBatchFilter("all");
+                  setCompanyFilter("all");
+                  setPositionFilter("all");
+                }}
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Active filter pills - show when filters are active but panel is collapsed */}
+        {!filtersExpanded && activeFilterCount > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {batchFilter !== "all" && (
+              <FilterPill label="Batch" value={batchFilter} onClear={() => setBatchFilter("all")} />
+            )}
+            {companyFilter !== "all" && (
+              <FilterPill label="Company" value={companyFilter} onClear={() => setCompanyFilter("all")} />
+            )}
+            {positionFilter !== "all" && (
+              <FilterPill label="Position" value={positionFilter} onClear={() => setPositionFilter("all")} />
+            )}
+          </div>
+        )}
       </section>
 
       {loadError && <p className="text-sm text-red-500 mb-4">Failed to load alumni: {loadError}</p>}
 
       <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((m) => (
-          <AlumniMemberCard key={m.id} member={m} canEdit={isAdmin} onEdit={openEdit} onDelete={handleDeleteClick} />
+        {filtered.map((m, index) => (
+          <AlumniMemberCard key={m.id} member={m} canEdit={isAdmin} onEdit={openEdit} onDelete={handleDeleteClick} index={index} />
         ))}
       </section>
 
@@ -500,13 +571,15 @@ export default function AlumniClient({ initialBatches, loadError }) {
 }
 
 function FilterSelect({ value, onChange, options, label }) {
+  const isActive = value !== "all";
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger>
-        <SelectValue placeholder={`${label}: All`} />
+      <SelectTrigger className={`h-8 w-auto min-w-[100px] text-xs ${isActive ? 'border-primary/50 bg-primary/5' : 'bg-background/50'}`}>
+        <span className="text-muted-foreground mr-1">{label}:</span>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">{label}: All</SelectItem>
+        <SelectItem value="all">All</SelectItem>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
             {o}
@@ -514,5 +587,17 @@ function FilterSelect({ value, onChange, options, label }) {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function FilterPill({ label, value, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+      <span className="text-primary/70">{label}:</span>
+      <span className="max-w-[100px] truncate">{value}</span>
+      <button onClick={onClear} className="ml-0.5 hover:text-primary/80">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }
