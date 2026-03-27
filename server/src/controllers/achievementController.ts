@@ -284,32 +284,34 @@ export const getFeaturedAchievements = async (c: any) => {
     return c.json({ error: 'error' }, 400)
   }
 }
-
 export const getRelatedAchievements = async (c: any) => {
-  const { id } = await c.req.json()
-  const limit = c.req.query('limit') || '20'
-  // console.log('getRelatedAchievements called with id: ', id, ' and limit: ', limit)
+  const { id } = await c.req.json();
+  const limit = Number(c.req.query('limit')) || 20;
+
   try {
     const result = await sql`
-      SELECT DISTINCT a.*
+      SELECT 
+        a.*,
+        ARRAY_AGG(DISTINCT t.name) AS tags
       FROM achievements a
       JOIN achievement_tags at ON a.id = at.achievement_id
+      JOIN tags t ON t.id = at.tag_id
       WHERE at.tag_id IN (
           SELECT tag_id
           FROM achievement_tags
           WHERE achievement_id = ${id}
       )
       AND a.id != ${id}
+      GROUP BY a.id
       LIMIT ${limit};
     `;
-    // console.log('result: ', result)
-    return c.json({ result })
+
+    return c.json({ result });
+  } catch (error) {
+    console.log('error:', error);
+    return c.json({ error: 'error' }, 400);
   }
-  catch (error) {
-    console.log('error: ', error)
-    return c.json({ error: 'error' }, 400)
-  }
-}
+};
 
 export const getAchievementTags = async (c: any) => {
   // console.log('getAchievementTags called')

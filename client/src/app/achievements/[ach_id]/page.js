@@ -5,7 +5,9 @@ import { CalendarArrowUp, Tag, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import RelatedAchievements from "@/components/achievements/RelatedAchievements";
+import AchievementFilterProvider from "@/components/achievements/AchievementFilterProvider";
+import AchievementTagChips from "@/components/achievements/AchievementTagChips";
+import FilteredRelatedAchievements from "@/components/achievements/FilteredRelatedAchievements";
 
 const normalizeAchievementTags = (achievement) => {
   const rawTags = achievement?.tag_names ?? achievement?.tags ?? [];
@@ -57,7 +59,8 @@ export default async function SingleAchievement({ params }) {
   const relatedAchievements = Array.isArray(relatedResponse) ? relatedResponse : [];
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0f] text-slate-900 dark:text-[#f1f0ff] font-sans relative overflow-x-hidden">
+    <AchievementFilterProvider>
+      <div className="min-h-screen bg-slate-50 dark:bg-[#0a0a0f] text-slate-900 dark:text-[#f1f0ff] font-sans relative overflow-x-hidden">
 
       {/* Ambient blobs */}
       <div className="pointer-events-none fixed top-[-200px] left-[-200px] w-[700px] h-[700px] rounded-full bg-indigo-600/[0.12] dark:bg-indigo-600/[0.06] blur-3xl z-0" />
@@ -70,6 +73,7 @@ export default async function SingleAchievement({ params }) {
           <div className="flex justify-end mb-6">
             <Link
               href={`/achievements/${ach_id}/edit`}
+              prefetch={false}
               className="inline-flex items-center gap-2 text-sm text-white rounded-lg px-5 py-2 font-bold uppercase tracking-wider transition-all hover:-translate-y-px"
               style={{
                 fontFamily: "'Syne', sans-serif",
@@ -83,11 +87,36 @@ export default async function SingleAchievement({ params }) {
           </div>
         )}
 
-        {/* Two-column layout */}
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
+        {/* Top metadata */}
+        <div className="flex flex-col gap-6 mb-8">
+          {achievement.title && (
+            <h1
+              className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-indigo-700 dark:from-[#f1f0ff] dark:to-[#a78bfa]"
+              style={{
+                fontFamily: "'Syne', sans-serif",
+              }}
+            >
+              {achievement.title}
+            </h1>
+          )}
 
-          {/* LEFT: Image + Intro */}
-          <div className="w-full lg:w-[340px] xl:w-[380px] flex-shrink-0 flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center gap-2 text-sm border rounded-lg px-4 py-2 text-slate-600 dark:text-[#9090b0] border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]">
+              <CalendarArrowUp size={14} className="text-amber-400" />
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.05em" }}>
+                {formatRelative(achievement.date, new Date())}
+              </span>
+            </div>
+
+            <AchievementTagChips tags={tags} />
+          </div>
+
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-[#2a2a38]" />
+        </div>
+
+        {/* Sticky image + scrolling description */}
+        <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)] gap-8 items-start">
+          <div className="w-full lg:sticky lg:top-24 lg:h-fit self-start flex flex-col gap-4">
             <div
               className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]"
               style={{ aspectRatio: "1 / 1" }}
@@ -122,66 +151,24 @@ export default async function SingleAchievement({ params }) {
             )}
           </div>
 
-          {/* RIGHT: Title, Date, Tags, Description */}
-          <div className="flex-1 min-w-0 flex flex-col gap-6">
-            {achievement.title && (
-              <h1
-                className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-indigo-700 dark:from-[#f1f0ff] dark:to-[#a78bfa]"
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                }}
-              >
-                {achievement.title}
-              </h1>
-            )}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div
-                className="inline-flex items-center gap-2 text-sm border rounded-lg px-4 py-2 text-slate-600 dark:text-[#9090b0] border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]"
-              >
-                <CalendarArrowUp size={14} className="text-amber-400" />
-                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.05em" }}>
-                  {formatRelative(achievement.date, new Date())}
-                </span>
-              </div>
-
-              {tags.length > 0 && tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-all cursor-default border-indigo-300/60 dark:border-[rgba(99,102,241,0.25)] text-indigo-700 dark:text-[#a78bfa] hover:border-indigo-400/60 dark:hover:border-indigo-400/50"
-                  style={{
-                    fontFamily: "'Syne', sans-serif",
-                    background: "linear-gradient(135deg, rgba(99,102,241,0.12), rgba(167,139,250,0.06))",
-                  }}
-                >
-                  <Tag size={11} aria-hidden="true" />
-                  {tag}
-                </span>
-              ))}
+          <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#111118] border-slate-200 dark:border-[#2a2a38] lg:h-[340px] xl:h-[380px] lg:flex lg:flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b bg-slate-100 dark:bg-[#17171f] border-slate-200 dark:border-[#2a2a38] lg:shrink-0">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#6b6b8a]" style={{ fontFamily: "'Syne', sans-serif" }}>
+                Description
+              </span>
+              <Tag size={13} className="text-slate-500 dark:text-[#6b6b8a]" />
             </div>
-
-            <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-300 to-transparent dark:via-[#2a2a38]" />
-
-            <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#111118] border-slate-200 dark:border-[#2a2a38]">
-              <div
-                className="flex items-center justify-between px-5 py-3 border-b bg-slate-100 dark:bg-[#17171f] border-slate-200 dark:border-[#2a2a38]"
-              >
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#6b6b8a]" style={{ fontFamily: "'Syne', sans-serif" }}>
-                  Description
-                </span>
-                <Tag size={13} className="text-slate-500 dark:text-[#6b6b8a]" />
-              </div>
-              <div className="px-8 py-7 text-base leading-loose text-slate-600 dark:text-[#9090b0]" style={{ fontWeight: 300 }}>
-                <MarkdownRender content={achievement.description} />
-              </div>
+            <div className="px-8 py-7 text-base leading-loose text-slate-600 dark:text-[#9090b0] lg:flex-1 lg:overflow-y-auto" style={{ fontWeight: 300 }}>
+              <MarkdownRender content={achievement.description} className="w-full max-w-none break-words" />
             </div>
           </div>
         </div>
 
         {/* Related achievements */}
-        <RelatedAchievements achievements={relatedAchievements} />
+        <FilteredRelatedAchievements achievements={relatedAchievements} />
 
       </div>
-    </div>
+      </div>
+    </AchievementFilterProvider>
   );
 }

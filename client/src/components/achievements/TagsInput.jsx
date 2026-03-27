@@ -5,6 +5,11 @@ import { Label } from '@/components/ui/label'
 import { Tag } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+const TAG_ALLOWED_REGEX = /^[A-Z0-9 +#._-]+$/
+
+const sanitizeTagInput = (value) =>
+  value.toUpperCase().replace(/[^A-Z0-9 +#._-]/g, '')
+
 const normalizeTags = (raw) => {
   if (!Array.isArray(raw)) return []
   return raw
@@ -16,7 +21,7 @@ const normalizeTags = (raw) => {
       return ''
     })
     .map((t) => t.trim().toUpperCase())
-    .filter((t) => t.length > 0 && /^[A-Z ]+$/.test(t))
+    .filter((t) => t.length > 0 && TAG_ALLOWED_REGEX.test(t))
 }
 
 /**
@@ -76,7 +81,7 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
 
   const addTag = (value) => {
     const tag = value.trim().toUpperCase()
-    if (!tag || !/^[A-Z ]+$/.test(tag)) return
+    if (!tag || !TAG_ALLOWED_REGEX.test(tag)) return
     if (!tags.includes(tag)) {
       setTags((prev) => [...prev, tag])
     }
@@ -166,7 +171,7 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
           type="text"
           value={tagInput}
           onChange={(e) => {
-            setTagInput(e.target.value.toUpperCase().replace(/[^A-Z ]/g, ''))
+            setTagInput(sanitizeTagInput(e.target.value))
             setShowSuggestions(true)
             setHighlightedTagIndex(-1)
           }}

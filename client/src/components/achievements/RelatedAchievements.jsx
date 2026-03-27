@@ -1,20 +1,97 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { formatRelative } from "date-fns";
+import { Tag } from "lucide-react";
 
 function AchievementCard({ achievement }) {
-  const tags =
-    achievement?.tag_names ??
-    achievement?.tags ??
-    [];
+  const rawTags = achievement?.tags ?? achievement?.tag_names ?? [];
+  const normalizedTags = Array.isArray(rawTags)
+    ? rawTags
+        .map((tag) => {
+          if (typeof tag === "string") return tag.trim();
+          if (typeof tag?.name === "string") return tag.name.trim();
+          if (typeof tag?.tag === "string") return tag.tag.trim();
+          return "";
+        })
+        .filter(Boolean)
+    : typeof rawTags === "string"
+      ? rawTags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      : [];
+  const sortedTags = [...new Set(normalizedTags)].sort(
+    (a, b) => a.length - b.length || a.localeCompare(b)
+  );
 
-  const firstTag = Array.isArray(tags)
-    ? typeof tags[0] === "string"
-      ? tags[0]
-      : tags[0]?.name ?? tags[0]?.tag ?? ""
-    : "";
+  const [visibleCount, setVisibleCount] = useState(sortedTags.length);
+  const rowRef = useRef(null);
+  const probePlusRef = useRef(null);
+  const tagMeasureRefs = useRef([]);
+
+  useEffect(() => {
+    const recalcVisibleCount = () => {
+      const row = rowRef.current;
+      if (!row) return;
+
+      const maxWidth = row.clientWidth;
+      const gap = 6; // Tailwind gap-1.5 => 0.375rem => 6px
+      const widths = sortedTags.map((_, idx) => tagMeasureRefs.current[idx]?.offsetWidth || 0);
+
+      if (sortedTags.length === 0 || maxWidth <= 0 || widths.some((w) => w <= 0)) {
+        setVisibleCount(sortedTags.length);
+        return;
+      }
+
+      let count = 0;
+      let used = 0;
+      for (let i = 0; i < widths.length; i += 1) {
+        const next = (count === 0 ? 0 : gap) + widths[i];
+        if (used + next <= maxWidth) {
+          used += next;
+          count += 1;
+        } else {
+          break;
+        }
+      }
+
+      let hidden = sortedTags.length - count;
+      if (hidden > 0 && probePlusRef.current) {
+        let plusWidth = 0;
+        probePlusRef.current.textContent = `+${hidden}`;
+        plusWidth = probePlusRef.current.offsetWidth;
+
+        while (count > 0 && used + gap + plusWidth > maxWidth) {
+          count -= 1;
+          hidden = sortedTags.length - count;
+          used -= widths[count];
+          if (count > 0) used -= gap;
+          probePlusRef.current.textContent = `+${hidden}`;
+          plusWidth = probePlusRef.current.offsetWidth;
+        }
+      }
+
+      // Always show at least one tag chip (truncated) when tags exist.
+      if (count === 0 && sortedTags.length > 0) count = 1;
+
+      setVisibleCount(count);
+    };
+
+    const rafId = requestAnimationFrame(recalcVisibleCount);
+    const observer = new ResizeObserver(recalcVisibleCount);
+    if (rowRef.current) observer.observe(rowRef.current);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [sortedTags]);
+
+  const visibleTags = sortedTags.slice(0, visibleCount);
+  const extraTagCount = Math.max(0, sortedTags.length - visibleCount);
 
   return (
     <Link
@@ -30,34 +107,82 @@ function AchievementCard({ achievement }) {
       />
 
       {/* Image */}
-      <div className="w-full aspect-square relative bg-slate-50 dark:bg-[#1a1a24]">
+      <div className="w-full aspect-[4/3] relative bg-slate-50 dark:bg-[#1a1a24]">
         <Image
           src={achievement.image}
           alt={achievement.title ?? "Achievement"}
           fill
-          className="object-cover"
+          className="object-contain p-2"
         />
       </div>
 
       {/* Body */}
       <div className="px-3 pt-2.5 pb-3">
-        {firstTag && (
-          <span
-            className="inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 mb-1.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)] text-indigo-700 dark:text-[#a78bfa]"
-            style={{
-              fontFamily: "'Syne', sans-serif",
-              background: "rgba(99,102,241,0.10)",
-            }}
-          >
-            {firstTag}
-          </span>
-        )}
         <p
           className="text-[12px] font-semibold leading-[1.4] line-clamp-2 text-slate-900 dark:text-[#e2e0ff]"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
           {achievement.title}
         </p>
+        {sortedTags.length > 0 && (
+          <>
+            <div ref={rowRef} className="mt-1.5 mb-1.5 flex items-center gap-1.5 min-w-0">
+              {visibleTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)] text-indigo-700 dark:text-[#a78bfa] max-w-full min-w-0"
+                  style={{
+                    fontFamily: "'Syne', sans-serif",
+                    background: "rgba(99,102,241,0.10)",
+                  }}
+                  title={tag}
+                >
+                  <Tag size={10} aria-hidden="true" />
+                  <span className="truncate">{tag}</span>
+                </span>
+              ))}
+              {extraTagCount > 0 && (
+                <span
+                  className="inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)] text-indigo-700 dark:text-[#a78bfa]"
+                  style={{
+                    fontFamily: "'Syne', sans-serif",
+                    background: "rgba(99,102,241,0.10)",
+                  }}
+                >
+                  +{extraTagCount}
+                </span>
+              )}
+            </div>
+
+            {/* Hidden measurement probes for accurate width-based fitting. */}
+            <div className="absolute -z-10 opacity-0 pointer-events-none whitespace-nowrap">
+              {sortedTags.map((tag, idx) => (
+                <span
+                  key={`measure-${tag}-${idx}`}
+                  ref={(el) => {
+                    tagMeasureRefs.current[idx] = el;
+                  }}
+                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)]"
+                  style={{
+                    fontFamily: "'Syne', sans-serif",
+                  }}
+                >
+                  <Tag size={10} aria-hidden="true" />
+                  <span>{tag}</span>
+                </span>
+              ))}
+              <span
+                ref={probePlusRef}
+                className="inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)]"
+                style={{
+                  fontFamily: "'Syne', sans-serif",
+                }}
+              >
+                +0
+              </span>
+            </div>
+          </>
+        )}
         <p className="text-[10px] mt-1.5 text-slate-500 dark:text-[#6b6b8a]">
           {formatRelative(achievement.date, new Date())}
         </p>
