@@ -58,12 +58,11 @@ export const getLandingPublic = async (c: any) => {
                     ${designationExpr} as designation,
                     ${companyExpr} as company_name,
                     m.image_url,
-                    b.label as batch_label,
-                    b.year as batch_year
+                    b.label as batch_label
                 from alumni_member m
                 left join alumni_batch b on b.id = m.batch_id
                 ${highlightWhere}
-                order by b.year desc, m.full_name, m.id
+                order by b.id desc, m.full_name, m.id
             `
         ])
 
@@ -74,7 +73,7 @@ export const getLandingPublic = async (c: any) => {
             const clubYear = Number.isInteger(Number(m.club_position_year)) ? Number(m.club_position_year) : null
 
             const batchTitle = m.batch_label
-                ? `${m.batch_label}${m.batch_year ? ` (${m.batch_year})` : ''}`
+                ? `${m.batch_label}`
                 : 'MIST Alumni'
 
             const titleCore = designation && company
@@ -243,9 +242,9 @@ export const timelineCrud = makeCrud(
 )
 export const alumniBatchCrud = makeCrudWithOrder(
     'alumni_batch',
-    ['year', 'label', 'motto', 'sort_order'],
-    ['year', 'label', 'motto', 'sort_order'],
-    'sort_order'
+    ['label'],
+    ['label'],
+    'id'
 )
 export const alumniMemberCrud = makeCrudWithOrder(
     'alumni_member',

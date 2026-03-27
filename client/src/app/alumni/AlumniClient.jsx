@@ -24,7 +24,6 @@ function normalizeMember(member) {
     name: member.name || member.full_name || "",
     batch: member.batch || "",
     batch_id: member.batch_id || "",
-    batch_year: Number(member.batch_year || 0) || null,
     designation: member.designation || "",
     company_name: member.company_name || "",
     position_in_club: member.position_in_club || "",
@@ -43,7 +42,6 @@ function toFlatMembers(batches) {
         ...m,
         batch_id: batch.id,
         batch: batch.label || batch.batch || "",
-        batch_year: batch.year,
       })
     )
   );
@@ -60,6 +58,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
   const [batchFilter, setBatchFilter] = React.useState("all");
   const [companyFilter, setCompanyFilter] = React.useState("all");
   const [positionFilter, setPositionFilter] = React.useState("all");
+  const [featuredFilter, setFeaturedFilter] = React.useState("all");
   const [sortBy, setSortBy] = React.useState("name");
   const [loading, setLoading] = React.useState(false);
   const [filtersExpanded, setFiltersExpanded] = React.useState(false);
@@ -69,6 +68,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
     batchFilter !== "all" ? 1 : 0,
     companyFilter !== "all" ? 1 : 0,
     positionFilter !== "all" ? 1 : 0,
+    featuredFilter !== "all" ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
   const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
@@ -77,7 +77,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
   const [editingMemberId, setEditingMemberId] = React.useState(null);
   const [memberToDelete, setMemberToDelete] = React.useState(null);
 
-  const [batchForm, setBatchForm] = React.useState({ year: "", label: "", motto: "" });
+  const [batchForm, setBatchForm] = React.useState({ label: "" });
   const [memberForm, setMemberForm] = React.useState({
     batch_id: "",
     full_name: "",
@@ -91,6 +91,12 @@ export default function AlumniClient({ initialBatches, loadError }) {
     highlight: false,
   });
   const [uploadingImage, setUploadingImage] = React.useState(false);
+  const yearOptions = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear; year >= 2010; year -= 1) years.push(String(year));
+    return years;
+  }, []);
 
   const members = React.useMemo(() => toFlatMembers(batches), [batches]);
   const batchOptions = React.useMemo(() => [...new Set(members.map((m) => m.batch).filter(Boolean))].sort(), [members]);
@@ -114,6 +120,8 @@ export default function AlumniClient({ initialBatches, loadError }) {
       if (batchFilter !== "all" && m.batch !== batchFilter) return false;
       if (companyFilter !== "all" && m.company_name !== companyFilter) return false;
       if (positionFilter !== "all" && m.position_in_club !== positionFilter) return false;
+      if (featuredFilter === "featured" && !m.highlight) return false;
+      if (featuredFilter === "non_featured" && m.highlight) return false;
       if (!q) return true;
       return (
         matchText(m.name, q) ||
@@ -125,12 +133,12 @@ export default function AlumniClient({ initialBatches, loadError }) {
       );
     });
     return list.sort((a, b) => {
-      if (sortBy === "batch") return Number(b.batch_year || 0) - Number(a.batch_year || 0);
+      if (sortBy === "batch") return String(a.batch || "").localeCompare(String(b.batch || ""));
       if (sortBy === "company") return String(a.company_name || "").localeCompare(String(b.company_name || ""));
       if (sortBy === "position") return String(a.position_in_club || "").localeCompare(String(b.position_in_club || ""));
       return String(a.name || "").localeCompare(String(b.name || ""));
     });
-  }, [members, query, batchFilter, companyFilter, positionFilter, sortBy]);
+  }, [members, query, batchFilter, companyFilter, positionFilter, featuredFilter, sortBy]);
 
   function resetMemberForm() {
     setEditingMemberId(null);
@@ -166,8 +174,8 @@ export default function AlumniClient({ initialBatches, loadError }) {
   }
 
   async function saveBatch() {
-    if (!batchForm.year || !batchForm.label) {
-      toast.error("Year and label are required.");
+    if (!batchForm.label.trim()) {
+      toast.error("Batch label is required.");
       return;
     }
 
@@ -175,16 +183,11 @@ export default function AlumniClient({ initialBatches, loadError }) {
     const tid = toast.loading("Saving batch...");
     try {
       const { createAdminAlumniBatch } = await import("@/actions/alumni");
-      const res = await createAdminAlumniBatch({
-        year: Number(batchForm.year),
-        label: batchForm.label,
-        motto: batchForm.motto,
-        is_active: true,
-      });
+      const res = await createAdminAlumniBatch({ label: batchForm.label, is_active: true });
       if (res?.error) throw new Error(res.error);
       await refreshPublic();
       setBatchDialogOpen(false);
-      setBatchForm({ year: "", label: "", motto: "" });
+      setBatchForm({ label: "" });
       toast.success("Batch added", { id: tid });
     } catch (e) {
       toast.error(e?.message || "Failed to add batch", { id: tid });
@@ -194,8 +197,8 @@ export default function AlumniClient({ initialBatches, loadError }) {
   }
 
   async function saveMember() {
-    if (!memberForm.batch_id || !memberForm.full_name || !memberForm.designation || !memberForm.company_name || !memberForm.position_in_club) {
-      toast.error("Please fill all required fields.");
+    if (!memberForm.batch_id || !memberForm.full_name) {
+      toast.error("Name and batch are required.");
       return;
     }
 
@@ -278,6 +281,9 @@ export default function AlumniClient({ initialBatches, loadError }) {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 py-12 md:py-16">
+      <datalist id="club-year-options">
+        {yearOptions.map((year) => <option key={year} value={year} />)}
+      </datalist>
       <datalist id="companies-list">
         {companyOptions.map((o) => <option key={o} value={o} />)}
       </datalist>
@@ -308,20 +314,12 @@ export default function AlumniClient({ initialBatches, loadError }) {
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Add Alumni Batch</DialogTitle>
-                    <DialogDescription>Provide year, label, and motto.</DialogDescription>
+                      <DialogDescription>Provide a label for the batch.</DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-3">
-                    <div>
-                      <Label>Year</Label>
-                      <Input value={batchForm.year} onChange={(e) => setBatchForm((p) => ({ ...p, year: e.target.value }))} placeholder="2023" />
-                    </div>
+                    <div className="space-y-3">
                     <div>
                       <Label>Label</Label>
                       <Input value={batchForm.label} onChange={(e) => setBatchForm((p) => ({ ...p, label: e.target.value }))} placeholder="CSE" />
-                    </div>
-                    <div>
-                      <Label>Motto</Label>
-                      <Input value={batchForm.motto} onChange={(e) => setBatchForm((p) => ({ ...p, motto: e.target.value }))} placeholder="We build the future" />
                     </div>
                     <Button onClick={saveBatch} disabled={loading}>Save Batch</Button>
                   </div>
@@ -363,7 +361,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
                         <SelectContent>
                           {(batches || []).map((b) => (
                             <SelectItem key={b.id} value={b.id}>
-                              {b.label} ({b.year})
+                              {b.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -388,10 +386,6 @@ export default function AlumniClient({ initialBatches, loadError }) {
                       />
                     </div>
                     <div>
-                      <Label>Image URL</Label>
-                      <Input value={memberForm.image_url} onChange={(e) => setMemberForm((p) => ({ ...p, image_url: e.target.value }))} />
-                    </div>
-                    <div>
                       <Label>Upload Image</Label>
                       <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage || loading} />
                     </div>
@@ -406,7 +400,12 @@ export default function AlumniClient({ initialBatches, loadError }) {
                     </div>
                     <div>
                       <Label>Club Position Year</Label>
-                      <Input value={memberForm.club_position_year} onChange={(e) => setMemberForm((p) => ({ ...p, club_position_year: e.target.value }))} placeholder="2023" />
+                      <Input
+                        value={memberForm.club_position_year}
+                        onChange={(e) => setMemberForm((p) => ({ ...p, club_position_year: e.target.value }))}
+                        placeholder="2023"
+                        list="club-year-options"
+                      />
                     </div>
                     <div>
                       <Label>LinkedIn URL</Label>
@@ -501,6 +500,16 @@ export default function AlumniClient({ initialBatches, loadError }) {
             <FilterSelect value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
             <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
             <FilterSelect value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
+            <FilterSelect
+              value={featuredFilter}
+              onChange={setFeaturedFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "featured", label: "Featured" },
+                { value: "non_featured", label: "Not Featured" },
+              ]}
+              label="Featured"
+            />
             
             {activeFilterCount > 0 && (
               <Button
@@ -510,6 +519,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
                   setBatchFilter("all");
                   setCompanyFilter("all");
                   setPositionFilter("all");
+                  setFeaturedFilter("all");
                 }}
                 className="h-8 text-xs text-muted-foreground hover:text-foreground"
               >
@@ -531,6 +541,13 @@ export default function AlumniClient({ initialBatches, loadError }) {
             )}
             {positionFilter !== "all" && (
               <FilterPill label="Position" value={positionFilter} onClear={() => setPositionFilter("all")} />
+            )}
+            {featuredFilter !== "all" && (
+              <FilterPill
+                label="Featured"
+                value={featuredFilter === "featured" ? "Featured" : "Not Featured"}
+                onClear={() => setFeaturedFilter("all")}
+              />
             )}
           </div>
         )}
@@ -571,6 +588,14 @@ export default function AlumniClient({ initialBatches, loadError }) {
 }
 
 function FilterSelect({ value, onChange, options, label }) {
+  const normalizedOptions = React.useMemo(
+    () => options.map((option) => (typeof option === "string" ? { value: option, label: option } : option)),
+    [options]
+  );
+  const optionsWithAll = React.useMemo(() => {
+    if (normalizedOptions.some((option) => option.value === "all")) return normalizedOptions;
+    return [{ value: "all", label: "All" }, ...normalizedOptions];
+  }, [normalizedOptions]);
   const isActive = value !== "all";
   return (
     <Select value={value} onValueChange={onChange}>
@@ -579,10 +604,9 @@ function FilterSelect({ value, onChange, options, label }) {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">All</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o} value={o}>
-            {o}
+        {optionsWithAll.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
           </SelectItem>
         ))}
       </SelectContent>

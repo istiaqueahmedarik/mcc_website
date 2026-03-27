@@ -11,6 +11,15 @@ async function getAlumniMemberColumns() {
   return new Set(rows.map((r: any) => r.column_name))
 }
 
+async function getAlumniBatchColumns() {
+  const rows = await sql`
+    select column_name
+    from information_schema.columns
+    where table_name = 'alumni_batch'
+  `
+  return new Set(rows.map((r: any) => r.column_name))
+}
+
 async function requireAdmin(c: any) {
   const { id, email } = c.get('jwtPayload') || {}
   if (!id || !email) return null
@@ -52,7 +61,7 @@ function buildPublicMemberPayload(row: any) {
 
 export const getAlumniPublic = async (c: any) => {
   try {
-    const columns = await getAlumniMemberColumns()
+    const [columns, batchColumns] = await Promise.all([getAlumniMemberColumns(), getAlumniBatchColumns()])
     const positionExpr = columns.has('position_in_club')
       ? sql`position_in_club`
       : columns.has('role')
@@ -72,8 +81,10 @@ export const getAlumniPublic = async (c: any) => {
     const cfExpr = columns.has('cf_handle') ? sql`cf_handle` : sql`null`
     const highlightExpr = columns.has('highlight') ? sql`highlight` : sql`false`
 
+    const batchYearExpr = batchColumns.has('year') ? sql`year` : sql`null`
+    const batchOrderExpr = batchColumns.has('year') ? sql`year desc, id desc` : sql`id desc`
     const [batches, members] = await Promise.all([
-      sql`select id, year, label, motto from alumni_batch order by year desc, id desc`,
+      sql`select id, label, ${batchYearExpr} as year from alumni_batch order by ${batchOrderExpr}`,
       sql`
         select
           id,
@@ -101,10 +112,8 @@ export const getAlumniPublic = async (c: any) => {
 
     const result = batches.map((batch) => ({
       id: batch.id,
-      year: batch.year,
-      batch: batch.label || `Batch ${batch.year}`,
+      batch: batch.label || `Batch ${batch.id}`,
       label: batch.label,
-      motto: batch.motto,
       members: (membersByBatch[String(batch.id)] || []).sort((a, b) => a.name.localeCompare(b.name)),
     }))
 
@@ -119,7 +128,9 @@ export const listAdminAlumniBatches = async (c: any) => {
   const admin = await requireAdmin(c)
   if (!admin) return c.json({ error: 'Unauthorized' }, 401)
   try {
-    const result = await sql`select * from alumni_batch order by year desc, id desc`
+    const columns = await getAlumniBatchColumns()
+    const orderExpr = columns.has('year') ? sql`year desc, id desc` : sql`id desc`
+    const result = await sql`select * from alumni_batch order by ${orderExpr}`
     return c.json({ result })
   } catch (e) {
     console.error(e)
@@ -132,11 +143,15 @@ export const createAdminAlumniBatch = async (c: any) => {
   if (!admin) return c.json({ error: 'Unauthorized' }, 401)
   try {
     const body = await c.req.json()
-    const result = await sql`
-      insert into alumni_batch (year, label, motto)
-      values (${toNullableYear(body.year)}, ${toNullableText(body.label)}, ${toNullableText(body.motto)})
-      returning *
-    `
+    const columns = await getAlumniBatchColumns()
+    const label = toNullableText(body.label)
+    if (!label) return c.json({ error: 'Label is required' }, 400)
+    if (columns.has('year')) {
+      const year = toNullableYear(body.year) ?? new Date().getFullYear()
+      const result = await sql`insert into alumni_batch (label, year) values (${label}, ${year}) returning *`
+      return c.json({ result: result[0] })
+    }
+    const result = await sql`insert into alumni_batch (label) values (${label}) returning *`
     return c.json({ result: result[0] })
   } catch (e) {
     console.error(e)
@@ -149,16 +164,16 @@ export const updateAdminAlumniBatch = async (c: any) => {
   if (!admin) return c.json({ error: 'Unauthorized' }, 401)
   try {
     const body = await c.req.json()
+    const columns = await getAlumniBatchColumns()
     if (!body.id) return c.json({ error: 'Missing id' }, 400)
-    const result = await sql`
-      update alumni_batch
-      set
-        year = ${toNullableYear(body.year)},
-        label = ${toNullableText(body.label)},
-        motto = ${toNullableText(body.motto)}
-      where id = ${body.id}
-      returning *
-    `
+    const label = toNullableText(body.label)
+    if (!label) return c.json({ error: 'Label is required' }, 400)
+    if (columns.has('year')) {
+      const year = toNullableYear(body.year) ?? new Date().getFullYear()
+      const result = await sql`update alumni_batch set label = ${label}, year = ${year} where id = ${body.id} returning *`
+      return c.json({ result: result[0] })
+    }
+    const result = await sql`update alumni_batch set label = ${label} where id = ${body.id} returning *`
     return c.json({ result: result[0] })
   } catch (e) {
     console.error(e)

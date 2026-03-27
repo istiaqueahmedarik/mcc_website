@@ -634,6 +634,46 @@
   pointer-events: none;
 }
 
+@keyframes alumni-card-sweep {
+  0% {
+    transform: translateX(-140%) rotate(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.22;
+  }
+  80% {
+    opacity: 0.1;
+  }
+  100% {
+    transform: translateX(140%) rotate(-18deg);
+    opacity: 0;
+  }
+}
+
+.alumni-card-angled-glow {
+  background: linear-gradient(155deg, transparent 12%, hsl(var(--primary) / 0.1) 45%, transparent 82%);
+}
+
+.alumni-card-sweep-glow::before {
+  content: "";
+  position: absolute;
+  inset: -60% -45%;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    hsl(var(--primary) / 0.22) 48%,
+    hsl(var(--highlight) / 0.2) 52%,
+    transparent 70%
+  );
+  filter: blur(7px);
+  animation: alumni-card-sweep 4s linear infinite;
+  pointer-events: none;
+}
+
 .dark .profile-card-glow {
   background: radial-gradient(circle at 50% 0%,
       hsl(263 72% 68% / 0.15) 0%,
