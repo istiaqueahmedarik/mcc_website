@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Linkedin, Pencil, Trash2 } from "lucide-react";
+import { Linkedin, Pencil, Star, Trash2 } from "lucide-react";
 import { SiCodeforces } from "react-icons/si";
 import { useEffect, useState } from "react";
 
@@ -43,11 +43,11 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
     designation,
     company_name,
     batch,
-    batch_year,
     position_in_club,
     club_position_year,
     linkedin_url,
     cf_handle,
+    highlight,
   } = member;
 
   const headline = [designation, company_name].filter(Boolean).join(" @ ");
@@ -81,11 +81,14 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
   }, [index]);
 
   return (
-    <div className={`group relative flex flex-col rounded-lg border bg-card p-4 shadow-sm transition-all duration-500 hover:shadow-md overflow-hidden ${
+    <div className={`group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-500 hover:shadow-md overflow-hidden ${
       isGlowing 
         ? 'border-primary/50 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.4)]' 
         : 'border-border/50 hover:border-border/80'
     }`}>
+      <div className="pointer-events-none absolute inset-0 alumni-card-angled-glow opacity-60" />
+      <div className="pointer-events-none absolute inset-0 alumni-card-sweep-glow" />
+
       {/* Border beam effect when glowing */}
       {isGlowing && (
         <BorderBeam 
@@ -113,17 +116,20 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
         </div>
       )}
 
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         {image_url ? (
-          <img src={image_url} alt={name} className="h-14 w-14 rounded-full border border-border/50 object-cover shadow-sm" />
+          <img src={image_url} alt={name} className="h-20 w-20 rounded-full border border-border/50 object-cover shadow-sm shrink-0" />
         ) : (
-          <div className="h-14 w-14 rounded-full border border-border/50 bg-muted/50 flex items-center justify-center text-base font-medium text-muted-foreground shadow-sm">
+          <div className="h-20 w-20 rounded-full border border-border/50 bg-muted/50 flex items-center justify-center text-lg font-medium text-muted-foreground shadow-sm shrink-0">
             {avatarFallback(name)}
           </div>
         )}
 
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="font-semibold text-base leading-tight tracking-tight text-foreground/90">{name}</div>
+          <div className="flex items-center gap-2">
+            <div className="font-semibold text-base leading-tight tracking-tight text-foreground/90">{name}</div>
+            {highlight && <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500 shrink-0" />}
+          </div>
           
           {(designation || company_name) && (
             <div className="text-xs font-medium text-muted-foreground/80 line-clamp-2">
@@ -134,7 +140,7 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1.5">
-             {(batch || batch_year) && (
+             {batch && (
               <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-medium bg-secondary/50 text-secondary-foreground hover:bg-secondary/60">
                 {batch}
               </Badge>
@@ -148,7 +154,7 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/40 pt-3">
+      <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/40 pt-2.5">
         {linkedin_url && (
           <a 
             href={linkedin_url} 

@@ -16,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { uploadImage } from "@/lib/action";
 
 function parseBio(rawBio) {
   if (!rawBio) return { about: "", career_path: [] };
@@ -110,7 +111,7 @@ export default function AlumniAdminClient({ token }) {
         const batch = batchMap.get(String(x.batch_id));
         return {
           ...normalizeMember(x),
-          batch_label: batch ? `${batch.label} (${batch.year})` : String(x.batch_id),
+          batch_label: batch ? `${batch.label}` : String(x.batch_id),
         };
       })
     );
@@ -155,9 +156,7 @@ export default function AlumniAdminClient({ token }) {
         description="Create and manage graduation batches."
         items={batches}
         fields={[
-          ["year", "Year"],
           ["label", "Label"],
-          ["motto", "Motto"],
           ["is_active", "Active"],
         ]}
         onCreate={(b) => adminFetch("/alumni/admin/batch/create", b)}
@@ -175,8 +174,8 @@ export default function AlumniAdminClient({ token }) {
           ["position_in_club", "Position in Club"],
           ["designation", "Designation"],
           ["company_name", "Company"],
-          ["image_url", "Image"],
           ["linkedin_url", "LinkedIn"],
+          ["club_position_year", "Club Position Year"],
           ["email", "Email"],
           ["facebook_url", "Facebook URL"],
           ["phone", "Phone"],
@@ -205,13 +204,17 @@ function Section({ kind, title, description, items, fields, onCreate, onUpdate, 
   const [editId, setEditId] = React.useState(null);
   const [errors, setErrors] = React.useState({});
   const [uploading, setUploading] = React.useState(false);
+  const yearOptions = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear; year >= 2010; year -= 1) years.push(String(year));
+    return years;
+  }, []);
 
   // ... (keep validate function same)
   function validate(next) {
     const e = {};
     const val = (k) => (next[k] ?? "").toString().trim();
-    const intPattern = /^\d+$/;
-    const yearPattern = /^(\d{4})(?:[–-]?\d{0,4})?$/;
     const urlOk = (u) => {
       try {
         new URL(u);
@@ -225,18 +228,12 @@ function Section({ kind, title, description, items, fields, onCreate, onUpdate, 
     };
 
     if (kind === "batch") {
-      ensure(intPattern.test(val("year")) && val("year").length === 4, "year", "4-digit year");
       ensure(val("label").length > 0, "label", "Required");
-      if (val("motto")) ensure(val("motto").length <= 140, "motto", "Max 140 chars");
     } else {
       ensure(val("batch_id").length > 0, "batch_id", "Required");
       ensure(val("full_name").length > 0, "full_name", "Required");
-      ensure(val("position_in_club").length > 0, "position_in_club", "Required");
-      ensure(val("designation").length > 0, "designation", "Required");
-      ensure(val("company_name").length > 0, "company_name", "Required");
       if (val("email")) ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val("email")), "email", "Invalid email");
       if (val("phone")) ensure(/^[0-9+()\-\s]{6,20}$/.test(val("phone")), "phone", "Invalid phone");
-      if (val("image_url")) ensure(urlOk(val("image_url")), "image_url", "Invalid URL");
       if (val("linkedin_url")) ensure(urlOk(val("linkedin_url")), "linkedin_url", "Invalid URL");
       if (val("facebook_url")) ensure(urlOk(val("facebook_url")), "facebook_url", "Invalid URL");
     }
@@ -394,9 +391,18 @@ function Section({ kind, title, description, items, fields, onCreate, onUpdate, 
                   >
                     <option value="" disabled>Select a batch...</option>
                     {(batches || []).map((b) => (
-                      <option key={b.id} value={b.id}>{b.label} ({b.year})</option>
+                      <option key={b.id} value={b.id}>{b.label}</option>
                     ))}
                   </select>
+                ) : kind === "member" && k === "club_position_year" ? (
+                  <Input
+                    name={k}
+                    value={form[k] || ""}
+                    onChange={handleChange}
+                    className={errors[k] ? "border-destructive" : ""}
+                    list="club-year-options"
+                    placeholder="2023"
+                  />
                 ) : ["is_active", "highlight"].includes(k) ? (
                   <select
                     name={k}
@@ -433,6 +439,13 @@ function Section({ kind, title, description, items, fields, onCreate, onUpdate, 
                 <Input type="file" accept="image/*" onChange={handleImageUpload} />
                 {uploading && <span className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin"/> Uploading...</span>}
               </div>
+            )}
+            {kind === "member" && (
+              <datalist id="club-year-options">
+                {yearOptions.map((year) => (
+                  <option key={year} value={year} />
+                ))}
+              </datalist>
             )}
           </div>
           
