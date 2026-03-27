@@ -3,8 +3,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Linkedin, Pencil, Star, Trash2 } from "lucide-react";
-import { SiCodeforces } from "react-icons/si";
 import { useEffect, useState } from "react";
+import { SiCodeforces } from "react-icons/si";
 
 function avatarFallback(name) {
   return String(name || "A").trim().charAt(0).toUpperCase() || "A";
@@ -49,6 +49,11 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
     cf_handle,
     highlight,
   } = member;
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [image_url]);
 
   const headline = [designation, company_name].filter(Boolean).join(" @ ");
   const cfUrl = cf_handle ? `https://codeforces.com/profile/${cf_handle}` : "";
@@ -116,8 +121,13 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
       )}
 
       <div className="flex items-start gap-3">
-        {image_url ? (
-          <img src={image_url} alt={name} className="h-16 w-16 rounded-md border border-border/50 object-cover shadow-sm shrink-0" />
+        {image_url && !imageFailed ? (
+          <img
+            src={image_url}
+            alt={name}
+            className="h-16 w-16 rounded-md border border-border/50 object-cover shadow-sm shrink-0"
+            onError={() => setImageFailed(true)}
+          />
         ) : (
           <div className="h-16 w-16 rounded-md border border-border/50 bg-muted/50 flex items-center justify-center text-lg font-medium text-muted-foreground shadow-sm shrink-0">
             {avatarFallback(name)}

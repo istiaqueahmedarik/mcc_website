@@ -38,7 +38,7 @@ export default function Home() {
       }
     }
   };
-  
+
   const [joinNowDestination, setJoinNowDestination] = useState("/login");
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function Home() {
       const token = document.cookie
         .split("; ")
         .find((row) => row.startsWith("token="));
-      
+
       setJoinNowDestination(token ? "/courses" : "/login");
     }
   }, []);
@@ -161,81 +161,81 @@ export default function Home() {
   // Parse alumni data from database or use fallback
   const alumni = cms?.alumni
     ? cms.alumni.map((a) => {
-        // Parse company and role from title if they don't exist as separate fields
-        let company = a.company;
-        let role = a.role;
+      // Parse company and role from title if they don't exist as separate fields
+      let company = a.company;
+      let role = a.role;
 
-        // If company and role aren't available, extract from title
-        if (!company || !role) {
-          // Title format: "Former Position • Role @ Company"
-          const titleParts = a.title.split("•");
-          if (titleParts.length > 1) {
-            const rolePart = titleParts[1].trim();
-            const roleCompanyMatch = rolePart.match(/(.*)\s+@\s+(.*)$/);
+      // If company and role aren't available, extract from title
+      if (!company || !role) {
+        // Title format: "Former Position • Role @ Company"
+        const titleParts = a.title.split("•");
+        if (titleParts.length > 1) {
+          const rolePart = titleParts[1].trim();
+          const roleCompanyMatch = rolePart.match(/(.*)\s+@\s+(.*)$/);
 
-            if (roleCompanyMatch) {
-              role = role || roleCompanyMatch[1].trim();
-              company = company || roleCompanyMatch[2].trim();
-            }
+          if (roleCompanyMatch) {
+            role = role || roleCompanyMatch[1].trim();
+            company = company || roleCompanyMatch[2].trim();
           }
         }
+      }
 
-        return {
-          quote: a.quote,
-          name: a.name,
-          title: a.title,
-          image: a.image_url || a.image,
-          company: company || "Unknown Company",
-          role: role || "Software Engineer",
-        };
-      })
+      return {
+        quote: a.quote,
+        name: a.name,
+        title: a.title,
+        image: a.image_url || a.image,
+        company: company || "Unknown Company",
+        role: role || "Software Engineer",
+      };
+    })
     : [
-        {
-          quote: "Leadership & Platform Scaling",
-          name: "Ayesha Rahman",
-          title: "Former President (2019–2020) • Software Engineer @ Google",
-          image:
-            "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg",
-          company: "Google",
-          role: "Software Engineer",
-        },
-        {
-          quote: "Problem Setting & Training",
-          name: "Mahmudul Hasan",
-          title: "Former Competitive Programming Lead • SDE @ Amazon",
-          image:
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/1024px-Amazon_logo.svg.png",
-          company: "Amazon",
-          role: "Software Development Engineer",
-        },
-        {
-          quote: "Curriculum & Mentorship",
-          name: "Farhan Ahmed",
-          title: "Former Education Coordinator • SWE @ Meta",
-          image:
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/2560px-Meta_Platforms_Inc._logo.svg.png",
-          company: "Meta",
-          role: "Software Engineer",
-        },
-        {
-          quote: "AI Research & Innovation",
-          name: "Nusrat Jahan",
-          title: "Former Core Member • Research Engineer @ Microsoft",
-          image:
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png",
-          company: "Microsoft",
-          role: "Research Engineer",
-        },
-        {
-          quote: "Automation & Tooling",
-          name: "Sakib Chowdhury",
-          title: "Former Contest Ops • Engineer @ DeepMind",
-          image:
-            "https://cdn.brandfetch.io/id9M89MUnI/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B",
-          company: "DeepMind",
-          role: "Software Engineer",
-        },
-      ];
+      {
+        quote: "Leadership & Platform Scaling",
+        name: "Ayesha Rahman",
+        title: "Former President (2019–2020) • Software Engineer @ Google",
+        image:
+          "https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg",
+        company: "Google",
+        role: "Software Engineer",
+      },
+      {
+        quote: "Problem Setting & Training",
+        name: "Mahmudul Hasan",
+        title: "Former Competitive Programming Lead • SDE @ Amazon",
+        image:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/1024px-Amazon_logo.svg.png",
+        company: "Amazon",
+        role: "Software Development Engineer",
+      },
+      {
+        quote: "Curriculum & Mentorship",
+        name: "Farhan Ahmed",
+        title: "Former Education Coordinator • SWE @ Meta",
+        image:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Meta_Platforms_Inc._logo.svg/2560px-Meta_Platforms_Inc._logo.svg.png",
+        company: "Meta",
+        role: "Software Engineer",
+      },
+      {
+        quote: "AI Research & Innovation",
+        name: "Nusrat Jahan",
+        title: "Former Core Member • Research Engineer @ Microsoft",
+        image:
+          "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Microsoft_logo_%282012%29.svg/2560px-Microsoft_logo_%282012%29.svg.png",
+        company: "Microsoft",
+        role: "Research Engineer",
+      },
+      {
+        quote: "Automation & Tooling",
+        name: "Sakib Chowdhury",
+        title: "Former Contest Ops • Engineer @ DeepMind",
+        image:
+          "https://cdn.brandfetch.io/id9M89MUnI/theme/dark/logo.svg?c=1dxbfHSJFAPEGdCLU4o5B",
+        company: "DeepMind",
+        role: "Software Engineer",
+      },
+    ];
 
   // Inline, lightweight marquee to avoid ref error from InfiniteMovingCards
   const AlumniMarquee = ({ items, speed = 0.5 }) => {
@@ -262,12 +262,14 @@ export default function Home() {
         <img
           src={item.image}
           alt={item.company || item.name}
-          className="h-8 w-8 object-contain rounded-sm"
+          className="h-12 w-12 object-contain rounded-sm"
         />
         <div className="flex flex-col">
           <span className="text-sm font-medium">{item.name}</span>
           <span className="text-xs text-muted-foreground">
-            {(item.role || "").trim()} {item.company ? `@ ${item.company}` : ""}
+            {(item.role || "").trim()}
+          </span>
+          <span className="text-xs text-muted-foreground">{item.company ? `@ ${item.company}` : ""}
           </span>
         </div>
       </div>
