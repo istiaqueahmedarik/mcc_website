@@ -443,7 +443,7 @@ export default async function Page({ params, searchParams }) {
           initialSection={initialSection}
           tabCounts={tabCounts}
         >
-          <div sectionkey="current-teams">
+          <div data-section-key="current-teams">
           <Card className="w-full lg:w-full border-0">
             <CardHeader className="bg-muted/30 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -583,7 +583,7 @@ export default async function Page({ params, searchParams }) {
           </Card>
           </div>
 
-          <div sectionkey="submissions">
+          <div data-section-key="submissions">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -707,7 +707,7 @@ export default async function Page({ params, searchParams }) {
           </Card>
           </div>
 
-          <div sectionkey="auto-preview">
+          <div data-section-key="auto-preview">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -798,7 +798,7 @@ export default async function Page({ params, searchParams }) {
           </Card>
           </div>
 
-          <div sectionkey="manual-requests">
+          <div data-section-key="manual-requests">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex items-center gap-2 text-xl">
@@ -837,7 +837,7 @@ export default async function Page({ params, searchParams }) {
           </Card>
           </div>
 
-          <div sectionkey="participants">
+          <div data-section-key="participants">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex items-center gap-2 text-xl">

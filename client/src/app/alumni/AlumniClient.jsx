@@ -280,7 +280,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-12 md:py-16">
+    <div className="w-full max-w-7xl mx-auto px-4 py-8">
       <datalist id="club-year-options">
         {yearOptions.map((year) => <option key={year} value={year} />)}
       </datalist>
@@ -294,10 +294,10 @@ export default function AlumniClient({ initialBatches, loadError }) {
         {positionOptions.map((o) => <option key={o} value={o} />)}
       </datalist>
 
-      <header className="mb-8">
+      <header className="mb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">Alumni Directory</h1>
+            <h1 className="text-2xl md:text-2xl font-semibold tracking-tight">Alumni Directory</h1>
             <p className="mt-2 text-sm md:text-base text-muted-foreground">
               Alumni cards with batch, role, position year, and social links.
             </p>

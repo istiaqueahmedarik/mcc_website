@@ -57,8 +57,8 @@ export default function TeamCollectionDetailSectionPanels({
 
       {Children.toArray(children).map((child, idx) => {
         if (!child || typeof child !== "object") return child;
-        const key = child.props?.sectionKey;
-        if (!key) return child;
+          const key = child.props?.["data-section-key"];
+          if (!key) return null;
         return (
           <div key={`${key}-${idx}`} className={key === activeSection ? "" : "hidden"}>
             {child}
