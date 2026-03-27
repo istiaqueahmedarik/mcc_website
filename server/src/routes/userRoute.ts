@@ -7,6 +7,7 @@ import {
   listVjudgePending,
   loginToVJudgeRoute,
   searchUsers,
+  setBasicProfile,
   setCodeforcesId,
   setMistId,
   setMistIdCard,
@@ -38,6 +39,7 @@ route.post("/vjudge/set", setVjudgeId);
 route.get("/vjudge/pending", listVjudgePending);
 route.post("/vjudge/verify", verifyVjudge);
 route.post("/tshirt/set", setTshirtSize);
+route.post("/basic/set", setBasicProfile);
 route.post("/profile-pic/set", setProfilePic);
 route.post("/mist-id-card/set", setMistIdCard);
 route.post("/mist-id/set", setMistId);

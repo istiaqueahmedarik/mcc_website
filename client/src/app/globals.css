@@ -644,7 +644,7 @@
   background: hsl(var(--profile-surface-2));
   border: 1px solid hsl(var(--profile-border));
   border-radius: var(--profile-radius-md);
-  padding: 20px;
+  padding: 12px;
   transition: all 150ms ease;
 }
 
@@ -705,6 +705,8 @@
 .profile-sidebar-sticky {
   position: sticky;
   top: 24px;
+  align-self: start;
+  height: fit-content;
 }
 
 @media (max-width: 1023px) {

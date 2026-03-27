@@ -555,11 +555,11 @@ export const finalizeCollection = async (c: any) => {
             await sql`SELECT email, full_name, vjudge_id FROM users WHERE vjudge_id = ANY(${uniqueMembers})`;
           const clientUrl = process.env.CLIENT_URL || "";
           const websiteUrl =
-          process.env.WEBSITE_URL ||
-          process.env.NEXT_PUBLIC_WEBSITE_URL ||
-          "https://computerclub.mist.ac.bd";
+            process.env.WEBSITE_URL ||
+            process.env.NEXT_PUBLIC_WEBSITE_URL ||
+            "https://computerclub.mist.ac.bd";
           const facebookUrl =
-          process.env.FACEBOOK_URL ||
+            process.env.FACEBOOK_URL ||
             process.env.NEXT_PUBLIC_FACEBOOK_URL ||
             "";
           const linkedinUrl =
@@ -570,8 +570,10 @@ export const finalizeCollection = async (c: any) => {
             process.env.DISCORD_URL ||
             process.env.NEXT_PUBLIC_DISCORD_URL ||
             "";
-            
-            const dashboardUrl = websiteUrl ? `${websiteUrl}/finalized-teams/${collection_id}` : "";
+
+          const dashboardUrl = websiteUrl
+            ? `${websiteUrl}/finalized-teams/${collection_id}`
+            : "";
           const escapeHtml = (value: string) =>
             String(value || "")
               .replace(/&/g, "&amp;")
@@ -756,7 +758,20 @@ export const getUserTeams = async (c: any) => {
   if (!vj) return c.json({ success: true, result: [] });
 
   const teams = await sql`
-    SELECT t.*, c.room_id, c.contest_id, c.title as collection_title
+    SELECT
+      t.*, c.room_id, c.contest_id, c.title as collection_title,
+      COALESCE((
+        SELECT json_agg(
+          json_build_object(
+            'full_name', u.full_name,
+            'vjudge_id', u.vjudge_id,
+            'profile_pic', u.profile_pic
+          )
+          ORDER BY array_position(t.member_vjudge_ids, u.vjudge_id)
+        )
+        FROM users u
+        WHERE u.vjudge_id = ANY (t.member_vjudge_ids)
+      ), '[]'::json) AS member_profiles
     FROM public.team_collection_teams t
     JOIN public.team_collections c ON t.collection_id=c.id
     WHERE t.approved=true AND ${vj} = ANY (t.member_vjudge_ids)
@@ -770,7 +785,20 @@ export const getTeamsByVjudgePublic = async (c: any) => {
   if (!vjudge_id) return c.json({ error: "vjudge_id required" }, 400);
 
   const teams = await sql`
-    SELECT t.*, c.room_id, c.contest_id, c.title as collection_title
+    SELECT
+      t.*, c.room_id, c.contest_id, c.title as collection_title,
+      COALESCE((
+        SELECT json_agg(
+          json_build_object(
+            'full_name', u.full_name,
+            'vjudge_id', u.vjudge_id,
+            'profile_pic', u.profile_pic
+          )
+          ORDER BY array_position(t.member_vjudge_ids, u.vjudge_id)
+        )
+        FROM users u
+        WHERE u.vjudge_id = ANY (t.member_vjudge_ids)
+      ), '[]'::json) AS member_profiles
     FROM public.team_collection_teams t
     JOIN public.team_collections c ON t.collection_id=c.id
     WHERE t.approved=true AND ${vjudge_id} = ANY (t.member_vjudge_ids)
@@ -789,7 +817,20 @@ export const getTeamsCoachedByVjudgePublic = async (c: any) => {
       return c.json({ success: true, result: [] });
     }
     const teams = await sql`
-            SELECT t.*, c.room_id, c.contest_id, c.title as collection_title
+            SELECT
+              t.*, c.room_id, c.contest_id, c.title as collection_title,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'full_name', u.full_name,
+                    'vjudge_id', u.vjudge_id,
+                    'profile_pic', u.profile_pic
+                  )
+                  ORDER BY array_position(t.member_vjudge_ids, u.vjudge_id)
+                )
+                FROM users u
+                WHERE u.vjudge_id = ANY (t.member_vjudge_ids)
+              ), '[]'::json) AS member_profiles
             FROM public.team_collection_teams t
             JOIN public.team_collections c ON t.collection_id=c.id
             WHERE t.approved=true AND t.coach_vjudge_id=${vjudge_id}
