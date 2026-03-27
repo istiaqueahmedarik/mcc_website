@@ -5,11 +5,11 @@ import { createContext, useContext, useMemo, useState } from "react";
 const AchievementFilterContext = createContext(null);
 
 export default function AchievementFilterProvider({ children }) {
-  const [selectedTag, setSelectedTag] = useState("");
+  const [selectedTags, setSelectedTags] = useState([]);
 
   const value = useMemo(
-    () => ({ selectedTag, setSelectedTag }),
-    [selectedTag]
+    () => ({ selectedTags, setSelectedTags }),
+    [selectedTags]
   );
 
   return (

@@ -115,7 +115,7 @@ export default async function SingleAchievement({ params }) {
         </div>
 
         {/* Sticky image + scrolling description */}
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)] gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <div className="w-full lg:sticky lg:top-24 lg:h-fit self-start flex flex-col gap-4">
             <div
               className="relative w-full rounded-2xl overflow-hidden border border-slate-200 dark:border-[#2a2a38] bg-white dark:bg-[#111118]"
@@ -151,14 +151,15 @@ export default async function SingleAchievement({ params }) {
             )}
           </div>
 
-          <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#111118] border-slate-200 dark:border-[#2a2a38] lg:h-[340px] xl:h-[380px] lg:flex lg:flex-col">
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-slate-100 dark:bg-[#17171f] border-slate-200 dark:border-[#2a2a38] lg:shrink-0">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#6b6b8a]" style={{ fontFamily: "'Syne', sans-serif" }}>
-                Description
-              </span>
-              <Tag size={13} className="text-slate-500 dark:text-[#6b6b8a]" />
-            </div>
-            <div className="px-8 py-7 text-base leading-loose text-slate-600 dark:text-[#9090b0] lg:flex-1 lg:overflow-y-auto" style={{ fontWeight: 300 }}>
+          <div className="rounded-2xl overflow-hidden border bg-white dark:bg-[#111118] border-slate-200 dark:border-[#2a2a38] h-[calc(100vw-3rem)] lg:h-[30rem] xl:h-[34rem] flex flex-col">
+            <div
+              className="px-8 py-7 text-base leading-loose text-slate-600 dark:text-[#9090b0] h-full overflow-y-auto lg:flex-1"
+              style={{
+                fontFamily:
+                  "'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                fontWeight: 400,
+              }}
+            >
               <MarkdownRender content={achievement.description} className="w-full max-w-none break-words" />
             </div>
           </div>

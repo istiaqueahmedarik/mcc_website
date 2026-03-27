@@ -25,12 +25,14 @@ const normalizeAchievementTags = (achievement) => {
 };
 
 export default function FilteredRelatedAchievements({ achievements = [] }) {
-  const { selectedTag } = useAchievementFilter();
+  const { selectedTags } = useAchievementFilter();
 
-  const filtered = selectedTag
+  const selectedUpper = selectedTags.map((tag) => tag.toUpperCase());
+
+  const filtered = selectedUpper.length > 0
     ? achievements.filter((item) =>
-        normalizeAchievementTags(item).some(
-          (tag) => tag.toUpperCase() === selectedTag.toUpperCase()
+        normalizeAchievementTags(item).some((tag) =>
+          selectedUpper.includes(tag.toUpperCase())
         )
       )
     : achievements;

@@ -4,9 +4,20 @@ import { Tag, RotateCcw } from "lucide-react";
 import { useAchievementFilter } from "@/components/achievements/AchievementFilterProvider";
 
 export default function AchievementTagChips({ tags = [] }) {
-  const { selectedTag, setSelectedTag } = useAchievementFilter();
+  const { selectedTags, setSelectedTags } = useAchievementFilter();
 
   if (!Array.isArray(tags) || tags.length === 0) return null;
+
+  const toggleTag = (tag) => {
+    const normalized = tag.toUpperCase();
+    setSelectedTags((prev) => {
+      const exists = prev.some((item) => item.toUpperCase() === normalized);
+      if (exists) {
+        return prev.filter((item) => item.toUpperCase() !== normalized);
+      }
+      return [...prev, tag];
+    });
+  };
 
   return (
     <div className="flex items-center justify-between gap-10 flex-wrap">
@@ -14,13 +25,16 @@ export default function AchievementTagChips({ tags = [] }) {
       {/* Tags (Left Side) */}
       <div className="flex flex-wrap gap-2">
         {tags.map((tag) => {
-          const isActive = selectedTag.toUpperCase() === tag.toUpperCase();
+          const isActive = selectedTags.some(
+            (item) => item.toUpperCase() === tag.toUpperCase()
+          );
 
           return (
             <button
               key={tag}
               type="button"
-              onClick={() => setSelectedTag(isActive ? "" : tag)}
+              onClick={() => toggleTag(tag)}
+              aria-pressed={isActive}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-all cursor-pointer ${
                 isActive
                   ? "border-indigo-500 dark:border-indigo-400 text-indigo-800 dark:text-indigo-200"
@@ -41,10 +55,10 @@ export default function AchievementTagChips({ tags = [] }) {
       </div>
 
       {/* Reset Button (Right Side) */}
-      {selectedTag && (
+      {selectedTags.length > 0 && (
         <button
           type="button"
-          onClick={() => setSelectedTag("")}
+          onClick={() => setSelectedTags([])}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-red-400/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
           style={{ fontFamily: "'Syne', sans-serif" }}
         >
