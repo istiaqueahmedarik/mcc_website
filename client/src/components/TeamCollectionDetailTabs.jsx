@@ -1,31 +1,12 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useTransition } from "react";
+import { useMemo } from "react";
 
 export default function TeamCollectionDetailTabs({
   activeSection,
   tabCounts,
+  onSectionChange,
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    if (isPending) {
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-    }
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, [isPending]);
 
   const tabs = useMemo(
     () => [
@@ -60,13 +41,7 @@ export default function TeamCollectionDetailTabs({
 
   const onTabClick = (sectionKey) => {
     if (sectionKey === activeSection) return;
-
-    const nextParams = new URLSearchParams(searchParams?.toString() || "");
-    nextParams.set("section", sectionKey);
-
-    startTransition(() => {
-      router.push(`${pathname}?${nextParams.toString()}`);
-    });
+    onSectionChange?.(sectionKey);
   };
 
   return (
@@ -77,35 +52,18 @@ export default function TeamCollectionDetailTabs({
             key={tab.key}
             type="button"
             onClick={() => onTabClick(tab.key)}
-            disabled={isPending && tab.key !== activeSection}
-            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed ${
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors duration-200 ${
               activeSection === tab.key
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             }`}
             aria-current={activeSection === tab.key ? "page" : undefined}
-            aria-busy={isPending && tab.key === activeSection}
           >
             {tab.label}
             {tab.count ? ` (${tab.count})` : ""}
           </button>
         ))}
       </div>
-
-      {isPending && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm"
-          role="status"
-          aria-live="assertive"
-        >
-          <div className="px-6 py-5">
-            <span
-              className="inline-block h-12 w-12 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-      )}
     </>
   );
 }

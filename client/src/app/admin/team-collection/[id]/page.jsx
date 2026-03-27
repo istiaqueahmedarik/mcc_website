@@ -13,7 +13,7 @@ import ManualTeamCreateFloatingButton from "@/components/ManualTeamCreateFloatin
 import ProgressLink from "@/components/ProgressLink";
 import { TeamActionForm } from "@/components/TeamActionForm";
 import TeamCardActionsInline from "@/components/TeamCardActionsInline";
-import TeamCollectionDetailTabs from "@/components/TeamCollectionDetailTabs";
+import TeamCollectionDetailSectionPanels from "@/components/TeamCollectionDetailSectionPanels";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -102,9 +102,22 @@ export default async function Page({ params, searchParams }) {
   const user = await get_with_token("auth/user/profile");
   if (user?.result?.length === 0) redirect("/login");
   if (user?.result?.[0]?.admin === false) redirect("/");
+
+  const resolvedSearchParams = await searchParams;
+  const tabOptions = [
+    "current-teams",
+    "submissions",
+    "auto-preview",
+    "manual-requests",
+    "participants",
+  ];
+  const initialSection = tabOptions.includes(resolvedSearchParams?.section)
+    ? resolvedSearchParams?.section
+    : "current-teams";
+
   const { id } = await params;
   const detail = await adminGetCollectionDetail(id);
-  const finalizedRes = await publicFinalizedTeamsByContest();
+
   if (detail?.error)
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -125,7 +138,16 @@ export default async function Page({ params, searchParams }) {
     );
 
   const { collection, rankOrder, choices, teams } = detail.result || {};
-  const roomUserScores = await fetchLatestRoomUserScores(collection?.room_id);
+  const [finalizedRes, roomUserScores, preview, reqRes] = await Promise.all([
+    publicFinalizedTeamsByContest(),
+    fetchLatestRoomUserScores(collection?.room_id),
+    adminPreviewCollection(id).catch(() => null),
+    adminListTeamRequests(id).catch(() => null),
+  ]);
+
+  const teamRequests = reqRes?.success ? reqRes.result || [] : [];
+  const autoTeams = preview?.result?.autoTeams || [];
+
   const normalizeTitle = (value) =>
     String(value || "")
       .trim()
@@ -197,6 +219,7 @@ export default async function Page({ params, searchParams }) {
         { sensitivity: "base" }
       );
     });
+
   const sortedTeams = [...(teams || [])].sort((a, b) => {
     const aScore = getTeamScore(a);
     const bScore = getTeamScore(b);
@@ -219,26 +242,7 @@ export default async function Page({ params, searchParams }) {
       { sensitivity: "base" }
     );
   });
-  // Load manual team requests
-  let teamRequests = [];
-  try {
-    const reqRes = await adminListTeamRequests(id);
-    if (reqRes?.success) teamRequests = reqRes.result || [];
-  } catch { }
-  const preview = await adminPreviewCollection(id);
-  const manualTeams = preview?.result?.manualTeams || [];
-  const autoTeams = preview?.result?.autoTeams || [];
-  const resolvedSearchParams = await searchParams;
-  const tabOptions = [
-    "current-teams",
-    "submissions",
-    "auto-preview",
-    "manual-requests",
-    "participants",
-  ];
-  const activeSection = tabOptions.includes(resolvedSearchParams?.section)
-    ? resolvedSearchParams?.section
-    : "current-teams";
+
   const allTeamUserIds = new Set();
   for (const t of teams || []) {
     for (const m of t?.member_vjudge_ids || []) allTeamUserIds.add(String(m));
@@ -264,6 +268,13 @@ export default async function Page({ params, searchParams }) {
       if (m) allTeamUserIds.add(String(m));
     }
   }
+  for (const t of autoTeams || []) {
+    const memberIds = Array.isArray(t?.members) ? t.members : [];
+    for (const m of memberIds) {
+      if (m) allTeamUserIds.add(String(m));
+    }
+  }
+
   const teamProfilesArr = await Promise.all(
     Array.from(allTeamUserIds).map(async (vj) => ({
       vj,
@@ -428,14 +439,11 @@ export default async function Page({ params, searchParams }) {
       </div>
 
       <div className="max-w-full mx-auto px-2 md:px-6 py-2">
-        <div className="flex justify-center">
-          <TeamCollectionDetailTabs
-            activeSection={activeSection}
-            tabCounts={tabCounts}
-          />
-        </div>
-
-        {activeSection === "current-teams" && (
+        <TeamCollectionDetailSectionPanels
+          initialSection={initialSection}
+          tabCounts={tabCounts}
+        >
+          <div sectionkey="current-teams">
           <Card className="w-full lg:w-full border-0">
             <CardHeader className="bg-muted/30 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -573,9 +581,9 @@ export default async function Page({ params, searchParams }) {
               </div>
             </CardContent>
           </Card>
-        )}
+          </div>
 
-        {activeSection === "submissions" && (
+          <div sectionkey="submissions">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -697,9 +705,9 @@ export default async function Page({ params, searchParams }) {
               </div>
             </CardContent>
           </Card>
-        )}
+          </div>
 
-        {activeSection === "auto-preview" && (
+          <div sectionkey="auto-preview">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex text-center items-center text-xl">
@@ -788,9 +796,9 @@ export default async function Page({ params, searchParams }) {
               </div>
             </CardContent>
           </Card>
-        )}
+          </div>
 
-        {activeSection === "manual-requests" && (
+          <div sectionkey="manual-requests">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex items-center gap-2 text-xl">
@@ -827,9 +835,9 @@ export default async function Page({ params, searchParams }) {
               </div>
             )}
           </Card>
-        )}
+          </div>
 
-        {activeSection === "participants" && (
+          <div sectionkey="participants">
           <Card className="overflow-hidden border-0">
             <CardHeader className="bg-muted/30 border-0 items-center">
               <h2 className="flex items-center gap-2 text-xl">
@@ -884,7 +892,8 @@ export default async function Page({ params, searchParams }) {
               </div>
             </CardContent>
           </Card>
-        )}
+          </div>
+        </TeamCollectionDetailSectionPanels>
       </div>
 
       <ManualTeamCreateFloatingButton
