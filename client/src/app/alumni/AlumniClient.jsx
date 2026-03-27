@@ -1,7 +1,5 @@
 "use client";
 
-import { isAdminClient } from "@/lib/isAdmin";
-import React from "react";
 import AlumniMemberCard from "@/components/alumni/AlumniMemberCard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -14,9 +12,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, SlidersHorizontal, X, ChevronDown } from "lucide-react";
-import { toast } from "sonner";
 import { uploadImage } from "@/lib/action";
+import { isAdminClient } from "@/lib/isAdmin";
+import { ChevronDown, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
+
+function normalizeImageUrl(raw) {
+  const url = String(raw || "").trim();
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
+}
+
+function pickMemberImageUrl(member) {
+  return normalizeImageUrl(
+    member?.image_url ||
+      member?.profile_pic ||
+      member?.photo_url ||
+      member?.avatar_url ||
+      member?.image ||
+      member?.avatar ||
+      ""
+  );
+}
 
 function normalizeMember(member) {
   return {
@@ -28,7 +47,7 @@ function normalizeMember(member) {
     company_name: member.company_name || "",
     position_in_club: member.position_in_club || "",
     club_position_year: member.club_position_year ? Number(member.club_position_year) : null,
-    image_url: member.image_url || "",
+    image_url: pickMemberImageUrl(member),
     linkedin_url: member.linkedin_url || "",
     cf_handle: member.cf_handle || "",
     highlight: Boolean(member.highlight),
@@ -163,7 +182,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
       full_name: member.name || "",
       designation: member.designation || "",
       company_name: member.company_name || "",
-      image_url: member.image_url || "",
+      image_url: pickMemberImageUrl(member),
       position_in_club: member.position_in_club || "",
       club_position_year: member.club_position_year ? String(member.club_position_year) : "",
       linkedin_url: member.linkedin_url || "",
