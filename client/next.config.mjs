@@ -56,13 +56,19 @@ const nextConfig = {
       fs: false,
     };
 
-    // Ignore @diplodoc/cut-extension modules
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@diplodoc/cut-extension': false,
-      '@diplodoc/cut-extension/runtime': false,
-      '@diplodoc/cut-extension/runtime/styles.css': false,
-    };
+    if (isServer) {
+      // Keep cut-extension out of server bundles; client bundle needs it for editor runtime.
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@diplodoc/cut-extension': false,
+        '@diplodoc/cut-extension/runtime': false,
+        '@diplodoc/cut-extension/runtime/styles.css': false,
+      };
+    } else if (config.resolve.alias) {
+      delete config.resolve.alias['@diplodoc/cut-extension'];
+      delete config.resolve.alias['@diplodoc/cut-extension/runtime'];
+      delete config.resolve.alias['@diplodoc/cut-extension/runtime/styles.css'];
+    }
 
     return config;
   },

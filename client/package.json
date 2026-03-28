@@ -8,7 +8,7 @@
     "os": false
   },
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
@@ -153,6 +153,7 @@
   "devDependencies": {
     "@babel/core": "^7.28.4",
     "@babel/preset-env": "^7.28.3",
+    "@types/node": "^25.5.0",
     "babel-loader": "^10.0.0",
     "eslint": "^8",
     "eslint-config-next": "15.3.0",
