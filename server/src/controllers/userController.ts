@@ -316,6 +316,45 @@ export const setMistId = async (c: any) => {
   }
 };
 
+export const setBasicProfile = async (c: any) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    const { full_name, phone, batch_name } = await c.req.json();
+    const shouldUpdateName =
+      typeof full_name === "string" && full_name.trim().length > 0;
+    const shouldUpdatePhone = phone !== undefined;
+    const shouldUpdateBatch = batch_name !== undefined;
+
+    if (!shouldUpdateName && !shouldUpdatePhone && !shouldUpdateBatch) {
+      return c.json({ error: "No profile fields provided" }, 400);
+    }
+
+    const name = shouldUpdateName ? full_name.trim() : null;
+    const sanitizedPhone =
+      typeof phone === "string" ? phone.trim() || null : null;
+    const sanitizedBatch =
+      typeof batch_name === "string" ? batch_name.trim() || null : null;
+
+    const rows = await sql`
+      update users
+      set
+        full_name = case when ${shouldUpdateName} then ${name} else full_name end,
+        phone = case when ${shouldUpdatePhone} then ${sanitizedPhone} else phone end,
+        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end
+      where id = ${id}
+      returning id, full_name, phone, batch_name
+    `;
+
+    if (rows.length === 0) return c.json({ error: "User not found" }, 404);
+    return c.json({ result: rows[0] });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to set basic profile" }, 400);
+  }
+};
+
 // Lightweight user search for admin tooling / coach assignment
 export const searchUsers = async (c: any) => {
   const { id, email } = c.get("jwtPayload") || {};

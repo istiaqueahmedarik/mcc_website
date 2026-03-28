@@ -1,370 +1,646 @@
 "use client";
-import React from "react";
-import {
-  Award,
-  Briefcase,
-  Building2,
-  Facebook,
-  GraduationCap,
-  Linkedin,
-  Mail,
-  MapPin,
-  Phone,
-  Search,
-  Sparkles,
-} from "lucide-react";
-import MccLogo from "@/components/IconChanger/MccLogo";
 
-function highlight(text, q) {
-  const safe = String(text || "");
-  if (!q) return safe;
-  const idx = safe.toLowerCase().indexOf(q.toLowerCase());
-  if (idx === -1) return safe;
-  return (
-    <>
-      {safe.slice(0, idx)}
-      <span className="bg-[hsl(var(--alumni-gold)/0.25)]">
-        {safe.slice(idx, idx + q.length)}
-      </span>
-      {safe.slice(idx + q.length)}
-    </>
-  );
+import AlumniMemberCard from "@/components/alumni/AlumniMemberCard";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { uploadImage } from "@/lib/action";
+import { isAdminClient } from "@/lib/isAdmin";
+import { ChevronDown, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
+
+function normalizeImageUrl(raw) {
+  const url = String(raw || "").trim();
+  if (!url) return "";
+  if (url.startsWith("//")) return `https:${url}`;
+  return url;
 }
 
-function toCareerPath(value) {
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (typeof value === "string") {
-    return value
-      .split(/->|→|\|/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
-  return [];
+function pickMemberImageUrl(member) {
+  return normalizeImageUrl(
+    member?.image_url ||
+      member?.profile_pic ||
+      member?.photo_url ||
+      member?.avatar_url ||
+      member?.image ||
+      member?.avatar ||
+      ""
+  );
 }
 
 function normalizeMember(member) {
-  const careerPath = toCareerPath(member.career_path);
   return {
     ...member,
-    current_company: member.current_company || "",
-    location: member.location || "",
-    email: member.email || "",
-    phone: member.phone || "",
+    name: member.name || member.full_name || "",
+    batch: member.batch || "",
+    batch_id: member.batch_id || "",
+    designation: member.designation || "",
+    company_name: member.company_name || "",
+    position_in_club: member.position_in_club || "",
+    club_position_year: member.club_position_year ? Number(member.club_position_year) : null,
+    image_url: pickMemberImageUrl(member),
     linkedin_url: member.linkedin_url || "",
-    facebook_url: member.facebook_url || "",
-    career_path: careerPath,
+    cf_handle: member.cf_handle || "",
+    highlight: Boolean(member.highlight),
   };
 }
 
-function matchesQuery(member, query) {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  const targets = [
-    member.name,
-    member.role,
-    member.now,
-    member.current_company,
-    member.location,
-    member.email,
-    member.phone,
-    ...(member.career_path || []),
-  ];
-  return targets.some((v) => String(v || "").toLowerCase().includes(q));
-}
-
-function MemberCard({ m, query }) {
-  const careerPath = m.career_path || [];
-
-  return (
-    <div
-      key={m.id || m.name}
-      className={
-        "alumni-batch-card group p-5 border-border/60 " +
-        (m.highlight ? "ring-1 ring-[hsl(var(--alumni-gold))]/50" : "")
-      }
-    >
-      <div className="relative z-10 flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          {m.image_url && (
-            <img
-              src={m.image_url}
-              alt={m.name}
-              className="w-12 h-12 rounded object-cover border border-border/60"
-            />
-          )}
-          <div className="flex flex-col">
-            <span className="font-semibold text-base md:text-lg leading-snug alumni-name group-hover:drop-shadow-sm transition-all">
-              {highlight(m.name, query)}
-            </span>
-            {m.role && (
-              <span className="text-[11px] tracking-wider text-muted-foreground/70 uppercase mt-1">
-                {highlight(m.role, query)}
-              </span>
-            )}
-          </div>
-        </div>
-        {(m.now || m.current_company || m.role || m.location) && (
-          <div className="text-xs md:text-sm text-muted-foreground leading-relaxed grid gap-1">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-              <span>
-                Current Company: {highlight(m.current_company || m.now, query)}
-              </span>
-            </div>
-            {m.role && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-                <span>Role: {highlight(m.role, query)}</span>
-              </div>
-            )}
-            {m.location && (
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]" />
-                <span>Location: {highlight(m.location, query)}</span>
-              </div>
-            )}
-          </div>
-        )}
-        {(m.linkedin_url || m.email || m.facebook_url || m.phone) && (
-          <div className="pt-2 border-t border-border/60">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-              Contact & Social Links
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs">
-              {m.linkedin_url && (
-                <a
-                  href={m.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Linkedin className="h-3.5 w-3.5" /> LinkedIn
-                </a>
-              )}
-              {m.email && (
-                <a
-                  href={`mailto:${m.email}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Mail className="h-3.5 w-3.5" /> Email
-                </a>
-              )}
-              {m.facebook_url && (
-                <a
-                  href={m.facebook_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Facebook className="h-3.5 w-3.5" /> Facebook
-                </a>
-              )}
-              {m.phone && (
-                <a
-                  href={`tel:${m.phone}`}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border/70 hover:border-[hsl(var(--alumni-gold))]/70"
-                >
-                  <Phone className="h-3.5 w-3.5" /> Phone
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-        {careerPath.length > 0 && (
-          <div className="pt-2 border-t border-border/60">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-              Career Path
-            </p>
-            <p className="text-xs leading-relaxed">
-              {careerPath.map((step, idx) => (
-                <React.Fragment key={`${step}-${idx}`}>
-                  {idx > 0 && <span className="text-muted-foreground"> {"→"} </span>}
-                  <span>{highlight(step, query)}</span>
-                </React.Fragment>
-              ))}
-            </p>
-          </div>
-        )}
-      </div>
-      <div
-        className="absolute -top-12 -right-10 w-40 h-40 opacity-0 group-hover:opacity-70 transition-opacity duration-500 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(circle at center, hsl(var(--alumni-gold)/0.55), transparent 70%)",
-        }}
-      />
-    </div>
+function toFlatMembers(batches) {
+  return (batches || []).flatMap((batch) =>
+    (batch.members || []).map((m) =>
+      normalizeMember({
+        ...m,
+        batch_id: batch.id,
+        batch: batch.label || batch.batch || "",
+      })
+    )
   );
 }
 
-function BatchBlock({ batch, query }) {
-  const filteredMembers = batch.members.filter((m) => matchesQuery(m, query));
-  if (filteredMembers.length === 0) return null;
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-3">
-            <GraduationCap className="h-7 w-7 text-[hsl(var(--alumni-gold))]" />{" "}
-            {highlight(batch.batch, query)}
-          </h2>
-          {batch.motto && (
-            <p className="text-xs md:text-sm text-muted-foreground mt-1 uppercase tracking-wider">
-              {highlight(batch.motto, query)}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 text-[10px] tracking-widest font-semibold text-muted-foreground/70">
-          <Award className="h-4 w-4 text-[hsl(var(--alumni-gold))]" />{" "}
-          Celebrating Contributions
-        </div>
-      </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMembers.map((m) => (
-          <MemberCard key={m.id || m.name} m={m} query={query} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function useDebounce(value, delay) {
-  const [d, setD] = React.useState(value);
-  React.useEffect(() => {
-    const id = setTimeout(() => setD(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return d;
+function matchText(value, query) {
+  return String(value || "").toLowerCase().includes(query.toLowerCase());
 }
 
 export default function AlumniClient({ initialBatches, loadError }) {
+  const [isAdmin, setIsAdmin] = React.useState(false);
+  const [batches, setBatches] = React.useState(initialBatches || []);
   const [query, setQuery] = React.useState("");
   const [batchFilter, setBatchFilter] = React.useState("all");
-  const debounced = useDebounce(query, 200);
+  const [companyFilter, setCompanyFilter] = React.useState("all");
+  const [positionFilter, setPositionFilter] = React.useState("all");
+  const [featuredFilter, setFeaturedFilter] = React.useState("all");
+  const [sortBy, setSortBy] = React.useState("name");
+  const [loading, setLoading] = React.useState(false);
+  const [filtersExpanded, setFiltersExpanded] = React.useState(false);
 
-  const normalizedBatches = React.useMemo(
-    () =>
-      (initialBatches || []).map((batch) => ({
-        ...batch,
-        members: (batch.members || []).map((m) => normalizeMember(m)),
-      })),
-    [initialBatches]
-  );
+  // Count active filters
+  const activeFilterCount = [
+    batchFilter !== "all" ? 1 : 0,
+    companyFilter !== "all" ? 1 : 0,
+    positionFilter !== "all" ? 1 : 0,
+    featuredFilter !== "all" ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
 
-  const batchOptions = React.useMemo(
-    () =>
-      normalizedBatches.map((b) => ({
-        id: String(b.id || b.batch),
-        label: `${b.batch} (${b.year})`,
-      })),
-    [normalizedBatches]
-  );
+  const [batchDialogOpen, setBatchDialogOpen] = React.useState(false);
+  const [memberDialogOpen, setMemberDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [editingMemberId, setEditingMemberId] = React.useState(null);
+  const [memberToDelete, setMemberToDelete] = React.useState(null);
 
-  const visible = React.useMemo(() => {
-    const source =
-      batchFilter === "all"
-        ? normalizedBatches
-        : normalizedBatches.filter(
-            (b) => String(b.id || b.batch) === batchFilter
-          );
+  const [batchForm, setBatchForm] = React.useState({ label: "" });
+  const [memberForm, setMemberForm] = React.useState({
+    batch_id: "",
+    full_name: "",
+    designation: "",
+    company_name: "",
+    image_url: "",
+    position_in_club: "",
+    club_position_year: "",
+    linkedin_url: "",
+    cf_handle: "",
+    highlight: false,
+  });
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const yearOptions = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let year = currentYear; year >= 2010; year -= 1) years.push(String(year));
+    return years;
+  }, []);
 
-    if (!debounced) return source;
-    const q = debounced.toLowerCase();
-    return source.filter((b) => {
-      const inBatch = [b.batch, b.motto, String(b.year)].some(
-        (v) => String(v || "").toLowerCase().includes(q)
+  const members = React.useMemo(() => toFlatMembers(batches), [batches]);
+  const batchOptions = React.useMemo(() => [...new Set(members.map((m) => m.batch).filter(Boolean))].sort(), [members]);
+  const companyOptions = React.useMemo(() => [...new Set(members.map((m) => m.company_name).filter(Boolean))].sort(), [members]);
+  const positionOptions = React.useMemo(() => [...new Set(members.map((m) => m.position_in_club).filter(Boolean))].sort(), [members]);
+  const designationOptions = React.useMemo(() => [...new Set(members.map((m) => m.designation).filter(Boolean))].sort(), [members]);
+
+  React.useEffect(() => {
+    setIsAdmin(isAdminClient());
+  }, []);
+
+  async function refreshPublic() {
+    const res = await fetch(process.env.NEXT_PUBLIC_SERVER_URL + "/alumni/public", { cache: "no-store" });
+    const json = await res.json();
+    if (!json.error) setBatches(json.batches || []);
+  }
+
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = members.filter((m) => {
+      if (batchFilter !== "all" && m.batch !== batchFilter) return false;
+      if (companyFilter !== "all" && m.company_name !== companyFilter) return false;
+      if (positionFilter !== "all" && m.position_in_club !== positionFilter) return false;
+      if (featuredFilter === "featured" && !m.highlight) return false;
+      if (featuredFilter === "non_featured" && m.highlight) return false;
+      if (!q) return true;
+      return (
+        matchText(m.name, q) ||
+        matchText(m.batch, q) ||
+        matchText(m.designation, q) ||
+        matchText(m.company_name, q) ||
+        matchText(m.position_in_club, q) ||
+        matchText(m.cf_handle, q)
       );
-      if (inBatch) return true;
-      return b.members.some((m) => matchesQuery(m, q));
     });
-  }, [batchFilter, debounced, normalizedBatches]);
+    return list.sort((a, b) => {
+      if (sortBy === "batch") return String(a.batch || "").localeCompare(String(b.batch || ""));
+      if (sortBy === "company") return String(a.company_name || "").localeCompare(String(b.company_name || ""));
+      if (sortBy === "position") return String(a.position_in_club || "").localeCompare(String(b.position_in_club || ""));
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [members, query, batchFilter, companyFilter, positionFilter, featuredFilter, sortBy]);
+
+  function resetMemberForm() {
+    setEditingMemberId(null);
+    setMemberForm({
+      batch_id: "",
+      full_name: "",
+      designation: "",
+      company_name: "",
+      image_url: "",
+      position_in_club: "",
+      club_position_year: "",
+      linkedin_url: "",
+      cf_handle: "",
+      highlight: false,
+    });
+  }
+
+  function openEdit(member) {
+    setEditingMemberId(member.id);
+    setMemberForm({
+      batch_id: member.batch_id || "",
+      full_name: member.name || "",
+      designation: member.designation || "",
+      company_name: member.company_name || "",
+      image_url: pickMemberImageUrl(member),
+      position_in_club: member.position_in_club || "",
+      club_position_year: member.club_position_year ? String(member.club_position_year) : "",
+      linkedin_url: member.linkedin_url || "",
+      cf_handle: member.cf_handle || "",
+      highlight: Boolean(member.highlight),
+    });
+    setMemberDialogOpen(true);
+  }
+
+  async function saveBatch() {
+    if (!batchForm.label.trim()) {
+      toast.error("Batch label is required.");
+      return;
+    }
+
+    setLoading(true);
+    const tid = toast.loading("Saving batch...");
+    try {
+      const { createAdminAlumniBatch } = await import("@/actions/alumni");
+      const res = await createAdminAlumniBatch({ label: batchForm.label, is_active: true });
+      if (res?.error) throw new Error(res.error);
+      await refreshPublic();
+      setBatchDialogOpen(false);
+      setBatchForm({ label: "" });
+      toast.success("Batch added", { id: tid });
+    } catch (e) {
+      toast.error(e?.message || "Failed to add batch", { id: tid });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveMember() {
+    if (!memberForm.batch_id || !memberForm.full_name) {
+      toast.error("Name and batch are required.");
+      return;
+    }
+
+    setLoading(true);
+    const tid = toast.loading(editingMemberId ? "Updating alumni..." : "Adding alumni...");
+    try {
+      const { createAdminAlumniMember, updateAdminAlumniMember } = await import("@/actions/alumni");
+      const payload = {
+        batch_id: memberForm.batch_id,
+        full_name: memberForm.full_name,
+        designation: memberForm.designation,
+        company_name: memberForm.company_name,
+        image_url: memberForm.image_url,
+        position_in_club: memberForm.position_in_club,
+        club_position_year: memberForm.club_position_year ? Number(memberForm.club_position_year) : null,
+        linkedin_url: memberForm.linkedin_url,
+        cf_handle: memberForm.cf_handle,
+        highlight: Boolean(memberForm.highlight),
+        is_active: true,
+      };
+
+      const res = editingMemberId
+        ? await updateAdminAlumniMember({ id: editingMemberId, ...payload })
+        : await createAdminAlumniMember(payload);
+
+      if (res?.error) throw new Error(res.error);
+      await refreshPublic();
+      setMemberDialogOpen(false);
+      resetMemberForm();
+      toast.success(editingMemberId ? "Alumni updated" : "Alumni added", { id: tid });
+    } catch (e) {
+      toast.error(e?.message || "Failed to save alumni", { id: tid });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      const idSeed = String(memberForm.full_name || "alumni").trim().replace(/\s+/g, "_").toLowerCase();
+      const { url, error } = await uploadImage("alumni", idSeed, file, "all_picture");
+      if (error || !url) {
+        toast.error("Image upload failed");
+        return;
+      }
+      setMemberForm((p) => ({ ...p, image_url: url }));
+      toast.success("Image uploaded");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  async function handleDeleteClick(member) {
+    if (!member?.id) return;
+    setMemberToDelete(member);
+    setDeleteDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!memberToDelete?.id) return;
+    setLoading(true);
+    const tid = toast.loading("Deleting alumni...");
+    try {
+      const { deleteAdminAlumniMember } = await import("@/actions/alumni");
+      const res = await deleteAdminAlumniMember({ id: memberToDelete.id });
+      if (res?.error) throw new Error(res.error);
+      await refreshPublic();
+      toast.success("Alumni deleted", { id: tid });
+      setDeleteDialogOpen(false);
+      setMemberToDelete(null);
+    } catch (e) {
+      toast.error(e?.message || "Failed to delete alumni", { id: tid });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div className="relative w-full flex flex-col items-center pb-32">
-      <section className="alumni-hero relative w-full overflow-hidden pt-28 pb-16 flex flex-col items-center text-center">
-        <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_center,black,transparent_75%)]" />
-        <div className="relative flex flex-col items-center gap-6 px-4 max-w-4xl">
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.3em] font-medium text-muted-foreground">
-            <span className="inline-flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-[hsl(var(--alumni-gold))]" />{" "}
-              Honor Roll
-            </span>
-            <span className="h-px w-8 bg-gradient-to-r from-transparent via-border to-transparent" />
-            <span>Legacy</span>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-            <span className="alumni-name">Our Distinguished Alumni</span>
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed">
-            A tribute to the minds who built, guided & elevated this community.
-            Their journeys continue to inspire every new cohort of builders &
-            problem solvers.
-          </p>
-          <div className="w-full max-w-md mx-auto relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, role, position, batch, motto..."
-              className="w-full pl-9 pr-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
-            />
-          </div>
-          <div className="w-full max-w-md mx-auto">
-            <select
-              value={batchFilter}
-              onChange={(e) => setBatchFilter(e.target.value)}
-              className="w-full px-3 py-2 rounded-md border border-border/60 bg-background/60 text-sm focus:outline-none focus:ring-1 focus:ring-[hsl(var(--alumni-gold))]"
-            >
-              <option value="all">All batches</option>
-              {batchOptions.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {loadError && (
-            <div className="text-xs text-red-500">
-              Failed to load alumni ({loadError})
-            </div>
-          )}
-        </div>
-        <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-[110%] h-48 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-      </section>
-      <section className="relative w-full max-w-7xl px-4 mt-10">
-        <div className="grid gap-16">
-          {visible.map((b) => (
-            <BatchBlock key={b.id || b.batch} batch={b} query={debounced} />
-          ))}
-          {visible.length === 0 && (
-            <div className="text-center text-sm text-muted-foreground py-20">
-              No matches
-            </div>
-          )}
-        </div>
-      </section>
-      <section className="relative mt-28 w-full max-w-5xl px-4">
-        <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-[hsl(var(--alumni-royal-fade)/0.8)] via-background to-background p-10 flex flex-col md:flex-row items-center gap-8">
-          <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_70%_30%,black,transparent_70%)]">
-            <div className="absolute right-10 top-10 w-56 h-56 rounded-full bg-[hsl(var(--alumni-gold)/0.12)] blur-2xl" />
-          </div>
-          <div className="relative flex-1 space-y-4">
-            <h3 className="text-2xl md:text-3xl font-bold leading-tight">
-              Inspiring the Next Generation
-            </h3>
-            <p className="text-sm md:text-base text-muted-foreground max-w-lg">
-              Have a story or update to share? Help us keep the legacy timeline
-              alive & motivate future innovators.
+    <div className="w-full max-w-7xl mx-auto px-4 py-8">
+      <datalist id="club-year-options">
+        {yearOptions.map((year) => <option key={year} value={year} />)}
+      </datalist>
+      <datalist id="companies-list">
+        {companyOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+      <datalist id="designations-list">
+        {designationOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+      <datalist id="positions-list">
+        {positionOptions.map((o) => <option key={o} value={o} />)}
+      </datalist>
+
+      <header className="mb-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-2xl font-semibold tracking-tight">Alumni Directory</h1>
+            <p className="mt-2 text-sm md:text-base text-muted-foreground">
+              Alumni cards with batch, role, position year, and social links.
             </p>
-            <button className="px-5 py-2 rounded-md text-sm font-medium bg-[hsl(var(--alumni-gold))] text-black hover:brightness-110 transition">
-              Contact us
-            </button>
           </div>
-          <div className="relative">
-            <MccLogo w={160} h={160} />
-          </div>
+
+          {isAdmin && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Plus className="h-4 w-4" /> Add Batch
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add Alumni Batch</DialogTitle>
+                      <DialogDescription>Provide a label for the batch.</DialogDescription>
+                  </DialogHeader>
+                    <div className="space-y-3">
+                    <div>
+                      <Label>Label</Label>
+                      <Input value={batchForm.label} onChange={(e) => setBatchForm((p) => ({ ...p, label: e.target.value }))} placeholder="CSE" />
+                    </div>
+                    <Button onClick={saveBatch} disabled={loading}>Save Batch</Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog
+                open={memberDialogOpen}
+                onOpenChange={(open) => {
+                  setMemberDialogOpen(open);
+                  if (!open) resetMemberForm();
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" /> Add Alumni
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingMemberId ? "Edit Alumni" : "Add Alumni"}</DialogTitle>
+                    <DialogDescription>Fill requested alumni information.</DialogDescription>
+                  </DialogHeader>
+
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Name</Label>
+                      <Input value={memberForm.full_name} onChange={(e) => setMemberForm((p) => ({ ...p, full_name: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Batch</Label>
+                      <Select
+                        value={memberForm.batch_id}
+                        onValueChange={(val) => setMemberForm((p) => ({ ...p, batch_id: val }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select batch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(batches || []).map((b) => (
+                            <SelectItem key={b.id} value={b.id}>
+                              {b.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Current Position (e.g. SWE)</Label>
+                      <Input 
+                        value={memberForm.designation} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, designation: e.target.value }))}
+                        list="designations-list"
+                        placeholder="Software Engineer"
+                      />
+                    </div>
+                    <div>
+                      <Label>Company (e.g. Google)</Label>
+                      <Input 
+                        value={memberForm.company_name} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, company_name: e.target.value }))}
+                        list="companies-list"
+                        placeholder="Google"
+                      />
+                    </div>
+                    <div>
+                      <Label>Upload Image</Label>
+                      <Input type="file" accept="image/*" onChange={handleImageUpload} disabled={uploadingImage || loading} />
+                    </div>
+                    <div>
+                      <Label>Club Position</Label>
+                      <Input 
+                        value={memberForm.position_in_club} 
+                        onChange={(e) => setMemberForm((p) => ({ ...p, position_in_club: e.target.value }))} 
+                        list="positions-list"
+                        placeholder="President" 
+                      />
+                    </div>
+                    <div>
+                      <Label>Club Position Year</Label>
+                      <Input
+                        value={memberForm.club_position_year}
+                        onChange={(e) => setMemberForm((p) => ({ ...p, club_position_year: e.target.value }))}
+                        placeholder="2023"
+                        list="club-year-options"
+                      />
+                    </div>
+                    <div>
+                      <Label>LinkedIn URL</Label>
+                      <Input value={memberForm.linkedin_url} onChange={(e) => setMemberForm((p) => ({ ...p, linkedin_url: e.target.value }))} />
+                    </div>
+                    <div>
+                      <Label>Codeforces Handle</Label>
+                      <Input value={memberForm.cf_handle} onChange={(e) => setMemberForm((p) => ({ ...p, cf_handle: e.target.value }))} />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm mt-6">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(memberForm.highlight)}
+                        onChange={(e) => setMemberForm((p) => ({ ...p, highlight: e.target.checked }))}
+                      />
+                      Show on landing page
+                    </label>
+                  </div>
+
+                  <Button onClick={saveMember} disabled={loading || uploadingImage}>
+                    {editingMemberId ? "Update Alumni" : "Add Alumni"}
+                  </Button>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
         </div>
+      </header>
+
+      <section className="mb-6">
+        {/* Main filter bar - compact single row */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              value={query} 
+              onChange={(e) => setQuery(e.target.value)} 
+              placeholder="Search alumni..." 
+              className="pl-9 h-9 bg-background/50" 
+            />
+            {query && (
+              <button 
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter toggle button */}
+          <Button
+            variant={filtersExpanded || activeFilterCount > 0 ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className="h-9 gap-1.5"
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Filters</span>
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`} />
+          </Button>
+
+          {/* Sort dropdown - always visible */}
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="h-9 w-auto min-w-[120px] bg-background/50">
+              <span className="text-muted-foreground text-xs mr-1">Sort:</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="batch">Batch</SelectItem>
+              <SelectItem value="company">Company</SelectItem>
+              <SelectItem value="position">Position</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Results count */}
+          <span className="text-xs text-muted-foreground ml-auto">
+            {filtered.length} {filtered.length === 1 ? 'alumni' : 'alumni'}
+          </span>
+        </div>
+
+        {/* Expandable filter panel */}
+        {filtersExpanded && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-border/50">
+            <FilterSelect value={batchFilter} onChange={setBatchFilter} options={batchOptions} label="Batch" />
+            <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companyOptions} label="Company" />
+            <FilterSelect value={positionFilter} onChange={setPositionFilter} options={positionOptions} label="Position" />
+            <FilterSelect
+              value={featuredFilter}
+              onChange={setFeaturedFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "featured", label: "Featured" },
+                { value: "non_featured", label: "Not Featured" },
+              ]}
+              label="Featured"
+            />
+            
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setBatchFilter("all");
+                  setCompanyFilter("all");
+                  setPositionFilter("all");
+                  setFeaturedFilter("all");
+                }}
+                className="h-8 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Active filter pills - show when filters are active but panel is collapsed */}
+        {!filtersExpanded && activeFilterCount > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {batchFilter !== "all" && (
+              <FilterPill label="Batch" value={batchFilter} onClear={() => setBatchFilter("all")} />
+            )}
+            {companyFilter !== "all" && (
+              <FilterPill label="Company" value={companyFilter} onClear={() => setCompanyFilter("all")} />
+            )}
+            {positionFilter !== "all" && (
+              <FilterPill label="Position" value={positionFilter} onClear={() => setPositionFilter("all")} />
+            )}
+            {featuredFilter !== "all" && (
+              <FilterPill
+                label="Featured"
+                value={featuredFilter === "featured" ? "Featured" : "Not Featured"}
+                onClear={() => setFeaturedFilter("all")}
+              />
+            )}
+          </div>
+        )}
       </section>
+
+      {loadError && <p className="text-sm text-red-500 mb-4">Failed to load alumni: {loadError}</p>}
+
+      <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((m, index) => (
+          <AlumniMemberCard key={m.id} member={m} canEdit={isAdmin} onEdit={openEdit} onDelete={handleDeleteClick} index={index} />
+        ))}
+      </section>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Alumni</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{memberToDelete?.name}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={loading}>
+              {loading ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {filtered.length === 0 && (
+        <div className="text-center text-sm text-muted-foreground py-16">No alumni found.</div>
+      )}
     </div>
+  );
+}
+
+function FilterSelect({ value, onChange, options, label }) {
+  const normalizedOptions = React.useMemo(
+    () => options.map((option) => (typeof option === "string" ? { value: option, label: option } : option)),
+    [options]
+  );
+  const optionsWithAll = React.useMemo(() => {
+    if (normalizedOptions.some((option) => option.value === "all")) return normalizedOptions;
+    return [{ value: "all", label: "All" }, ...normalizedOptions];
+  }, [normalizedOptions]);
+  const isActive = value !== "all";
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={`h-8 w-auto min-w-[100px] text-xs ${isActive ? 'border-primary/50 bg-primary/5' : 'bg-background/50'}`}>
+        <span className="text-muted-foreground mr-1">{label}:</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {optionsWithAll.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function FilterPill({ label, value, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+      <span className="text-primary/70">{label}:</span>
+      <span className="max-w-[100px] truncate">{value}</span>
+      <button onClick={onClear} className="ml-0.5 hover:text-primary/80">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
   );
 }

@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 
 function ReportTable({ merged, lastUpdated }) {
@@ -106,12 +106,41 @@ function ReportTable({ merged, lastUpdated }) {
 
   const totalUsers = users.length;
   const [validVjudgeIds, setValidVjudgeIds] = useState(null);
+  const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({});
+  const [isProfilesLoading, setIsProfilesLoading] = useState(false);
+  const profileCacheRef = useRef(new Map());
+  const serverBase = useMemo(() => {
+    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+    return base ? String(base).replace(/\/+$/, "") : "";
+  }, []);
+
+  const resolveAvatarUrl = (rawUrl) => {
+    if (typeof rawUrl !== "string") return null;
+    const value = rawUrl.trim();
+    if (!value || value === "null" || value === "undefined") return null;
+
+    if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) {
+      return value;
+    }
+
+    if (value.startsWith("//")) {
+      return `https:${value}`;
+    }
+
+    if (!serverBase) return value;
+
+    if (value.startsWith("/")) {
+      return `${serverBase}${value}`;
+    }
+
+    return `${serverBase}/${value.replace(/^\/+/, "")}`;
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
         const base =
           process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
-        console.log(base);
         const res = await fetch(`${base}/auth/public/vjudge-ids`, {
           cache: "no-store",
         });
@@ -123,6 +152,100 @@ function ReportTable({ merged, lastUpdated }) {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const loadProfiles = async () => {
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+        const ids = Array.from(
+          new Set(
+            users
+              .map((u) => String(u?.username || "").trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (!base || ids.length === 0) {
+          if (!cancelled) {
+            setPublicProfilesByVjudge({});
+            setIsProfilesLoading(false);
+          }
+          return;
+        }
+
+        const nextMap = {};
+        const idsToFetch = [];
+
+        ids.forEach((id) => {
+          const key = id.toLowerCase();
+          if (profileCacheRef.current.has(key)) {
+            nextMap[key] = profileCacheRef.current.get(key);
+          } else {
+            idsToFetch.push(id);
+          }
+        });
+
+        if (!cancelled) {
+          // Keep only the current table users to avoid stale profile data leaks.
+          setPublicProfilesByVjudge(nextMap);
+        }
+
+        if (idsToFetch.length === 0) {
+          if (!cancelled) setIsProfilesLoading(false);
+          return;
+        }
+
+        if (!cancelled) setIsProfilesLoading(true);
+
+        const profileRequests = idsToFetch.map(async (vjudgeId) => {
+          const key = vjudgeId.toLowerCase();
+          try {
+            const res = await fetch(
+              `${base}/auth/public/profile/vj/${encodeURIComponent(vjudgeId)}`,
+              { cache: "no-store", signal: controller.signal }
+            );
+            if (!res.ok) return [key, null];
+            const json = await res.json();
+            return [key, json?.result || null];
+          } catch {
+            return [key, null];
+          }
+        });
+
+        const results = await Promise.all(profileRequests);
+        if (cancelled) return;
+
+        results.forEach((entry) => {
+          if (!entry) return;
+          const [id, profile] = entry;
+          profileCacheRef.current.set(id, profile);
+          nextMap[id] = profile;
+        });
+
+        setPublicProfilesByVjudge(nextMap);
+        setIsProfilesLoading(false);
+      } catch (e) {
+        if (controller.signal.aborted) return;
+        console.error("Failed to load public profiles by vjudge id", e);
+        if (!cancelled) {
+          setPublicProfilesByVjudge({});
+          setIsProfilesLoading(false);
+        }
+      }
+    };
+
+    loadProfiles();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [users]);
+
   const getNameColor = (rank) => {
     if (rank <= 3) {
       // Gold gradient: brightest for 1
@@ -310,9 +433,6 @@ function ReportTable({ merged, lastUpdated }) {
                   Name
                 </TableHead>
                 <TableHead className="text-[hsl(var(--foreground))]">
-                  Username
-                </TableHead>
-                <TableHead className="text-[hsl(var(--foreground))]">
                   Contests
                 </TableHead>
                 <TableHead className="text-[hsl(var(--foreground))]">
@@ -346,6 +466,45 @@ function ReportTable({ merged, lastUpdated }) {
             <TableBody>
               {users.map((u, index) => {
                 const isTop = index === 0;
+                const profileKey = String(u.username || "").toLowerCase();
+                const hasResolvedLookup = Object.prototype.hasOwnProperty.call(
+                  publicProfilesByVjudge,
+                  profileKey
+                );
+                const profile = hasResolvedLookup
+                  ? publicProfilesByVjudge[profileKey]
+                  : null;
+                const hasDbProfile = !!profile;
+                const shouldUseFallback = hasResolvedLookup && !hasDbProfile;
+                const isResolving = isProfilesLoading && !hasResolvedLookup;
+                const dbAvatar = hasDbProfile
+                  ? resolveAvatarUrl(profile.profile_pic)
+                  : null;
+                const fallbackAvatar = resolveAvatarUrl(u.avatarUrl);
+
+                // Always prioritize DB profile image/name when available.
+                const resolvedAvatar = hasDbProfile
+                  ? dbAvatar || "/vercel.svg"
+                  : shouldUseFallback
+                  ? fallbackAvatar || "/vercel.svg"
+                  : "/vercel.svg";
+                const resolvedName = hasDbProfile
+                  ? profile.full_name || u.realName || u.username
+                  : shouldUseFallback
+                  ? u.realName || "—"
+                  : "Loading...";
+                const resolvedBatch = hasDbProfile
+                  ? profile.batch_name || null
+                  : null;
+                const resolvedVjudgeId = hasDbProfile
+                  ? profile.vjudge_id || u.username
+                  : u.username;
+                const resolvedMistId = hasDbProfile
+                  ? profile.mist_id || null
+                  : u.mist_id || u.mistId || null;
+                const resolvedCfId = hasDbProfile
+                  ? profile.cf_id || null
+                  : u.cf_id || u.cfId || null;
                 return (
                   <TableRow
                     key={u.username}
@@ -457,64 +616,92 @@ function ReportTable({ merged, lastUpdated }) {
                       <div className="flex items-center gap-2">
                         <div
                           className={cn(
-                            "relative w-8 h-8 flex-shrink-0",
-                            isTop && "rounded-full"
+                            "relative w-16 h-16 flex items-center justify-center flex-shrink-0",
+                            isTop && "rounded-md"
                           )}
                         >
                           <Image
-                            src={u.avatarUrl || "/vercel.svg"}
-                            alt={u.realName || u.username}
-                            width={32}
-                            height={32}
+                            src={resolvedAvatar}
+                            alt={resolvedName || u.username}
+                            width={48}
+                            height={48}
+                            unoptimized
                             className={cn(
-                              "rounded-full object-cover w-8 h-8",
+                              "rounded-md object-cover w-12 h-12 transition-all duration-200",
                               isTop &&
                                 "ring-2 ring-[hsl(var(--alumni-gold))]/70 shadow-md"
                             )}
                             quality={20}
                           />
                         </div>
-                        <span
-                          className={cn("font-bold", isTop && "top-rank-name")}
-                          style={
-                            !isTop
-                              ? { color: getNameColor(index + 1) }
-                              : undefined
-                          }
-                        >
-                          {u.realName || "—"}
-                        </span>
+                        <div className="min-w-0">
+                          <p
+                            className={cn(
+                              "font-bold truncate",
+                              isTop && "top-rank-name"
+                            )}
+                            style={
+                              !isTop
+                                ? { color: getNameColor(index + 1) }
+                                : undefined
+                            }
+                          >
+                            {resolvedName}
+                          </p>
+                          <p className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                            {isResolving
+                              ? "Loading profile..."
+                              : resolvedBatch
+                              ? `${resolvedBatch} [${resolvedMistId || resolvedVjudgeId}]`
+                              : resolvedMistId || resolvedVjudgeId}
+                          </p>
+                          {!isResolving && (
+                            <div className="mt-1 flex items-center gap-2">
+                              {resolvedVjudgeId ? (
+                                <Link
+                                  href={`https://vjudge.net/user/${encodeURIComponent(
+                                    resolvedVjudgeId
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center"
+                                  title={`VJudge: ${resolvedVjudgeId}`}
+                                >
+                                  <Image
+                                    src="/vj.jpg"
+                                    alt="VJudge"
+                                    width={16}
+                                    height={16}
+                                    className="h-4 w-4 rounded-sm object-cover"
+                                  />
+                                </Link>
+                              ) : null}
+
+                              {resolvedCfId ? (
+                                <Link
+                                  href={`https://codeforces.com/profile/${encodeURIComponent(
+                                    resolvedCfId
+                                  )}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center"
+                                  title={`Codeforces: ${resolvedCfId}`}
+                                >
+                                  <Image
+                                    src="/cf.png"
+                                    alt="Codeforces"
+                                    width={16}
+                                    height={16}
+                                    className="h-4 w-4 rounded-sm object-cover"
+                                  />
+                                </Link>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     {/* Username */}
-                    <TableCell
-                      className={cn("font-bold", isTop && "top-rank-name")}
-                    >
-                      {validVjudgeIds?.has(String(u.username)) ? (
-                        <Link
-                          href={`/profile/${encodeURIComponent(u.username)}`}
-                          className="underline-offset-2 hover:underline transition-all duration-200"
-                          style={
-                            !isTop
-                              ? { color: getNameColor(index + 1) }
-                              : undefined
-                          }
-                        >
-                          {u.username}
-                        </Link>
-                      ) : (
-                        <span
-                          className="transition-all duration-200"
-                          style={
-                            !isTop
-                              ? { color: getNameColor(index + 1) }
-                              : undefined
-                          }
-                        >
-                          {u.username}
-                        </span>
-                      )}
-                    </TableCell>
                     {/* Contests Attended */}
                     <TableCell className="text-center">
                       <Badge

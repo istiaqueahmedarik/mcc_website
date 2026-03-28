@@ -22,7 +22,8 @@ const MccLogo = ({ w, h, classes }) => {
         src={resolvedTheme === 'light' ? '/mccLogoBlack.png' : '/mccLogo.png'}
         width={w}
         height={h}
-        className={classes}
+        className={cn(classes)}
+        style={{ width: 'auto', height: 'auto' }}
         alt="MCC Logo"
       />
     </div>

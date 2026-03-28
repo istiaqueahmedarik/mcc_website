@@ -59,7 +59,7 @@ export async function publicFinalizedTeamsLeaderboard(){
   return await get_with_token('team-collection/public/finalized/teams')
 }
 export async function publicFinalizedTeamsByContest(){
-  return await get('team-collection/public/finalized/teams/by-contest')
+  return await get_with_token('team-collection/public/finalized/teams/by-contest')
 }
 
 // Admin

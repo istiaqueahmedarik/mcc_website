@@ -1,51 +1,36 @@
 import { listActiveParticipationCollections } from "@/actions/team_collection";
+import EditableIdForm from "@/components/EditableIdForm";
 import { ParticipationToggle } from "@/components/ParticipationToggle";
+import ProfileSidebarEditor from "@/components/ProfileSidebarEditor";
 import ProgressLink from "@/components/ProgressLink";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import CoachedTeamsSection from "@/components/profile/CoachedTeamsSection";
+import AnimatedTooltip from "@/components/ui/AnimatedTooltip";
 import { get_with_token, logout, post_with_token } from "@/lib/action";
 import { createClient } from "@/utils/supabase/server";
+
 import {
   Award,
-  Calendar,
   CheckCircle2,
-  Edit3,
   ExternalLink,
-  LogOut,
-  Mail,
-  Phone,
-  Shield,
   Users,
   XCircle,
-  ZoomIn,
 } from "lucide-react";
+import { unstable_noStore as noStore } from "next/cache";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export default async function page({ searchParams }) {
   // Removed Codeforces OAuth code parameter handling
+  noStore();
 
-  const res = await get_with_token("auth/user/profile");
+  const res = await get_with_token(`auth/user/profile?t=${Date.now()}`);
   const user = res.result[0];
   const myTeamsRes = await get_with_token("team-collection/my-teams");
   const myTeams = myTeamsRes?.result || [];
   const coachedTeamsRes = user?.vjudge_id
     ? await post_with_token("team-collection/public/teams/coached-by-vjudge", {
-        vjudge_id: user.vjudge_id,
-      })
+      vjudge_id: user.vjudge_id,
+    })
     : { result: [] };
   const coachedTeams = coachedTeamsRes?.result || [];
   const participationCollectionsRes =
@@ -58,362 +43,47 @@ export default async function page({ searchParams }) {
       style={{ background: "hsl(var(--profile-bg))" }}
     >
       <div className="max-w-[1400px] mx-auto py-8 px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-6">
           {/* Left Sidebar - Profile Summary */}
-          <aside
-            className="space-y-4 profile-sidebar-sticky"
-            aria-label="Profile Summary"
-          >
-            <div className="profile-card">
-              {/* Avatar */}
-              <div className="flex justify-center mb-5">
-                <div className="relative group">
-                  <Avatar
-                    className="h-32 w-32 rounded-2xl border-2 transition-all duration-300 hover:scale-105"
-                    style={{ borderColor: "hsl(var(--profile-primary))" }}
-                  >
-                    <AvatarImage
-                      src={user.profile_pic}
-                      alt={user.full_name || "User"}
-                      className="object-cover"
-                    />
-                    <AvatarFallback
-                      className="text-4xl"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, hsl(var(--profile-primary)), hsl(var(--profile-success)))",
-                        color: "white",
-                      }}
-                    >
-                      {user.full_name ? user.full_name.charAt(0) : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-              </div>
-
-              {/* Name and Badges */}
-              <div className="text-center mb-5">
-                <h1
-                  className="text-2xl font-bold mb-2 transition-colors duration-200"
-                  style={{ color: "hsl(var(--profile-text))" }}
-                >
-                  {user.full_name || "Anonymous User"}
-                </h1>
-                <div className="flex flex-wrap justify-center gap-2 mb-4">
-                  {user.admin && (
-                    <span
-                      className="profile-badge transition-all duration-200 hover:scale-105"
-                      style={{
-                        background: "hsl(var(--profile-primary))",
-                        color: "white",
-                      }}
-                    >
-                      <Shield className="h-3.5 w-3.5" />
-                      Admin
-                    </span>
-                  )}
-                  {user.granted && (
-                    <span className="profile-badge profile-badge-success transition-all duration-200 hover:scale-105">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Verified
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Contact Info Chips */}
-              <div className="space-y-2 mb-5">
-                <a
-                  href={`mailto:${user.email}`}
-                  className="profile-info-chip w-full profile-focus-ring transition-all duration-200 hover:translate-x-1"
-                  title={user.email}
-                >
-                  <Mail className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate text-sm">{user.email}</span>
-                </a>
-                {user.phone && (
-                  <a
-                    href={`tel:${user.phone}`}
-                    className="profile-info-chip w-full profile-focus-ring transition-all duration-200 hover:translate-x-1"
-                    title={user.phone}
-                  >
-                    <Phone className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate text-sm">{user.phone}</span>
-                  </a>
-                )}
-                <div className="profile-info-chip w-full transition-all duration-200">
-                  <Calendar className="h-4 w-4 flex-shrink-0" />
-                  <span className="text-sm">
-                    Joined{" "}
-                    {new Date(user.created_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Profile Picture Upload */}
-              <form action={updateProfilePic} className="mb-4">
-                <Label
-                  htmlFor="profile-pic"
-                  className="text-sm font-medium mb-2 block"
-                  style={{ color: "hsl(var(--profile-text-secondary))" }}
-                >
-                  Update Profile Picture
-                </Label>
-                <Input
-                  id="profile-pic"
-                  type="file"
-                  name="image"
-                  accept="image/*"
-                  className="w-full text-sm mb-2 profile-focus-ring"
-                  style={{ borderRadius: "var(--profile-radius-sm)" }}
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    background: "hsl(var(--profile-primary))",
-                    color: "white",
-                    borderRadius: "var(--profile-radius-sm)",
-                  }}
-                >
-                  Upload Photo
-                </Button>
-              </form>
-
-              {/* Logout Button */}
-              <form action={logout}>
-                <Button
-                  variant="outline"
-                  className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    borderRadius: "var(--profile-radius-sm)",
-                    color: "hsl(var(--profile-danger))",
-                    borderColor: "hsl(var(--profile-danger) / 0.3)",
-                  }}
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </Button>
-              </form>
-            </div>
-
-            {/* T-shirt Size */}
-            <div className="profile-card">
-              <div className="flex items-center justify-between mb-3">
-                <Label
-                  className="text-sm font-semibold"
-                  style={{ color: "hsl(var(--profile-text))" }}
-                >
-                  T-shirt Size
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-xs profile-focus-ring"
-                      style={{ borderRadius: "var(--profile-radius-sm)" }}
-                    >
-                      ?
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-72 text-xs">
-                    <p className="mb-2 font-medium">Unisex sizes</p>
-                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                      <li>XS: 34-36in | S: 36-38in</li>
-                      <li>M: 38-40in | L: 40-42in</li>
-                      <li>XL: 42-44in | XXL: 44-46in</li>
-                      <li>3XL: 46-48in | 4XL: 48-50in</li>
-                    </ul>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <form action={saveTshirtSize} className="space-y-2">
-                <select
-                  name="tshirt_size"
-                  defaultValue={user.tshirt_size || ""}
-                  className="flex h-9 w-full items-center justify-between px-3 py-2 text-sm profile-focus-ring"
-                  style={{
-                    borderRadius: "var(--profile-radius-sm)",
-                    border: "1px solid rgba(var(--profile-border))",
-                    background: "hsl(var(--profile-surface-2))",
-                    color: "hsl(var(--profile-text))",
-                  }}
-                >
-                  <option value="" disabled>
-                    Select size
-                  </option>
-                  <option value="XS">XS</option>
-                  <option value="S">S</option>
-                  <option value="M">M</option>
-                  <option value="L">L</option>
-                  <option value="XL">XL</option>
-                  <option value="XXL">XXL</option>
-                  <option value="3XL">3XL</option>
-                  <option value="4XL">4XL</option>
-                </select>
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="w-full profile-focus-ring transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                  style={{
-                    background: "hsl(var(--profile-primary))",
-                    color: "white",
-                    borderRadius: "var(--profile-radius-sm)",
-                  }}
-                >
-                  Save
-                </Button>
-              </form>
-              {user.tshirt_size && (
-                <p
-                  className="mt-2 text-xs text-center"
-                  style={{ color: "hsl(var(--profile-text-muted))" }}
-                >
-                  Current: {user.tshirt_size}
-                </p>
-              )}
-            </div>
-
-            {/* MIST ID */}
-            <div className="profile-card">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3
-                    className="text-sm font-semibold"
-                    style={{ color: "hsl(var(--profile-text-secondary))" }}
-                  >
-                    MIST ID
-                  </h3>
-                  <p
-                    className="text-sm font-mono"
-                    style={{ color: "hsl(var(--profile-text))" }}
-                  >
-                    {user.mist_id || "No MIST ID saved yet"}
-                  </p>
-                </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="profile-focus-ring flex items-center gap-2"
-                      style={{ borderRadius: "var(--profile-radius-sm)" }}
-                    >
-                      <Edit3 className="h-4 w-4" />
-                      Edit
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
-                    <DialogTitle className="text-lg font-medium mb-3">
-                      Update MIST ID
-                    </DialogTitle>
-                    <form action={saveMistId} className="space-y-3">
-                      <Label
-                        htmlFor="mist-id-input"
-                        className="text-xs font-semibold"
-                        style={{ color: "hsl(var(--profile-text-secondary))" }}
-                      >
-                        Student ID
-                      </Label>
-                      <Input
-                        id="mist-id-input"
-                        name="mist_id"
-                        type="text"
-                        defaultValue={user.mist_id ?? ""}
-                        placeholder="Enter your MIST student ID"
-                        className="text-sm w-full profile-focus-ring"
-                        style={{
-                          borderRadius: "var(--profile-radius-sm)",
-                          background: "hsl(var(--profile-surface-2))",
-                          color: "hsl(var(--profile-text))",
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Saving will update the ID stored on your profile.
-                      </p>
-                      <Button
-                        type="submit"
-                        size="sm"
-                        className="w-full profile-focus-ring"
-                        style={{
-                          background: "hsl(var(--profile-primary))",
-                          color: "white",
-                          borderRadius: "var(--profile-radius-sm)",
-                        }}
-                      >
-                        Save MIST ID
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-
-            {/* MIST ID Card - Collapsible */}
-            {user.mist_id_card && (
-              <div className="profile-card">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full profile-focus-ring"
-                      style={{ borderRadius: "var(--profile-radius-sm)" }}
-                    >
-                      <ZoomIn className="h-4 w-4 mr-2" />
-                      View MIST ID Card
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-xl">
-                    <DialogTitle className="text-lg font-medium">
-                      MIST ID Card
-                    </DialogTitle>
-                    <Image
-                      src={user.mist_id_card || "/placeholder.svg"}
-                      alt="MIST ID Card"
-                      className="w-full h-auto rounded-md"
-                      width={600}
-                      height={400}
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            )}
+          <aside className="profile-sidebar-sticky" aria-label="Profile Summary">
+            <ProfileSidebarEditor
+              user={user}
+              saveAction={saveSidebarProfile}
+              logoutAction={logout}
+            />
           </aside>
 
           {/* Right Column - Main Content */}
           <main className="space-y-6">
             {/* Contest Participation */}
-            <section
-              className="profile-card"
-              aria-labelledby="participation-title"
-            >
-              <h2
-                id="participation-title"
-                className="flex items-center gap-2 text-xl font-bold mb-5"
-                style={{ color: "hsl(var(--profile-text))" }}
+            {participationCollections.length > 0 && (
+              <section
+                className="profile-card"
+                aria-labelledby="participation-title"
               >
-                <Award className="h-5 w-5" />
-                Contest Participation
-              </h2>
-              <div className="space-y-4">
-                {participationCollections.length === 0 && (
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "hsl(var(--profile-text-muted))" }}
-                  >
-                    No active participation windows.
-                  </p>
-                )}
-                {participationCollections.map((col) => (
-                  <ParticipationToggle key={col.id} col={col} />
-                ))}
-              </div>
-            </section>
+                <h2
+                  id="participation-title"
+                  className="flex items-center p-2 text-xl font-bold"
+                  style={{ color: "hsl(var(--profile-text))" }}
+                >
+                  <Award className="h-5 w-5" />
+                  Contest Participation
+                </h2>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {participationCollections.length === 0 && (
+                    <p
+                      className="text-sm font-medium"
+                      style={{ color: "hsl(var(--profile-text-muted))" }}
+                    >
+                      No active participation windows.
+                    </p>
+                  )}
+                  {participationCollections.map((col) => (
+                    <ParticipationToggle key={col.id} col={col} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* Competitive Programming Profiles */}
             <section
@@ -431,10 +101,14 @@ export default async function page({ searchParams }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {user.cf_id && (
                   <div className="flex items-start gap-4 group">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-red-600 dark:text-red-400">
-                        CF
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden">
+                      <Image
+                        src="/cf.png"
+                        alt="Codeforces"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -462,7 +136,15 @@ export default async function page({ searchParams }) {
                         )}
                       </div>
                       <div className="mt-3">
-                        <CodeforcesSetIdForm current={user.cf_id} />
+                        <EditableIdForm
+                          action={saveCodeforces}
+                          fieldName="cf_id"
+                          inputId="cf_id"
+                          current={user.cf_id}
+                          placeholder={user.cf_id ? "CF Handle" : "Enter CF handle"}
+                          saveVariant={user.cf_id ? "outline" : "default"}
+                          saveLabel={user.cf_id ? "Save" : "Add"}
+                        />
                         <p className="mt-1 text-xs text-muted-foreground">
                           Changing your handle will reset verification.
                         </p>
@@ -472,10 +154,14 @@ export default async function page({ searchParams }) {
                 )}
                 {!user.cf_id && (
                   <div className="flex items-start gap-4 group">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-red-600 dark:text-red-400">
-                        CF
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/cf.png"
+                        alt="Codeforces"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -484,7 +170,15 @@ export default async function page({ searchParams }) {
                       <p className="text-sm text-muted-foreground font-medium">
                         No handle saved
                       </p>
-                      <CodeforcesSetIdForm current={user.cf_id} />
+                      <EditableIdForm
+                        action={saveCodeforces}
+                        fieldName="cf_id"
+                        inputId="cf_id_new"
+                        current={user.cf_id}
+                        placeholder="Enter CF handle"
+                        saveVariant="default"
+                        saveLabel="Add"
+                      />
                     </div>
                   </div>
                 )}
@@ -539,10 +233,14 @@ export default async function page({ searchParams }) {
 
                 {user.vjudge_id && (
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 dark:from-purple-900/30 dark:to-fuchsia-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
-                        VJ
-                      </span>
+                    <div className="relative h-10 w-10 rounded-sm overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/vj.jpg"
+                        alt="VJudge"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -571,44 +269,34 @@ export default async function page({ searchParams }) {
                         )}
                       </div>
                       <div className="mt-3">
-                        <form
+                        <EditableIdForm
                           action={saveVjudge}
-                          className="flex items-center gap-2"
-                        >
-                          <Label htmlFor="vjudge_id" className="text-sm">
-                            Change ID:
-                          </Label>
-                          <Input
-                            id="vjudge_id"
-                            name="vjudge_id"
-                            defaultValue={user.vjudge_id}
-                            placeholder="Enter VJudge ID"
-                            className="max-w-xs rounded-xl"
-                          />
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant="outline"
-                            className="rounded-full px-5"
-                          >
-                            Save
-                          </Button>
-                        </form>
-                        {!user.vjudge_verified && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Saving will reset verification.
-                          </p>
-                        )}
+                          fieldName="vjudge_id"
+                          inputId="vjudge_id"
+                          current={user.vjudge_id}
+                          placeholder="Enter VJudge ID"
+                          saveVariant="outline"
+                          saveLabel="Save"
+                          inputClassName="max-w-xs rounded-xl"
+                          saveClassName="rounded-full px-5"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Changing your handle will reset verification.
+                        </p>
                       </div>
                     </div>
                   </div>
                 )}
                 {!user.vjudge_id && (
                   <div className="flex items-start gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-purple-100 to-fuchsia-100 dark:from-purple-900/30 dark:to-fuchsia-900/20 flex items-center justify-center ring-1 ring-black/5 dark:ring-white/10 shadow-inner">
-                      <span className="font-bold text-purple-600 dark:text-purple-400">
-                        VJ
-                      </span>
+                    <div className="relative h-12 w-12 rounded-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-inner bg-white">
+                      <Image
+                        src="/vj.jpg"
+                        alt="VJudge"
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
                     </div>
                     <div>
                       <h3 className="font-medium tracking-tight text-base">
@@ -617,27 +305,19 @@ export default async function page({ searchParams }) {
                       <p className="text-sm text-muted-foreground font-medium">
                         No VJudge ID saved
                       </p>
-                      <form
+                      <EditableIdForm
                         action={saveVjudge}
-                        className="mt-2 flex items-center gap-2"
-                      >
-                        <Label htmlFor="vjudge_id_new" className="text-sm">
-                          Add ID:
-                        </Label>
-                        <Input
-                          id="vjudge_id_new"
-                          name="vjudge_id"
-                          placeholder="Enter VJudge ID"
-                          className="max-w-xs rounded-xl"
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="rounded-full px-5"
-                        >
-                          Save
-                        </Button>
-                      </form>
+                        fieldName="vjudge_id"
+                        inputId="vjudge_id_new"
+                        label="Add ID:"
+                        current={user.vjudge_id}
+                        placeholder="Enter VJudge ID"
+                        saveVariant="default"
+                        saveLabel="Save"
+                        inputClassName="max-w-xs rounded-xl"
+                        saveClassName="rounded-full px-5"
+                        className="mt-2"
+                      />
                       <p className="mt-1 text-xs text-muted-foreground">
                         Admin will verify after you save.
                       </p>
@@ -665,7 +345,7 @@ export default async function page({ searchParams }) {
                   No finalized teams yet.
                 </p>
               ) : (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
                   {myTeams.map((t) => (
                     <ProgressLink
                       key={t.id}
@@ -678,113 +358,25 @@ export default async function page({ searchParams }) {
                       >
                         {t.team_title}
                       </div>
-                      <div
-                        className="text-sm mt-1"
-                        style={{ color: "hsl(var(--profile-text-secondary))" }}
-                      >
-                        Members:{" "}
-                        {Array.isArray(t.member_vjudge_ids)
-                          ? t.member_vjudge_ids.join(", ")
-                          : ""}
-                      </div>
                       {t.collection_title && (
                         <div
-                          className="text-xs mt-1"
+                          className="text-sm text-muted-foreground font-medium"
                           style={{ color: "hsl(var(--profile-text-muted))" }}
                         >
-                          Collection: {t.collection_title}
+                          {t.collection_title}
                         </div>
                       )}
+                      <TeamMemberList team={t} />
                     </ProgressLink>
                   ))}
                 </div>
               )}
             </section>
 
-            {/* Teams Coached */}
-            <section
-              className="profile-card"
-              aria-labelledby="coached-teams-title"
-            >
-              <h2
-                id="coached-teams-title"
-                className="flex items-center gap-2 text-xl font-bold mb-5"
-                style={{ color: "hsl(var(--profile-text))" }}
-              >
-                <Shield className="h-5 w-5" />
-                Teams Coached{" "}
-                {coachedTeams.length > 0 && (
-                  <span
-                    className="text-sm font-normal"
-                    style={{ color: "hsl(var(--profile-text-muted))" }}
-                  >
-                    ({coachedTeams.length})
-                  </span>
-                )}
-              </h2>
-              {!user?.vjudge_id && (
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "hsl(var(--profile-text-muted))" }}
-                >
-                  Add a VJudge ID to appear as a coach.
-                </p>
-              )}
-              {user?.vjudge_id && coachedTeams.length === 0 && (
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "hsl(var(--profile-text-muted))" }}
-                >
-                  You are not coaching any finalized teams yet.
-                </p>
-              )}
-              {user?.vjudge_id && coachedTeams.length > 0 && (
-                <div className="space-y-3">
-                  {coachedTeams.map((t) => (
-                    <ProgressLink
-                      key={`coach-${t.id}`}
-                      href={`/team/final/${t.id}`}
-                      className="block profile-stat-tile profile-focus-ring group"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div
-                          className="font-semibold group-hover:underline"
-                          style={{ color: "hsl(var(--profile-success))" }}
-                        >
-                          {t.team_title}
-                        </div>
-                        <span
-                          className="text-[10px] uppercase px-2 py-0.5 rounded-full font-semibold"
-                          style={{
-                            background: "hsl(var(--profile-success) / 0.15)",
-                            color: "hsl(var(--profile-success))",
-                          }}
-                        >
-                          Coach
-                        </span>
-                      </div>
-                      <div
-                        className="text-sm"
-                        style={{ color: "hsl(var(--profile-text-secondary))" }}
-                      >
-                        Members:{" "}
-                        {Array.isArray(t.member_vjudge_ids)
-                          ? t.member_vjudge_ids.join(", ")
-                          : ""}
-                      </div>
-                      {t.collection_title && (
-                        <div
-                          className="text-xs mt-1"
-                          style={{ color: "hsl(var(--profile-text-muted))" }}
-                        >
-                          Collection: {t.collection_title}
-                        </div>
-                      )}
-                    </ProgressLink>
-                  ))}
-                </div>
-              )}
-            </section>
+            <CoachedTeamsSection
+              coachedTeams={coachedTeams}
+              hasVjudgeId={Boolean(user?.vjudge_id)}
+            />
           </main>
         </div>
       </div>
@@ -792,33 +384,43 @@ export default async function page({ searchParams }) {
   );
 }
 
-function CodeforcesSetIdForm({ current }) {
+function TeamMemberList({ team }) {
+  const profiles = Array.isArray(team?.member_profiles)
+    ? team.member_profiles.filter((m) => m && m.vjudge_id)
+    : [];
+
+  const fallbackIds = Array.isArray(team?.member_vjudge_ids)
+    ? team.member_vjudge_ids
+    : [];
+
+  if (profiles.length === 0 && fallbackIds.length === 0) {
+    return null;
+  }
+
+  const tooltipItems = profiles.map((m, idx) => ({
+    id: idx + 1,
+    name: m.full_name || "Unknown Member",
+    designation: m.vjudge_id,
+    image: m.profile_pic || "/placeholder.svg",
+  }));
+
   return (
-    <form action={saveCodeforces} className="mt-2 flex items-center gap-2">
-      <Input
-        id="cf_id"
-        name="cf_id"
-        defaultValue={current || ""}
-        placeholder={current ? "CF Handle" : "Enter CF handle"}
-        className="text-xs h-8 profile-focus-ring flex-1"
-        style={{ borderRadius: "var(--profile-radius-sm)" }}
-      />
-      <Button
-        type="submit"
-        size="sm"
-        variant={current ? "outline" : "default"}
-        className="text-xs h-8 px-3 profile-focus-ring"
-        style={{
-          borderRadius: "var(--profile-radius-sm)",
-          ...(!current && {
-            background: "hsl(var(--profile-primary))",
-            color: "white",
-          }),
-        }}
-      >
-        {current ? "Save" : "Add"}
-      </Button>
-    </form>
+    <div className="mt-2 space-y-2">
+      {profiles.length > 0
+        ? <AnimatedTooltip items={tooltipItems} />
+        : fallbackIds.map((vj) => (
+          <div
+            key={vj}
+            className="text-xs rounded-md px-2 py-1"
+            style={{
+              color: "hsl(var(--profile-text-muted))",
+              background: "hsl(var(--profile-surface-2))",
+            }}
+          >
+            {vj}
+          </div>
+        ))}
+    </div>
   );
 }
 
@@ -838,45 +440,47 @@ async function saveVjudge(formData) {
   redirect("/profile");
 }
 
-async function saveMistId(formData) {
+async function saveSidebarProfile(formData) {
   "use server";
+
+  const full_name = formData.get("full_name")?.toString().trim();
+  const phone = formData.get("phone")?.toString().trim() || null;
+  const batch_name = formData.get("batch_name")?.toString().trim() || null;
   const mist_id = formData.get("mist_id")?.toString().trim();
-  if (!mist_id) return;
-  await post_with_token("user/mist-id/set", { mist_id });
-  redirect("/profile");
-}
-
-async function saveTshirtSize(formData) {
-  "use server";
-  const val = formData.get("tshirt_size")?.toString().trim() || null;
-  await post_with_token("user/tshirt/set", { tshirt_size: val });
-  redirect("/profile");
-}
-
-async function updateProfilePic(formData) {
-  "use server";
+  const tshirt_size = formData.get("tshirt_size")?.toString().trim() || null;
   const file = formData.get("image");
-  if (!file || typeof file === "string") return;
 
-  // Get current user id/email
-  const prof = await get_with_token("auth/user/profile");
-  const me = prof?.result?.[0];
-  const userId = me?.id || "me";
+  const basicPayload = { phone, batch_name };
+  if (full_name) basicPayload.full_name = full_name;
+  await post_with_token("user/basic/set", basicPayload);
 
-  const supabase = await createClient();
-  const fileName = `${Date.now()}-${file.name}`;
-  const path = `profile_pics/${userId}/${fileName}`;
-
-  const { data, error } = await supabase.storage
-    .from("all_picture")
-    .upload(path, file);
-
-  if (error) {
-    console.error("Upload error:", error);
-    redirect("/profile");
+  if (mist_id) {
+    await post_with_token("user/mist-id/set", { mist_id });
   }
 
-  const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/${data.fullPath}`;
-  await post_with_token("user/profile-pic/set", { profile_pic: url });
+  await post_with_token("user/tshirt/set", { tshirt_size });
+
+  if (file && typeof file !== "string") {
+    // Get current user id/email
+    const prof = await get_with_token("auth/user/profile");
+    const me = prof?.result?.[0];
+    const userId = me?.id || "me";
+
+    const supabase = await createClient();
+    const fileName = `${Date.now()}-${file.name}`;
+    const path = `profile_pics/${userId}/${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from("all_picture")
+      .upload(path, file);
+
+    if (!error) {
+      const url = `${process.env.SUPABASE_URL}/storage/v1/object/public/${data.fullPath}`;
+      await post_with_token("user/profile-pic/set", { profile_pic: url });
+    } else {
+      console.error("Upload error:", error);
+    }
+  }
+
   redirect("/profile");
 }

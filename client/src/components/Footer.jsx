@@ -19,12 +19,13 @@ const links = {
     { label: 'About Us', href: '#about' },
     { label: 'Alumni', href: '/alumni' },
     { label: 'Contact', href: 'mailto:club@example.com' },
+    { label: 'Report an Issue', href: 'https://github.com/istiaqueahmedarik/mcc_website/issues' },
   ],
 }
 
 export default function Footer() {
   return (
-    <footer className="relative w-full mt-32 border-t border-border/60 bg-background/70 backdrop-blur-md">
+    <footer className="relative w-full border-t border-border/60 bg-background/70 backdrop-blur-md">
       <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_50%_0%,black,transparent_70%)] bg-gradient-to-b from-primary/10 via-background to-background" />
       <div className="relative mx-auto max-w-7xl px-6 py-16 grid gap-12 md:grid-cols-4">
         <div className="flex flex-col gap-4">
@@ -40,20 +41,22 @@ export default function Footer() {
           </div>
         </div>
 
-        {Object.entries(links).map(([section, items]) => (
-          <div key={section} className="space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">{section}</h3>
-            <ul className="space-y-2">
-              {items.map((l) => (
-                <li key={l.label}>
-                  <Link href={l.href} className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+        <div className="grid grid-cols-2 gap-8 md:col-span-3 lg:grid-cols-3">
+          {Object.entries(links).map(([section, items]) => (
+            <div key={section} className="grid grid-cols-1 gap-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">{section}</h3>
+              <ul className="space-y-2">
+                {items.map((l) => (
+                  <li key={l.label}>
+                    <Link href={l.href} className="text-sm text-muted-foreground transition-colors hover:text-primary">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </div>
       <div className="relative border-t border-border/60">
         <div className="mx-auto max-w-7xl px-6 py-6 text-[11px] md:text-xs flex flex-col md:flex-row items-center justify-between gap-4">

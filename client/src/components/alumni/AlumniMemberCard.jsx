@@ -1,194 +1,240 @@
-'use client'
-import React from 'react'
-import { Linkedin, ExternalLink, Briefcase, Trophy } from 'lucide-react'
-import { cn } from '@/lib/utils'
+"use client";
 
-/**
- * Enhanced Alumni Member Card Component
- * Displays member details with social links (LinkedIn only)
- * Features centered large profile image and full position visibility
- * 
- * Props:
- * @param {object} member - Alumni member data
- * @param {string} member.name - Full name
- * @param {string} member.role - Role in MCC (e.g., "PRESIDENT", "VICE PRESIDENT")
- * @param {string} member.now - Current position/company (fully visible)
- * @param {string} member.image_url - Profile image URL (displays as large circular image)
- * @param {string} member.linkedin_url - LinkedIn profile URL (optional)
- * @param {string} member.bio - Short biography (optional)
- * @param {boolean} member.highlight - Whether to highlight this card (e.g., for presidents)
- * @param {string} query - Search query for highlighting matched text (optional)
- * @param {string} variant - Card style variant: "default" | "compact" | "detailed"
- */
-export default function AlumniMemberCard({
-    member,
-    query = '',
-    variant = 'default',
-    className
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Linkedin, Pencil, Star, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { SiCodeforces } from "react-icons/si";
+
+function avatarFallback(name) {
+  return String(name || "A").trim().charAt(0).toUpperCase() || "A";
+}
+
+function BorderBeam({
+  className,
+  size = 200,
+  duration = 15,
+  anchor = 90,
+  borderWidth = 1.5,
+  colorFrom = "hsl(var(--primary))",
+  colorTo = "hsl(var(--primary) / 0.2)",
+  delay = 0,
 }) {
-    const {
-        name,
-        role,
-        now,
-        image_url,
-        linkedin_url,
-        bio,
-        highlight
-    } = member
+  return (
+    <div
+      style={{
+        "--size": size,
+        "--duration": duration,
+        "--anchor": anchor,
+        "--border-width": borderWidth,
+        "--color-from": colorFrom,
+        "--color-to": colorTo,
+        "--delay": `-${delay}s`,
+      }}
+      className={`pointer-events-none absolute inset-0 rounded-[inherit] [border:calc(var(--border-width)*1px)_solid_transparent] ![mask-clip:padding-box,border-box] ![mask-composite:intersect] [mask:linear-gradient(transparent,transparent),linear-gradient(white,white)] after:absolute after:aspect-square after:w-[calc(var(--size)*1px)] after:animate-border-beam after:[animation-delay:var(--delay)] after:[background:linear-gradient(to_left,var(--color-from),var(--color-to),transparent)] after:[offset-anchor:calc(var(--anchor)*1%)_50%] after:[offset-path:rect(0_auto_auto_0_round_calc(var(--size)*1px))] ${className}`}
+    />
+  );
+}
 
-    // Highlight search matches
-    const highlightText = (text) => {
-        if (!query || !text) return text
-        const idx = text.toLowerCase().indexOf(query.toLowerCase())
-        if (idx === -1) return text
-        return (
-            <>
-                {text.slice(0, idx)}
-                <span className='bg-[hsl(var(--alumni-gold)/0.25)] px-0.5 rounded'>
-                    {text.slice(idx, idx + query.length)}
-                </span>
-                {text.slice(idx + query.length)}
-            </>
-        )
-    }
+export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDelete, index = 0 }) {
+  const {
+    name,
+    image_url,
+    designation,
+    company_name,
+    batch,
+    position_in_club,
+    club_position_year,
+    linkedin_url,
+    cf_handle,
+    highlight,
+  } = member;
+  const [imageFailed, setImageFailed] = useState(false);
 
-    const hasLinks = linkedin_url
+  useEffect(() => {
+    setImageFailed(false);
+  }, [image_url]);
 
-    if (variant === 'compact') {
-        return (
-            <div className={cn(
-                'group relative overflow-hidden rounded-lg border border-border/60 bg-card p-4 transition-all hover:shadow-lg hover:border-[hsl(var(--alumni-gold)/0.5)]',
-                highlight && 'ring-1 ring-[hsl(var(--alumni-gold))]/50',
-                className
-            )}>
-                <div className='relative z-10 flex items-start gap-3'>
-                    {image_url ? (
-                        <img
-                            src={image_url}
-                            alt={name}
-                            className='w-16 h-16 rounded-full object-cover border-2 border-border/60 group-hover:border-[hsl(var(--alumni-gold)/0.5)] transition-colors flex-shrink-0'
-                        />
-                    ) : (
-                        <div className='w-16 h-16 rounded-full bg-gradient-to-br from-[hsl(var(--alumni-royal)/0.3)] to-[hsl(var(--alumni-gold)/0.2)] border-2 border-border/60 flex items-center justify-center flex-shrink-0'>
-                            <span className='text-xl font-bold text-[hsl(var(--alumni-gold))]'>
-                                {name.charAt(0).toUpperCase()}
-                            </span>
-                        </div>
-                    )}
-                    <div className='flex-1 min-w-0'>
-                        <h3 className='font-semibold text-base leading-snug truncate alumni-name group-hover:drop-shadow-sm transition-all'>
-                            {highlightText(name)}
-                        </h3>
-                        {role && (
-                            <span className='text-[10px] tracking-wider text-muted-foreground/70 uppercase'>
-                                {highlightText(role)}
-                            </span>
-                        )}
-                        {now && (
-                            <p className='text-xs text-muted-foreground mt-1 line-clamp-2'>
-                                {highlightText(now)}
-                            </p>
-                        )}
-                    </div>
-                </div>
+  const headline = [designation, company_name].filter(Boolean).join(" @ ");
+  const cfUrl = cf_handle ? `https://codeforces.com/profile/${cf_handle}` : "";
 
-                {/* Hover glow effect */}
-                <div className='absolute -top-12 -right-10 w-40 h-40 opacity-0 group-hover:opacity-70 transition-opacity duration-500 pointer-events-none'
-                    style={{ background: 'radial-gradient(circle at center, hsl(var(--alumni-gold)/0.55), transparent 70%)' }}
-                />
+  // Staggered glow effect - each card glows at different intervals
+  const [isGlowing, setIsGlowing] = useState(false);
+
+  useEffect(() => {
+    // Stagger start: each card starts its cycle with a delay based on index
+    const startDelay = (index % 9) * 400; // Stagger by 400ms, cycle through 9 cards
+    const glowDuration = 2000; // Glow stays on for 2 seconds
+    const cycleDuration = 6000; // Full cycle is 6 seconds
+
+    const startTimeout = setTimeout(() => {
+      setIsGlowing(true);
+
+      // Set up the repeating cycle
+      const interval = setInterval(() => {
+        setIsGlowing(true);
+        setTimeout(() => setIsGlowing(false), glowDuration);
+      }, cycleDuration);
+
+      // Turn off initial glow after duration
+      setTimeout(() => setIsGlowing(false), glowDuration);
+
+      return () => clearInterval(interval);
+    }, startDelay);
+
+    return () => clearTimeout(startTimeout);
+  }, [index]);
+
+  return (
+    <div className={`group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-500 hover:shadow-md overflow-hidden ${isGlowing
+        ? 'border-primary/50 shadow-[0_0_20px_-5px_hsl(var(--primary)/0.4)]'
+        : 'border-border/50 hover:border-border/80'
+      }`}>
+      <div className="pointer-events-none absolute inset-0 alumni-card-angled-glow opacity-60" />
+      <div className="pointer-events-none absolute inset-0 alumni-card-sweep-glow" />
+
+      {/* Border beam effect when glowing */}
+      {isGlowing && (
+        <BorderBeam
+          size={100}
+          duration={2}
+          delay={0}
+          colorFrom="hsl(var(--primary))"
+          colorTo="hsl(var(--primary) / 0.1)"
+        />
+      )}
+
+      {canEdit && (
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit?.(member)}>
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            onClick={() => onDelete?.(member)}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
+      <div className="flex items-start gap-3">
+        {image_url && !imageFailed ? (
+          <img
+            src={image_url}
+            alt={name}
+            className="h-16 w-16 rounded-md border border-border/50 object-cover shadow-sm shrink-0"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          <div className="h-16 w-16 rounded-md border border-border/50 bg-muted/50 flex items-center justify-center text-lg font-medium text-muted-foreground shadow-sm shrink-0">
+            {avatarFallback(name)}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="font-semibold text-base leading-tight text-foreground/90">{name}</div>
+            {highlight && <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500 shrink-0" />}
+          </div>
+
+          {(designation || company_name) && (
+            <div className="text-xs font-medium text-muted-foreground/80 line-clamp-0">
+              {designation && <span className="text-foreground/80">{designation}</span>}
+              {designation && company_name && <span> @ </span>}
+              {company_name && <span>{company_name}</span>}
             </div>
-        )
-    }
+          )}
 
-    return (
-        <div className={cn(
-            'group relative overflow-hidden rounded-xl border border-border/60 bg-card transition-all hover:shadow-xl hover:border-[hsl(var(--alumni-gold)/0.5)]',
-            highlight && 'ring-2 ring-[hsl(var(--alumni-gold))]/50 shadow-lg',
-            className
-        )}>
-            {/* Background glow effect */}
-            <div className='absolute -top-12 -right-10 w-48 h-48 opacity-0 group-hover:opacity-60 transition-opacity duration-500 pointer-events-none'
-                style={{ background: 'radial-gradient(circle at center, hsl(var(--alumni-gold)/0.4), transparent 70%)' }}
-            />
+          <div className="flex flex-wrap items-center gap-2 pt-1.5">
 
-            {/* Highlight badge for distinguished members */}
-            {highlight && (
-                <div className='absolute top-0 right-0 z-20'>
-                    <div className='bg-[hsl(var(--alumni-gold))] text-black text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-bl-lg flex items-center gap-1'>
-                        <Trophy className='h-3 w-3' />
-                        Distinguished
-                    </div>
-                </div>
+            {linkedin_url && (
+              <a
+                href={linkedin_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-[#0077B5] transition-colors rounded-md hover:bg-muted/50"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="h-4 w-4" />
+              </a>
+            )}
+            {cfUrl && (
+              <a
+                href={cfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-[#1f8dd6] transition-colors px-1 rounded-md hover:bg-muted/50"
+                aria-label="Codeforces"
+              >
+                <SiCodeforces className="h-4 w-4" />
+              </a>
+            )}
+            {batch && (
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-medium bg-secondary/50 rounded-md hover:bg-secondary">
+                {batch}
+              </Badge>
+            )}
+            {position_in_club && (
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-medium border-primary/20 rounded-md hover:bg-primary/5 hover:text-primary">
+                {position_in_club} {club_position_year && `'${String(club_position_year).slice(-2)}`}
+              </Badge>
+            )}
+          </div>
+          {/* <div className="mt-2 flex items-center gap-2 border-t border-border/40 pt-2.5">
+            {linkedin_url && (
+              <a
+                href={linkedin_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-[#0077B5] transition-colors"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="h-4 w-4" />
+              </a>
+            )}
+            {cfUrl && (
+              <a
+                href={cfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-[#1f8dd6] transition-colors"
+                aria-label="Codeforces"
+              >
+                <SiCodeforces className="h-4 w-4" />
+              </a>
             )}
 
-            <div className='relative z-10 p-6 space-y-4'>
-                {/* Header with image and basic info - Centered layout with LARGER profile */}
-                <div className='flex flex-col items-center text-center gap-3'>
-                    {image_url ? (
-                        <img
-                            src={image_url}
-                            alt={name}
-                            className='w-40 h-40 rounded-full object-cover border-3 border-border/60 group-hover:border-[hsl(var(--alumni-gold)/0.5)] transition-colors'
-                        />
-                    ) : (
-                        <div className='w-40 h-40 rounded-full bg-gradient-to-br from-[hsl(var(--alumni-royal)/0.3)] to-[hsl(var(--alumni-gold)/0.2)] border-3 border-border/60 flex items-center justify-center'>
-                            <span className='text-5xl font-bold text-[hsl(var(--alumni-gold))]'>
-                                {name.charAt(0).toUpperCase()}
-                            </span>
-                        </div>
-                    )}
-
-                    <div className='w-full'>
-                        <h3 className='font-bold text-xl leading-tight alumni-name group-hover:drop-shadow-sm transition-all'>
-                            {highlightText(name)}
-                        </h3>
-                        {role && (
-                            <div className='flex items-center justify-center gap-1.5 mt-2'>
-                                <Trophy className='h-3.5 w-3.5 text-[hsl(var(--alumni-gold))]' />
-                                <span className='text-xs tracking-wider text-muted-foreground/80 uppercase font-medium'>
-                                    {highlightText(role)}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Current position */}
-                {now && (
-                    <div className='flex items-start gap-2 text-sm bg-[hsl(var(--alumni-royal-fade)/0.3)] rounded-lg p-3'>
-                        <Briefcase className='h-4 w-4 text-[hsl(var(--alumni-gold))] mt-0.5 flex-shrink-0' />
-                        <p className='text-muted-foreground leading-relaxed text-left'>
-                            {highlightText(now)}
-                        </p>
-                    </div>
-                )}
-
-                {/* Bio */}
-                {bio && variant === 'detailed' && (
-                    <p className='text-xs text-muted-foreground/80 leading-relaxed border-l-2 border-border/40 pl-3'>
-                        {highlightText(bio)}
-                    </p>
-                )}
-
-                {/* Social links - LinkedIn only */}
-                {hasLinks && (
-                    <div className='flex items-center justify-center gap-2 pt-2 border-t border-border/40'>
-                        {linkedin_url && (
-                            <a
-                                href={linkedin_url}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className='inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-[hsl(var(--alumni-royal-fade)/0.6)] hover:bg-[hsl(var(--alumni-royal)/0.3)] text-xs font-medium transition-colors group/link'
-                                aria-label={`${name}'s LinkedIn profile`}
-                            >
-                                <Linkedin className='h-4 w-4' />
-                                <span>LinkedIn</span>
-                                <ExternalLink className='h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity' />
-                            </a>
-                        )}
-                    </div>
-                )}
-            </div>
+          </div> */}
         </div>
-    )
+      </div>
+      {/* 
+      <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/40 pt-2.5">
+        {linkedin_url && (
+          <a 
+            href={linkedin_url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-muted-foreground hover:text-[#0077B5] transition-colors"
+            aria-label="LinkedIn"
+          >
+            <Linkedin className="h-4 w-4" />
+          </a>
+        )}
+        {cfUrl && (
+          <a 
+            href={cfUrl} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-muted-foreground hover:text-[#1f8dd6] transition-colors"
+            aria-label="Codeforces"
+          >
+            <SiCodeforces className="h-4 w-4" />
+          </a>
+        )}
+      </div> */}
+    </div>
+  );
 }

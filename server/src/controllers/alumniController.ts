@@ -1,102 +1,309 @@
 import sql from '../db'
 
-function parseBioMeta(raw: any) {
-    if (!raw) return {}
-    if (typeof raw === 'object') return raw
-    if (typeof raw !== 'string') return {}
-
-    const text = raw.trim()
-    if (!text) return {}
-
-    try {
-        const parsed = JSON.parse(text)
-        if (parsed && typeof parsed === 'object') return parsed
-    } catch {
-        // Fallback: treat legacy plain-text bio as summary text.
-        return { about: text }
-    }
-
-    return {}
+async function getAlumniMemberColumns() {
+  // Always fetch columns to ensure schema changes are picked up immediately
+  // In a high-traffic app we might cache this with a TTL, but for this admin function it's fine
+  const rows = await sql`
+    select column_name
+    from information_schema.columns
+    where table_name = 'alumni_member'
+  `
+  return new Set(rows.map((r: any) => r.column_name))
 }
 
-function normalizeCareerPath(meta: Record<string, any>, company: string | null) {
-    const raw = meta.career_path ?? meta.careerPath ?? null
-    let list: string[] = []
+async function getAlumniBatchColumns() {
+  const rows = await sql`
+    select column_name
+    from information_schema.columns
+    where table_name = 'alumni_batch'
+  `
+  return new Set(rows.map((r: any) => r.column_name))
+}
 
-    if (Array.isArray(raw)) {
-        list = raw.map(v => String(v ?? '').trim()).filter(Boolean)
-    } else if (typeof raw === 'string') {
-        list = raw
-            .split(/->|→|\|/)
-            .map(v => v.trim())
-            .filter(Boolean)
-    }
+async function requireAdmin(c: any) {
+  const { id, email } = c.get('jwtPayload') || {}
+  if (!id || !email) return null
+  const user = await sql`select id from users where id = ${id} and email = ${email} and admin = true`
+  if (user.length === 0) return null
+  return user[0]
+}
 
-    if (list.length === 0) {
-        list = company ? ['MIST', company] : ['MIST']
-    }
+function toNullableText(value: any) {
+  const text = String(value ?? '').trim()
+  return text ? text : null
+}
 
-    if (list.length > 0 && list[0].toLowerCase() !== 'mist') {
-        list = ['MIST', ...list]
-    }
+function toNullableYear(value: any) {
+  if (value === null || value === undefined || value === '') return null
+  const num = Number(value)
+  if (!Number.isInteger(num)) return null
+  return num
+}
 
-    if (company && list[list.length - 1]?.toLowerCase() !== company.toLowerCase()) {
-        list.push(company)
-    }
+function buildPublicMemberPayload(row: any) {
+  const designation = toNullableText(row.designation)
+  const company = toNullableText(row.company_name)
 
-    return list
+  return {
+    id: row.id,
+    name: row.full_name,
+    position_in_club: toNullableText(row.position_in_club),
+    club_position_year: toNullableYear(row.club_position_year),
+    designation,
+    company_name: company,
+    headline: designation && company ? `${designation} @ ${company}` : (designation || company || null),
+    image_url: toNullableText(row.image_url),
+    linkedin_url: toNullableText(row.linkedin_url),
+    cf_handle: toNullableText(row.cf_handle),
+    highlight: Boolean(row.highlight),
+  }
 }
 
 export const getAlumniPublic = async (c: any) => {
-    try {
-        const [batches, members] = await Promise.all([
-            sql`select id, year, label, motto, sort_order from alumni_batch where is_active = true order by year desc, sort_order`,
-            sql`select id, batch_id, full_name, role, current_position, bio, image_url, linkedin_url, github_url, highlight, sort_order from alumni_member where is_active = true order by sort_order, full_name`
-        ])
-        const membersByBatch: Record<string, any[]> = {}
-        for (const m of members) {
-            const meta = parseBioMeta(m.bio)
-            const company = (meta.current_company ?? meta.company ?? '').toString().trim() || null
-            const location = (meta.location ?? '').toString().trim() || null
-            const email = (meta.email ?? '').toString().trim() || null
-            const phone = (meta.phone ?? '').toString().trim() || null
-            const linkedinUrl = (meta.linkedin_url ?? m.linkedin_url ?? '').toString().trim() || null
-            const githubOrFacebook = (m.github_url ?? '').toString().trim()
-            const facebookFromMeta = (meta.facebook_url ?? meta.facebook ?? '').toString().trim()
-            const facebookUrl = facebookFromMeta || (githubOrFacebook.includes('facebook.com') ? githubOrFacebook : null)
+  try {
+    const [columns, batchColumns] = await Promise.all([getAlumniMemberColumns(), getAlumniBatchColumns()])
+    const positionExpr = columns.has('position_in_club')
+      ? sql`position_in_club`
+      : columns.has('role')
+        ? sql`role`
+        : sql`null`
+    const clubYearExpr = columns.has('club_position_year') ? sql`club_position_year` : sql`null`
+    const designationExpr = columns.has('designation')
+      ? sql`designation`
+      : columns.has('current_position')
+        ? sql`nullif(split_part(current_position, ' @ ', 1), '')`
+        : sql`null`
+    const companyExpr = columns.has('company_name')
+      ? sql`company_name`
+      : columns.has('current_position')
+        ? sql`nullif(split_part(current_position, ' @ ', 2), '')`
+        : sql`null`
+    const cfExpr = columns.has('cf_handle') ? sql`cf_handle` : sql`null`
+    const highlightExpr = columns.has('highlight') ? sql`highlight` : sql`false`
 
-            const bid = String(m.batch_id)
-            if (!membersByBatch[bid]) membersByBatch[bid] = []
-            membersByBatch[bid].push({
-                id: m.id,
-                name: m.full_name,
-                role: m.role,
-                now: m.current_position,
-                current_company: company,
-                location,
-                email,
-                phone,
-                linkedin_url: linkedinUrl,
-                facebook_url: facebookUrl,
-                career_path: normalizeCareerPath(meta, company),
-                bio_summary: (meta.about ?? meta.bio_summary ?? '').toString().trim() || null,
-                image_url: m.image_url,
-                highlight: m.highlight,
-                sort_order: m.sort_order
-            })
-        }
-        const result = batches.map(b => ({
-            id: b.id,
-            year: b.year,
-            batch: b.label || `Batch ${b.year}`,
-            label: b.label,
-            motto: b.motto,
-            sort_order: b.sort_order,
-            members: (membersByBatch[String(b.id)] || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name))
-        }))
-        return c.json({ batches: result })
-    } catch (e) {
-        console.error(e)
-        return c.json({ error: 'Failed to load alumni' }, 500)
+    const batchYearExpr = batchColumns.has('year') ? sql`year` : sql`null`
+    const batchOrderExpr = batchColumns.has('year') ? sql`year desc, id desc` : sql`id desc`
+    const [batches, members] = await Promise.all([
+      sql`select id, label, ${batchYearExpr} as year from alumni_batch order by ${batchOrderExpr}`,
+      sql`
+        select
+          id,
+          batch_id,
+          full_name,
+          ${positionExpr} as position_in_club,
+          ${clubYearExpr} as club_position_year,
+          ${designationExpr} as designation,
+          ${companyExpr} as company_name,
+          image_url,
+          linkedin_url,
+          ${cfExpr} as cf_handle,
+          ${highlightExpr} as highlight
+        from alumni_member
+        order by full_name, id
+      `,
+    ])
+
+    const membersByBatch: Record<string, any[]> = {}
+    for (const row of members) {
+      const key = String(row.batch_id)
+      if (!membersByBatch[key]) membersByBatch[key] = []
+      membersByBatch[key].push(buildPublicMemberPayload(row))
     }
+
+    const result = batches.map((batch) => ({
+      id: batch.id,
+      batch: batch.label || `Batch ${batch.id}`,
+      label: batch.label,
+      members: (membersByBatch[String(batch.id)] || []).sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+
+    return c.json({ batches: result })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to load alumni' }, 500)
+  }
+}
+
+export const listAdminAlumniBatches = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const columns = await getAlumniBatchColumns()
+    const orderExpr = columns.has('year') ? sql`year desc, id desc` : sql`id desc`
+    const result = await sql`select * from alumni_batch order by ${orderExpr}`
+    return c.json({ result })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to list alumni batches' }, 500)
+  }
+}
+
+export const createAdminAlumniBatch = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const body = await c.req.json()
+    const columns = await getAlumniBatchColumns()
+    const label = toNullableText(body.label)
+    if (!label) return c.json({ error: 'Label is required' }, 400)
+    if (columns.has('year')) {
+      const year = toNullableYear(body.year) ?? new Date().getFullYear()
+      const result = await sql`insert into alumni_batch (label, year) values (${label}, ${year}) returning *`
+      return c.json({ result: result[0] })
+    }
+    const result = await sql`insert into alumni_batch (label) values (${label}) returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to create alumni batch' }, 400)
+  }
+}
+
+export const updateAdminAlumniBatch = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const body = await c.req.json()
+    const columns = await getAlumniBatchColumns()
+    if (!body.id) return c.json({ error: 'Missing id' }, 400)
+    const label = toNullableText(body.label)
+    if (!label) return c.json({ error: 'Label is required' }, 400)
+    if (columns.has('year')) {
+      const year = toNullableYear(body.year) ?? new Date().getFullYear()
+      const result = await sql`update alumni_batch set label = ${label}, year = ${year} where id = ${body.id} returning *`
+      return c.json({ result: result[0] })
+    }
+    const result = await sql`update alumni_batch set label = ${label} where id = ${body.id} returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to update alumni batch' }, 400)
+  }
+}
+
+export const deleteAdminAlumniBatch = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const body = await c.req.json()
+    if (!body.id) return c.json({ error: 'Missing id' }, 400)
+    const result = await sql`delete from alumni_batch where id = ${body.id} returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to delete alumni batch' }, 400)
+  }
+}
+
+export const listAdminAlumniMembers = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const result = await sql`select * from alumni_member order by full_name, id`
+    return c.json({ result })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to list alumni members' }, 500)
+  }
+}
+
+export const createAdminAlumniMember = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const columns = await getAlumniMemberColumns()
+    const body = await c.req.json()
+    const positionInClub = toNullableText(body.position_in_club)
+    const designation = toNullableText(body.designation)
+    const companyName = toNullableText(body.company_name)
+    const currentPosition = [designation, companyName].filter(Boolean).join(' @ ') || null
+
+    const data: Record<string, any> = {
+      batch_id: body.batch_id,
+      full_name: toNullableText(body.full_name),
+      image_url: toNullableText(body.image_url),
+      linkedin_url: toNullableText(body.linkedin_url),
+      highlight: body.highlight ?? false,
+    }
+
+    if (columns.has('position_in_club')) data.position_in_club = positionInClub
+    else if (columns.has('role')) data.role = positionInClub
+    if (columns.has('club_position_year')) data.club_position_year = toNullableYear(body.club_position_year)
+    if (columns.has('designation')) data.designation = designation
+    if (columns.has('company_name')) data.company_name = companyName
+    if (columns.has('current_position')) data.current_position = currentPosition
+    if (columns.has('cf_handle')) data.cf_handle = toNullableText(body.cf_handle)
+
+    const cols = Object.keys(data)
+    const vals = Object.values(data)
+    let colFrag: any = sql``
+    let valFrag: any = sql``
+    cols.forEach((col, idx) => {
+      colFrag = idx === 0 ? sql`${sql(col)}` : sql`${colFrag}, ${sql(col)}`
+      valFrag = idx === 0 ? sql`${vals[idx]}` : sql`${valFrag}, ${vals[idx]}`
+    })
+
+    const result = await sql`insert into alumni_member (${colFrag}) values (${valFrag}) returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to create alumni member' }, 400)
+  }
+}
+
+export const updateAdminAlumniMember = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const columns = await getAlumniMemberColumns()
+    const body = await c.req.json()
+    if (!body.id) return c.json({ error: 'Missing id' }, 400)
+    const positionInClub = toNullableText(body.position_in_club)
+    const designation = toNullableText(body.designation)
+    const companyName = toNullableText(body.company_name)
+    const currentPosition = [designation, companyName].filter(Boolean).join(' @ ') || null
+
+    const data: Record<string, any> = {
+      batch_id: body.batch_id,
+      full_name: toNullableText(body.full_name),
+      image_url: toNullableText(body.image_url),
+      linkedin_url: toNullableText(body.linkedin_url),
+      highlight: body.highlight ?? false,
+    }
+
+    if (columns.has('position_in_club')) data.position_in_club = positionInClub
+    else if (columns.has('role')) data.role = positionInClub
+    if (columns.has('club_position_year')) data.club_position_year = toNullableYear(body.club_position_year)
+    if (columns.has('designation')) data.designation = designation
+    if (columns.has('company_name')) data.company_name = companyName
+    if (columns.has('current_position')) data.current_position = currentPosition
+    if (columns.has('cf_handle')) data.cf_handle = toNullableText(body.cf_handle)
+
+    const entries = Object.entries(data)
+    let setFrag: any = sql``
+    entries.forEach(([k, v], idx) => {
+      const frag = sql`${sql(k)} = ${v}`
+      setFrag = idx === 0 ? frag : sql`${setFrag}, ${frag}`
+    })
+
+    const result = await sql`update alumni_member set ${setFrag} where id = ${body.id} returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to update alumni member' }, 400)
+  }
+}
+
+export const deleteAdminAlumniMember = async (c: any) => {
+  const admin = await requireAdmin(c)
+  if (!admin) return c.json({ error: 'Unauthorized' }, 401)
+  try {
+    const body = await c.req.json()
+    if (!body.id) return c.json({ error: 'Missing id' }, 400)
+    const result = await sql`delete from alumni_member where id = ${body.id} returning *`
+    return c.json({ result: result[0] })
+  } catch (e) {
+    console.error(e)
+    return c.json({ error: 'Failed to delete alumni member' }, 400)
+  }
 }

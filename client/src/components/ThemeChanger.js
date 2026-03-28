@@ -18,6 +18,14 @@ const ThemeChanger = () => {
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
 
+  if (!mounted) {
+    return (
+      <div className="cursor-pointer" aria-hidden>
+        <Sun />
+      </div>
+    )
+  }
+
   return (
     <div
       className="cursor-pointer"
