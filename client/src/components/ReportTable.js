@@ -30,10 +30,30 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
   const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({})
   const [isProfilesLoading, setIsProfilesLoading] = useState(false)
   const profileCacheRef = useRef(new Map())
+  const latestProfilesRequestRef = useRef(0)
   const serverBase = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
     return base ? String(base).replace(/\/+$/, "") : ""
   }, [])
+  const debugProfiles = process.env.NEXT_PUBLIC_DEBUG_PROFILE_BATCH === "true"
+
+  const profileIds = useMemo(() => {
+    const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
+    return Array.from(ids).sort()
+  }, [users])
+
+  const profileIdsSignature = useMemo(() => profileIds.join("|"), [profileIds])
+
+  const areProfileMapsEqual = (a, b) => {
+    const aKeys = Object.keys(a)
+    const bKeys = Object.keys(b)
+    if (aKeys.length !== bKeys.length) return false
+    for (const key of aKeys) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false
+      if (a[key] !== b[key]) return false
+    }
+    return true
+  }
 
   const resolveAvatarUrl = (rawUrl) => {
     if (typeof rawUrl !== "string") return null
@@ -191,80 +211,94 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
 
   useEffect(() => {
     const controller = new AbortController()
-    let cancelled = false
+    const requestId = ++latestProfilesRequestRef.current
+
+    const isRequestActive = () => !controller.signal.aborted && requestId === latestProfilesRequestRef.current
+
+    const setProfilesIfChanged = (nextMap) => {
+      if (!isRequestActive()) return
+      setPublicProfilesByVjudge((prev) => (areProfileMapsEqual(prev, nextMap) ? prev : nextMap))
+    }
 
     const loadProfiles = async () => {
       try {
-        const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
-        const ids = Array.from(new Set(users.map((u) => String(u?.username || "").trim()).filter(Boolean)))
-
-        if (!base || ids.length === 0) {
-          if (!cancelled) {
-            setPublicProfilesByVjudge({})
-            setIsProfilesLoading(false)
-          }
+        if (!serverBase || profileIds.length === 0) {
+          setProfilesIfChanged({})
+          if (isRequestActive()) setIsProfilesLoading(false)
           return
         }
 
         const nextMap = {}
         const idsToFetch = []
-        ids.forEach((id) => {
-          const key = id.toLowerCase()
-          if (profileCacheRef.current.has(key)) nextMap[key] = profileCacheRef.current.get(key)
+        profileIds.forEach((id) => {
+          if (profileCacheRef.current.has(id)) nextMap[id] = profileCacheRef.current.get(id)
           else idsToFetch.push(id)
         })
 
-        if (!cancelled) setPublicProfilesByVjudge(nextMap)
+        setProfilesIfChanged(nextMap)
 
         if (idsToFetch.length === 0) {
-          if (!cancelled) setIsProfilesLoading(false)
+          if (isRequestActive()) setIsProfilesLoading(false)
           return
         }
 
-        if (!cancelled) setIsProfilesLoading(true)
+        if (isRequestActive()) setIsProfilesLoading(true)
 
-        const requests = idsToFetch.map(async (vjudgeId) => {
-          const key = vjudgeId.toLowerCase()
-          try {
-            const res = await fetch(`${base}/auth/public/profile/vj/${encodeURIComponent(vjudgeId)}`, {
-              cache: "no-store",
-              signal: controller.signal,
-            })
-            if (!res.ok) return [key, null]
+        let batchMap = {}
+        let requestFailed = false
+        try {
+          const res = await fetch(`${serverBase}/api/vjudge/profiles`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            cache: "no-store",
+            signal: controller.signal,
+            body: JSON.stringify({ ids: idsToFetch }),
+          })
+
+          if (!res.ok) {
+            requestFailed = true
+          } else {
             const json = await res.json()
-            return [key, json?.result || null]
-          } catch {
-            return [key, null]
+            batchMap = json?.result && typeof json.result === "object" ? json.result : {}
           }
+        } catch {
+          requestFailed = true
+        }
+
+        if (!isRequestActive()) return
+
+        const unresolvedIds = []
+        idsToFetch.forEach((requestedId) => {
+          const profile = batchMap[requestedId] ?? batchMap[requestedId.toLowerCase()] ?? null
+          if (profile == null) unresolvedIds.push(requestedId)
+          profileCacheRef.current.set(requestedId, profile)
+          nextMap[requestedId] = profile
         })
 
-        const results = await Promise.all(requests)
-        if (cancelled) return
-        results.forEach((entry) => {
-          if (!entry) return
-          const [id, profile] = entry
-          profileCacheRef.current.set(id, profile)
-          nextMap[id] = profile
-        })
+        if (debugProfiles && (requestFailed || unresolvedIds.length > 0)) {
+          console.warn("Profile batch fetch diagnostics", {
+            requestFailed,
+            requested: idsToFetch.length,
+            unresolvedIds,
+          })
+        }
 
-        setPublicProfilesByVjudge(nextMap)
-        setIsProfilesLoading(false)
+        setProfilesIfChanged(nextMap)
+        if (isRequestActive()) setIsProfilesLoading(false)
       } catch (e) {
         if (controller.signal.aborted) return
         console.error("Failed to load public profiles by vjudge id", e)
-        if (!cancelled) {
-          setPublicProfilesByVjudge({})
-          setIsProfilesLoading(false)
-        }
+        if (isRequestActive()) setIsProfilesLoading(false)
       }
     }
 
     loadProfiles()
     return () => {
-      cancelled = true
       controller.abort()
     }
-  }, [users])
+  }, [profileIdsSignature, serverBase])
 
   // Progress: build per-contest ranking and compute last vs previous attended
   const { contestRanks, progressByUser } = useMemo(() => {
