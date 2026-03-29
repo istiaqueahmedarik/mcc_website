@@ -3,7 +3,7 @@
 import { get, get_with_token, post_with_token } from "@/lib/action";
 import { cookies } from "next/headers";
 
-const API_URL = process.env.SERVER_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
 
 export async function loginToVJudge(email, pass) {
   try {
