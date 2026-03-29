@@ -1,5 +1,6 @@
 "use client";
 
+import { getPublicProfilesByVjudgeIds } from "@/actions/report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,7 +50,7 @@ function ReportTable({ merged, lastUpdated }) {
     const filtered = merged.users;
     return filtered;
   }, [merged.users]);
-
+  
   const { contestRanks, progressByUser } = useMemo(() => {
     const contestRanks = {};
 
@@ -105,7 +106,6 @@ function ReportTable({ merged, lastUpdated }) {
   }, [merged.users, merged.contestIds]);
 
   const totalUsers = users.length;
-  const [validVjudgeIds, setValidVjudgeIds] = useState(null);
   const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({});
   const [isProfilesLoading, setIsProfilesLoading] = useState(false);
   const profileCacheRef = useRef(new Map());
@@ -164,23 +164,6 @@ function ReportTable({ merged, lastUpdated }) {
   };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const base =
-          process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
-        const res = await fetch(`${base}/auth/public/vjudge-ids`, {
-          cache: "no-store",
-        });
-        const json = await res.json();
-        setValidVjudgeIds(new Set(json?.result || []));
-      } catch (e) {
-        console.error("Failed to load vjudge ids", e);
-      }
-    };
-    load();
-  }, []);
-
-  useEffect(() => {
     const controller = new AbortController();
     const requestId = ++latestProfilesRequestRef.current;
 
@@ -196,7 +179,7 @@ function ReportTable({ merged, lastUpdated }) {
 
     const loadProfiles = async () => {
       try {
-        if (!serverBase || profileIds.length === 0) {
+        if (profileIds.length === 0) {
           setProfilesIfChanged({});
           if (isRequestActive()) setIsProfilesLoading(false);
           return;
@@ -226,20 +209,12 @@ function ReportTable({ merged, lastUpdated }) {
         let requestFailed = false;
 
         try {
-          const res = await fetch(`${serverBase}/api/vjudge/profiles`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            cache: "no-store",
-            signal: controller.signal,
-            body: JSON.stringify({ ids: idsToFetch }),
-          });
+          const json = await getPublicProfilesByVjudgeIds(idsToFetch);
+          if (controller.signal.aborted) return;
 
-          if (!res.ok) {
+          if (!json || json.error) {
             requestFailed = true;
           } else {
-            const json = await res.json();
             batchMap =
               json?.result && typeof json.result === "object"
                 ? json.result
@@ -283,7 +258,7 @@ function ReportTable({ merged, lastUpdated }) {
     return () => {
       controller.abort();
     };
-  }, [profileIdsSignature, serverBase]);
+  }, [profileIdsSignature]);
 
   const getNameColor = (rank) => {
     if (rank <= 3) {

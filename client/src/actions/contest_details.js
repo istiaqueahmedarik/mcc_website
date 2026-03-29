@@ -411,7 +411,7 @@ export async function getCurrentLevelData(level) {
   const usersWithCfData = await getCodeforcesDataInParallel(userProfiles);
 
   // Step 3: Get VJudge data in single batch
-  const { result: publicContest } = await get("public-contest-report/all");
+  const { result: publicContest } = await get_with_token("public-contest-report/all");
   const vjudgeDataMap = publicContest
     ? await getVJudgeDataInBatch(usersWithCfData, publicContest)
     : new Map();

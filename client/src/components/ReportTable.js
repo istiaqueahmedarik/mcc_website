@@ -1,4 +1,5 @@
 "use client"
+import { getPublicProfilesByVjudgeIds } from "@/actions/report"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -194,21 +195,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return Math.max(...merged.users.map((u) => u.totalSolved), 0)
   }, [merged.users])
 
-  // Load valid VJudge IDs from server to decide linking
-  const [validVjudgeIds, setValidVjudgeIds] = useState(null)
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
-        const res = await fetch(`${base}/auth/public/vjudge-ids`, { cache: 'no-store' })
-        const json = await res.json()
-        const set = new Set(json?.result || [])
-        setValidVjudgeIds(set)
-      } catch (e) { console.error('Failed to load vjudge ids', e) }
-    }
-    load()
-  }, [])
-
   useEffect(() => {
     const controller = new AbortController()
     const requestId = ++latestProfilesRequestRef.current
@@ -222,7 +208,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
 
     const loadProfiles = async () => {
       try {
-        if (!serverBase || profileIds.length === 0) {
+        if (profileIds.length === 0) {
           setProfilesIfChanged({})
           if (isRequestActive()) setIsProfilesLoading(false)
           return
@@ -247,20 +233,12 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         let batchMap = {}
         let requestFailed = false
         try {
-          const res = await fetch(`${serverBase}/api/vjudge/profiles`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            cache: "no-store",
-            signal: controller.signal,
-            body: JSON.stringify({ ids: idsToFetch }),
-          })
+          const json = await getPublicProfilesByVjudgeIds(idsToFetch)
+          if (controller.signal.aborted) return
 
-          if (!res.ok) {
+          if (!json || json.error) {
             requestFailed = true
           } else {
-            const json = await res.json()
             batchMap = json?.result && typeof json.result === "object" ? json.result : {}
           }
         } catch {
@@ -298,7 +276,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return () => {
       controller.abort()
     }
-  }, [profileIdsSignature, serverBase])
+  }, [profileIdsSignature])
 
   // Progress: build per-contest ranking and compute last vs previous attended
   const { contestRanks, progressByUser } = useMemo(() => {
