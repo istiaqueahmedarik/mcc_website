@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { formatRelative } from "date-fns";
 import { Tag } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 function AchievementCard({ achievement }) {
   const rawTags = achievement?.tags ?? achievement?.tag_names ?? [];
@@ -120,7 +120,6 @@ function AchievementCard({ achievement }) {
       <div className="px-3 pt-2.5 pb-3">
         <p
           className="text-[12px] font-semibold leading-[1.4] line-clamp-2 text-slate-900 dark:text-[#e2e0ff]"
-          style={{ fontFamily: "'Syne', sans-serif" }}
         >
           {achievement.title}
         </p>
@@ -132,7 +131,6 @@ function AchievementCard({ achievement }) {
                   key={tag}
                   className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)] text-indigo-700 dark:text-[#a78bfa] max-w-full min-w-0"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
                     background: "rgba(99,102,241,0.10)",
                   }}
                   title={tag}
@@ -145,7 +143,6 @@ function AchievementCard({ achievement }) {
                 <span
                   className="inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)] text-indigo-700 dark:text-[#a78bfa]"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
                     background: "rgba(99,102,241,0.10)",
                   }}
                 >
@@ -163,9 +160,6 @@ function AchievementCard({ achievement }) {
                     tagMeasureRefs.current[idx] = el;
                   }}
                   className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)]"
-                  style={{
-                    fontFamily: "'Syne', sans-serif",
-                  }}
                 >
                   <Tag size={10} aria-hidden="true" />
                   <span>{tag}</span>
@@ -174,9 +168,6 @@ function AchievementCard({ achievement }) {
               <span
                 ref={probePlusRef}
                 className="inline-block text-[10px] font-bold uppercase tracking-widest rounded-full px-2 py-0.5 border border-indigo-300/50 dark:border-[rgba(99,102,241,0.22)]"
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                }}
               >
                 +0
               </span>
@@ -206,7 +197,6 @@ export default function RelatedAchievements({ achievements }) {
         <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-300 dark:to-[#2a2a38]" />
         <span
           className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-[#6b6b8a] whitespace-nowrap"
-          style={{ fontFamily: "'Syne', sans-serif" }}
         >
           More achievements
         </span>
