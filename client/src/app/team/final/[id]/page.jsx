@@ -1,10 +1,9 @@
-import Link from "next/link";
-import Image from "next/image";
 import { publicTeamById, renameMyTeam } from "@/actions/team_collection";
-import RenameTeamClient from "@/components/team/RenameTeamClient";
-import CodeforcesSubmissionDashboard from "@/components/codeforces-submission-dashboard";
 import PastPerformanceChart from "@/components/past-performance-chart";
+import RenameTeamClient from "@/components/team/RenameTeamClient";
 import { revalidatePath } from "next/cache";
+import Image from "next/image";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -274,15 +273,8 @@ export default async function TeamFinalPage({ params }) {
     .filter((u) => u.cf_id);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Breadcrumb */}
-        <div className="inline-flex items-center gap-2 bg-card/90 dark:bg-card/70 backdrop-blur-md rounded-full px-5 py-2.5 mb-6 shadow-lg border border-border/40 dark:border-border/20 hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-          <div className="w-2 h-2 bg-brand rounded-full animate-pulse shadow-[0_0_8px_rgba(var(--brand),0.6)]" />
-          <span className="text-sm font-semibold text-foreground dark:text-foreground/90 group-hover:text-brand transition-colors">
-            Team Dashboard
-          </span>
-        </div>
+    <div className="min-h-screen  items-center bg-background">
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
         {/* New Team Layout */}
         <div className="space-y-12">
@@ -292,7 +284,7 @@ export default async function TeamFinalPage({ params }) {
               <h1 className="text-4xl font-bold text-foreground dark:text-foreground/95 tracking-tight mb-2">
                 {team.team_title}
               </h1>
-              <p className="text-lg text-foreground/70 dark:text-foreground/60 font-medium">
+              <p className="text-lg text-foreground/60 dark:text-foreground/50 font-medium">
                 {team.collection_title}
               </p>
             </div>
@@ -305,7 +297,7 @@ export default async function TeamFinalPage({ params }) {
 
           {/* Team Members & Coach Section */}
           <div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
               {/* Team Member Cards */}
               {profiles.map((p, idx) => {
                 const u = p.data?.result;
@@ -335,7 +327,7 @@ export default async function TeamFinalPage({ params }) {
 
                       <div className="w-full space-y-2 mb-4">
                         {u?.email && (
-                          <div className="profile-info-chip text-xs w-full justify-center">
+                          <div className="profile-info-chip text-xs w-full items-start justify-start">
                             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
@@ -343,11 +335,36 @@ export default async function TeamFinalPage({ params }) {
                           </div>
                         )}
                         {u?.phone && (
-                          <div className="profile-info-chip text-xs w-full justify-center">
+                          <div className="profile-info-chip text-xs w-full items-start justify-start">
                             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
                             <span>{u.phone}</span>
+                          </div>
+                        )}
+                        {u?.mist_id && (
+                          <div className="profile-info-chip text-xs w-full items-start justify-start">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11h5M7 15h4M14 10h3v5h-3z" />
+                            </svg>
+                            <span>{u.mist_id}</span>
+                          </div>
+                        )}
+                        {u?.batch_name && (
+                          <div className="profile-info-chip text-xs w-full items-start justify-start">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.65-.08-1.28-.24-1.87M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.65.08-1.28.24-1.87m0 0a5 5 0 019.52 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span>{u.batch_name}</span>
+                          </div>
+                        )}
+                        {u?.tshirt_size && (
+                          <div className="profile-info-chip text-xs w-full items-start justify-start">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-3 4 3 3 1-1.5 4-2.5-1V20H8v-9l-2.5 1L4 8l4-1z" />
+                            </svg>
+                            <span>{u.tshirt_size}</span>
                           </div>
                         )}
                       </div>
@@ -398,7 +415,7 @@ export default async function TeamFinalPage({ params }) {
 
                       <div className="w-full space-y-2 mb-4">
                         {u?.email && (
-                          <div className="profile-info-chip text-xs w-full justify-center">
+                          <div className="profile-info-chip text-xs w-full justify-start">
                             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
@@ -406,11 +423,19 @@ export default async function TeamFinalPage({ params }) {
                           </div>
                         )}
                         {u?.phone && (
-                          <div className="profile-info-chip text-xs w-full justify-center">
+                          <div className="profile-info-chip text-xs w-full justify-start">
                             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
                             <span>{u.phone}</span>
+                          </div>
+                        )}
+                        {u?.tshirt_size && (
+                          <div className="profile-info-chip text-xs w-full justify-start">
+                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7l4-3 4 3 3 1-1.5 4-2.5-1V20H8v-9l-2.5 1L4 8l4-1z" />
+                            </svg>
+                            <span>{u.tshirt_size}</span>
                           </div>
                         )}
                       </div>
@@ -433,7 +458,7 @@ export default async function TeamFinalPage({ params }) {
         </div>
 
         {/* Team Performance Section */}
-        <div className="bg-gradient-to-br from-card/95 via-card/90 to-card/80 dark:from-card/90 dark:via-card/85 dark:to-card/75 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/20 dark:border-border/10 mb-8 hover:shadow-3xl transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
+        <div className="bg-gradient-to-br mt-4 from-card/95 via-card/90 to-card/80 dark:from-card/90 dark:via-card/85 dark:to-card/75 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-border/20 dark:border-border/10 mb-8 hover:shadow-3xl transition-all duration-700 animate-in fade-in slide-in-from-bottom-4">
           <div className="flex items-center gap-4 mb-8">
             <div className="text-4xl">📊</div>
             <div className="flex-1">

@@ -19,14 +19,51 @@ import { unstable_noStore as noStore } from "next/cache";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
+async function getPublicProfileByVjudge(vjudgeId) {
+  if (!vjudgeId) return null;
+  try {
+    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+    const res = await fetch(
+      `${base}/auth/public/profile/vj/${encodeURIComponent(vjudgeId)}`,
+      {
+        cache: "force-cache",
+        next: { revalidate: 300 },
+      }
+    );
+    const data = await res.json();
+    return data?.result || null;
+  } catch (error) {
+    return null;
+  }
+}
+
 export default async function page({ searchParams }) {
   // Removed Codeforces OAuth code parameter handling
   noStore();
 
   const res = await get_with_token(`auth/user/profile?t=${Date.now()}`);
+  if (!res || res.error || !Array.isArray(res.result) || res.result.length === 0) {
+    redirect("/login");
+  }
   const user = res.result[0];
   const myTeamsRes = await get_with_token("team-collection/my-teams");
+  console.log("My Teams Response:", myTeamsRes);
   const myTeams = myTeamsRes?.result || [];
+  const coachIds = Array.from(
+    new Set(
+      myTeams
+        .map((team) => team?.coach_vjudge_id)
+        .filter((coachId) => typeof coachId === "string" && coachId.trim())
+    )
+  );
+  const coachProfiles = Object.fromEntries(
+    await Promise.all(
+      coachIds.map(async (coachId) => [
+        coachId,
+        await getPublicProfileByVjudge(coachId),
+      ])
+    )
+  );
   const coachedTeamsRes = user?.vjudge_id
     ? await post_with_token("team-collection/public/teams/coached-by-vjudge", {
       vjudge_id: user.vjudge_id,
@@ -366,17 +403,22 @@ export default async function page({ searchParams }) {
                           {t.collection_title}
                         </div>
                       )}
-                      <TeamMemberList team={t} />
+                      <TeamMemberList
+                        team={t}
+                        coachProfile={coachProfiles[t.coach_vjudge_id] || null}
+                      />
                     </ProgressLink>
                   ))}
                 </div>
               )}
             </section>
 
-            <CoachedTeamsSection
-              coachedTeams={coachedTeams}
-              hasVjudgeId={Boolean(user?.vjudge_id)}
-            />
+            {coachedTeams.length > 0 && (
+              <CoachedTeamsSection
+                coachedTeams={coachedTeams}
+                hasVjudgeId={Boolean(user?.vjudge_id)}
+              />
+            )}
           </main>
         </div>
       </div>
@@ -384,7 +426,9 @@ export default async function page({ searchParams }) {
   );
 }
 
-function TeamMemberList({ team }) {
+function TeamMemberList({ team, coachProfile }) {
+  const coachId =
+    typeof team?.coach_vjudge_id === "string" ? team.coach_vjudge_id : null;
   const profiles = Array.isArray(team?.member_profiles)
     ? team.member_profiles.filter((m) => m && m.vjudge_id)
     : [];
@@ -393,7 +437,7 @@ function TeamMemberList({ team }) {
     ? team.member_vjudge_ids
     : [];
 
-  if (profiles.length === 0 && fallbackIds.length === 0) {
+  if (profiles.length === 0 && fallbackIds.length === 0 && !coachId) {
     return null;
   }
 
@@ -404,10 +448,23 @@ function TeamMemberList({ team }) {
     image: m.profile_pic || "/placeholder.svg",
   }));
 
+  const memberAndCoachItems = coachId
+    ? [
+      ...tooltipItems,
+      {
+        id: tooltipItems.length + 1,
+        name: coachProfile?.full_name || "Coach",
+        role: "Coach",
+        designation: coachId,
+        image: coachProfile?.profile_pic || "/placeholder.svg",
+      },
+    ]
+    : tooltipItems;
+
   return (
     <div className="mt-2 space-y-2">
-      {profiles.length > 0
-        ? <AnimatedTooltip items={tooltipItems} />
+      {memberAndCoachItems.length > 0
+        ? <AnimatedTooltip items={memberAndCoachItems} />
         : fallbackIds.map((vj) => (
           <div
             key={vj}

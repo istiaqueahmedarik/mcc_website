@@ -846,13 +846,13 @@ export async function isCourseIns(course_id) {
 }
 
 export async function getAchievements(limit, offset=0) {
-  const response = await get_with_token(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
+  const response = await get(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
   if (response?.error) return response.error;
   return response?.result;
 }
 
 export async function getAchievementsById(ach_id) {
-  const response = await post_with_token("achieve/get_achievement", {
+  const response = await post("achieve/get_achievement", {
     id: ach_id,
   });
   if (response.error) return response.error;
@@ -860,19 +860,19 @@ export async function getAchievementsById(ach_id) {
 }
 
 export async function getAchievementNumber() {
-  const response = await get_with_token("achieve/get_achievement_number");
+  const response = await get("achieve/get_achievement_number");
   if (response?.error) return response.error;
   return response?.result?.[0]?.count;
 }
 
 export async function getFeaturedAchievements(limit = 12) {
-  const response = await get_with_token(`achieve/get_featured_achievements?limit=${limit}`);
+  const response = await get(`achieve/get_featured_achievements?limit=${limit}`);
   if (response?.error) return response.error;
   return response?.result;
 }
 
 export async function getRelatedAchievements(ach_id, limit = 20) {
-  const response = await post_with_token(`achieve/get_related_achievements?limit=${limit}`, {
+  const response = await post(`achieve/get_related_achievements?limit=${limit}`, {
     id: ach_id
   });
   if (response?.error) return response.error;

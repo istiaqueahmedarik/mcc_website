@@ -45,6 +45,11 @@ export default function AnimatedTooltip({ items = [] }) {
               >
                 <div className="absolute inset-x-10 -bottom-px z-30 h-px w-[20%] bg-gradient-to-r from-transparent via-primary to-transparent" />
                 <div className="absolute -bottom-px left-10 z-30 h-px w-[40%] bg-gradient-to-r from-transparent via-ring to-transparent" />
+                {item.role && (
+                  <div className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-primary">
+                    ({item.role})
+                  </div>
+                )}
                 <div className="relative z-30 whitespace-nowrap text-base font-medium text-popover-foreground">
                   {item.name}
                 </div>

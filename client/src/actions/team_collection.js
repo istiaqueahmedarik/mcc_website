@@ -56,10 +56,10 @@ export async function adminProcessTeamRequest(request_id, processed, approve=fal
 
 // Leaderboard
 export async function publicFinalizedTeamsLeaderboard(){
-  return await get_with_token('team-collection/public/finalized/teams')
+  return await get('team-collection/public/finalized/teams')
 }
 export async function publicFinalizedTeamsByContest(){
-  return await get_with_token('team-collection/public/finalized/teams/by-contest')
+  return await get('team-collection/public/finalized/teams/by-contest')
 }
 
 // Admin
