@@ -6,17 +6,32 @@ import {
   useMarkdownEditor,
 } from "@gravity-ui/markdown-editor";
 import { Button } from "@gravity-ui/uikit";
-import { transform as transformHTML } from "@diplodoc/html-extension";
+import * as htmlExtension from "@diplodoc/html-extension";
 import { useYfmHtmlBlockStyles } from "../hooks/useYfmHtmlBlockStyles";
 import { wYfmHtmlBlockItemData } from "@gravity-ui/markdown-editor";
 
+const resolveHtmlTransform = () => {
+  if (typeof htmlExtension.transform === "function") {
+    return htmlExtension.transform;
+  }
+
+  if (typeof htmlExtension.default?.transform === "function") {
+    return htmlExtension.default.transform;
+  }
+
+  return null;
+};
+
+const htmlTransform = resolveHtmlTransform();
+
 export const Editor = memo(({ onChange, value }) => {
   const yfmHtmlBlockStyles = useYfmHtmlBlockStyles();
+  const mdPlugins = htmlTransform ? [htmlTransform({ bundle: false })] : [];
 
   const editor = useMarkdownEditor({
     md: {
       html: true,
-      plugins: [transformHTML({ bundle: false })],
+      plugins: mdPlugins,
     },
     initialValue: value,
     initial: {

@@ -12,8 +12,9 @@ const ThemeChanger = () => {
     setMounted(true)
   }, [])
 
+  if (!mounted) return null // prevents hydration mismatch
+
   function handleClick() {
-    if (!mounted) return
     setTheme(theme === 'light' ? 'dark' : 'light')
   }
 

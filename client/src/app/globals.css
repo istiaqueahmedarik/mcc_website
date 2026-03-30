@@ -344,6 +344,48 @@
   background-color: var(--g-color-base-background) !important;
 }
 
+/* Keep visual editor font aligned with markdown markup mode. */
+.g-md-wysiwyg-editor__editor .yfm,
+.g-md-wysiwyg-editor__editor .yfm.yfm-editor,
+.g-md-wysiwyg-editor__editor .ProseMirror.yfm {
+  --yfm-font-family-sans: var(--g-text-code-font-family);
+  font-family: var(--g-text-code-font-family);
+}
+
+/* Keep visual editor UX intact under global resets. */
+.g-md-wysiwyg-editor__editor,
+.g-md-wysiwyg-editor__editor .yfm-editor,
+.g-md-wysiwyg-editor__editor .ProseMirror {
+  cursor: text;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ul,
+.g-md-wysiwyg-editor__editor .ProseMirror menu {
+  list-style-type: disc;
+  padding-inline-start: 1.5rem;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ol {
+  list-style-type: decimal;
+  padding-inline-start: 1.5rem;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ol ol {
+  list-style-type: lower-alpha;
+}
+
+.g-md-wysiwyg-editor__editor .ProseMirror ol ol ol {
+  list-style-type: lower-roman;
+}
+
 /* Enhanced 3D effects for alumni cards */
 .perspective-1000 {
   perspective: 1000px;

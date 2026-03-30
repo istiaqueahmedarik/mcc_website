@@ -1,288 +1,162 @@
-"use client";
-import React, {
-  useActionState,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
-import { Menu, X, ImageIcon, TrophyIcon, CalendarIcon, Check, Copy } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import EditorWrapper from "@/components/EditorWrapper";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { createAchievement, uploadImage } from "@/lib/action";
-import TagsInput from "@/components/achievements/TagsInput";
+'use client'
+
+import { createAchievement, uploadImage } from '@/lib/action'
+import AchievementFormShell from '@/components/achievements/AchievementFormShell'
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const initialState = {
-  message: "",
+  message: '',
   success: false,
-};
+}
 
-const Insert = ({ state, inputRef, handleCopy, tagsResetKey }) => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (copied) {
-      setTimeout(() => setCopied(false), 2500);
-    }
-  }, [copied]);
-
-  const uploadImageForDescription = useCallback(async (rawImage) => {
-    const { url, error } = await uploadImage(
-      "achievements",
-      new Date().getTime().toString(),
-      rawImage,
-      "all_picture"
-    );
-    if (error) {
-      return { success: false, message: "Problem uploading image", url: "" };
-    }
-    inputRef.current.value = url;
-    return { success: true, message: "", url };
-  }, []);
-
-  const updateCopy = () => {
-    handleCopy();
-    setCopied(true);
-  };
-
-  return (
-    <>
-      {!isMobileMenuOpen && (
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="lg:hidden fixed bottom-4 left-4 z-50 p-2 bg-blue-600 text-white rounded-md shadow-lg"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-      )}
-
-      {isMobileMenuOpen && (
-        <div
-          style={{ background: "var(--sidebar-background)" }}
-          className="lg:hidden fixed inset-0 z-40"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      <div
-        style={{ background: "var(--sidebar-background)" }}
-        className={`fixed
-          lg:relative inset-y-0 left-0 z-50
-          w-80 sm:w-96 lg:w-80
-          border-r border-gray-200 dark:border-zinc-700
-          transform transition-transform duration-300 ease-in-out ${
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          } lg:translate-x-0 h-[90vh] overflow-y-auto`}
-      >
-        <div className="p-4 border-b border-gray-200 dark:border-zinc-700 relative">
-          <button
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="lg:hidden absolute top-4 right-4 p-1 hover:bg-gray-100 rounded"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-
-          <div className="flex items-center space-x-3 pr-8 lg:pr-0">
-            <div className="min-w-0">
-              <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-100 truncate">
-                Create Achievement
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-300 break-words">
-                Share the latest achievements of MIST Computer Club
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="w-full flex flex-col px-4 mt-4 space-y-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <div className="relative">
-              <TrophyIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                id="title"
-                name="title"
-                placeholder="Title of the achievement"
-                className="pl-10 border-gray-300 dark:border-zinc-700 dark:focus:ring-zinc-600"
-              />
-            </div>
-          </div>
-
-          {/* Image */}
-          <div className="space-y-2">
-            <Label htmlFor="image">Image</Label>
-            <div className="relative">
-              <ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="file"
-                id="image"
-                name="image"
-                onChange={(e) => uploadImageForDescription(e.target.files[0])}
-                className="pl-10 border-gray-300 dark:border-zinc-700"
-                accept="image/*"
-              />
-            </div>
-          </div>
-
-          {/* Image URL */}
-          <div className="space-y-2">
-            <Label htmlFor="imageUrl">Uploaded Image URL</Label>
-            <div className="relative">
-              <ImageIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="text"
-                id="imageUrl"
-                ref={inputRef}
-                name="imageUrl"
-                disabled
-                placeholder="Image Url of the achievement"
-                className="pl-10 pr-12 border-gray-300 dark:border-zinc-700 dark:focus:ring-zinc-600"
-              />
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={updateCopy}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-lg"
-                    >
-                      {copied ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    className="rounded-md bg-gray-900 px-2 py-1 text-xs text-white"
-                  >
-                    {copied ? "Copied!" : "Copy to clipboard"}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-
-          {/* Date */}
-          <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input type="date" id="date" name="date" className="pl-10" />
-            </div>
-          </div>
-
-          {/* Tags */}
-          <TagsInput key={tagsResetKey} />
-
-          <div className="space-b-2">
-            <p className="italic text-gray-400 text-sm dark:text-gray-700">
-              Note: You can copy the url by uploading an image and paste that on
-              the description. Remember that always upload the thumbnail image
-              at last. So that the last image will be automatically taken for
-              thumbnail.
-            </p>
-          </div>
-
-          {state?.message && (
-            <Alert variant={state?.success ? "success" : "destructive"}>
-              <AlertDescription>{state?.message}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </div>
-    </>
-  );
-};
-
-const MainContent = ({ description, setDescription, pending, editorResetKey }) => {
-  const handleDescriptionChange = useCallback(
-    (newValue) => setDescription(newValue),
-    [setDescription]
-  );
-
-  return (
-    <div className="flex-1 h-screen lg:ml-0 ml-0">
-      <div className="h-full flex flex-col">
-        <div className="flex-1 flex flex-col">
-          <div>
-            <EditorWrapper
-              key={editorResetKey}
-              value={description}
-              handleChange={handleDescriptionChange}
-            />
-            <input type="hidden" name="description" value={description} />
-          </div>
-          <div className="mt-4 flex justify-between items-center px-4">
-            <span className="text-sm text-gray-500">
-              {description.length} characters
-            </span>
-            <button
-              type="submit"
-              disabled={pending}
-              className="px-6 py-2 bg-zinc-700 dark:bg-zinc-200 text-white rounded-lg dark:text-zinc-800 transition-colors"
-            >
-              {pending ? "Submitting..." : "Create Achievement"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+const badgePresets = [
+  '1st Place',
+  '2nd Place',
+  '3rd Place',
+  'Finalist',
+  'Special Award',
+  'Custom',
+]
 
 const NHEFPage = () => {
-  const [description, setDescription] = useState("");
-  const [editorResetKey, setEditorResetKey] = useState(0);
-  const [state, formAction, pending] = useActionState(createAchievement, initialState);
-  const inputRef = useRef(null);
+  const [description, setDescription] = useState('')
+  const [editorResetKey, setEditorResetKey] = useState(0)
+  const [state, formAction, pending] = useActionState(createAchievement, initialState)
+
+  const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  const [copied, setCopied] = useState(false)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState('')
+  const [uploadedImageUrl, setUploadedImageUrl] = useState('')
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
+  const [selectedBadge, setSelectedBadge] = useState('1st Place')
+  const [customBadge, setCustomBadge] = useState('')
+
+  const today = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Dhaka',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date()),
+    []
+  )
 
   useEffect(() => {
-    if (state?.success) {
-      setDescription("");
-      setEditorResetKey((prev) => (prev + 1) % 2);
-    }
-  }, [state]);
+    if (!copied) return undefined
+    const timer = setTimeout(() => setCopied(false), 1800)
+    return () => clearTimeout(timer)
+  }, [copied])
+
+  useEffect(() => {
+    if (!state?.success) return
+    setDescription('')
+    setEditorResetKey((prev) => (prev + 1) % 2)
+    setImagePreviewUrl('')
+    setUploadedImageUrl('')
+    setSelectedBadge('1st Place')
+    setCustomBadge('')
+  }, [state])
+
+  useEffect(
+    () => () => {
+      if (imagePreviewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreviewUrl)
+      }
+    },
+    [imagePreviewUrl]
+  )
+
+  const uploadImageForDescription = useCallback(
+    async (rawImage) => {
+      if (!rawImage) return
+
+      if (imagePreviewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreviewUrl)
+      }
+      setImagePreviewUrl(URL.createObjectURL(rawImage))
+
+      const { url, error } = await uploadImage(
+        'achievements',
+        new Date().getTime().toString(),
+        rawImage,
+        'all_picture'
+      )
+
+      if (error) {
+        if (inputRef.current) inputRef.current.value = ''
+        setUploadedImageUrl('')
+        return
+      }
+
+      if (inputRef.current) inputRef.current.value = url
+      setUploadedImageUrl(url)
+    },
+    [imagePreviewUrl]
+  )
+
+  const onImageInputChange = useCallback(
+    (e) => {
+      const file = e.target.files?.[0]
+      uploadImageForDescription(file)
+    },
+    [uploadImageForDescription]
+  )
+
+  const onDropImage = useCallback(
+    (e) => {
+      e.preventDefault()
+      setIsDraggingImage(false)
+      const file = e.dataTransfer.files?.[0]
+      if (file?.type?.startsWith('image/')) {
+        uploadImageForDescription(file)
+      }
+    },
+    [uploadImageForDescription]
+  )
 
   const handleCopy = useCallback(() => {
-    if (inputRef.current?.value) {
-      navigator.clipboard.writeText(inputRef.current.value);
-    }
-  }, []);
+    if (!uploadedImageUrl) return
+    navigator.clipboard.writeText(uploadedImageUrl)
+    setCopied(true)
+  }, [uploadedImageUrl])
 
   return (
-    <form action={formAction} className="w-full flex flex-col justify-center">
-      <div className="flex w-full">
-        <Insert
-          state={state}
-          inputRef={inputRef}
-          handleCopy={handleCopy}
-          tagsResetKey={editorResetKey}
-        />
-        <MainContent
-          pending={pending}
-          setDescription={setDescription}
-          description={description}
-          editorResetKey={editorResetKey}
-        />
-      </div>
-    </form>
-  );
-};
+    <AchievementFormShell
+      formAction={formAction}
+      pending={pending}
+      state={state}
+      heading="New Achievement"
+      subheading="Document a milestone, award, or recognition worth celebrating."
+      description={description}
+      setDescription={setDescription}
+      titleDefaultValue=""
+      dateDefaultValue={today}
+      initialTags={[]}
+      tagsResetKey={editorResetKey}
+      inputRef={inputRef}
+      fileInputRef={fileInputRef}
+      uploadedImageUrl={uploadedImageUrl}
+      imagePreviewUrl={imagePreviewUrl}
+      isDraggingImage={isDraggingImage}
+      setIsDraggingImage={setIsDraggingImage}
+      onDropImage={onDropImage}
+      onImageInputChange={onImageInputChange}
+      handleCopy={handleCopy}
+      copied={copied}
+      selectedBadge={selectedBadge}
+      setSelectedBadge={setSelectedBadge}
+      customBadge={customBadge}
+      setCustomBadge={setCustomBadge}
+      badgePresets={badgePresets}
+      submitIdleText="Create Achievement"
+      submitPendingText="Submitting..."
+      imageHelperText="This field is auto-filled after upload. Keep the thumbnail image upload last so the most recent URL is used as thumbnail automatically."
+      isFeaturedDefaultChecked={false}
+    />
+  )
+}
 
 export default NHEFPage;

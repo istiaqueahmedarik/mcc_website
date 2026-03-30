@@ -16,15 +16,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PastPerformanceChart from "@/components/past-performance-chart";
 
 async function fetchAllSharedReports() {
+  const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+  if (!base) {
+    return { result: [] };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
   try {
-    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
     const res = await fetch(`${base}/public-contest-report/all`, {
       cache: "no-store",
+      signal: controller.signal,
     });
+
+    if (!res.ok) {
+      return { result: [] };
+    }
+
     return await res.json();
-  } catch (e) {
-    console.error(e);
+  } catch {
     return { result: [] };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -116,21 +130,37 @@ function deriveUserPerformanceAcrossReports(vjudge, reports) {
 export const dynamic = "force-dynamic";
 
 async function fetchPublicProfile(vjudge) {
+  const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
+  if (!base) {
+    return { error: "Failed" };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
   try {
-    const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
     const res = await fetch(
       `${base}/auth/public/profile/vj/${encodeURIComponent(vjudge)}`,
-      { cache: "no-store" }
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      }
     );
+
+    if (!res.ok) {
+      return { error: "Failed" };
+    }
+
     return await res.json();
-  } catch (e) {
-    console.error(e);
+  } catch {
     return { error: "Failed" };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export default async function PublicProfilePage({ params }) {
-  const { vjudge } = params;
+  const { vjudge } = await params;
   const [data, allReports] = await Promise.all([
     fetchPublicProfile(vjudge),
     fetchAllSharedReports(),
