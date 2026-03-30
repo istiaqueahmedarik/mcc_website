@@ -430,7 +430,7 @@ export default function Home() {
         <div className="flex flex-col items-center">
           <AchievementPage />
           <Link href="/achievements" className="mt-8">
-            <Button className="dark:bg-white dark:text-black text-white bg-blue-500 hover:bg-blue-700">See all</Button>
+            <Button variant="outline">See more</Button>
           </Link>
         </div>
       </section>
@@ -488,7 +488,7 @@ export default function Home() {
         <AlumniMarquee items={alumni} speed={0.6} />
         <div className="flex justify-center mt-6">
           <Link href="/alumni">
-            <Button variant="outline">See all Alumni</Button>
+            <Button variant="outline">See more</Button>
           </Link>
         </div>
       </section>

@@ -1,27 +1,28 @@
 "use client";
 
-import { formatRelative } from "date-fns";
 import { Tag } from "lucide-react";
+import { format } from "date-fns";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { CalendarArrowUp, CalendarDays } from "lucide-react";
 
 function AchievementCard({ achievement }) {
   const rawTags = achievement?.tags ?? achievement?.tag_names ?? [];
   const normalizedTags = Array.isArray(rawTags)
     ? rawTags
-        .map((tag) => {
-          if (typeof tag === "string") return tag.trim();
-          if (typeof tag?.name === "string") return tag.name.trim();
-          if (typeof tag?.tag === "string") return tag.tag.trim();
-          return "";
-        })
-        .filter(Boolean)
+      .map((tag) => {
+        if (typeof tag === "string") return tag.trim();
+        if (typeof tag?.name === "string") return tag.name.trim();
+        if (typeof tag?.tag === "string") return tag.tag.trim();
+        return "";
+      })
+      .filter(Boolean)
     : typeof rawTags === "string"
       ? rawTags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean)
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
       : [];
   const sortedTags = [...new Set(normalizedTags)].sort(
     (a, b) => a.length - b.length || a.localeCompare(b)
@@ -96,7 +97,7 @@ function AchievementCard({ achievement }) {
   return (
     <Link
       href={`/achievements/${achievement.id}`}
-      className="group w-full rounded-[14px] overflow-hidden border border-slate-300 dark:border-[#2a2a38] bg-white dark:bg-[#111118] transition-all duration-200 hover:-translate-y-1 relative"
+      className="group w-full rounded-md overflow-hidden bg-white dark:bg-[#111118] transition-all duration-200 scale- hover:scale-105 relative"
     >
       {/* Gold shimmer top rule */}
       <div
@@ -107,7 +108,7 @@ function AchievementCard({ achievement }) {
       />
 
       {/* Image */}
-      <div className="w-full aspect-[4/3] relative bg-slate-50 dark:bg-[#1a1a24]">
+      <div className="w-full aspect-[4/3] relative border-b border-slate-200 dark:border-[#2a2a38]">
         <Image
           src={achievement.image}
           alt={achievement.title ?? "Achievement"}
@@ -117,12 +118,23 @@ function AchievementCard({ achievement }) {
       </div>
 
       {/* Body */}
-      <div className="px-3 pt-2.5 pb-3">
-        <p
-          className="text-[12px] font-semibold leading-[1.4] line-clamp-2 text-slate-900 dark:text-[#e2e0ff]"
+      <div className="p-4 gap-4">
+        <h2
+          className="tracking-wide font-semibold text-slate-900 dark:text-[#e2e0ff]"
         >
           {achievement.title}
-        </p>
+        </h2>
+
+        {/* <div className="flex items-center gap-2 text-amber-300/60">
+          <CalendarArrowUp size={12} className="" />
+          <span className="text-xs tracking-wide">
+            {formatRelative(achievement.date, new Date())}
+          </span>
+        </div> */}
+        <div className="flex items-center gap-1.5 text-zinc-500 dark:text-white/40 text-[11px] font-medium tracking-wide">
+          <CalendarDays className="w-3 h-3 shrink-0" />
+          <span>{format(achievement.date, "dd MMM yyyy")}</span>
+        </div>
         {sortedTags.length > 0 && (
           <>
             <div ref={rowRef} className="mt-1.5 mb-1.5 flex items-center gap-1.5 min-w-0">
@@ -174,9 +186,6 @@ function AchievementCard({ achievement }) {
             </div>
           </>
         )}
-        <p className="text-[10px] mt-1.5 text-slate-500 dark:text-[#6b6b8a]">
-          {formatRelative(achievement.date, new Date())}
-        </p>
       </div>
 
       {/* Hover border glow */}
@@ -192,7 +201,6 @@ export default function RelatedAchievements({ achievements }) {
 
   return (
     <section className="mt-16">
-      {/* Section heading */}
       <div className="flex items-center gap-3 mb-6 px-1">
         <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-300 dark:to-[#2a2a38]" />
         <span
@@ -203,7 +211,7 @@ export default function RelatedAchievements({ achievements }) {
         <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-300 dark:to-[#2a2a38]" />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {achievements.map((achievement) => (
           <AchievementCard key={achievement.id} achievement={achievement} />
         ))}

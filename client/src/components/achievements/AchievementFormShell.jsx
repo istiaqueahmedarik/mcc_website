@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import EditorWrapper from '@/components/EditorWrapper'
+import TagsInput from '@/components/achievements/TagsInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CalendarIcon, Check, Copy, Link2, Trophy, Upload } from 'lucide-react'
+import { CalendarIcon, Trophy, Upload } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-import EditorWrapper from '@/components/EditorWrapper'
-import TagsInput from '@/components/achievements/TagsInput'
 
 export default function AchievementFormShell({
   formAction,
@@ -29,18 +29,13 @@ export default function AchievementFormShell({
   onImageInputChange,
   handleCopy,
   copied,
-  selectedBadge,
-  setSelectedBadge,
   customBadge,
   setCustomBadge,
-  badgePresets,
   submitIdleText,
   submitPendingText,
   imageHelperText,
   isFeaturedDefaultChecked = false,
 }) {
-  const introValue = selectedBadge === 'Custom' ? customBadge.trim() : selectedBadge
-  const badgePreviewText = introValue || selectedBadge
   const lastToastKeyRef = useRef('')
 
   useEffect(() => {
@@ -59,49 +54,20 @@ export default function AchievementFormShell({
   }, [state?.message, state?.success])
 
   return (
-    <form action={formAction} className="min-h-screen">
-      <div className="relative min-h-screen bg-[var(--ab-bg)] text-[var(--ab-text)] [font-family:'DM_Sans',system-ui,sans-serif] [--ab-bg:#f8fafc] [--ab-surface:#ffffff] [--ab-surface-2:#f1f5f9] [--ab-border:rgba(15,23,42,0.14)] [--ab-accent:#4f46e5] [--ab-accent-2:#7c3aed] [--ab-gold:#d97706] [--ab-text:#0f172a] [--ab-muted:#475569] dark:[--ab-bg:#0a0a0f] dark:[--ab-surface:#111118] dark:[--ab-surface-2:#17171f] dark:[--ab-border:#2a2a38] dark:[--ab-accent:#6366f1] dark:[--ab-accent-2:#a78bfa] dark:[--ab-gold:#f59e0b] dark:[--ab-text:#f1f0ff] dark:[--ab-muted:#9090b0]">
-        <div className="pointer-events-none fixed -left-40 -top-44 h-[42rem] w-[42rem] rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.12)_0%,transparent_72%)]" />
-        <div className="pointer-events-none fixed -bottom-40 -right-44 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.1)_0%,transparent_72%)]" />
-
-        <main className="relative z-10 mx-auto w-full max-w-[1440px] px-4 pb-20 pt-10 sm:px-8 lg:px-10 sm:pt-12">
-          <h1 className="text-3xl font-extrabold tracking-tight text-transparent [font-family:'Syne',sans-serif] bg-gradient-to-r from-[var(--ab-text)] to-[var(--ab-accent-2)] bg-clip-text sm:text-4xl">
+    <form action={formAction} className="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0a0a0f] dark:text-[#e8e8f5]">
+      <main className="mx-auto w-full max-w-7xl px-4 md:px-12 py-2">
+        <header className="mb-8 text-center">
+          <h1 className="text-2xl font-extrabold tracking-wide text-slate-700 dark:text-[#a9a9c5] sm:text-3xl">
             {heading}
           </h1>
-          <p className="mt-2 text-sm font-light text-[var(--ab-muted)]">{subheading}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-[#8f8faf]">{subheading}</p>
+        </header>
 
-          <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-6">
-            <div className="col-span-full flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
-              Basic Info
-              <span className="h-px flex-1 bg-[var(--ab-border)]" />
-            </div>
-
-            <div className="col-span-full space-y-2">
-              <Label
-                htmlFor="title"
-                className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
-              >
-                Achievement Title
-              </Label>
-              <div className="relative">
-                <Trophy className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ab-muted)]" />
-                <Input
-                  id="title"
-                  name="title"
-                  type="text"
-                  defaultValue={titleDefaultValue}
-                  placeholder="e.g. 1st Place - National Science Olympiad 2025"
-                  className="h-12 border-[var(--ab-border)] bg-[var(--ab-surface)] pl-10 text-[var(--ab-text)] placeholder:text-[rgba(144,144,176,0.6)] focus-visible:ring-[var(--ab-accent)]"
-                />
-              </div>
-            </div>
-
-            <div className="col-span-full grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-6">
-              <div className="space-y-2">
-                <Label
-                  htmlFor="image"
-                  className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
-                >
+        <div className="rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-[#242434] dark:bg-[#111118] sm:p-6">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-6">
+            <div className="col-span-full grid grid-cols-1 gap-5 md:grid-cols-2 lg:gap-6 items-start">
+              <div className="space-y-4">
+                <Label htmlFor="image" className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
                   Achievement Image / Photo
                 </Label>
 
@@ -113,10 +79,10 @@ export default function AchievementFormShell({
                   onDragLeave={() => setIsDraggingImage(false)}
                   onDrop={onDropImage}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`group relative aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-5 transition-colors flex ${
+                  className={`group relative flex aspect-square w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border-2 border-dashed p-5 transition-colors ${
                     isDraggingImage
-                      ? 'border-amber-400 bg-amber-400/10'
-                      : 'border-[var(--ab-border)] bg-[var(--ab-surface)] hover:border-[var(--ab-accent)] hover:bg-[var(--ab-surface-2)]'
+                      ? 'border-amber-400 bg-amber-100/40 dark:bg-amber-400/10'
+                      : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100 dark:border-[#2a2a38] dark:bg-[#17171f] dark:hover:border-[#3a3a4f] dark:hover:bg-[#1d1d28]'
                   }`}
                 >
                   <Input
@@ -134,16 +100,16 @@ export default function AchievementFormShell({
                       <img
                         src={imagePreviewUrl}
                         alt="Achievement preview"
-                        className="absolute inset-0 h-full w-full object-contain bg-[var(--ab-surface-2)]"
+                        className="absolute inset-0 h-full w-full object-contain bg-slate-100 dark:bg-[#1d1d28]"
                       />
-                      <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-black/55 backdrop-blur-[1px] group-hover:flex">
+                      <div className="absolute inset-0 hidden items-center justify-center gap-2 bg-black/50 group-hover:flex">
                         <Button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
                             fileInputRef.current?.click()
                           }}
-                          className="h-9 bg-white/15 text-white backdrop-blur hover:bg-white/25"
+                          className="h-9 rounded-full bg-white/20 px-4 text-white hover:bg-white/30"
                         >
                           Replace
                         </Button>
@@ -151,20 +117,18 @@ export default function AchievementFormShell({
                     </>
                   ) : (
                     <div className="space-y-3 text-center">
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500/20 to-violet-400/20 text-indigo-200">
-                        <Upload className="h-6 w-6" />
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-slate-600 dark:bg-[#242434] dark:text-[#9f9fbc]">
+                        <Upload className="h-5 w-5" />
                       </div>
-                      <p className="text-sm font-semibold [font-family:'Syne',sans-serif]">
-                        Drop your image here
-                      </p>
-                      <p className="text-xs text-[var(--ab-muted)]">PNG, JPG, WebP - Max 10MB</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-[#c6c6dc]">Drop your image here</p>
+                      <p className="text-xs text-slate-500 dark:text-[#8f8faf]">PNG, JPG, WebP - Max 10MB</p>
                       <Button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
                           fileInputRef.current?.click()
                         }}
-                        className="bg-gradient-to-r from-[var(--ab-accent)] to-[var(--ab-accent-2)] text-white hover:opacity-90"
+                        className="rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90"
                       >
                         Browse Files
                       </Button>
@@ -173,182 +137,121 @@ export default function AchievementFormShell({
                 </div>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-5 h-full flex flex-col justify-center">
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="imageUrl"
-                    className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
-                  >
-                    Uploaded Image URL
+                  <Label htmlFor="title" className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
+                    Achievement Title
                   </Label>
-
-                  <div className="rounded-xl border border-[var(--ab-border)] bg-[var(--ab-surface)] p-4">
-                    <div className="flex h-12 items-stretch overflow-hidden rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)]">
-                      <span className="flex items-center border-r border-[var(--ab-border)] bg-[var(--ab-surface-2)] px-3 text-[var(--ab-muted)]">
-                        <Link2 className="h-4 w-4" />
-                      </span>
-                      <Input
-                        id="imageUrl"
-                        ref={inputRef}
-                        name="imageUrl"
-                        disabled
-                        value={uploadedImageUrl}
-                        placeholder="URL will appear after image is uploaded"
-                        className="h-full flex-1 border-0 bg-transparent text-xs text-[var(--ab-muted)] [font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation_Mono','Courier_New',monospace] focus-visible:ring-0"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        disabled={!uploadedImageUrl}
-                        className={`border-l border-[var(--ab-border)] px-3 transition-colors ${
-                          uploadedImageUrl
-                            ? 'bg-[var(--ab-surface-2)] text-[var(--ab-muted)] hover:bg-indigo-500/15 hover:text-[var(--ab-accent-2)]'
-                            : 'cursor-not-allowed bg-[var(--ab-surface-2)] text-[rgba(144,144,176,0.35)]'
-                        }`}
-                      >
-                        {copied ? (
-                          <Check className="h-4 w-4 text-emerald-400" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="mt-4 flex gap-2 rounded-md border border-amber-400/20 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-600">
-                      <div className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-600/25 text-[10px] font-bold">
-                        i
-                      </div>
-                      <p className="leading-relaxed">{imageHelperText}</p>
-                    </div>
+                  <div className="relative">
+                    <Trophy className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-[#7c7ca0]" />
+                    <Input
+                      id="title"
+                      name="title"
+                      type="text"
+                      defaultValue={titleDefaultValue}
+                      placeholder="e.g. 1st Place - National Science Olympiad 2025"
+                      className="h-10 rounded-md border-slate-300 bg-white pl-10 text-slate-800 placeholder:text-slate-400 focus-visible:ring-slate-400 dark:border-[#2a2a38] dark:bg-[#17171f] dark:text-[#d8d8ec] dark:placeholder:text-[#767697]"
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
                     Tags
                   </Label>
-                  <div className="rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)] p-3">
+                  <div className="rounded-md border border-slate-200 bg-white p-3 dark:border-[#2a2a38] dark:bg-[#17171f]">
                     <TagsInput key={tagsResetKey} initialTags={initialTags} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label
-                    htmlFor="date"
-                    className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]"
-                  >
-                    Date Achieved
+                  <Label htmlFor="intro" className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
+                    Intro Message
                   </Label>
-                  <div className="relative">
-                    <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ab-muted)]" />
-                    <Input
-                      id="date"
-                      name="date"
-                      type="date"
-                      defaultValue={dateDefaultValue}
-                      className="h-12 w-full border-[var(--ab-border)] bg-[var(--ab-surface)] pl-10 text-[var(--ab-text)] focus-visible:ring-[var(--ab-accent)]"
-                    />
-                  </div>
+                  <Input
+                    id="intro"
+                    name="intro"
+                    type="text"
+                    value={customBadge}
+                    onChange={(e) => setCustomBadge(e.target.value)}
+                    placeholder="Write a custom intro message"
+                    className="h-10 rounded-md border-slate-300 bg-white text-slate-800 placeholder:text-slate-400 focus-visible:ring-slate-400 dark:border-[#2a2a38] dark:bg-[#17171f] dark:text-[#d8d8ec] dark:placeholder:text-[#767697]"
+                  />
                 </div>
-
-                <div className="space-y-2">
-                  <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
-                    Intro Badge / Position
-                  </Label>
-                  <input type="hidden" name="intro" value={introValue} />
-
-                  <div className="flex flex-wrap gap-2">
-                    {badgePresets.map((badge) => (
-                      <button
-                        key={badge}
-                        type="button"
-                        onClick={() => {
-                          setSelectedBadge(badge)
-                          if (badge !== 'Custom') {
-                            setCustomBadge('')
-                          }
-                        }}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-bold tracking-wide [font-family:'Syne',sans-serif] transition-colors ${
-                          selectedBadge === badge
-                            ? 'border-transparent bg-gradient-to-r from-amber-500 to-yellow-400 text-zinc-950'
-                            : 'border-[var(--ab-border)] bg-[var(--ab-surface)] text-[var(--ab-muted)] hover:border-[var(--ab-accent-2)] hover:text-[var(--ab-accent-2)]'
-                        }`}
-                      >
-                        {badge}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="flex h-11 min-w-[9rem] items-center gap-2 rounded-md border border-amber-400/25 bg-amber-500/10 px-3 text-sm font-bold text-amber-600 [font-family:'Syne',sans-serif]">
-                      <Trophy className="h-4 w-4" />
-                      <span className="truncate">{badgePreviewText}</span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="date" className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
+                      Date Achieved
+                    </Label>
+                    <div className="relative">
+                      <CalendarIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-[#7c7ca0]" />
+                      <Input
+                        id="date"
+                        name="date"
+                        type="date"
+                        defaultValue={dateDefaultValue}
+                        className="h-10 w-full rounded-md border-slate-300 bg-white pl-10 text-slate-800 focus-visible:ring-slate-400 dark:border-[#2a2a38] dark:bg-[#17171f] dark:text-[#d8d8ec]"
+                      />
                     </div>
-                    <Input
-                      type="text"
-                      value={customBadge}
-                      onChange={(e) => setCustomBadge(e.target.value)}
-                      placeholder="Or type a custom intro"
-                      className="h-11 border-[var(--ab-border)] bg-[var(--ab-surface)] text-[var(--ab-text)] placeholder:text-[rgba(144,144,176,0.6)] focus-visible:ring-[var(--ab-accent)]"
-                    />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label className="text-[11px] uppercase tracking-[0.12em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
-                    Is Featured?
-                  </Label>
-                  <Label
-                    htmlFor="is_Featured"
-                    className="flex cursor-pointer items-center gap-2 rounded-md border border-[var(--ab-border)] bg-[var(--ab-surface)] px-3 py-2 text-xs font-semibold text-[var(--ab-text)] [font-family:'Syne',sans-serif]"
-                  >
-                    <input
-                      id="is_Featured"
-                      name="is_Featured"
-                      type="checkbox"
-                      defaultChecked={isFeaturedDefaultChecked}
-                      className="h-4 w-4 rounded border-[var(--ab-border)] text-[var(--ab-accent)] focus:ring-[var(--ab-accent)]"
-                    />
-                    <span>Is Featured</span>
-                  </Label>
-                  <Label className="text-xs text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
-                    *Only featured achievements will be displayed in the main feed
-                  </Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="is_Featured" className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-[#8f8faf]">
+                      Is Featured?
+                    </Label>
+                    <label
+                      htmlFor="is_Featured"
+                      className="flex w-full items-center justify-between rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-[#2a2a38] dark:bg-[#17171f]"
+                    >
+                      <span className="font-medium text-slate-700 dark:text-[#c6c6dc]">Show in main feed</span>
+                      <span className="relative inline-flex h-6 w-11 items-center">
+                        <input
+                          id="is_Featured"
+                          name="is_Featured"
+                          type="checkbox"
+                          defaultChecked={isFeaturedDefaultChecked}
+                          className="peer sr-only"
+                        />
+                          <span className="absolute inset-0 rounded-full bg-zinc-300 transition-colors duration-200 peer-checked:bg-black peer-focus-visible:ring-2 peer-focus-visible:ring-black/30" />
+                          <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform duration-200 peer-checked:translate-x-5" />
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="col-span-full my-1 h-px bg-gradient-to-r from-transparent via-[var(--ab-border)] to-transparent" />
-
-            <div className="col-span-full flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-[var(--ab-muted)] [font-family:'Syne',sans-serif]">
+            <div className="col-span-full border-t border-slate-200 p text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-[#242434] dark:text-[#8f8faf]">
               Description
-              <span className="h-px flex-1 bg-[var(--ab-border)]" />
             </div>
 
-            <div className="col-span-full overflow-hidden rounded-xl border border-[var(--ab-border)] bg-[var(--ab-surface)]">
+            <div className="col-span-full overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-[#2a2a38] dark:bg-[#17171f]">
               <div className="p-1 sm:p-2">
                 <EditorWrapper value={description} handleChange={setDescription} />
                 <input type="hidden" name="description" value={description} />
               </div>
 
-              <div className="flex items-center justify-between border-t border-[var(--ab-border)] bg-[var(--ab-surface-2)] px-4 py-2 text-xs text-[var(--ab-muted)]">
+              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 dark:border-[#2a2a38] dark:bg-[#1d1d28] dark:text-[#8f8faf]">
                 <span>{description.length.toLocaleString()} characters</span>
               </div>
             </div>
 
-            <div className='col-span-full mt-2 flex flex-col gap-3 border-t border-[var(--ab-border)] pt-4 sm:flex-row sm:items-center sm:justify-end'>
+            <div className="col-span-full mt-2 flex flex-col gap-4 border-t border-slate-200 pt-4 dark:border-[#242434]">
+
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
               <Button
                 type="submit"
                 disabled={pending}
-                className="bg-gradient-to-r from-[var(--ab-accent)] to-indigo-400 px-7 text-white shadow-[0_4px_20px_rgba(99,102,241,0.35)] hover:opacity-95"
+                className="rounded-md bg-primary px-4 text-primary-foreground shadow-sm hover:bg-primary/90"
               >
                 {pending ? submitPendingText : submitIdleText}
               </Button>
+              </div>
             </div>
-
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </form>
   )
 }

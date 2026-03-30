@@ -17,10 +17,10 @@ export default async function Achievements() {
     cookieStore.get('admin') && cookieStore.get('admin').value === 'true'
 
   return (
-    <div className="flex flex-col items-center justify-center gap-10 p-6 md:p-12">
+    <div className="flex flex-col items-center justify-center gap-10 py-4 px-2 md:px-16">
       <div className="items-center text-center">
         <h1 className="text-2xl font-bold">Achievements</h1>
-        <p className="text-zinc-600 dark:text-white/40 text-sm max-w-sm leading-relaxed my-4">
+        <p className="text-zinc-600 dark:text-white/40 text-sm leading-relaxed my-4">
           A curated collection of milestones, wins, and moments worth remembering.
         </p>
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900/[0.04] dark:bg-white/[0.04] border border-zinc-900/[0.12] dark:border-white/[0.08] text-xs text-zinc-600 dark:text-white/40 font-mono">

@@ -10,9 +10,10 @@ import { isAdminClient } from "@/lib/isAdmin";
 export default function MoreAchievements({
     achievements, setFeaturedIndex, featuredIndex, resetTimer, onDeleteSuccess
 }) {
+    console.log("Rendering MoreAchievements with achievements:", achievements);
     const isAdmin = isAdminClient();
     return (
-        <div className="w-full">
+        <div className="w-full hidden md:block">
 
             <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 mb-4">
                 <Trophy className="w-6 h-6 text-primary" />
@@ -28,7 +29,7 @@ export default function MoreAchievements({
                             resetTimer();
                         }}
                         className={cn(
-                            "group relative h-40 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300",
+                            "group relative h-40 rounded-md overflow-hidden cursor-pointer transition-all duration-300",
                             featuredIndex === index
                                 ? "ring-2 ring-sky-600 dark:ring-primary scale-105"
                                 : "hover:scale-105"

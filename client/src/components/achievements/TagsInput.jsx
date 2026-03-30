@@ -145,8 +145,6 @@ export default function TagsInput({ initialTags = [], name = 'tags' }) {
 
   return (
     <div className="space-y-2">
-      <Label>Tags</Label>
-
       <div className="border rounded-md p-2 flex flex-wrap gap-2 relative">
         {/* Tag Chips */}
         {tags.map((tag) => (

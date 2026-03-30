@@ -150,11 +150,38 @@ export async function uploadImage(folder, uId, file, bucket) {
 
 export async function getAchievementTags() {
   // console.log("Getting achievement tags");
-  const response = await get("achieve/get_tags");
+  const response = await get_with_token("achieve/get_tags");
   // console.log("Tags response:", response);
   if (response.error) return response.error;
   return { success: true, tags: response.result || [] };
 }
+
+export const getPublicAlumni = cache(async () => {
+  const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL
+  if (!base) {
+    return { batches: [], error: "Server URL is not configured" };
+  }
+
+  const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+
+  try {
+    const res = await fetch(`${normalizedBase}/alumni/public`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      next: { revalidate: 600, tags: ["alumni-public"] },
+    });
+
+    if (!res.ok) {
+      return { batches: [], error: "Bad response" };
+    }
+
+    return await res.json();
+  } catch (e) {
+    return { batches: [], error: "Network error" };
+  }
+});
 
 export async function createAchievement(prevState, formData) {
   let raw = Object.fromEntries(formData);
@@ -801,7 +828,7 @@ export async function getSchedulesDash() {
 
 export async function getContests() {
   try {
-    const res = await fetch(`${process.env.SERVER_URL}/getContests`);
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/getContests`);
     const tophContests = await res.json();
     return tophContests;
   } catch (error) {
@@ -819,13 +846,13 @@ export async function isCourseIns(course_id) {
 }
 
 export async function getAchievements(limit, offset=0) {
-  const response = await get(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
+  const response = await get_with_token(`achieve/get_achievements?limit=${limit}&offset=${offset}`);
   if (response?.error) return response.error;
   return response?.result;
 }
 
 export async function getAchievementsById(ach_id) {
-  const response = await post("achieve/get_achievement", {
+  const response = await post_with_token("achieve/get_achievement", {
     id: ach_id,
   });
   if (response.error) return response.error;
@@ -833,19 +860,19 @@ export async function getAchievementsById(ach_id) {
 }
 
 export async function getAchievementNumber() {
-  const response = await get("achieve/get_achievement_number");
+  const response = await get_with_token("achieve/get_achievement_number");
   if (response?.error) return response.error;
   return response?.result?.[0]?.count;
 }
 
 export async function getFeaturedAchievements(limit = 12) {
-  const response = await get(`achieve/get_featured_achievements?limit=${limit}`);
+  const response = await get_with_token(`achieve/get_featured_achievements?limit=${limit}`);
   if (response?.error) return response.error;
   return response?.result;
 }
 
 export async function getRelatedAchievements(ach_id, limit = 20) {
-  const response = await post(`achieve/get_related_achievements?limit=${limit}`, {
+  const response = await post_with_token(`achieve/get_related_achievements?limit=${limit}`, {
     id: ach_id
   });
   if (response?.error) return response.error;

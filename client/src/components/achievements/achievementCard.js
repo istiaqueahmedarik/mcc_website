@@ -99,7 +99,7 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
       </div>
 
       {/* Content */}
-      <div className="relative px-5 pb-5 pt-4 flex flex-col gap-3 z-10">
+      <div className="relative px-5 pb-5 pt-4 flex flex-col gap-1 z-10">
         {/* Accent line */}
         <div className={`absolute top-0 left-5 right-5 h-px ${accentColors[colorIdx]} opacity-30 group-hover:opacity-70 transition-opacity duration-300`} />
 
@@ -108,15 +108,19 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
           <CalendarDays className="w-3 h-3 shrink-0" />
           <span>{format(achievement.date, "dd MMM yyyy")}</span>
         </div>
-
-        {/* Title */}
-        <h2 className="font-semibold text-[15px] text-zinc-900 dark:text-white leading-snug line-clamp-2 tracking-tight">
+        <h2 className={`font-semibold text-[15px] text-zinc-900 dark:text-white leading-relaxed border-b-2 tracking-wide`}>
           {achievement.title}
         </h2>
 
-        {(tags.length > 0 || introMsg) && (
-          <div className="grid grid-cols-2 items-start gap-2.5">
-            <div className={introMsg ? "min-w-0" : "col-span-2 min-w-0"}>
+        {introMsg && (
+          <p className="text-sm leading-relaxed text-zinc-700/50 dark:text-white/80 break-words">
+            {introMsg}
+          </p>
+        )}
+
+        {(tags.length > 0) && (
+          <div className="grid grid-cols-2 items-start gap-2.5 mt-2">
+            <div className="col-span-2 min-w-0">
               {tags.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-full border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.04] dark:bg-white/[0.04] px-2 py-0.5 text-[10px] uppercase tracking-wider text-zinc-600 dark:text-white/55">
@@ -141,16 +145,7 @@ export default function AchievementCard({ achievement, isAdmin, onDeleteSuccess,
             </div>
 
             <div className={tags.length > 0 ? "min-w-0 flex justify-end" : "col-span-2 min-w-0 flex justify-end"}>
-              {introMsg && (
-                <div className="inline-flex w-fit max-w-full items-start gap-2 rounded-lg border border-zinc-900/10 bg-zinc-900/[0.04] px-2.5 py-1.5 dark:border-white/10 dark:bg-white/[0.05]">
-                  <span
-                    className={`mt-1 h-2 w-2 shrink-0 rounded-full ${accentColors[colorIdx]} opacity-90`}
-                  />
-                  <p className="text-[12px] leading-relaxed text-zinc-700 dark:text-white/80 break-words">
-                    {introMsg}
-                  </p>
-                </div>
-              )}
+
             </div>
           </div>
         )}

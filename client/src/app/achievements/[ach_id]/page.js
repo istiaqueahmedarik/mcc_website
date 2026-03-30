@@ -4,9 +4,10 @@ import FilteredRelatedAchievements from "@/components/achievements/FilteredRelat
 import MarkdownRender from "@/components/MarkdownRenderer";
 import { getAchievementsById, getRelatedAchievements } from "@/lib/action";
 import { formatRelative } from "date-fns";
-import { CalendarArrowUp } from "lucide-react";
+import { CalendarArrowUp, Pencil } from "lucide-react";
 import { cookies } from "next/headers";
 import Image from "next/image";
+import Link from "next/link";
 
 const normalizeAchievementTags = (achievement) => {
   const rawTags = achievement?.tag_names ?? achievement?.tags ?? [];
@@ -59,27 +60,21 @@ export default async function SingleAchievement({ params }) {
   return (
     <AchievementFilterProvider>
       <div className="min-h-screen text-slate-900">
-        <div className="max-w-7xl border mx-auto px-4 sm:px-6 py-10 sm:py-12 pb-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12 pb-24">
           <header className="relative mb-10 sm:mb-12">
-            {/* {isAdmin && (
-              <div className="mb-4 flex justify-end">
-                <Link
-                  href={`/achievements/${ach_id}/edit`}
-                  prefetch={false}
-                  className="inline-flex items-center gap-2 text-sm text-white rounded-lg px-4 py-2 font-semibold tracking-wide transition-all hover:-translate-y-px"
-                  style={{
-                    background: "linear-gradient(135deg, #6366f1, #818cf8)",
-                    boxShadow: "0 4px 20px rgba(99,102,241,0.35)",
-                  }}
-                >
-                  <Pencil size={13} />
-                  Edit
-                </Link>
-              </div>
-            )} */}
+            {isAdmin && (
+              <Link
+                href={`/achievements/${ach_id}/edit`}
+                prefetch={false}
+                className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-50 inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-xl"
+              >
+                <Pencil size={16} />
+                Edit Achievement
+              </Link>
+            )}
 
             {achievement.title && (
-              <h1 className="mx-auto max-w-5xl text-center sm:text-3xl md:text-5xl font-extrabold tracking-wide border-b-2 border-border text-slate-600 dark:text-[#a9a9c5] pb-3 shadow-sm">
+              <h1 className="mx-auto max-w-5xl text-center sm:text-2xl md:text-3xl font-extrabold tracking-wide border-b-2 border-border text-slate-600 dark:text-[#a9a9c5] pb-3 shadow-sm">
                 {achievement.title}
               </h1>
             )}
@@ -87,31 +82,32 @@ export default async function SingleAchievement({ params }) {
 
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1.1fr)] gap-4 lg:gap-4 items-start">
             <aside className="w-full lg:sticky lg:top-24 self-start">
-              <div className="rounded-3xl overflow-hidden">
+              <div className="overflow-hidden">
                 <div className="relative w-full">
                   <Image
                     src={achievement.image}
                     alt={achievement.title ?? "Achievement"}
                     width={1200}
                     height={1200}
-                    className="w-full h-full object-contain rounded-xl shadow-lg"
+                    quality={100}
+                    className="w-full h-full object-contain rounded-md shadow-lg transition-transform duration-300 ease-out hover:scale-110"
                     priority
                   />
                 </div>
 
-                <div className="p-2">
-                  <div className="flex flex-col border items-start gap-2 text-sm sm:text-base rounded-lg px-3 py-2 text-slate-600 dark:text-[#a9a9c5]">
-                    {achievement.intro && (
-                      <p className="rounded-xl text-base font-large text-amber-900 dark:text-amber-200 leading-relaxed">
-                        {achievement.intro}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1 text-amber-500">
-                      <CalendarArrowUp size={16} className="text-amber-500" />
-                      <span className="font-semibold tracking-wide">
+                <div className="p-2 mt-4">
+                  <div className="flex flex-col items-start gap-2 text-sm sm:text-base rounded-lg px-3 py-2 text-slate-600 dark:text-[#a9a9c5]">
+                    <div className="flex items-center gap-2 text-amber-300/50 dark:text-amber-200/50">
+                      <CalendarArrowUp size={16} className="" />
+                      <span className="font-medium tracking-wide">
                         {formatRelative(achievement.date, new Date())}
                       </span>
                     </div>
+                    {achievement.intro && (
+                      <p className="border-b text-xl text-center text-amber-900 dark:text-amber-200 leading-relaxed">
+                        {achievement.intro}
+                      </p>
+                    )}
                     <AchievementTagChips tags={tags} />
                   </div>
 

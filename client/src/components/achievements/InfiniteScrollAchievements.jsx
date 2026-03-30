@@ -136,11 +136,11 @@ export default function InfiniteScrollAchievements({
         <div className="w-full space-y-8">
             {/* Tag filter */}
             <div className="flex flex-col gap-3 rounded-2xl border border-zinc-900/10 dark:border-white/10 bg-zinc-900/[0.02] dark:bg-white/[0.02] p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-[11px] font-mono text-zinc-500 dark:text-white/50 tracking-widest uppercase">
                         Filter by tag
                     </span>
-                </div>
+                </div> */}
 
                 {availableTags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
