@@ -20,34 +20,43 @@ const Ubuntu_Medium = localFont({
 });
 
 export const metadata = {
-  metadataBase: new URL('https://computerclub.mist.ac.bd'),
+  metadataBase: new URL("https://computerclub.mist.ac.bd"),
   title: "MIST Computer Club",
   description:
     "MIST Computer Club is one of the finest clubs of MIST that is supervised by our experienced, cooperative and so many helpful faculty members",
   icons: {
     icon: [
-      { url: '/favicon.ico' },
-      { url: '/mcc.png', sizes: '32x32', type: 'image/png' },
-      { url: '/mcc.png', sizes: '16x16', type: 'image/png' },
+      { url: "/favicon.ico" },
+      { url: "/mcc.png", sizes: "32x32", type: "image/png" },
+      { url: "/mcc.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: '/mcc.png',
+    apple: "/mcc.png",
   },
-  manifest: '/site.webmanifest',
+  manifest: "/site.webmanifest",
   openGraph: {
-    images: '/og-image.png',
-    width: 1200,
-    height: 600,
-    type: 'website',
-    locale: 'en_US',
-    siteName: 'MIST Computer Club',
+    type: "website",
+    locale: "en_US",
+    siteName: "MIST Computer Club",
+    images: [
+      {
+        url: "/mcc.png",
+        width: 1200,
+        height: 1200,
+        alt: "MIST Computer Club",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/mcc.png"],
   },
   other: {
-    'msapplication-TileColor': '#1e40af',
+    "msapplication-TileColor": "#1e40af",
   },
 };
 
 export const viewport = {
-  themeColor: '#1e40af',
+  themeColor: "#1e40af",
 };
 
 export default function RootLayout({ children }) {
@@ -55,8 +64,8 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/mccLogo.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/mccLogo.png" />
+        <link rel="icon" href="/mcc.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/mcc.png" />
         <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#1e40af" />
       </head>

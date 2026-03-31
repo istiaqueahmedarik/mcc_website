@@ -90,7 +90,7 @@ export default async function SingleAchievement({ params }) {
                     width={1200}
                     height={1200}
                     quality={100}
-                    className="w-full h-full object-contain rounded-md shadow-lg transition-transform duration-300 ease-out hover:scale-110"
+                    className="w-full h-full object-contain rounded-md shadow-lg transition-transform duration-300 ease-out group-hover:scale-110"
                     priority
                   />
                 </div>
@@ -120,7 +120,7 @@ export default async function SingleAchievement({ params }) {
               <div className="px-2 sm:px-4 lg:px-6 py-2">
                 <MarkdownRender
                   content={achievement.description}
-                  className="w-full max-w-none break-words text-base sm:text-lg leading-9 text-slate-700 dark:text-[#c6c6dc]"
+                  className="w-full max-w-none prose-sm md:prose-base break-words sm:text-sm leading-9 text-slate-700 dark:text-[#c6c6dc]"
                 />
               </div>
             </section>

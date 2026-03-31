@@ -43,6 +43,7 @@ const Navbar = async () => {
       icon: CalendarClock,
       label: 'Contest Reminders',
     },
+    { href: '/icpc_journey', icon: Globe, label: 'ICPC' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
     { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
@@ -57,6 +58,7 @@ const Navbar = async () => {
   const adminTools = [
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
+    { href: '/admin/icpc', icon: CalendarClock, label: 'ICPC' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
@@ -85,7 +87,7 @@ const Navbar = async () => {
                   size="sm"
                   className="text-sm font-medium"
                 >
-                  <item.icon className="w-4 h-4 mr-2" />
+                  <item.icon className="w-4 h-4" />
                   {item.label}
                 </Button>
               </ProgressLink>
@@ -98,7 +100,7 @@ const Navbar = async () => {
                     size="sm"
                     className="text-sm font-medium"
                   >
-                    <item.icon className="w-4 h-4 mr-2" />
+                    <item.icon className="w-4 h-4" />
                     {item.label}
                   </Button>
                 </ProgressLink>
@@ -107,7 +109,7 @@ const Navbar = async () => {
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gap-2">
                   {" "}
-                  <ShieldHalf className="w-4 h-4 mr-2" /> Admin
+                  <ShieldHalf className="w-4 h-4 " /> Admin
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {adminTools.map((item) => (

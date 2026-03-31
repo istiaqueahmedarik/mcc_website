@@ -39,7 +39,7 @@ export default function FeaturedAchievement({ featuredAchievement }) {
                         src={featuredAchievement.image || "/vjudge_cover.png"}
                         alt={featuredAchievement.title || "Achievement"}
                         fill
-                        className="object-contain"
+                        className="object-contain group-hover:scale-105 transition-transform duration-300"
                         priority
                     />
                 </div>
