@@ -1,7 +1,8 @@
+"use server";
+
 const getBaseUrl = () => {
   const base = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
-  if (!base) return null;
-  return base.endsWith("/") ? base.slice(0, -1) : base;
+  return base;
 };
 
 export async function getIcpcJourneyPublic() {
