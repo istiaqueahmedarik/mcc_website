@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Environment Variables
+
+Optional variables used by this project:
+
+- `NEXT_PUBLIC_SERVER_URL`: Backend server base URL for client-visible API calls.
+- `SERVER_URL`: Backend server base URL for server-side calls.
+- `GITHUB_TOKEN`: Optional GitHub token used by `/developers` page to increase API rate limits.
+- `GITHUB_REPO_OWNER`: Optional repository owner for `/developers` (default: `istiaqueahmedarik`).
+- `GITHUB_REPO_NAME`: Optional repository name for `/developers` (default: `mcc_website`).
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.

@@ -41,12 +41,12 @@ const Navbar = async () => {
     {
       href: '/contest_reminders',
       icon: CalendarClock,
-      label: 'Contest Reminders',
+      label: 'Reminders',
     },
     { href: '/icpc_journey', icon: Globe, label: 'ICPC' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
-    { href: '/contests_report/live', icon: Globe, label: 'Contests Report' },
+    { href: '/contests_report/live', icon: Globe, label: 'Reports' },
     { href: '/finalized-teams', icon: Users, label: 'Teams' },
   ]
 

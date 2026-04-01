@@ -23,6 +23,7 @@ const nextConfig = {
       { protocol: "https", hostname: "cdn.vjudge.net.cn" },
       { protocol: "https", hostname: "upload.wikimedia.org" },
       { protocol: "https", hostname: "cdn.brandfetch.io" },
+      { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ],
     dangerouslyAllowSVG: true,
   },

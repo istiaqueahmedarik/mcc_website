@@ -95,20 +95,20 @@ export default async function SingleAchievement({ params }) {
                   />
                 </div>
 
-                <div className="p-2 mt-4">
-                  <div className="flex flex-col items-start gap-2 text-sm sm:text-base rounded-lg px-3 py-2 text-slate-600 dark:text-[#a9a9c5]">
-                    <div className="flex items-center gap-2 text-amber-300/50 dark:text-amber-200/50">
-                      <CalendarArrowUp size={16} className="" />
-                      <span className="font-medium tracking-wide">
-                        {formatRelative(achievement.date, new Date())}
-                      </span>
-                    </div>
+                <div className="px-2 mt-2">
+                  <div className="flex flex-col items-start gap-2 text-sm sm:text-base rounded-lg px-2 text-slate-600 dark:text-[#a9a9c5]">
                     {achievement.intro && (
-                      <p className="border-b text-xl text-center text-amber-900 dark:text-amber-200 leading-relaxed">
+                      <p className="border-b text-lg text-start text-amber-900 dark:text-amber-200 leading-tight">
                         {achievement.intro}
                       </p>
                     )}
                     <AchievementTagChips tags={tags} />
+                    {/* <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CalendarArrowUp size={1} className="" />
+                      <span className="font-medium tracking-wide">
+                        {formatRelative(achievement.date, new Date())}
+                      </span>
+                    </div> */}
                   </div>
 
 

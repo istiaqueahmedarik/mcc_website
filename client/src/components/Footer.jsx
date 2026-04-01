@@ -4,22 +4,19 @@ import Link from 'next/link'
 
 const links = {
   explore: [
-    { label: 'Contests', href: '/upcomingContest' },
+    { label: 'Contests', href: '/contest_reminders' },
     { label: 'Achievements', href: '/achievements' },
-    { label: 'Courses', href: '/courses' },
     { label: 'Dashboard', href: '/my_dashboard' },
   ],
   resources: [
-    { label: 'Problem Tracker', href: '#' },
-    { label: 'Reports', href: '#' },
-    { label: 'Reminders', href: '#' },
-    { label: 'Live Share', href: '#' },
+    { label: 'Teams', href: '/finalized-teams' },
+    { label: 'Alumni', href: '/alumni' },
+    { label: 'Live Share', href: '/contests_report/live' },
   ],
   community: [
-    { label: 'About Us', href: '#about' },
-    { label: 'Alumni', href: '/alumni' },
     { label: 'Contact', href: 'mailto:club@example.com' },
     { label: 'Report an Issue', href: 'https://github.com/istiaqueahmedarik/mcc_website/issues' },
+    { label: 'Developers', href: '/developers' },
   ],
 }
 
