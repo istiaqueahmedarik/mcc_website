@@ -8,13 +8,13 @@
     "os": false
   },
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --turbopack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-    "@ai-sdk/google": "^1.1.22",
+    "@ai-sdk/google": "^3.0.55",
     "@ai-sdk/openai": "^1.2.5",
     "@ariakit/react": "^0.4.15",
     "@diplodoc/html-extension": "^2.8.0",
@@ -99,7 +99,7 @@
     "@udecode/plate-trailing-block": "^44.0.0",
     "@uploadthing/react": "^7.1.0",
     "@uppy/tus": "^4.2.2",
-    "ai": "^6.0.7",
+    "ai": "^6.0.142",
     "babel-plugin-react-compiler": "^0.0.0-experimental-fe484b5-20240911",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

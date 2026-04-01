@@ -55,12 +55,12 @@ function YearSection({ data }) {
         className="relative flex flex-col lg:flex-row min-h-screen"
       >
         {/* ── Left panel — Sticky year + competition info ── */}
-        <div className="lg:w-[40%] w-full lg:sticky lg:top-0 lg:h-screen flex items-center justify-center p-6 lg:p-12">
+        <div className="lg:w-[40%] w-full lg:sticky lg:top-0 lg:h-screen flex  items-center justify-center p-6 lg:p-12">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-sm"
+            className="w-full flex flex-col items-start"
           >
 
             {/* Large ghost year */}
@@ -74,33 +74,36 @@ function YearSection({ data }) {
             </motion.span>
 
             {/* Competition name */}
-            <motion.h2
-              initial={{ opacity: 0, y: 14 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
-              transition={{ duration: 0.5, delay: 0.12 }}
-              className="text-2xl lg:text-3xl font-bold tracking-wider mb-2 text-foreground"
-            >
-              {data.competition}
-            </motion.h2>
+            <div className="flex flex-col items-start px-2">
+
+              <motion.h2
+                initial={{ opacity: 0, y: 14 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 14 }}
+                transition={{ duration: 0.5, delay: 0.12 }}
+                className="text-2xl lg:text-3xl font-bold tracking-wider mb-2 text-foreground"
+              >
+                {data.competition}
+              </motion.h2>
 
 
-            {/* Meta chips */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex flex-wrap gap-2"
-            >
-              {chipData.map(({ icon: Icon, text }, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/60 transition-colors duration-300 cursor-default "
-                >
-                  <Icon className="w-3 h-3" />
-                  {text}
-                </span>
-              ))}
-            </motion.div>
+              {/* Meta chips */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex flex-wrap gap-2"
+              >
+                {chipData.map(({ icon: Icon, text }, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted/60 transition-colors duration-300 cursor-default "
+                  >
+                    <Icon className="w-3 h-3" />
+                    {text}
+                  </span>
+                ))}
+              </motion.div>
+            </div>
           </motion.div>
         </div>
 
@@ -120,9 +123,8 @@ function YearSection({ data }) {
                   initial={{ opacity: 0, scale: 0.92 }}
                   animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.92 }}
                   transition={{ duration: 0.5, delay: 0.2 + i * 0.1 }}
-                  className={`group relative overflow-hidden rounded-xl aspect-[3/2] border border-border/30 ${
-                    images.length % 2 === 1 && i === images.length - 1 ? "col-span-2" : ""
-                  }`}
+                  className={`group relative overflow-hidden rounded-xl aspect-[3/2] border border-border/30 ${images.length % 2 === 1 && i === images.length - 1 ? "col-span-2" : ""
+                    }`}
                 >
                   <img
                     src={img}

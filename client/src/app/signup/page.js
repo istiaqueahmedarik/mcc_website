@@ -101,7 +101,7 @@ export default function Page() {
 
     try {
       const res = await OCRImage(imageData);
-      console.log(res);
+      console.log("ID Card OCR Result:", res);
 
       const resData = {
         batchDetails: res.Batch_details,

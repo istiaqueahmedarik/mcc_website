@@ -30,21 +30,19 @@ export async function detectObjectsFromBase64(base64ImageUrl) {
             bounding_box = data.data[0][0].bounding_box;
         } catch {
             console.log('No bounding box found');
-            bounding_box = [16, 108, 126, 215];
+            bounding_box = [430, 190, 720, 520]; // Fallback for profile picture based on standard resolution
         }
         return { bounding_box: JSON.stringify(bounding_box) };
     } catch (error) {
         console.error(error);
     }
-    return { bounding_box: JSON.stringify([16, 108, 126, 215]) };
+    return { bounding_box: JSON.stringify([430, 190, 720, 520]) };
 }
 
 
 export async function OCRImage(image) {
     const result = await generateText({
-        model: google('gemini-2.0-flash-exp', {
-            structuredOutputs: true
-        }),
+        model: google('gemini-3-flash-preview'),
 
         maxSteps: 10,
         messages: [
@@ -52,7 +50,7 @@ export async function OCRImage(image) {
                 role: 'user',
                 content: [
                     { type: 'text', text: "Respond this ID card in structured way" },
-                    { type: 'image', image: image },
+                    { type: 'image', image: typeof image === 'string' && image.startsWith('data:') ? Buffer.from(image.split(',')[1], 'base64') : image },
                 ],
             },
         ],
