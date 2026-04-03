@@ -56,7 +56,7 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
   }, [image_url]);
 
   const headline = [designation, company_name].filter(Boolean).join(" @ ");
-  const cfUrl = cf_handle ? `https://codeforces.com/profile/${cf_handle}` : "";
+  const cfUrl = cf_handle ? `${cf_handle}` : "";
 
   // Staggered glow effect - each card glows at different intervals
   const [isGlowing, setIsGlowing] = useState(false);

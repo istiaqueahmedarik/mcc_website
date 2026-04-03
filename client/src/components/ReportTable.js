@@ -30,6 +30,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
   const [liveModal, setLiveModal] = useState(false)
   const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({})
   const [isProfilesLoading, setIsProfilesLoading] = useState(false)
+  const [failedAvatars, setFailedAvatars] = useState(new Set())
   const profileCacheRef = useRef(new Map())
   const latestProfilesRequestRef = useRef(0)
   const serverBase = useMemo(() => {
@@ -37,56 +38,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return base ? String(base).replace(/\/+$/, "") : ""
   }, [])
   const debugProfiles = process.env.NEXT_PUBLIC_DEBUG_PROFILE_BATCH === "true"
-
-  const profileIds = useMemo(() => {
-    const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
-    return Array.from(ids).sort()
-  }, [users])
-
-  const profileIdsSignature = useMemo(() => profileIds.join("|"), [profileIds])
-
-  const areProfileMapsEqual = (a, b) => {
-    const aKeys = Object.keys(a)
-    const bKeys = Object.keys(b)
-    if (aKeys.length !== bKeys.length) return false
-    for (const key of aKeys) {
-      if (!Object.prototype.hasOwnProperty.call(b, key)) return false
-      if (a[key] !== b[key]) return false
-    }
-    return true
-  }
-
-  const resolveAvatarUrl = (rawUrl) => {
-    if (typeof rawUrl !== "string") return null
-    const value = rawUrl.trim()
-    if (!value || value === "null" || value === "undefined") return null
-
-    if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) {
-      return value
-    }
-
-    if (value.startsWith("//")) {
-      return `https:${value}`
-    }
-
-    if (!serverBase) return value
-    if (value.startsWith("/")) return `${serverBase}${value}`
-    return `${serverBase}/${value.replace(/^\/+/, "")}`
-  }
-
-  const toggleOptOut = (contestId) => {
-    setOptOutContests((prev) => ({
-      ...prev,
-      [contestId]: !prev[contestId],
-    }))
-  }
-
-  const updateFilter = (key, value) => {
-    setAdvancedFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
-  }
 
   const users = useMemo(() => {
     let filtered = merged.users.filter(
@@ -190,6 +141,71 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
 
     return filtered
   }, [merged.users, searchText, removeWorstCount, optOutContests, advancedFilters])
+
+  const profileIds = useMemo(() => {
+    const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
+    return Array.from(ids).sort()
+  }, [users])
+
+  const profileIdsSignature = useMemo(() => profileIds.join("|"), [profileIds])
+
+  const areProfileMapsEqual = (a, b) => {
+    const aKeys = Object.keys(a)
+    const bKeys = Object.keys(b)
+    if (aKeys.length !== bKeys.length) return false
+    for (const key of aKeys) {
+      if (!Object.prototype.hasOwnProperty.call(b, key)) return false
+      if (a[key] !== b[key]) return false
+    }
+    return true
+  }
+
+  const getCustomAvatar = (username) => {
+    if (!username) return "?"
+    const usernameStr = String(username).trim()
+    if (!usernameStr) return "?"
+    
+    // If username starts with MIST_, use the character after MIST_ (index 5)
+    if (usernameStr.startsWith("MIST_")) {
+      const char = usernameStr.charAt(5) || usernameStr.charAt(0)
+      return char.toUpperCase()
+    }
+    
+    // Otherwise use the first character
+    return usernameStr.charAt(0).toUpperCase()
+  }
+
+  const resolveAvatarUrl = (rawUrl) => {
+    if (typeof rawUrl !== "string") return null
+    const value = rawUrl.trim()
+    if (!value || value === "null" || value === "undefined") return null
+
+    if (/^https?:\/\//i.test(value) || value.startsWith("data:") || value.startsWith("blob:")) {
+      return value
+    }
+
+    if (value.startsWith("//")) {
+      return `https:${value}`
+    }
+
+    if (!serverBase) return value
+    if (value.startsWith("/")) return `${serverBase}${value}`
+    return `${serverBase}/${value.replace(/^\/+/, "")}`
+  }
+
+  const toggleOptOut = (contestId) => {
+    setOptOutContests((prev) => ({
+      ...prev,
+      [contestId]: !prev[contestId],
+    }))
+  }
+
+  const updateFilter = (key, value) => {
+    setAdvancedFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
 
   const maxPossibleSolved = useMemo(() => {
     return Math.max(...merged.users.map((u) => u.totalSolved), 0)
@@ -754,15 +770,21 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
               const isResolving = isProfilesLoading && !hasResolvedLookup
               const dbAvatar = hasDbProfile ? resolveAvatarUrl(profile.profile_pic) : null
               const fallbackAvatar = resolveAvatarUrl(u.avatarUrl)
-              const resolvedAvatar = hasDbProfile
-                ? dbAvatar || "/vercel.svg"
-                : shouldUseFallback
-                  ? fallbackAvatar || "/vercel.svg"
-                  : "/vercel.svg"
+              const customAvatar = getCustomAvatar(u.username)
+              const hasFailedAvatar = failedAvatars.has(u.username)
+              const resolvedAvatar = hasFailedAvatar 
+                ? customAvatar
+                : (hasDbProfile && dbAvatar) 
+                  ? dbAvatar 
+                  : (shouldUseFallback && fallbackAvatar)
+                    ? fallbackAvatar
+                    : isResolving
+                      ? null
+                      : customAvatar
               const resolvedName = hasDbProfile
                 ? profile.full_name || u.realName || u.username
                 : shouldUseFallback
-                  ? u.realName || "—"
+                  ? u.username || "—"
                   : "Loading..."
               const resolvedBatch = hasDbProfile ? profile.batch_name || null : null
               const resolvedVjudgeId = hasDbProfile ? profile.vjudge_id || u.username : u.username
@@ -823,18 +845,35 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                           isTop && "rounded-md"
                         )}
                       >
-                        <Image
-                          src={resolvedAvatar}
-                          alt={resolvedName || u.username}
-                          width={48}
-                          height={48}
-                          unoptimized
-                          className={cn(
-                            "rounded-md object-cover w-12 h-12 transition-all duration-200",
-                            isTop && "ring-2 ring-[hsl(var(--alumni-gold))]/70 shadow-md"
-                          )}
-                          quality={20}
-                        />
+                        {!resolvedAvatar || (resolvedAvatar && resolvedAvatar.length === 1) ? (
+                          // Custom avatar - show character
+                          <div
+                            className={cn(
+                              "rounded-md w-12 h-12 flex items-center justify-center text-2xl font-bold transition-all duration-200",
+                              "bg-black text-white border border-gray-700",
+                              isTop && "ring-2 ring-[hsl(var(--alumni-gold))]/70 shadow-md"
+                            )}
+                          >
+                            {resolvedAvatar || "?"}
+                          </div>
+                        ) : (
+                          // Image avatar
+                          <Image
+                            src={resolvedAvatar}
+                            alt={resolvedName || u.username}
+                            width={48}
+                            height={48}
+                            unoptimized
+                            className={cn(
+                              "rounded-md object-cover w-12 h-12 transition-all duration-200",
+                              isTop && "ring-2 ring-[hsl(var(--alumni-gold))]/70 shadow-md"
+                            )}
+                            quality={20}
+                            onError={() => {
+                              setFailedAvatars(prev => new Set(prev).add(u.username))
+                            }}
+                          />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p
