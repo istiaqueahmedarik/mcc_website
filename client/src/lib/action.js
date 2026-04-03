@@ -6,11 +6,11 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "../utils/supabase/server";
 
-const server_url = process.env.SERVER_URL + "/";
+const server_url = process.env.NEXT_PUBLIC_SERVER_URL + "/";
 
 export const post = cache(async (url, data) => {
   url = server_url + url;
-
+  
   const response = await fetch(
     url,
     {

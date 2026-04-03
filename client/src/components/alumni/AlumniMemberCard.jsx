@@ -57,6 +57,11 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
 
   const headline = [designation, company_name].filter(Boolean).join(" @ ");
   const cfUrl = cf_handle ? `${cf_handle}` : "";
+  const normalizedLinkedInUrl = linkedin_url
+    ? linkedin_url.startsWith('https://')
+      ? linkedin_url
+      : `https://${linkedin_url}`
+    : "";
 
   // Staggered glow effect - each card glows at different intervals
   const [isGlowing, setIsGlowing] = useState(false);
@@ -137,7 +142,7 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <div className="font-semibold text-base leading-tight text-foreground/90">{name}</div>
-            {highlight && <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500 shrink-0" />}
+            {highlight && canEdit && <Star className="h-3.5 w-3.5 fill-amber-500 text-amber-500 shrink-0" />}
           </div>
 
           {(designation || company_name) && (
@@ -150,9 +155,9 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
 
           <div className="flex flex-wrap items-center gap-2 pt-1.5">
 
-            {linkedin_url && (
+            {normalizedLinkedInUrl && (
               <a
-                href={linkedin_url}
+                href={normalizedLinkedInUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-[#0077B5] transition-colors rounded-md hover:bg-muted/50"
@@ -183,58 +188,8 @@ export default function AlumniMemberCard({ member, canEdit = false, onEdit, onDe
               </Badge>
             )}
           </div>
-          {/* <div className="mt-2 flex items-center gap-2 border-t border-border/40 pt-2.5">
-            {linkedin_url && (
-              <a
-                href={linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-[#0077B5] transition-colors"
-                aria-label="LinkedIn"
-              >
-                <Linkedin className="h-4 w-4" />
-              </a>
-            )}
-            {cfUrl && (
-              <a
-                href={cfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-[#1f8dd6] transition-colors"
-                aria-label="Codeforces"
-              >
-                <SiCodeforces className="h-4 w-4" />
-              </a>
-            )}
-
-          </div> */}
         </div>
       </div>
-      {/* 
-      <div className="mt-3 flex items-center justify-end gap-2 border-t border-border/40 pt-2.5">
-        {linkedin_url && (
-          <a 
-            href={linkedin_url} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="text-muted-foreground hover:text-[#0077B5] transition-colors"
-            aria-label="LinkedIn"
-          >
-            <Linkedin className="h-4 w-4" />
-          </a>
-        )}
-        {cfUrl && (
-          <a 
-            href={cfUrl} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="text-muted-foreground hover:text-[#1f8dd6] transition-colors"
-            aria-label="Codeforces"
-          >
-            <SiCodeforces className="h-4 w-4" />
-          </a>
-        )}
-      </div> */}
     </div>
   );
 }
