@@ -66,25 +66,41 @@ export function TypingTest() {
       const container = wordsContainerRef.current;
       if (!container) return;
 
-      // Account for padding: p-8 = 32px on each side = 64px total
-      const containerWidth = container.offsetWidth - 64;
-      const tempSpan = document.createElement("span");
-      tempSpan.style.cssText =
-        "font-family: monospace; font-size: 1.875rem; visibility: hidden; position: absolute;";
-      document.body.appendChild(tempSpan);
+      const containerStyles = getComputedStyle(container);
+      const paddingLeft = parseFloat(containerStyles.paddingLeft || "0");
+      const paddingRight = parseFloat(containerStyles.paddingRight || "0");
+      const containerWidth = container.clientWidth - paddingLeft - paddingRight;
+      if (containerWidth <= 0) return;
+
+      const lineProbe = document.createElement("div");
+      lineProbe.className =
+        "flex flex-nowrap gap-x-3 text-2xl md:text-3xl leading-relaxed font-mono";
+      lineProbe.style.cssText =
+        "position: absolute; visibility: hidden; pointer-events: none;";
+
+      const wordProbe = document.createElement("span");
+      wordProbe.style.whiteSpace = "pre";
+      lineProbe.appendChild(wordProbe);
+      container.appendChild(lineProbe);
+
+      const lineStyles = getComputedStyle(lineProbe);
+      const spaceWidth = parseFloat(
+        lineStyles.columnGap || lineStyles.gap || "0",
+      );
 
       const newLines: number[][] = [];
       let currentLine: number[] = [];
       let currentWidth = 0;
-      const spaceWidth = 12; // gap-x-3 = 0.75rem = 12px
+      const safetyBuffer = 2;
 
       for (let i = 0; i < words.length; i++) {
-        tempSpan.textContent = words[i].word;
-        const wordWidth = tempSpan.getBoundingClientRect().width;
+        wordProbe.textContent = words[i].word;
+        const wordWidth = wordProbe.getBoundingClientRect().width;
+        const projectedWidth =
+          currentWidth + wordWidth + (currentLine.length > 0 ? spaceWidth : 0);
 
         if (
-          currentWidth + wordWidth + (currentLine.length > 0 ? spaceWidth : 0) >
-            containerWidth &&
+          projectedWidth > containerWidth - safetyBuffer &&
           currentLine.length > 0
         ) {
           // Start a new line when we exceed container width
@@ -101,7 +117,7 @@ export function TypingTest() {
         newLines.push(currentLine);
       }
 
-      document.body.removeChild(tempSpan);
+      container.removeChild(lineProbe);
       setLines(newLines);
     };
 
@@ -429,7 +445,7 @@ export function TypingTest() {
                     .map((lineWordIndices, lineIdx) => (
                       <div
                         key={`line-${currentLineIndex + lineIdx}`}
-                        className="flex flex-wrap gap-x-3 text-2xl md:text-3xl leading-relaxed font-mono"
+                        className="flex flex-nowrap gap-x-3 overflow-hidden text-2xl md:text-3xl leading-relaxed font-mono"
                       >
                         {lineWordIndices.map((wordIndex) => {
                           const word = words[wordIndex];
