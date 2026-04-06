@@ -212,7 +212,7 @@ export const startRoom = async (c: Context) => {
     
     const [room] = await sql`
       UPDATE rooms 
-      SET status = 'active', started_at = NOW()
+      SET status = 'active', started_at = NOW(), scheduled_start_time = NULL
       WHERE room_code = ${roomCode} AND status = 'waiting'
       RETURNING id, room_code, status, started_at
     `;
@@ -360,9 +360,9 @@ export const restartRoom = async (c: Context) => {
     // Reset room status
     const [room] = await sql`
       UPDATE rooms 
-      SET status = 'waiting', started_at = NULL, completed_at = NULL, word_set = ${JSON.stringify(wordArray)}
+      SET status = 'waiting', started_at = NULL, completed_at = NULL, scheduled_start_time = NULL, word_set = ${JSON.stringify(wordArray)}
       WHERE id = ${existingRoom.id}
-      RETURNING id, room_code, status, word_set
+      RETURNING id, room_code, status, word_set, scheduled_start_time
     `;
     
     if (!room) {
@@ -391,7 +391,8 @@ export const restartRoom = async (c: Context) => {
         id: room.id,
         roomCode: room.room_code,
         status: room.status,
-        wordSet: room.word_set
+        wordSet: room.word_set,
+        scheduledStartTime: room.scheduled_start_time
       }
     });
   } catch (error) {
@@ -400,5 +401,98 @@ export const restartRoom = async (c: Context) => {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to restart room'
     }, 500);
+  }
+};
+
+export const scheduleRoomStart = async (c: Context) => {
+  try {
+    const roomCode = c.req.param('code').toUpperCase();
+    const body = await c.req.json();
+    const scheduledStartTime = body?.scheduledStartTime;
+
+    if (!scheduledStartTime) {
+      const [room] = await sql`
+        UPDATE rooms
+        SET scheduled_start_time = NULL
+        WHERE room_code = ${roomCode} AND status = 'waiting'
+        RETURNING id, room_code, status, scheduled_start_time
+      `;
+
+      if (!room) {
+        return c.json({
+          success: false,
+          error: 'Room not found or already started'
+        }, 404);
+      }
+
+      return c.json({
+        success: true,
+        room: {
+          id: room.id,
+          roomCode: room.room_code,
+          status: room.status,
+          scheduledStartTime: room.scheduled_start_time
+        }
+      });
+    }
+
+    const parsed = new Date(scheduledStartTime);
+    if (Number.isNaN(parsed.getTime())) {
+      return c.json({
+        success: false,
+        error: 'Invalid scheduled start time'
+      }, 400);
+    }
+
+    const [room] = await sql`
+      UPDATE rooms
+      SET scheduled_start_time = ${parsed}
+      WHERE room_code = ${roomCode} AND status = 'waiting'
+      RETURNING id, room_code, status, scheduled_start_time
+    `;
+
+    if (!room) {
+      return c.json({
+        success: false,
+        error: 'Room not found or already started'
+      }, 404);
+    }
+
+    return c.json({
+      success: true,
+      room: {
+        id: room.id,
+        roomCode: room.room_code,
+        status: room.status,
+        scheduledStartTime: room.scheduled_start_time
+      }
+    });
+  } catch (error) {
+    console.error('Error scheduling room start:', error);
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to schedule room start'
+    }, 500);
+  }
+};
+
+export const autoStartScheduledRooms = async () => {
+  try {
+    const startedRooms = await sql`
+      UPDATE rooms
+      SET status = 'active', started_at = NOW(), scheduled_start_time = NULL
+      WHERE status = 'waiting'
+        AND scheduled_start_time IS NOT NULL
+        AND scheduled_start_time <= NOW()
+      RETURNING id, room_code, started_at
+    `;
+
+    if (startedRooms.length > 0) {
+      for (const room of startedRooms as Array<{ room_code: string; started_at: Date }>) {
+        console.log(`⏰ Auto-started typing room ${room.room_code} at ${room.started_at.toISOString()}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error auto-starting scheduled typing rooms:', error);
   }
 };

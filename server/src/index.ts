@@ -21,6 +21,7 @@ import vjudgeRoute from "./routes/vjudgeRoute";
 import wordRoute from "./routes/wordRoute";
 import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
+import { autoStartScheduledRooms } from "./controllers/typingRoomController";
 
 const app = new Hono<{ Variables: JwtVariables }>();
 
@@ -46,6 +47,10 @@ app.route("/team-collection", teamCollectionRoute);
 app.route("/typing/words", wordRoute);
 app.route("/typing/rooms", typingRoomRoute);
 app.route("/typing/participants", typingParticipantRoute);
+
+setInterval(() => {
+  autoStartScheduledRooms();
+}, 1000);
 
 export default {
   port: process.env.PORT || 5000,
