@@ -23,6 +23,7 @@ import {
   ChartNoAxesCombined,
   Code,
   Globe,
+  Keyboard,
   LogIn,
   Menu,
   Settings,
@@ -48,6 +49,7 @@ const Navbar = async () => {
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
     { href: '/contests_report/live', icon: Globe, label: 'Reports' },
     { href: '/finalized-teams', icon: Users, label: 'Teams' },
+    { href: '/typing', icon: Keyboard, label: 'Typing' },
   ]
 
   const userTools = [
