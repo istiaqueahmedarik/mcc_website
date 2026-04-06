@@ -18,6 +18,9 @@ import publicContestReportRoute from "./routes/publicContestReportRoute";
 import teamCollectionRoute from "./routes/teamCollectionRoute";
 import userRoute from "./routes/userRoute";
 import vjudgeRoute from "./routes/vjudgeRoute";
+import wordRoute from "./routes/wordRoute";
+import typingRoomRoute from "./routes/typingRoomRoute";
+import typingParticipantRoute from "./routes/typingParticipantRoute";
 
 const app = new Hono<{ Variables: JwtVariables }>();
 
@@ -40,6 +43,9 @@ app.route("/custom-contests", customContestRoute);
 app.route("/landing", landingRoute);
 app.route("/alumni", alumniRoute);
 app.route("/team-collection", teamCollectionRoute);
+app.route("/typing/words", wordRoute);
+app.route("/typing/rooms", typingRoomRoute);
+app.route("/typing/participants", typingParticipantRoute);
 
 export default {
   port: process.env.PORT || 5000,
