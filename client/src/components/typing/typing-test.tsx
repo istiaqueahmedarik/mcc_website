@@ -1,280 +1,269 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { get } from '@/lib/action'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { RefreshCw, Keyboard, Timer, Target, TrendingUp, Zap, Trophy } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { get } from "@/lib/action";
+import { cn } from "@/lib/utils";
+import {
+  Keyboard,
+  RefreshCw,
+  Target,
+  Timer,
+  TrendingUp,
+  Trophy,
+  Zap,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface Word {
-  id: string
-  word: string
-  difficulty: number
-  length: number
+  id: string;
+  word: string;
+  difficulty: number;
+  length: number;
 }
 
 interface TypedWord {
-  word: string
-  isCorrect: boolean
+  word: string;
+  isCorrect: boolean;
 }
 
 export function TypingTest() {
-  const [words, setWords] = useState<Word[]>([])
-  const [currentWordIndex, setCurrentWordIndex] = useState(0)
-  const [currentInput, setCurrentInput] = useState('')
-  const [typedWords, setTypedWords] = useState<TypedWord[]>([])
-  const [correctWords, setCorrectWords] = useState(0)
-  const [incorrectWords, setIncorrectWords] = useState(0)
-  const [timeLeft, setTimeLeft] = useState(60)
-  const [isActive, setIsActive] = useState(false)
-  const [isFinished, setIsFinished] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [typedChars, setTypedChars] = useState(0)
-  const [displayOffset, setDisplayOffset] = useState(0)
-  const [difficulty, setDifficulty] = useState<number | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const [lines, setLines] = useState<number[][]>([]) // Array of arrays containing word indices per line
-  const [currentLineIndex, setCurrentLineIndex] = useState(0)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const wordsContainerRef = useRef<HTMLDivElement>(null)
+  const [words, setWords] = useState<Word[]>([]);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [currentInput, setCurrentInput] = useState("");
+  const [typedWords, setTypedWords] = useState<TypedWord[]>([]);
+  const [correctWords, setCorrectWords] = useState(0);
+  const [incorrectWords, setIncorrectWords] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [isActive, setIsActive] = useState(false);
+  const [isFinished, setIsFinished] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [typedChars, setTypedChars] = useState(0);
+  const [difficulty, setDifficulty] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [lines, setLines] = useState<number[][]>([]); // Array of arrays containing word indices per line
+  const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const wordsContainerRef = useRef<HTMLDivElement>(null);
 
   // Prevent hydration mismatch from browser extensions like Dark Reader
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   // Calculate lines based on word widths
   useEffect(() => {
-    if (!wordsContainerRef.current || words.length === 0) return
+    if (!wordsContainerRef.current || words.length === 0) return;
 
     const calculateLines = () => {
-      const container = wordsContainerRef.current
-      if (!container) return
+      const container = wordsContainerRef.current;
+      if (!container) return;
 
       // Account for padding: p-8 = 32px on each side = 64px total
-      const containerWidth = container.offsetWidth - 64
-      const tempSpan = document.createElement('span')
-      tempSpan.style.cssText = 'font-family: monospace; font-size: 1.875rem; visibility: hidden; position: absolute;'
-      document.body.appendChild(tempSpan)
+      const containerWidth = container.offsetWidth - 64;
+      const tempSpan = document.createElement("span");
+      tempSpan.style.cssText =
+        "font-family: monospace; font-size: 1.875rem; visibility: hidden; position: absolute;";
+      document.body.appendChild(tempSpan);
 
-      const newLines: number[][] = []
-      let currentLine: number[] = []
-      let currentWidth = 0
-      const spaceWidth = 12 // gap-x-3 = 0.75rem = 12px
+      const newLines: number[][] = [];
+      let currentLine: number[] = [];
+      let currentWidth = 0;
+      const spaceWidth = 12; // gap-x-3 = 0.75rem = 12px
 
       for (let i = 0; i < words.length; i++) {
-        tempSpan.textContent = words[i].word
-        const wordWidth = tempSpan.getBoundingClientRect().width
+        tempSpan.textContent = words[i].word;
+        const wordWidth = tempSpan.getBoundingClientRect().width;
 
-        if (currentWidth + wordWidth + (currentLine.length > 0 ? spaceWidth : 0) > containerWidth && currentLine.length > 0) {
+        if (
+          currentWidth + wordWidth + (currentLine.length > 0 ? spaceWidth : 0) >
+            containerWidth &&
+          currentLine.length > 0
+        ) {
           // Start a new line when we exceed container width
-          newLines.push([...currentLine])
-          currentLine = [i]
-          currentWidth = wordWidth
+          newLines.push([...currentLine]);
+          currentLine = [i];
+          currentWidth = wordWidth;
         } else {
-          currentLine.push(i)
-          currentWidth += wordWidth + (currentLine.length > 1 ? spaceWidth : 0)
+          currentLine.push(i);
+          currentWidth += wordWidth + (currentLine.length > 1 ? spaceWidth : 0);
         }
       }
 
       if (currentLine.length > 0) {
-        newLines.push(currentLine)
+        newLines.push(currentLine);
       }
 
-      document.body.removeChild(tempSpan)
-      setLines(newLines)
-    }
+      document.body.removeChild(tempSpan);
+      setLines(newLines);
+    };
 
-    calculateLines()
-    window.addEventListener('resize', calculateLines)
-    return () => window.removeEventListener('resize', calculateLines)
-  }, [words])
+    calculateLines();
+    window.addEventListener("resize", calculateLines);
+    return () => window.removeEventListener("resize", calculateLines);
+  }, [words]);
 
   // Fetch words on mount and when difficulty changes
   useEffect(() => {
-    fetchWords()
-  }, [difficulty])
+    fetchWords();
+  }, [difficulty]);
 
   const fetchWords = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const difficultyParam = difficulty ? `&difficulty=${difficulty}` : ''
-      const response = await get(`typing/words/random?limit=200${difficultyParam}`)
+      const difficultyParam = difficulty ? `&difficulty=${difficulty}` : "";
+      const response = await get(
+        `typing/words/random?limit=200${difficultyParam}`,
+      );
       if (response.success && response.words) {
-        setWords(response.words)
+        setWords(response.words);
       }
     } catch (error) {
-      console.error('Error fetching words:', error)
+      console.error("Error fetching words:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   // Timer countdown
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
+    let interval: NodeJS.Timeout | null = null;
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft((time) => {
           if (time <= 1) {
-            setIsActive(false)
-            setIsFinished(true)
-            return 0
+            setIsActive(false);
+            setIsFinished(true);
+            return 0;
           }
-          return time - 1
-        })
-      }, 1000)
+          return time - 1;
+        });
+      }, 1000);
     }
 
     return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [isActive, timeLeft])
-
-  const startTest = () => {
-    setIsActive(true)
-    setIsFinished(false)
-    setTimeLeft(60)
-    setCurrentWordIndex(0)
-    setCurrentInput('')
-    setCorrectWords(0)
-    setIncorrectWords(0)
-    setTypedChars(0)
-    setTypedWords([])
-    setDisplayOffset(0)
-    setCurrentLineIndex(0)
-    inputRef.current?.focus()
-  }
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, timeLeft]);
 
   const resetTest = () => {
-    setIsActive(false)
-    setIsFinished(false)
-    setTimeLeft(60)
-    setCurrentWordIndex(0)
-    setCurrentInput('')
-    setCorrectWords(0)
-    setIncorrectWords(0)
-    setTypedChars(0)
-    setTypedWords([])
-    setDisplayOffset(0)
-    setCurrentLineIndex(0)
-    fetchWords()
-  }
+    setIsActive(false);
+    setIsFinished(false);
+    setTimeLeft(60);
+    setCurrentWordIndex(0);
+    setCurrentInput("");
+    setCorrectWords(0);
+    setIncorrectWords(0);
+    setTypedChars(0);
+    setTypedWords([]);
+    setCurrentLineIndex(0);
+    fetchWords();
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
+    const value = e.target.value;
 
-    if (isFinished) return
+    if (isFinished) return;
 
     // Start timer on first character typed
     if (!isActive && value.length === 1) {
-      setIsActive(true)
+      setIsActive(true);
     }
 
-    if (!isActive && value.length === 0) return
+    if (!isActive && value.length === 0) return;
 
-    if (value.endsWith(' ')) {
-      const typedWord = value.trim()
-      const currentWord = words[currentWordIndex]?.word
-      const isCorrect = typedWord === currentWord
+    if (value.endsWith(" ")) {
+      const typedWord = value.trim();
+      const currentWord = words[currentWordIndex]?.word;
+      const isCorrect = typedWord === currentWord;
 
-      setTypedChars((prev) => prev + typedWord.length + 1)
+      setTypedChars((prev) => prev + typedWord.length + 1);
 
       // Add to typed words history
-      setTypedWords((prev) => [...prev, { word: currentWord, isCorrect }])
+      setTypedWords((prev) => [...prev, { word: currentWord, isCorrect }]);
 
       if (isCorrect) {
-        setCorrectWords((prev) => prev + 1)
+        setCorrectWords((prev) => prev + 1);
       } else {
-        setIncorrectWords((prev) => prev + 1)
+        setIncorrectWords((prev) => prev + 1);
       }
 
-      const nextIndex = currentWordIndex + 1
-      setCurrentWordIndex(nextIndex)
-      setCurrentInput('')
+      const nextIndex = currentWordIndex + 1;
+      setCurrentWordIndex(nextIndex);
+      setCurrentInput("");
 
       // Check if we've finished the current line
       if (lines.length > 0) {
-        const currentLine = lines[currentLineIndex]
+        const currentLine = lines[currentLineIndex];
         if (currentLine && nextIndex > currentLine[currentLine.length - 1]) {
           // Move to next line
-          setCurrentLineIndex(prev => prev + 1)
+          setCurrentLineIndex((prev) => prev + 1);
         }
       }
 
       // Fetch more words if running low
       if (nextIndex >= words.length - 10) {
-        fetchWords()
+        fetchWords();
       }
     } else {
-      setCurrentInput(value)
+      setCurrentInput(value);
     }
-  }
+  };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Timer will start automatically on first character typed
-    // This is just to handle any special key behaviors if needed
-  }
-
-  const wpm = Math.round((correctWords / (60 - timeLeft || 1)) * 60)
-  const rawWpm = Math.round((typedChars / 5 / (60 - timeLeft || 1)) * 60)
-  const accuracy = correctWords + incorrectWords > 0
-    ? Math.round((correctWords / (correctWords + incorrectWords)) * 100)
-    : 100
+  const wpm = Math.round((correctWords / (60 - timeLeft || 1)) * 60);
+  const rawWpm = Math.round((typedChars / 5 / (60 - timeLeft || 1)) * 60);
+  const accuracy =
+    correctWords + incorrectWords > 0
+      ? Math.round((correctWords / (correctWords + incorrectWords)) * 100)
+      : 100;
 
   const getWordClassName = (index: number, word: string) => {
-    const relativeIndex = index - displayOffset
-    
     if (index < currentWordIndex) {
       // Already typed - show as correct (green) or incorrect (red)
-      const typedWord = typedWords[index]
+      const typedWord = typedWords[index];
       if (typedWord) {
-        return typedWord.isCorrect 
-          ? 'text-green-500' 
-          : 'text-red-500'
+        return typedWord.isCorrect ? "text-green-500" : "text-red-500";
       }
-      return 'text-muted-foreground'
+      return "text-muted-foreground";
     } else if (index === currentWordIndex) {
       // Currently typing
-      const isTypingCorrect = word.startsWith(currentInput) || currentInput === ''
+      const isTypingCorrect =
+        word.startsWith(currentInput) || currentInput === "";
       return cn(
-        'relative',
-        'after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-full',
-        isTypingCorrect 
-          ? 'after:bg-foreground text-foreground' 
-          : 'after:bg-destructive text-destructive'
-      )
+        "relative",
+        "after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-full",
+        isTypingCorrect
+          ? "after:bg-foreground text-foreground"
+          : "after:bg-destructive text-destructive",
+      );
     } else if (index === currentWordIndex + 1) {
-      return 'opacity-60'
+      return "opacity-60";
     } else {
-      return 'opacity-40'
+      return "opacity-40";
     }
-  }
-
-  const getDifficultyBadge = (difficulty: number) => {
-    switch (difficulty) {
-      case 1:
-        return <Badge variant="secondary" className="text-xs">Easy</Badge>
-      case 2:
-        return <Badge variant="default" className="text-xs">Medium</Badge>
-      case 3:
-        return <Badge variant="destructive" className="text-xs">Hard</Badge>
-      default:
-        return null
-    }
-  }
+  };
 
   const getPerformanceRating = () => {
-    if (wpm >= 80) return { label: 'Excellent!', icon: Trophy, color: 'text-yellow-500' }
-    if (wpm >= 60) return { label: 'Great!', icon: Zap, color: 'text-green-500' }
-    if (wpm >= 40) return { label: 'Good', icon: TrendingUp, color: 'text-blue-500' }
-    return { label: 'Keep Practicing', icon: Target, color: 'text-muted-foreground' }
-  }
+    if (wpm >= 80)
+      return { label: "Excellent!", icon: Trophy, color: "text-yellow-500" };
+    if (wpm >= 60)
+      return { label: "Great!", icon: Zap, color: "text-green-500" };
+    if (wpm >= 40)
+      return { label: "Good", icon: TrendingUp, color: "text-blue-500" };
+    return {
+      label: "Keep Practicing",
+      icon: Target,
+      color: "text-muted-foreground",
+    };
+  };
 
   if (isLoading || !mounted) {
     return (
@@ -282,16 +271,20 @@ export function TypingTest() {
         <Card className="border-2">
           <CardContent className="flex items-center justify-center py-20">
             <div className="text-center space-y-4">
-              {mounted && <RefreshCw className="h-12 w-12 animate-spin mx-auto text-primary" />}
+              {mounted && (
+                <RefreshCw className="h-12 w-12 animate-spin mx-auto text-primary" />
+              )}
               <div>
                 <p className="text-lg font-medium">Loading words...</p>
-                <p className="text-sm text-muted-foreground">Preparing your typing test</p>
+                <p className="text-sm text-muted-foreground">
+                  Preparing your typing test
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -306,9 +299,10 @@ export function TypingTest() {
             60 Second Typing Test
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Test your typing speed and accuracy. Click the input field below and start typing!
+            Test your typing speed and accuracy. Click the input field below and
+            start typing!
           </p>
-          
+
           {/* Difficulty Selector */}
           <div className="flex items-center justify-center gap-3 pt-4">
             <span className="text-sm text-muted-foreground">Difficulty:</span>
@@ -348,10 +342,12 @@ export function TypingTest() {
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className={cn(
-          "border-2 transition-all",
-          timeLeft <= 10 && isActive && "border-destructive animate-pulse"
-        )}>
+        <Card
+          className={cn(
+            "border-2 transition-all",
+            timeLeft <= 10 && isActive && "border-destructive animate-pulse",
+          )}
+        >
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
               <Timer className="h-4 w-4" />
@@ -359,9 +355,7 @@ export function TypingTest() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {timeLeft}s
-            </div>
+            <div className="text-3xl font-bold tabular-nums">{timeLeft}s</div>
           </CardContent>
         </Card>
 
@@ -411,10 +405,7 @@ export function TypingTest() {
       {/* Progress Bar */}
       {isActive && (
         <div className="space-y-2">
-          <Progress 
-            value={((60 - timeLeft) / 60) * 100} 
-            className="h-3"
-          />
+          <Progress value={((60 - timeLeft) / 60) * 100} className="h-3" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{60 - timeLeft}s elapsed</span>
             <span>{timeLeft}s remaining</span>
@@ -428,30 +419,32 @@ export function TypingTest() {
           {!isFinished ? (
             <div className="space-y-6">
               {/* Words Display - Two Lines Only */}
-              <div 
+              <div
                 ref={wordsContainerRef}
                 className="relative min-h-40 rounded-xl bg-linear-to-br from-muted/50 to-muted/30 p-8 backdrop-blur overflow-hidden"
               >
                 <div className="space-y-4">
-                  {lines.slice(currentLineIndex, currentLineIndex + 2).map((lineWordIndices, lineIdx) => (
-                    <div 
-                      key={`line-${currentLineIndex + lineIdx}`}
-                      className="flex flex-wrap gap-x-3 text-2xl md:text-3xl leading-relaxed font-mono"
-                    >
-                      {lineWordIndices.map((wordIndex) => {
-                        const word = words[wordIndex]
-                        if (!word) return null
-                        return (
-                          <span
-                            key={word.id || wordIndex}
-                            className={getWordClassName(wordIndex, word.word)}
-                          >
-                            {word.word}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  ))}
+                  {lines
+                    .slice(currentLineIndex, currentLineIndex + 2)
+                    .map((lineWordIndices, lineIdx) => (
+                      <div
+                        key={`line-${currentLineIndex + lineIdx}`}
+                        className="flex flex-wrap gap-x-3 text-2xl md:text-3xl leading-relaxed font-mono"
+                      >
+                        {lineWordIndices.map((wordIndex) => {
+                          const word = words[wordIndex];
+                          if (!word) return null;
+                          return (
+                            <span
+                              key={word.id || wordIndex}
+                              className={getWordClassName(wordIndex, word.word)}
+                            >
+                              {word.word}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ))}
                 </div>
               </div>
 
@@ -462,14 +455,17 @@ export function TypingTest() {
                   type="text"
                   value={currentInput}
                   onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
                   className={cn(
                     "w-full rounded-xl border-2 bg-background px-6 py-4 text-2xl md:text-3xl font-mono",
                     "focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary",
                     "transition-all duration-200",
-                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
                   )}
-                  placeholder={isActive ? "Type here..." : "Click here and start typing to begin..."}
+                  placeholder={
+                    isActive
+                      ? "Type here..."
+                      : "Click here and start typing to begin..."
+                  }
                   disabled={isFinished}
                   autoFocus
                   autoComplete="off"
@@ -477,7 +473,7 @@ export function TypingTest() {
                   autoCapitalize="off"
                   spellCheck="false"
                 />
-                
+
                 {!isActive && !isFinished && (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Keyboard className="h-4 w-4" />
@@ -491,19 +487,25 @@ export function TypingTest() {
             <div className="space-y-8 py-8">
               <div className="text-center space-y-4">
                 {(() => {
-                  const rating = getPerformanceRating()
-                  const Icon = rating.icon
+                  const rating = getPerformanceRating();
+                  const Icon = rating.icon;
                   return (
                     <>
                       <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-primary/10 mb-4">
                         <Icon className={cn("h-12 w-12", rating.color)} />
                       </div>
                       <div>
-                        <h2 className="text-5xl font-bold mb-2">Test Complete!</h2>
-                        <p className={cn("text-2xl font-semibold", rating.color)}>{rating.label}</p>
+                        <h2 className="text-5xl font-bold mb-2">
+                          Test Complete!
+                        </h2>
+                        <p
+                          className={cn("text-2xl font-semibold", rating.color)}
+                        >
+                          {rating.label}
+                        </p>
                       </div>
                     </>
-                  )
+                  );
                 })()}
               </div>
 
@@ -513,20 +515,32 @@ export function TypingTest() {
                 <div className="text-center space-y-2 p-6 rounded-xl bg-primary/5 border-2 border-primary/20">
                   <Zap className="h-8 w-8 mx-auto text-primary" />
                   <p className="text-5xl font-bold text-primary">{wpm}</p>
-                  <p className="text-sm font-medium text-muted-foreground">Words per minute</p>
-                  <p className="text-xs text-muted-foreground">({rawWpm} raw WPM)</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Words per minute
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ({rawWpm} raw WPM)
+                  </p>
                 </div>
                 <div className="text-center space-y-2 p-6 rounded-xl bg-muted/50 border-2">
                   <Target className="h-8 w-8 mx-auto" />
                   <p className="text-5xl font-bold">{accuracy}%</p>
-                  <p className="text-sm font-medium text-muted-foreground">Accuracy</p>
-                  <p className="text-xs text-muted-foreground">{incorrectWords} errors</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Accuracy
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {incorrectWords} errors
+                  </p>
                 </div>
                 <div className="text-center space-y-2 p-6 rounded-xl bg-muted/50 border-2">
                   <Keyboard className="h-8 w-8 mx-auto" />
                   <p className="text-5xl font-bold">{correctWords}</p>
-                  <p className="text-sm font-medium text-muted-foreground">Correct words</p>
-                  <p className="text-xs text-muted-foreground">{typedChars} characters</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Correct words
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {typedChars} characters
+                  </p>
                 </div>
               </div>
 
@@ -551,5 +565,5 @@ export function TypingTest() {
         </div>
       )}
     </div>
-  )
+  );
 }
