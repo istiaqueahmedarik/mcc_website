@@ -20,7 +20,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Word {
   id: string;
@@ -36,6 +36,7 @@ interface TypedWord {
 
 export function TypingTest() {
   const [words, setWords] = useState<Word[]>([]);
+  const [wordsFetchFailed, setWordsFetchFailed] = useState(false);
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentInput, setCurrentInput] = useState("");
   const [typedWords, setTypedWords] = useState<TypedWord[]>([]);
@@ -126,27 +127,34 @@ export function TypingTest() {
     return () => window.removeEventListener("resize", calculateLines);
   }, [words]);
 
-  // Fetch words on mount and when difficulty changes
-  useEffect(() => {
-    fetchWords();
-  }, [difficulty]);
-
-  const fetchWords = async () => {
+  const fetchWords = useCallback(async () => {
     setIsLoading(true);
+    setWordsFetchFailed(false);
     try {
       const difficultyParam = difficulty ? `&difficulty=${difficulty}` : "";
       const response = await get(
         `typing/words/random?limit=200${difficultyParam}`,
       );
-      if (response.success && response.words) {
+      if (response.success && Array.isArray(response.words) && response.words.length > 0) {
         setWords(response.words);
+        setWordsFetchFailed(false);
+      } else {
+        setWords([]);
+        setWordsFetchFailed(true);
       }
     } catch (error) {
       console.error("Error fetching words:", error);
+      setWords([]);
+      setWordsFetchFailed(true);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [difficulty]);
+
+  // Fetch words on mount and when difficulty changes
+  useEffect(() => {
+    fetchWords();
+  }, [fetchWords]);
 
   // Timer countdown
   useEffect(() => {
@@ -199,6 +207,7 @@ export function TypingTest() {
     if (value.endsWith(" ")) {
       const typedWord = value.trim();
       const currentWord = words[currentWordIndex]?.word;
+      if (!currentWord) return;
       const isCorrect = typedWord === currentWord;
 
       setTypedChars((prev) => prev + typedWord.length + 1);
@@ -302,6 +311,18 @@ export function TypingTest() {
       </div>
     );
   }
+
+  const visibleLineGroups =
+    lines.length > 0
+      ? lines.slice(currentLineIndex, currentLineIndex + 2)
+      : [
+          words
+            .slice(currentWordIndex, currentWordIndex + 8)
+            .map((_, idx) => currentWordIndex + idx),
+          words
+            .slice(currentWordIndex + 8, currentWordIndex + 16)
+            .map((_, idx) => currentWordIndex + 8 + idx),
+        ].filter((line) => line.length > 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -433,6 +454,18 @@ export function TypingTest() {
       <Card className="border-2 shadow-lg">
         <CardContent className="pt-6">
           {!isFinished ? (
+            wordsFetchFailed || words.length === 0 ? (
+              <div className="py-12 text-center space-y-4">
+                <p className="text-xl font-semibold">Something went wrong, try again.</p>
+                <p className="text-sm text-muted-foreground">
+                  We could not load words for the typing test.
+                </p>
+                <Button onClick={fetchWords} size="lg" className="text-base px-6">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Try Again
+                </Button>
+              </div>
+            ) : (
             <div className="space-y-6">
               {/* Words Display - Two Lines Only */}
               <div
@@ -440,9 +473,7 @@ export function TypingTest() {
                 className="relative min-h-40 rounded-xl bg-linear-to-br from-muted/50 to-muted/30 p-8 backdrop-blur overflow-hidden"
               >
                 <div className="space-y-4">
-                  {lines
-                    .slice(currentLineIndex, currentLineIndex + 2)
-                    .map((lineWordIndices, lineIdx) => (
+                  {visibleLineGroups.map((lineWordIndices, lineIdx) => (
                       <div
                         key={`line-${currentLineIndex + lineIdx}`}
                         className="flex flex-nowrap gap-x-3 overflow-hidden text-2xl md:text-3xl leading-relaxed font-mono"
@@ -498,6 +529,7 @@ export function TypingTest() {
                 )}
               </div>
             </div>
+            )
           ) : (
             /* Results */
             <div className="space-y-8 py-8">
