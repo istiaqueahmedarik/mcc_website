@@ -6,7 +6,8 @@ import {
   startRoom, 
   getLeaderboard,
   completeRoom,
-  restartRoom
+  restartRoom,
+  scheduleRoomStart
 } from '../controllers/typingRoomController';
 
 const typingRoomRoute = new Hono();
@@ -28,6 +29,9 @@ typingRoomRoute.post('/:code/complete', completeRoom);
 
 // POST /api/typing/rooms/:code/restart - Restart a room
 typingRoomRoute.post('/:code/restart', restartRoom);
+
+// POST /api/typing/rooms/:code/schedule-start - Schedule or clear scheduled start
+typingRoomRoute.post('/:code/schedule-start', scheduleRoomStart);
 
 // GET /api/typing/rooms/:code/leaderboard - Get room leaderboard
 typingRoomRoute.get('/:code/leaderboard', getLeaderboard);

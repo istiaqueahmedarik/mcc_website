@@ -26,6 +26,7 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
     sendComplete,
     startGame,
     restartGame,
+    scheduleGameStart,
     completeRoom
   } = useSupabaseRealtime(roomCode, userName)
 
@@ -100,6 +101,7 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
           roomState={roomState}
           participantId={participantId}
           onStartGame={startGame}
+          onScheduleStart={scheduleGameStart}
         />
       )}
 

@@ -18,6 +18,7 @@ export interface RoomState {
   status: 'waiting' | 'active' | 'completed';
   timeLimit: number;
   wordSet: string[];
+  scheduledStartTime?: number;
   startedAt?: number;
   participants: Participant[];
 }
@@ -168,15 +169,16 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
       const data = await response.json();
       if (data.success) {
-        setRoomState({
+        setRoomState((prev) => ({
           roomId: data.room.id,
           roomCode: data.room.roomCode,
           status: data.room.status,
           timeLimit: data.room.timeLimit,
           wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
+          scheduledStartTime: data.room.scheduledStartTime ? new Date(data.room.scheduledStartTime).getTime() : undefined,
           startedAt: data.room.startedAt ? new Date(data.room.startedAt).getTime() : undefined,
-          participants: [],
-        });
+          participants: prev?.participants ?? [],
+        }));
 
         await fetchParticipants();
       } else {
@@ -303,6 +305,11 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
           return {
             ...prev,
             status: payload.status,
+            scheduledStartTime: payload.scheduledStartTime
+              ? new Date(payload.scheduledStartTime).getTime()
+              : payload.scheduledStartTime === null
+                ? undefined
+                : prev.scheduledStartTime,
             startedAt: payload.startedAt ? new Date(payload.startedAt).getTime() : prev.startedAt,
             wordSet: payload.wordSet ?? prev.wordSet,
           };
@@ -357,6 +364,17 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
     return () => clearInterval(intervalId);
   }, [roomState, isConnected, fetchParticipants]);
+
+  // Lightweight room-state polling while waiting so scheduled auto-start is reflected for everyone.
+  useEffect(() => {
+    if (!roomState || roomState.status !== 'waiting') return;
+
+    const intervalId = setInterval(() => {
+      fetchRoomState();
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [roomState?.status, fetchRoomState]);
 
   // Send progress update
   const sendProgress = useCallback(async (progress: number, currentWpm: number, accuracy: number) => {
@@ -451,6 +469,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
           event: 'room_status',
           payload: {
             status: 'waiting',
+            scheduledStartTime: null,
             wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
           },
         });
@@ -458,12 +477,44 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         setRoomState(prev => prev ? {
           ...prev,
           status: 'waiting',
+          scheduledStartTime: undefined,
           startedAt: undefined,
           wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
         } : prev);
       }
     } catch (err) {
       console.error('Error restarting game:', err);
+    }
+  }, [roomCode]);
+
+  const scheduleGameStart = useCallback(async (scheduledStartTime: string | null) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/schedule-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduledStartTime }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        const parsedSchedule = data.room.scheduledStartTime ? new Date(data.room.scheduledStartTime).getTime() : undefined;
+
+        setRoomState(prev => prev ? {
+          ...prev,
+          scheduledStartTime: parsedSchedule,
+        } : prev);
+
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'room_status',
+          payload: {
+            status: 'waiting',
+            scheduledStartTime: data.room.scheduledStartTime,
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Error scheduling game start:', err);
     }
   }, [roomCode]);
 
@@ -502,6 +553,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     sendComplete,
     startGame,
     restartGame,
+    scheduleGameStart,
     completeRoom,
     fetchLeaderboard,
   };

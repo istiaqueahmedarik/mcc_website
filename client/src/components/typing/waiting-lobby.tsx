@@ -1,18 +1,27 @@
 'use client'
 
-import { RoomState } from '@/hooks/use-websocket'
+import { RoomState } from '@/hooks/use-supabase-realtime'
 import { Users, Clock, Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 interface WaitingLobbyProps {
   roomCode: string
   roomState: RoomState
   participantId: string | null
   onStartGame: () => void
+  onScheduleStart: (scheduledStartTime: string | null) => Promise<void> | void
 }
 
-export function WaitingLobby({ roomCode, roomState, participantId, onStartGame }: WaitingLobbyProps) {
+export function WaitingLobby({ roomCode, roomState, participantId, onStartGame, onScheduleStart }: WaitingLobbyProps) {
   const [copied, setCopied] = useState(false)
+  const [scheduleInput, setScheduleInput] = useState('')
+  const [isScheduling, setIsScheduling] = useState(false)
+  const [nowMs, setNowMs] = useState(Date.now())
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(roomCode)
@@ -21,6 +30,44 @@ export function WaitingLobby({ roomCode, roomState, participantId, onStartGame }
   }
 
   const isCreator = roomState.participants[0]?.id === participantId
+  const scheduledDate = roomState.scheduledStartTime ? new Date(roomState.scheduledStartTime) : null
+  const minScheduleInput = useMemo(() => {
+    const minDate = new Date(nowMs + 30000)
+    const tzOffset = minDate.getTimezoneOffset() * 60000
+    return new Date(minDate.getTime() - tzOffset).toISOString().slice(0, 16)
+  }, [nowMs])
+
+  const scheduleCountdown = useMemo(() => {
+    if (!scheduledDate) return null
+    const diffMs = scheduledDate.getTime() - nowMs
+    if (diffMs <= 0) return 'Starting now...'
+
+    const totalSeconds = Math.floor(diffMs / 1000)
+    const mins = Math.floor(totalSeconds / 60)
+    const secs = totalSeconds % 60
+    return `Auto starts in ${mins}:${secs.toString().padStart(2, '0')}`
+  }, [scheduledDate, nowMs])
+
+  const handleSchedule = async () => {
+    if (!scheduleInput) return
+    setIsScheduling(true)
+    try {
+      const localDate = new Date(scheduleInput)
+      await onScheduleStart(localDate.toISOString())
+      setScheduleInput('')
+    } finally {
+      setIsScheduling(false)
+    }
+  }
+
+  const handleClearSchedule = async () => {
+    setIsScheduling(true)
+    try {
+      await onScheduleStart(null)
+    } finally {
+      setIsScheduling(false)
+    }
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -98,14 +145,54 @@ export function WaitingLobby({ roomCode, roomState, participantId, onStartGame }
           <p className="text-sm text-muted-foreground">
             You are the host. Click to start the game when ready.
           </p>
+
+          <div className="border rounded-lg p-4 max-w-xl mx-auto text-left space-y-3">
+            <p className="text-sm font-medium">Or schedule auto-start</p>
+            <div className="flex flex-col md:flex-row gap-2">
+              <input
+                type="datetime-local"
+                value={scheduleInput}
+                onChange={(e) => setScheduleInput(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded-md"
+                min={minScheduleInput}
+              />
+              <button
+                onClick={handleSchedule}
+                disabled={!scheduleInput || isScheduling}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isScheduling ? 'Saving...' : 'Schedule'}
+              </button>
+              {scheduledDate && (
+                <button
+                  onClick={handleClearSchedule}
+                  disabled={isScheduling}
+                  className="px-4 py-2 border rounded-md font-medium hover:bg-accent disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {scheduledDate && (
+              <p className="text-sm text-muted-foreground">
+                Scheduled for {scheduledDate.toLocaleString()} {scheduleCountdown ? `(${scheduleCountdown})` : ''}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
       {!isCreator && (
         <div className="text-center">
-          <p className="text-muted-foreground">
-            Waiting for host to start the game...
-          </p>
+          {scheduledDate ? (
+            <p className="text-muted-foreground">
+              Game is scheduled for {scheduledDate.toLocaleString()}. {scheduleCountdown}
+            </p>
+          ) : (
+            <p className="text-muted-foreground">
+              Waiting for host to start the game...
+            </p>
+          )}
         </div>
       )}
 
