@@ -20,10 +20,10 @@ export function WaitingLobby({
   onScheduleStart,
 }: WaitingLobbyProps) {
   const [copied, setCopied] = useState(false);
-  const [scheduleInput, setScheduleInput] = useState("");
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [isScheduling, setIsScheduling] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
+  const [quickTimerMinutes, setQuickTimerMinutes] = useState(1);
 
   useEffect(() => {
     const id = setInterval(() => setNowMs(Date.now()), 1000);
@@ -40,40 +40,35 @@ export function WaitingLobby({
   const scheduledDate = roomState.scheduledStartTime
     ? new Date(roomState.scheduledStartTime)
     : null;
-  const minScheduleInput = useMemo(() => {
-    const minDate = new Date(nowMs + 30000);
-    const tzOffset = minDate.getTimezoneOffset() * 60000;
-    return new Date(minDate.getTime() - tzOffset).toISOString().slice(0, 16);
-  }, [nowMs]);
+
 
   const scheduleCountdown = useMemo(() => {
     if (!scheduledDate) return null;
     const diffMs = scheduledDate.getTime() - nowMs;
-    if (diffMs <= 0) return "Starting now...";
+    if (diffMs <= 0) return { text: "Starting now...", mins: 0, secs: 0, progress: 0 };
 
     const totalSeconds = Math.floor(diffMs / 1000);
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
-    return `Auto starts in ${mins}:${secs.toString().padStart(2, "0")}`;
+    
+    // Calculate progress (assume max 60 minutes for progress bar)
+    const maxSeconds = 60 * 60;
+    const progress = Math.min(100, ((maxSeconds - totalSeconds) / maxSeconds) * 100);
+    
+    return { 
+      text: `Auto starts in ${mins}:${secs.toString().padStart(2, "0")}`,
+      mins,
+      secs,
+      progress
+    };
   }, [scheduledDate, nowMs]);
 
-  const handleSchedule = async () => {
-    if (!scheduleInput) return;
-
-    const localDate = new Date(scheduleInput);
-    if (
-      Number.isNaN(localDate.getTime()) ||
-      localDate.getTime() <= Date.now()
-    ) {
-      setScheduleError("Please select a future time.");
-      return;
-    }
-
+  const handleQuickTimer = async () => {
+    const futureDate = new Date(Date.now() + quickTimerMinutes * 60 * 1000);
     setIsScheduling(true);
     setScheduleError(null);
     try {
-      await onScheduleStart(localDate.toISOString());
-      setScheduleInput("");
+      await onScheduleStart(futureDate.toISOString());
     } finally {
       setIsScheduling(false);
     }
@@ -168,44 +163,77 @@ export function WaitingLobby({
             You are the host. Click to start the game when ready.
           </p>
 
-          <div className="border rounded-lg p-4 max-w-xl mx-auto text-left space-y-3">
-            <p className="text-sm font-medium">Or schedule auto-start</p>
-            <div className="flex flex-col md:flex-row gap-2">
-              <input
-                type="datetime-local"
-                value={scheduleInput}
-                onChange={(e) => {
-                  setScheduleInput(e.target.value);
-                  if (scheduleError) setScheduleError(null);
-                }}
-                className="flex-1 px-3 py-2 border rounded-md"
-                min={minScheduleInput}
-              />
+          <div className="border rounded-lg p-5 max-w-xl mx-auto bg-muted/30">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-4 h-4" />
+              <p className="text-sm font-medium">Schedule Auto-Start</p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Start in:</span>
+                  <span className="font-semibold">{quickTimerMinutes} {quickTimerMinutes === 1 ? 'minute' : 'minutes'}</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="60"
+                  value={quickTimerMinutes}
+                  onChange={(e) => setQuickTimerMinutes(Number(e.target.value))}
+                  className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                />
+              </div>
+
+              {/* Quick Options */}
+              <div className="grid grid-cols-6 gap-2">
+                {[1, 2, 5, 10, 15, 30].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setQuickTimerMinutes(mins)}
+                    className={`px-2 py-1.5 rounded text-sm font-medium transition-colors ${
+                      quickTimerMinutes === mins
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background hover:bg-accent'
+                    }`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
+              </div>
+
               <button
-                onClick={handleSchedule}
-                disabled={!scheduleInput || isScheduling}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:opacity-50"
+                onClick={handleQuickTimer}
+                disabled={isScheduling}
+                className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
               >
-                {isScheduling ? "Saving..." : "Schedule"}
+                {isScheduling ? "Setting..." : "Set Timer"}
               </button>
-              {scheduledDate && (
+            </div>
+
+            {scheduleError && (
+              <p className="mt-3 text-sm text-red-600">{scheduleError}</p>
+            )}
+
+            {scheduledDate && scheduleCountdown && (
+              <div className="mt-4 pt-4 border-t space-y-3">
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Starting in</p>
+                  <div className="flex items-center justify-center gap-1 text-2xl font-bold">
+                    <span>{scheduleCountdown.mins.toString().padStart(2, '0')}</span>
+                    <span className="text-muted-foreground">:</span>
+                    <span>{scheduleCountdown.secs.toString().padStart(2, '0')}</span>
+                  </div>
+                </div>
                 <button
                   onClick={handleClearSchedule}
                   disabled={isScheduling}
-                  className="px-4 py-2 border rounded-md font-medium hover:bg-accent disabled:opacity-50"
+                  className="w-full px-3 py-1.5 text-sm border rounded-md hover:bg-accent disabled:opacity-50"
                 >
-                  Clear
+                  Cancel Timer
                 </button>
-              )}
-            </div>
-            {scheduleError && (
-              <p className="text-sm text-red-600">{scheduleError}</p>
-            )}
-            {scheduledDate && (
-              <p className="text-sm text-muted-foreground">
-                Scheduled for {scheduledDate.toLocaleString()}{" "}
-                {scheduleCountdown ? `(${scheduleCountdown})` : ""}
-              </p>
+              </div>
             )}
           </div>
         </div>
@@ -213,11 +241,16 @@ export function WaitingLobby({
 
       {!isCreator && (
         <div className="text-center">
-          {scheduledDate ? (
-            <p className="text-muted-foreground">
-              Game is scheduled for {scheduledDate.toLocaleString()}.{" "}
-              {scheduleCountdown}
-            </p>
+          {scheduledDate && scheduleCountdown ? (
+            <div className="inline-block">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <Clock className="w-4 h-4" />
+                <span>Game starting in</span>
+              </div>
+              <div className="text-3xl font-bold">
+                {scheduleCountdown.mins.toString().padStart(2, '0')}:{scheduleCountdown.secs.toString().padStart(2, '0')}
+              </div>
+            </div>
           ) : (
             <p className="text-muted-foreground">
               Waiting for host to start the game...
