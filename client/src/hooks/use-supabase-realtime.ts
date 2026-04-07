@@ -1,3 +1,4 @@
+'use server'
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/utils/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
