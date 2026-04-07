@@ -1,6 +1,9 @@
 import InfiniteScrollAchievements from '@/components/achievements/InfiniteScrollAchievements'
-import { getAchievements, getAchievementNumber } from '@/lib/action'
+import { getAchievementNumber, getAchievements } from '@/lib/action'
 import { cookies } from 'next/headers'
+
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 export default async function Achievements() {
   const [achievements, totalCount] = await Promise.all([
