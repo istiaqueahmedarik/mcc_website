@@ -1,7 +1,7 @@
 "use client";
 import { supabase } from "@/utils/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface Participant {
   id: string;
@@ -38,36 +38,10 @@ interface CachedFinalStats {
   accuracy: number;
 }
 
-function resolveClientApiBaseUrl() {
-  const configuredBase = (process.env.NEXT_PUBLIC_SERVER_URL || "").trim();
-  const normalizedConfiguredBase = configuredBase.replace(/\/+$/, "");
-
-  if (typeof window === "undefined") {
-    return normalizedConfiguredBase;
-  }
-
-  const currentHost = window.location.hostname;
-  const isLocalPageHost =
-    currentHost === "localhost" || currentHost === "127.0.0.1";
-  const pointsToLocalBackend =
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
-      normalizedConfiguredBase,
-    );
-
-  // In production-like hosts, never call localhost from the browser.
-  if (!isLocalPageHost && pointsToLocalBackend) {
-    return "";
-  }
-
-  return normalizedConfiguredBase;
-}
-
 export function useSupabaseRealtime(roomCode: string, userName: string | null) {
-  const apiBaseUrl = useMemo(() => resolveClientApiBaseUrl(), []);
   const apiUrl = useCallback(
-    (path: string) =>
-      `${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`,
-    [apiBaseUrl],
+    (path: string) => `/api${path.startsWith("/") ? path : `/${path}`}`,
+    [],
   );
 
   const [isConnected, setIsConnected] = useState(false);
