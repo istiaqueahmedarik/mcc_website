@@ -327,9 +327,9 @@ export function TypingTest() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Hero Section */}
-      {!isActive && !isFinished && (
+      {(
         <div className="text-center space-y-4 py-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
+          {/* <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
             <Keyboard className="h-10 w-10 text-primary" />
           </div>
           <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
@@ -338,7 +338,7 @@ export function TypingTest() {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Test your typing speed and accuracy. Click the input field below and
             start typing!
-          </p>
+          </p> */}
 
           {/* Difficulty Selector */}
           <div className="flex items-center justify-center gap-3 pt-4">
@@ -348,6 +348,7 @@ export function TypingTest() {
                 variant={difficulty === null ? "default" : "outline"}
                 size="sm"
                 onClick={() => setDifficulty(null)}
+                disabled={isActive || isFinished}
               >
                 All
               </Button>
@@ -355,6 +356,7 @@ export function TypingTest() {
                 variant={difficulty === 1 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setDifficulty(1)}
+                disabled={isActive || isFinished}
               >
                 Easy
               </Button>
@@ -362,6 +364,7 @@ export function TypingTest() {
                 variant={difficulty === 2 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setDifficulty(2)}
+                disabled={isActive || isFinished}
               >
                 Medium
               </Button>
@@ -369,6 +372,7 @@ export function TypingTest() {
                 variant={difficulty === 3 ? "default" : "outline"}
                 size="sm"
                 onClick={() => setDifficulty(3)}
+                disabled={isActive || isFinished}
               >
                 Hard
               </Button>
@@ -440,7 +444,7 @@ export function TypingTest() {
       </div>
 
       {/* Progress Bar */}
-      {isActive && (
+      {/* {(
         <div className="space-y-2">
           <Progress value={((60 - timeLeft) / 60) * 100} className="h-3" />
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -448,7 +452,7 @@ export function TypingTest() {
             <span>{timeLeft}s remaining</span>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Typing Area */}
       <Card className="border-2 shadow-lg">
