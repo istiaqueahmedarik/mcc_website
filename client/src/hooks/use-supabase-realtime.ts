@@ -1,7 +1,7 @@
-'use server'
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '@/utils/supabase/client';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+"use client";
+import { supabase } from "@/utils/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface Participant {
   id: string;
@@ -16,7 +16,7 @@ export interface Participant {
 export interface RoomState {
   roomId: string;
   roomCode: string;
-  status: 'waiting' | 'active' | 'completed';
+  status: "waiting" | "active" | "completed";
   timeLimit: number;
   wordSet: string[];
   scheduledStartTime?: number;
@@ -54,18 +54,18 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   const cacheStorageKey = `typing-final-stats:${roomCode}`;
 
   const persistStatsCache = useCallback(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     sessionStorage.setItem(
       cacheStorageKey,
       JSON.stringify({
         byId: finalStatsByIdRef.current,
         byName: finalStatsByNameRef.current,
-      })
+      }),
     );
   }, [cacheStorageKey]);
 
   const restoreStatsCache = useCallback(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     const raw = sessionStorage.getItem(cacheStorageKey);
     if (!raw) return;
 
@@ -79,40 +79,57 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     }
   }, [cacheStorageKey]);
 
-  const cacheParticipantStats = useCallback((id: string | undefined, name: string | undefined, wpm: number, accuracy: number) => {
-    const safeWpm = Number.isFinite(wpm) ? Math.round(wpm) : 0;
-    const safeAccuracy = Number.isFinite(accuracy) ? Math.round(accuracy) : 0;
+  const cacheParticipantStats = useCallback(
+    (
+      id: string | undefined,
+      name: string | undefined,
+      wpm: number,
+      accuracy: number,
+    ) => {
+      const safeWpm = Number.isFinite(wpm) ? Math.round(wpm) : 0;
+      const safeAccuracy = Number.isFinite(accuracy) ? Math.round(accuracy) : 0;
 
-    if (id) {
-      finalStatsByIdRef.current[id] = { wpm: safeWpm, accuracy: safeAccuracy };
-    }
+      if (id) {
+        finalStatsByIdRef.current[id] = {
+          wpm: safeWpm,
+          accuracy: safeAccuracy,
+        };
+      }
 
-    if (name) {
-      finalStatsByNameRef.current[name] = { wpm: safeWpm, accuracy: safeAccuracy };
-    }
+      if (name) {
+        finalStatsByNameRef.current[name] = {
+          wpm: safeWpm,
+          accuracy: safeAccuracy,
+        };
+      }
 
-    persistStatsCache();
-  }, [persistStatsCache]);
+      persistStatsCache();
+    },
+    [persistStatsCache],
+  );
 
-  const withCachedFinalStats = useCallback((entry: LeaderboardEntry): LeaderboardEntry => {
-    if (entry.wpm !== 0 || entry.accuracy !== 0) {
-      return entry;
-    }
+  const withCachedFinalStats = useCallback(
+    (entry: LeaderboardEntry): LeaderboardEntry => {
+      if (entry.wpm !== 0 || entry.accuracy !== 0) {
+        return entry;
+      }
 
-    const byId = entry.id ? finalStatsByIdRef.current[entry.id] : undefined;
-    const byName = finalStatsByNameRef.current[entry.name];
-    const cached = byId ?? byName;
+      const byId = entry.id ? finalStatsByIdRef.current[entry.id] : undefined;
+      const byName = finalStatsByNameRef.current[entry.name];
+      const cached = byId ?? byName;
 
-    if (!cached) {
-      return entry;
-    }
+      if (!cached) {
+        return entry;
+      }
 
-    return {
-      ...entry,
-      wpm: cached.wpm,
-      accuracy: cached.accuracy,
-    };
-  }, []);
+      return {
+        ...entry,
+        wpm: cached.wpm,
+        accuracy: cached.accuracy,
+      };
+    },
+    [],
+  );
 
   useEffect(() => {
     restoreStatsCache();
@@ -130,7 +147,9 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   // Fetch participants
   const fetchParticipants = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/rooms/${roomCode}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/rooms/${roomCode}`,
+      );
       if (!response.ok) {
         throw new Error(`Failed to fetch participants (${response.status})`);
       }
@@ -149,21 +168,28 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
         participants.forEach((p: Participant) => {
           if (p.completed || p.wpm || p.currentWpm || p.accuracy) {
-            cacheParticipantStats(p.id, p.name, p.wpm ?? p.currentWpm ?? 0, p.accuracy ?? 0);
+            cacheParticipantStats(
+              p.id,
+              p.name,
+              p.wpm ?? p.currentWpm ?? 0,
+              p.accuracy ?? 0,
+            );
           }
         });
 
-        setRoomState(prev => prev ? { ...prev, participants } : null);
+        setRoomState((prev) => (prev ? { ...prev, participants } : null));
       }
     } catch (err) {
-      console.error('Error fetching participants:', err);
+      console.error("Error fetching participants:", err);
     }
   }, [roomCode]);
 
   // Fetch current room state
   const fetchRoomState = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}`,
+      );
       if (!response.ok) {
         throw new Error(`Failed to fetch room (${response.status})`);
       }
@@ -175,44 +201,56 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
           roomCode: data.room.roomCode,
           status: data.room.status,
           timeLimit: data.room.timeLimit,
-          wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
-          scheduledStartTime: data.room.scheduledStartTime ? new Date(data.room.scheduledStartTime).getTime() : undefined,
-          startedAt: data.room.startedAt ? new Date(data.room.startedAt).getTime() : undefined,
+          wordSet:
+            typeof data.room.wordSet === "string"
+              ? JSON.parse(data.room.wordSet)
+              : data.room.wordSet,
+          scheduledStartTime: data.room.scheduledStartTime
+            ? new Date(data.room.scheduledStartTime).getTime()
+            : undefined,
+          startedAt: data.room.startedAt
+            ? new Date(data.room.startedAt).getTime()
+            : undefined,
           participants: prev?.participants ?? [],
         }));
 
         await fetchParticipants();
       } else {
-        setError(data.error || 'Failed to fetch room state');
+        setError(data.error || "Failed to fetch room state");
       }
     } catch (err) {
-      console.error('Error fetching room state:', err);
-      setError('Failed to fetch room state');
+      console.error("Error fetching room state:", err);
+      setError("Failed to fetch room state");
     }
   }, [roomCode, fetchParticipants]);
 
   // Fetch leaderboard
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/leaderboard`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/leaderboard`,
+      );
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard (${response.status})`);
       }
 
       const data = await response.json();
       if (data.success) {
-        const mappedLeaderboard = data.leaderboard.map((entry: any, index: number) => withCachedFinalStats({
-          id: entry.id,
-          rank: index + 1,
-          name: entry.userName,
-          wpm: entry.wpm,
-          accuracy: entry.accuracy,
-          completed: entry.completed,
-        }));
+        const mappedLeaderboard = data.leaderboard.map(
+          (entry: any, index: number) =>
+            withCachedFinalStats({
+              id: entry.id,
+              rank: index + 1,
+              name: entry.userName,
+              wpm: entry.wpm,
+              accuracy: entry.accuracy,
+              completed: entry.completed,
+            }),
+        );
         setLeaderboard(mappedLeaderboard);
       }
     } catch (err) {
-      console.error('Error fetching leaderboard:', err);
+      console.error("Error fetching leaderboard:", err);
     }
   }, [roomCode, withCachedFinalStats]);
 
@@ -221,11 +259,14 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     if (!userName) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/join`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userName }),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to join room (${response.status})`);
@@ -237,18 +278,18 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         await fetchRoomState();
 
         channelRef.current?.send({
-          type: 'broadcast',
-          event: 'participant_joined',
+          type: "broadcast",
+          event: "participant_joined",
           payload: {
             participantId: data.participant.id,
           },
         });
       } else {
-        setError(data.error || 'Failed to join room');
+        setError(data.error || "Failed to join room");
       }
     } catch (err) {
-      console.error('Error joining room:', err);
-      setError('Failed to join room');
+      console.error("Error joining room:", err);
+      setError("Failed to join room");
     }
   }, [roomCode, userName, fetchRoomState]);
 
@@ -271,21 +312,26 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     });
 
     channel
-      .on('broadcast', { event: 'participant_update' }, ({ payload }) => {
-        if (payload?.participantId && (payload.wpm !== undefined || payload.currentWpm !== undefined || payload.accuracy !== undefined)) {
+      .on("broadcast", { event: "participant_update" }, ({ payload }) => {
+        if (
+          payload?.participantId &&
+          (payload.wpm !== undefined ||
+            payload.currentWpm !== undefined ||
+            payload.accuracy !== undefined)
+        ) {
           cacheParticipantStats(
             payload.participantId,
             participantNamesByIdRef.current[payload.participantId],
             payload.wpm ?? payload.currentWpm ?? 0,
-            payload.accuracy ?? 0
+            payload.accuracy ?? 0,
           );
         }
 
-        setRoomState(prev => {
+        setRoomState((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
-            participants: prev.participants.map(p =>
+            participants: prev.participants.map((p) =>
               p.id === payload.participantId
                 ? {
                     ...p,
@@ -295,13 +341,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
                     accuracy: payload.accuracy ?? p.accuracy,
                     completed: payload.completed ?? p.completed,
                   }
-                : p
+                : p,
             ),
           };
         });
       })
-      .on('broadcast', { event: 'room_status' }, ({ payload }) => {
-        setRoomState(prev => {
+      .on("broadcast", { event: "room_status" }, ({ payload }) => {
+        setRoomState((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
@@ -311,37 +357,45 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
               : payload.scheduledStartTime === null
                 ? undefined
                 : prev.scheduledStartTime,
-            startedAt: payload.startedAt ? new Date(payload.startedAt).getTime() : prev.startedAt,
+            startedAt: payload.startedAt
+              ? new Date(payload.startedAt).getTime()
+              : prev.startedAt,
             wordSet: payload.wordSet ?? prev.wordSet,
           };
         });
 
-        if (payload.status === 'waiting') {
+        if (payload.status === "waiting") {
           fetchParticipants();
         }
       })
-      .on('broadcast', { event: 'game_started' }, ({ payload }) => {
-        setRoomState(prev => prev ? { ...prev, status: 'active', startedAt: payload.startedAt } : null);
+      .on("broadcast", { event: "game_started" }, ({ payload }) => {
+        setRoomState((prev) =>
+          prev
+            ? { ...prev, status: "active", startedAt: payload.startedAt }
+            : null,
+        );
       })
-      .on('broadcast', { event: 'game_ended' }, () => {
-        setRoomState(prev => prev ? { ...prev, status: 'completed' } : null);
+      .on("broadcast", { event: "game_ended" }, () => {
+        setRoomState((prev) =>
+          prev ? { ...prev, status: "completed" } : null,
+        );
         fetchLeaderboard();
       })
-      .on('broadcast', { event: 'participant_joined' }, () => {
+      .on("broadcast", { event: "participant_joined" }, () => {
         fetchParticipants();
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
+        if (status === "SUBSCRIBED") {
           setIsConnected(true);
           setError(null);
           fetchParticipants();
-        } else if (status === 'TIMED_OUT') {
+        } else if (status === "TIMED_OUT") {
           setIsConnected(false);
-          setError('Realtime connection timed out. Retrying...');
-        } else if (status === 'CLOSED') {
+          setError("Realtime connection timed out. Retrying...");
+        } else if (status === "CLOSED") {
           setIsConnected(false);
-        } else if (status === 'CHANNEL_ERROR') {
-          setError('Connection error');
+        } else if (status === "CHANNEL_ERROR") {
+          setError("Connection error");
           setIsConnected(false);
         }
       });
@@ -353,7 +407,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       channelRef.current = null;
       setIsConnected(false);
     };
-  }, [roomCode, userName, fetchParticipants, fetchLeaderboard, cacheParticipantStats]);
+  }, [
+    roomCode,
+    userName,
+    fetchParticipants,
+    fetchLeaderboard,
+    cacheParticipantStats,
+  ]);
 
   // Fallback polling while realtime is disconnected.
   useEffect(() => {
@@ -368,7 +428,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
   // Lightweight room-state polling while waiting so scheduled auto-start is reflected for everyone.
   useEffect(() => {
-    if (!roomState || roomState.status !== 'waiting') return;
+    if (!roomState || roomState.status !== "waiting") return;
 
     const intervalId = setInterval(() => {
       fetchRoomState();
@@ -378,160 +438,212 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   }, [roomState?.status, fetchRoomState]);
 
   // Send progress update
-  const sendProgress = useCallback(async (progress: number, currentWpm: number, accuracy: number) => {
-    if (!participantId) return;
+  const sendProgress = useCallback(
+    async (progress: number, currentWpm: number, accuracy: number) => {
+      if (!participantId) return;
 
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ progress, currentWpm, accuracy }),
-      });
+      try {
+        await fetch(
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ progress, currentWpm, accuracy }),
+          },
+        );
 
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'participant_update',
-        payload: {
-          participantId,
-          progress,
-          currentWpm,
-          accuracy,
-        },
-      });
-    } catch (err) {
-      console.error('Error sending progress:', err);
-    }
-  }, [participantId]);
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "participant_update",
+          payload: {
+            participantId,
+            progress,
+            currentWpm,
+            accuracy,
+          },
+        });
+      } catch (err) {
+        console.error("Error sending progress:", err);
+      }
+    },
+    [participantId],
+  );
 
   // Send completion
-  const sendComplete = useCallback(async (wpm: number, accuracy: number, stats: any) => {
-    if (!participantId) return;
+  const sendComplete = useCallback(
+    async (wpm: number, accuracy: number, stats: any) => {
+      if (!participantId) return;
 
-    try {
-      const selfName = roomState?.participants.find(p => p.id === participantId)?.name;
-      cacheParticipantStats(participantId, selfName, wpm, accuracy);
+      try {
+        const selfName = roomState?.participants.find(
+          (p) => p.id === participantId,
+        )?.name;
+        cacheParticipantStats(participantId, selfName, wpm, accuracy);
 
-      await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wpm, accuracy, completed: true }),
-      });
+        await fetch(
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wpm, accuracy, completed: true }),
+          },
+        );
 
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'participant_update',
-        payload: {
-          participantId,
-          wpm,
-          accuracy,
-          completed: true,
-        },
-      });
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "participant_update",
+          payload: {
+            participantId,
+            wpm,
+            accuracy,
+            completed: true,
+          },
+        });
 
-      setTimeout(() => fetchParticipants(), 1000);
-    } catch (err) {
-      console.error('Error sending complete:', err);
-    }
-  }, [participantId, fetchParticipants, roomState?.participants, cacheParticipantStats]);
+        setTimeout(() => fetchParticipants(), 1000);
+      } catch (err) {
+        console.error("Error sending complete:", err);
+      }
+    },
+    [
+      participantId,
+      fetchParticipants,
+      roomState?.participants,
+      cacheParticipantStats,
+    ],
+  );
 
   // Start game
   const startGame = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/start`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/start`,
+        {
+          method: "POST",
+        },
+      );
 
       const data = await response.json();
       if (data.success) {
         channelRef.current?.send({
-          type: 'broadcast',
-          event: 'game_started',
+          type: "broadcast",
+          event: "game_started",
           payload: {
             startedAt: new Date(data.room.startedAt).getTime(),
           },
         });
       }
     } catch (err) {
-      console.error('Error starting game:', err);
+      console.error("Error starting game:", err);
     }
   }, [roomCode]);
 
   // Restart game
   const restartGame = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/restart`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/restart`,
+        {
+          method: "POST",
+        },
+      );
 
       const data = await response.json();
       if (data.success) {
         channelRef.current?.send({
-          type: 'broadcast',
-          event: 'room_status',
+          type: "broadcast",
+          event: "room_status",
           payload: {
-            status: 'waiting',
+            status: "waiting",
             scheduledStartTime: null,
-            wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
+            wordSet:
+              typeof data.room.wordSet === "string"
+                ? JSON.parse(data.room.wordSet)
+                : data.room.wordSet,
           },
         });
 
-        setRoomState(prev => prev ? {
-          ...prev,
-          status: 'waiting',
-          scheduledStartTime: undefined,
-          startedAt: undefined,
-          wordSet: typeof data.room.wordSet === 'string' ? JSON.parse(data.room.wordSet) : data.room.wordSet,
-        } : prev);
+        setRoomState((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: "waiting",
+                scheduledStartTime: undefined,
+                startedAt: undefined,
+                wordSet:
+                  typeof data.room.wordSet === "string"
+                    ? JSON.parse(data.room.wordSet)
+                    : data.room.wordSet,
+              }
+            : prev,
+        );
       }
     } catch (err) {
-      console.error('Error restarting game:', err);
+      console.error("Error restarting game:", err);
     }
   }, [roomCode]);
 
-  const scheduleGameStart = useCallback(async (scheduledStartTime: string | null) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/schedule-start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduledStartTime }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        const parsedSchedule = data.room.scheduledStartTime ? new Date(data.room.scheduledStartTime).getTime() : undefined;
-
-        setRoomState(prev => prev ? {
-          ...prev,
-          scheduledStartTime: parsedSchedule,
-        } : prev);
-
-        channelRef.current?.send({
-          type: 'broadcast',
-          event: 'room_status',
-          payload: {
-            status: 'waiting',
-            scheduledStartTime: data.room.scheduledStartTime,
+  const scheduleGameStart = useCallback(
+    async (scheduledStartTime: string | null) => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/schedule-start`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scheduledStartTime }),
           },
-        });
+        );
+
+        const data = await response.json();
+        if (data.success) {
+          const parsedSchedule = data.room.scheduledStartTime
+            ? new Date(data.room.scheduledStartTime).getTime()
+            : undefined;
+
+          setRoomState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  scheduledStartTime: parsedSchedule,
+                }
+              : prev,
+          );
+
+          channelRef.current?.send({
+            type: "broadcast",
+            event: "room_status",
+            payload: {
+              status: "waiting",
+              scheduledStartTime: data.room.scheduledStartTime,
+            },
+          });
+        }
+      } catch (err) {
+        console.error("Error scheduling game start:", err);
       }
-    } catch (err) {
-      console.error('Error scheduling game start:', err);
-    }
-  }, [roomCode]);
+    },
+    [roomCode],
+  );
 
   const completeRoom = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/complete`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/complete`,
+        {
+          method: "POST",
+        },
+      );
 
       const data = await response.json();
       if (data.success) {
-        setRoomState(prev => prev ? { ...prev, status: 'completed' } : null);
+        setRoomState((prev) =>
+          prev ? { ...prev, status: "completed" } : null,
+        );
 
         channelRef.current?.send({
-          type: 'broadcast',
-          event: 'game_ended',
+          type: "broadcast",
+          event: "game_ended",
           payload: {
             completedAt: new Date(data.room.completedAt).getTime(),
           },
@@ -540,7 +652,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         await fetchLeaderboard();
       }
     } catch (err) {
-      console.error('Error completing room:', err);
+      console.error("Error completing room:", err);
     }
   }, [roomCode, fetchLeaderboard]);
 
