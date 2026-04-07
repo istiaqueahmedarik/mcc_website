@@ -7,7 +7,6 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { get } from "@/lib/action";
 import { cn } from "@/lib/utils";
@@ -20,7 +19,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Word {
   id: string;
@@ -51,6 +50,7 @@ export function TypingTest() {
   const [mounted, setMounted] = useState(false);
   const [lines, setLines] = useState<number[][]>([]); // Array of arrays containing word indices per line
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [fallbackCharBudget, setFallbackCharBudget] = useState(30);
   const inputRef = useRef<HTMLInputElement>(null);
   const wordsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -59,9 +59,62 @@ export function TypingTest() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    const updateFallbackCharBudget = () => {
+      const width = window.innerWidth;
+      if (width < 640) {
+        setFallbackCharBudget(20);
+      } else if (width < 1024) {
+        setFallbackCharBudget(30);
+      } else {
+        setFallbackCharBudget(42);
+      }
+    };
+
+    updateFallbackCharBudget();
+    window.addEventListener("resize", updateFallbackCharBudget);
+    return () => window.removeEventListener("resize", updateFallbackCharBudget);
+  }, []);
+
+  const fallbackLines = useMemo(() => {
+    if (words.length === 0) return [] as number[][];
+
+    const builtLines: number[][] = [];
+    let currentLine: number[] = [];
+    let currentChars = 0;
+
+    for (let i = 0; i < words.length; i++) {
+      const nextWordChars =
+        words[i].word.length + (currentLine.length > 0 ? 1 : 0);
+
+      if (
+        currentChars + nextWordChars > fallbackCharBudget &&
+        currentLine.length > 0
+      ) {
+        builtLines.push(currentLine);
+        currentLine = [i];
+        currentChars = words[i].word.length;
+      } else {
+        currentLine.push(i);
+        currentChars += nextWordChars;
+      }
+    }
+
+    if (currentLine.length > 0) {
+      builtLines.push(currentLine);
+    }
+
+    return builtLines;
+  }, [words, fallbackCharBudget]);
+
   // Calculate lines based on word widths
   useEffect(() => {
     if (!wordsContainerRef.current || words.length === 0) return;
+
+    let animationFrameId: number | null = null;
+    let retryCount = 0;
+    const maxRetries = 60;
+    let timeoutId: number | null = null;
 
     const calculateLines = () => {
       const container = wordsContainerRef.current;
@@ -71,7 +124,14 @@ export function TypingTest() {
       const paddingLeft = parseFloat(containerStyles.paddingLeft || "0");
       const paddingRight = parseFloat(containerStyles.paddingRight || "0");
       const containerWidth = container.clientWidth - paddingLeft - paddingRight;
-      if (containerWidth <= 0) return;
+      if (containerWidth <= 0) {
+        if (retryCount < maxRetries) {
+          retryCount += 1;
+          animationFrameId = window.requestAnimationFrame(calculateLines);
+        }
+        return;
+      }
+      retryCount = 0;
 
       const lineProbe = document.createElement("div");
       lineProbe.className =
@@ -123,8 +183,34 @@ export function TypingTest() {
     };
 
     calculateLines();
+    timeoutId = window.setTimeout(calculateLines, 250);
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        calculateLines();
+      });
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+      animationFrameId = window.requestAnimationFrame(calculateLines);
+    });
+
+    resizeObserver.observe(wordsContainerRef.current);
     window.addEventListener("resize", calculateLines);
-    return () => window.removeEventListener("resize", calculateLines);
+
+    return () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", calculateLines);
+    };
   }, [words]);
 
   const fetchWords = useCallback(async () => {
@@ -135,7 +221,11 @@ export function TypingTest() {
       const response = await get(
         `typing/words/random?limit=200${difficultyParam}`,
       );
-      if (response.success && Array.isArray(response.words) && response.words.length > 0) {
+      if (
+        response.success &&
+        Array.isArray(response.words) &&
+        response.words.length > 0
+      ) {
         setWords(response.words);
         setWordsFetchFailed(false);
       } else {
@@ -150,6 +240,20 @@ export function TypingTest() {
       setIsLoading(false);
     }
   }, [difficulty]);
+
+  const resetTest = useCallback(() => {
+    setIsActive(false);
+    setIsFinished(false);
+    setTimeLeft(60);
+    setCurrentWordIndex(0);
+    setCurrentInput("");
+    setCorrectWords(0);
+    setIncorrectWords(0);
+    setTypedChars(0);
+    setTypedWords([]);
+    setCurrentLineIndex(0);
+    fetchWords();
+  }, [fetchWords]);
 
   // Fetch words on mount and when difficulty changes
   useEffect(() => {
@@ -177,20 +281,6 @@ export function TypingTest() {
       if (interval) clearInterval(interval);
     };
   }, [isActive, timeLeft]);
-
-  const resetTest = () => {
-    setIsActive(false);
-    setIsFinished(false);
-    setTimeLeft(60);
-    setCurrentWordIndex(0);
-    setCurrentInput("");
-    setCorrectWords(0);
-    setIncorrectWords(0);
-    setTypedChars(0);
-    setTypedWords([]);
-    setCurrentLineIndex(0);
-    fetchWords();
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -230,6 +320,14 @@ export function TypingTest() {
         const currentLine = lines[currentLineIndex];
         if (currentLine && nextIndex > currentLine[currentLine.length - 1]) {
           // Move to next line
+          setCurrentLineIndex((prev) => prev + 1);
+        }
+      } else {
+        const currentFallbackLine = fallbackLines[currentLineIndex];
+        if (
+          currentFallbackLine &&
+          nextIndex > currentFallbackLine[currentFallbackLine.length - 1]
+        ) {
           setCurrentLineIndex((prev) => prev + 1);
         }
       }
@@ -315,19 +413,12 @@ export function TypingTest() {
   const visibleLineGroups =
     lines.length > 0
       ? lines.slice(currentLineIndex, currentLineIndex + 2)
-      : [
-          words
-            .slice(currentWordIndex, currentWordIndex + 8)
-            .map((_, idx) => currentWordIndex + idx),
-          words
-            .slice(currentWordIndex + 8, currentWordIndex + 16)
-            .map((_, idx) => currentWordIndex + 8 + idx),
-        ].filter((line) => line.length > 0);
+      : fallbackLines.slice(currentLineIndex, currentLineIndex + 2);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Hero Section */}
-      {(
+      {
         <div className="text-center space-y-4 py-8">
           {/* <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
             <Keyboard className="h-10 w-10 text-primary" />
@@ -379,7 +470,7 @@ export function TypingTest() {
             </div>
           </div>
         </div>
-      )}
+      }
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -460,79 +551,94 @@ export function TypingTest() {
           {!isFinished ? (
             wordsFetchFailed || words.length === 0 ? (
               <div className="py-12 text-center space-y-4">
-                <p className="text-xl font-semibold">Something went wrong, try again.</p>
+                <p className="text-xl font-semibold">
+                  Something went wrong, try again.
+                </p>
                 <p className="text-sm text-muted-foreground">
                   We could not load words for the typing test.
                 </p>
-                <Button onClick={fetchWords} size="lg" className="text-base px-6">
+                <Button
+                  onClick={fetchWords}
+                  size="lg"
+                  className="text-base px-6"
+                >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Try Again
                 </Button>
               </div>
             ) : (
-            <div className="space-y-6">
-              {/* Words Display - Two Lines Only */}
-              <div
-                ref={wordsContainerRef}
-                className="relative min-h-40 rounded-xl bg-linear-to-br from-muted/50 to-muted/30 p-8 backdrop-blur overflow-hidden"
-              >
-                <div className="space-y-4">
-                  {visibleLineGroups.map((lineWordIndices, lineIdx) => (
-                      <div
-                        key={`line-${currentLineIndex + lineIdx}`}
-                        className="flex flex-nowrap gap-x-3 overflow-hidden text-2xl md:text-3xl leading-relaxed font-mono"
-                      >
-                        {lineWordIndices.map((wordIndex) => {
-                          const word = words[wordIndex];
-                          if (!word) return null;
-                          return (
-                            <span
-                              key={word.id || wordIndex}
-                              className={getWordClassName(wordIndex, word.word)}
-                            >
-                              {word.word}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ))}
+              <div className="space-y-6">
+                {/* Words Display - Two Lines Only */}
+                <div
+                  ref={wordsContainerRef}
+                  className="relative min-h-40 rounded-xl bg-linear-to-br from-muted/50 to-muted/30 p-8 backdrop-blur overflow-hidden"
+                >
+                  {visibleLineGroups.length === 0 ? (
+                    <div className="flex h-full min-h-24 items-center justify-center text-sm text-muted-foreground">
+                      Preparing words...
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {visibleLineGroups.map((lineWordIndices, lineIdx) => (
+                        <div
+                          key={`line-${currentLineIndex + lineIdx}`}
+                          className="flex flex-nowrap gap-x-3 overflow-hidden text-2xl md:text-3xl leading-relaxed font-mono"
+                        >
+                          {lineWordIndices.map((wordIndex) => {
+                            const word = words[wordIndex];
+                            if (!word) return null;
+                            return (
+                              <span
+                                key={word.id || wordIndex}
+                                className={getWordClassName(
+                                  wordIndex,
+                                  word.word,
+                                )}
+                              >
+                                {word.word}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Input Field */}
+                <div className="space-y-3">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={currentInput}
+                    onChange={handleInputChange}
+                    className={cn(
+                      "w-full rounded-xl border-2 bg-background px-6 py-4 text-2xl md:text-3xl font-mono",
+                      "focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary",
+                      "transition-all duration-200",
+                      "disabled:opacity-50 disabled:cursor-not-allowed",
+                    )}
+                    placeholder={
+                      isActive
+                        ? "Type here..."
+                        : "Click here and start typing to begin..."
+                    }
+                    disabled={isFinished}
+                    autoFocus
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                  />
+
+                  {!isActive && !isFinished && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Keyboard className="h-4 w-4" />
+                      <span>Start typing to begin the 60-second test</span>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              {/* Input Field */}
-              <div className="space-y-3">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={currentInput}
-                  onChange={handleInputChange}
-                  className={cn(
-                    "w-full rounded-xl border-2 bg-background px-6 py-4 text-2xl md:text-3xl font-mono",
-                    "focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary",
-                    "transition-all duration-200",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                  )}
-                  placeholder={
-                    isActive
-                      ? "Type here..."
-                      : "Click here and start typing to begin..."
-                  }
-                  disabled={isFinished}
-                  autoFocus
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                />
-
-                {!isActive && !isFinished && (
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Keyboard className="h-4 w-4" />
-                    <span>Start typing to begin the 60-second test</span>
-                  </div>
-                )}
-              </div>
-            </div>
             )
           ) : (
             /* Results */

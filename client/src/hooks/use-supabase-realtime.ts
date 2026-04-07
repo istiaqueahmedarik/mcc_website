@@ -1,7 +1,7 @@
 "use client";
 import { supabase } from "@/utils/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export interface Participant {
   id: string;
@@ -38,7 +38,38 @@ interface CachedFinalStats {
   accuracy: number;
 }
 
+function resolveClientApiBaseUrl() {
+  const configuredBase = (process.env.NEXT_PUBLIC_SERVER_URL || "").trim();
+  const normalizedConfiguredBase = configuredBase.replace(/\/+$/, "");
+
+  if (typeof window === "undefined") {
+    return normalizedConfiguredBase;
+  }
+
+  const currentHost = window.location.hostname;
+  const isLocalPageHost =
+    currentHost === "localhost" || currentHost === "127.0.0.1";
+  const pointsToLocalBackend =
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+      normalizedConfiguredBase,
+    );
+
+  // In production-like hosts, never call localhost from the browser.
+  if (!isLocalPageHost && pointsToLocalBackend) {
+    return "";
+  }
+
+  return normalizedConfiguredBase;
+}
+
 export function useSupabaseRealtime(roomCode: string, userName: string | null) {
+  const apiBaseUrl = useMemo(() => resolveClientApiBaseUrl(), []);
+  const apiUrl = useCallback(
+    (path: string) =>
+      `${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`,
+    [apiBaseUrl],
+  );
+
   const [isConnected, setIsConnected] = useState(false);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [participantId, setParticipantId] = useState<string | null>(null);
@@ -148,7 +179,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   const fetchParticipants = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/rooms/${roomCode}`,
+        apiUrl(`/typing/participants/rooms/${roomCode}`),
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch participants (${response.status})`);
@@ -182,14 +213,12 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } catch (err) {
       console.error("Error fetching participants:", err);
     }
-  }, [roomCode]);
+  }, [roomCode, apiUrl, cacheParticipantStats]);
 
   // Fetch current room state
   const fetchRoomState = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}`,
-      );
+      const response = await fetch(apiUrl(`/typing/rooms/${roomCode}`));
       if (!response.ok) {
         throw new Error(`Failed to fetch room (${response.status})`);
       }
@@ -222,13 +251,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       console.error("Error fetching room state:", err);
       setError("Failed to fetch room state");
     }
-  }, [roomCode, fetchParticipants]);
+  }, [roomCode, fetchParticipants, apiUrl]);
 
   // Fetch leaderboard
   const fetchLeaderboard = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/leaderboard`,
+        apiUrl(`/typing/rooms/${roomCode}/leaderboard`),
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard (${response.status})`);
@@ -252,21 +281,18 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } catch (err) {
       console.error("Error fetching leaderboard:", err);
     }
-  }, [roomCode, withCachedFinalStats]);
+  }, [roomCode, withCachedFinalStats, apiUrl]);
 
   // Join room once user is known.
   const joinRoom = useCallback(async () => {
     if (!userName) return;
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/join`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userName }),
-        },
-      );
+      const response = await fetch(apiUrl(`/typing/rooms/${roomCode}/join`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userName }),
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to join room (${response.status})`);
@@ -291,7 +317,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       console.error("Error joining room:", err);
       setError("Failed to join room");
     }
-  }, [roomCode, userName, fetchRoomState]);
+  }, [roomCode, userName, fetchRoomState, apiUrl]);
 
   useEffect(() => {
     if (!userName || !roomCode) return;
@@ -428,7 +454,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
   // Lightweight room-state polling while waiting so scheduled auto-start is reflected for everyone.
   useEffect(() => {
-    if (!roomState || roomState.status !== "waiting") return;
+    if (roomState?.status !== "waiting") return;
 
     const intervalId = setInterval(() => {
       fetchRoomState();
@@ -443,14 +469,11 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       if (!participantId) return;
 
       try {
-        await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ progress, currentWpm, accuracy }),
-          },
-        );
+        await fetch(apiUrl(`/typing/participants/${participantId}/progress`), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ progress, currentWpm, accuracy }),
+        });
 
         channelRef.current?.send({
           type: "broadcast",
@@ -466,7 +489,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         console.error("Error sending progress:", err);
       }
     },
-    [participantId],
+    [participantId, apiUrl],
   );
 
   // Send completion
@@ -480,14 +503,11 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         )?.name;
         cacheParticipantStats(participantId, selfName, wpm, accuracy);
 
-        await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/participants/${participantId}/progress`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ wpm, accuracy, completed: true }),
-          },
-        );
+        await fetch(apiUrl(`/typing/participants/${participantId}/progress`), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wpm, accuracy, completed: true }),
+        });
 
         channelRef.current?.send({
           type: "broadcast",
@@ -510,18 +530,16 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       fetchParticipants,
       roomState?.participants,
       cacheParticipantStats,
+      apiUrl,
     ],
   );
 
   // Start game
   const startGame = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/start`,
-        {
-          method: "POST",
-        },
-      );
+      const response = await fetch(apiUrl(`/typing/rooms/${roomCode}/start`), {
+        method: "POST",
+      });
 
       const data = await response.json();
       if (data.success) {
@@ -536,13 +554,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } catch (err) {
       console.error("Error starting game:", err);
     }
-  }, [roomCode]);
+  }, [roomCode, apiUrl]);
 
   // Restart game
   const restartGame = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/restart`,
+        apiUrl(`/typing/rooms/${roomCode}/restart`),
         {
           method: "POST",
         },
@@ -581,13 +599,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } catch (err) {
       console.error("Error restarting game:", err);
     }
-  }, [roomCode]);
+  }, [roomCode, apiUrl]);
 
   const scheduleGameStart = useCallback(
     async (scheduledStartTime: string | null) => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/schedule-start`,
+          apiUrl(`/typing/rooms/${roomCode}/schedule-start`),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -623,13 +641,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         console.error("Error scheduling game start:", err);
       }
     },
-    [roomCode],
+    [roomCode, apiUrl],
   );
 
   const completeRoom = useCallback(async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/typing/rooms/${roomCode}/complete`,
+        apiUrl(`/typing/rooms/${roomCode}/complete`),
         {
           method: "POST",
         },
@@ -654,7 +672,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } catch (err) {
       console.error("Error completing room:", err);
     }
-  }, [roomCode, fetchLeaderboard]);
+  }, [roomCode, fetchLeaderboard, apiUrl]);
 
   return {
     isConnected,
