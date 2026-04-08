@@ -18,7 +18,7 @@ export const createRoom = async (c: Context) => {
     const timeLimit = body.timeLimit || 60;
     const difficulty = body.difficulty || null;
     const scheduledStartTime = body.scheduledStartTime || null;
-    const maxParticipants = body.maxParticipants || 10;
+    const maxParticipants = body.maxParticipants || 1000;
     const roomName = body.name || null;
     
     // Generate unique room code
