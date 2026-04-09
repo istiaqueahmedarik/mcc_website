@@ -116,41 +116,6 @@ export function WaitingLobby({
         </div>
       </div>
 
-      <div className="border rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Players in Room</h2>
-        <div className="space-y-2">
-          {roomState.participants.map((participant, index) => (
-            <div
-              key={participant.id}
-              className={`flex items-center justify-between p-3 rounded-md ${
-                participant.id === participantId
-                  ? "bg-primary/10 border border-primary"
-                  : "bg-muted"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center font-semibold">
-                  {index + 1}
-                </div>
-                <span className="font-medium">{participant.name}</span>
-                {participant.id === participantId && (
-                  <span className="text-xs text-muted-foreground">(You)</span>
-                )}
-                {index === 0 && (
-                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
-                    Host
-                  </span>
-                )}
-              </div>
-              <div
-                className="w-3 h-3 rounded-full bg-green-500"
-                title="Connected"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
       {isCreator && (
         <div className="text-center space-y-3">
           <button
@@ -262,6 +227,42 @@ export function WaitingLobby({
       <div className="text-center text-sm text-muted-foreground">
         <p>Share the room code with friends to join!</p>
       </div>
+
+      <div className="border rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-4">Players in Room</h2>
+        <div className="space-y-2">
+          {roomState.participants.map((participant, index) => (
+            <div
+              key={participant.id}
+              className={`flex items-center justify-between p-3 rounded-md ${
+                participant.id === participantId
+                  ? "bg-primary/10 border border-primary"
+                  : "bg-muted"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center font-semibold">
+                  {index + 1}
+                </div>
+                <span className="font-medium">{participant.name}</span>
+                {participant.id === participantId && (
+                  <span className="text-xs text-muted-foreground">(You)</span>
+                )}
+                {index === 0 && (
+                  <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
+                    Host
+                  </span>
+                )}
+              </div>
+              <div
+                className="w-3 h-3 rounded-full bg-green-500"
+                title="Connected"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      
     </div>
   );
 }

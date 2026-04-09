@@ -9,7 +9,8 @@ function buildUpstreamUrl(request, params) {
 }
 
 async function proxyToTypingApi(request, context) {
-  const targetUrl = buildUpstreamUrl(request, context?.params);
+  const params = await context?.params;
+  const targetUrl = buildUpstreamUrl(request, params);
 
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
