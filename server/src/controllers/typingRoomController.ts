@@ -26,7 +26,7 @@ export const createRoom = async (c: Context) => {
     const roomId = uuidv7();
     
     // Fetch random words for the room (filtered by difficulty if specified)
-    const wordLimit = Math.ceil(timeLimit * 5);
+    const wordLimit = Math.ceil(timeLimit * 3);
     let words;
     
     if (difficulty) {
@@ -373,7 +373,7 @@ export const restartRoom = async (c: Context) => {
       }, 404);
     }
 
-    const wordLimit = Math.ceil(Number(existingRoom.time || 60) * 5);
+    const wordLimit = Math.ceil(Number(existingRoom.time || 60) * 3);
     const words = await sql`
       SELECT word FROM words
       ORDER BY RANDOM()
