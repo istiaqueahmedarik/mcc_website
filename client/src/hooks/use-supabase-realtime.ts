@@ -113,6 +113,10 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     [persistStatsCache],
   );
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   const withCachedFinalStats = useCallback(
     (entry: LeaderboardEntry): LeaderboardEntry => {
       if (entry.wpm !== 0 || entry.accuracy !== 0) {
@@ -139,6 +143,10 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   useEffect(() => {
     restoreStatsCache();
   }, [restoreStatsCache]);
+
+  useEffect(() => {
+    hasJoinedRef.current = false;
+  }, [userName, roomCode]);
 
   useEffect(() => {
     if (!roomState?.participants) return;
@@ -262,18 +270,27 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     if (!userName) return;
 
     try {
+      setError(null);
+
       const response = await fetch(apiUrl(`/typing/rooms/${roomCode}/join`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userName }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to join room (${response.status})`);
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || `Failed to join room (${response.status})`);
+      }
+
       if (data.success) {
+        setError(null);
         setParticipantId(data.participant.id);
         await fetchRoomState();
 
@@ -289,7 +306,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       }
     } catch (err) {
       console.error("Error joining room:", err);
-      setError("Failed to join room");
+      setError(err instanceof Error ? err.message : "Failed to join room");
     }
   }, [roomCode, userName, fetchRoomState, apiUrl]);
 
@@ -654,6 +671,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     participantId,
     leaderboard,
     error,
+    clearError,
     sendProgress,
     sendComplete,
     startGame,

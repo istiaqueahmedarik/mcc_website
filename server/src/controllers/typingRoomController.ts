@@ -170,6 +170,21 @@ export const joinRoom = async (c: Context) => {
         error: 'Room is full'
       }, 400);
     }
+
+    // Prevent duplicate names within the same room.
+    const [existingParticipant] = await sql`
+      SELECT id FROM room_participants
+      WHERE room_id = ${room.id}
+        AND LOWER(user_name) = LOWER(${userName})
+      LIMIT 1
+    `;
+
+    if (existingParticipant) {
+      return c.json({
+        success: false,
+        error: 'This name is already taken in this room. Please choose a different name.'
+      }, 409);
+    }
     
     // Create participant
     const participantId = uuidv7();
@@ -199,6 +214,15 @@ export const joinRoom = async (c: Context) => {
     });
   } catch (error) {
     console.error('Error joining room:', error);
+
+    const err = error as { code?: string; constraint_name?: string; detail?: string; message?: string };
+    if (err?.code === '23505') {
+      return c.json({
+        success: false,
+        error: 'This name is already taken in this room. Please choose a different name.'
+      }, 409);
+    }
+
     return c.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to join room'

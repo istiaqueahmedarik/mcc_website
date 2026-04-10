@@ -1,15 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface NameEntryModalProps {
   onSubmit: (name: string) => void
   roomCode: string
+  externalError?: string | null
+  initialName?: string
 }
 
-export function NameEntryModal({ onSubmit, roomCode }: NameEntryModalProps) {
-  const [name, setName] = useState('')
+export function NameEntryModal({ onSubmit, roomCode, externalError, initialName = '' }: NameEntryModalProps) {
+  const [name, setName] = useState(initialName)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setName(initialName)
+  }, [initialName])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,6 +68,9 @@ export function NameEntryModal({ onSubmit, roomCode }: NameEntryModalProps) {
               className="w-full px-4 py-3 border rounded-md"
               autoFocus
             />
+            {externalError && (
+              <div className="text-sm text-destructive">{externalError}</div>
+            )}
             {error && (
               <div className="text-sm text-destructive">{error}</div>
             )}

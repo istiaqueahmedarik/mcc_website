@@ -13,6 +13,8 @@ interface MultiplayerRoomProps {
 
 export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
   const [userName, setUserName] = useState<string | null>(null)
+  const [lastAttemptedName, setLastAttemptedName] = useState('')
+  const [joinError, setJoinError] = useState<string | null>(null)
   const [fixedWordSet, setFixedWordSet] = useState<string[]>([])
   const [localFinalStats, setLocalFinalStats] = useState<{wpm: number, accuracy: number} | null>(null)
 
@@ -22,6 +24,7 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
     participantId,
     leaderboard,
     error: wsError,
+    clearError,
     sendProgress,
     sendComplete,
     startGame,
@@ -29,6 +32,15 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
     scheduleGameStart,
     completeRoom
   } = useSupabaseRealtime(roomCode, userName)
+
+  useEffect(() => {
+    if (wsError && userName && !participantId) {
+      setJoinError(wsError)
+      setLastAttemptedName(userName)
+      setUserName(null)
+      clearError()
+    }
+  }, [wsError, userName, participantId, clearError])
 
   // Fix the word list when game starts
   useEffect(() => {
@@ -39,7 +51,7 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
     if (roomState?.status === 'waiting') {
       setFixedWordSet([])
     }
-  }, [roomState?.status, roomState?.wordSet])
+  }, [roomState?.status, roomState?.wordSet, fixedWordSet.length])
 
   const isHost = roomState?.participants[0]?.id === participantId
 
@@ -73,7 +85,18 @@ export function MultiplayerRoom({ roomCode }: MultiplayerRoomProps) {
   }, [leaderboard, roomState?.participants, userName, localFinalStats])
 
   if (!userName) {
-    return <NameEntryModal onSubmit={setUserName} roomCode={roomCode} />
+    return (
+      <NameEntryModal
+        onSubmit={(name) => {
+          setJoinError(null)
+            clearError()
+          setUserName(name)
+        }}
+        roomCode={roomCode}
+        externalError={joinError}
+        initialName={lastAttemptedName}
+      />
+    )
   }
 
   if (!roomState) {

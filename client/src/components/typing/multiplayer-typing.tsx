@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { RoomState } from '@/hooks/use-supabase-realtime'
 
 interface MultiplayerTypingProps {
@@ -28,22 +28,27 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
   const progressIntervalRef = useRef<any>(null)
   const wordsContainerRef = useRef<HTMLDivElement>(null)
 
-  const words = roomState.wordSet || []
+  const words = useMemo(() => roomState.wordSet || [], [roomState.wordSet])
   const currentWord = words[currentWordIndex]
 
-  const calculateWPM = () => {
-    if (!startTime) return 0
-    const minutes = (Date.now() - startTime) / 60000
-    return minutes > 0 ? Math.round(correctChars / 5 / minutes) : 0
-  }
+  const getElapsedMinutes = useCallback(() => {
+    const baseStartTime = roomState.startedAt ?? startTime
+    if (!baseStartTime) return 0
+    return Math.max(0, (Date.now() - baseStartTime) / 60000)
+  }, [roomState.startedAt, startTime])
 
-  const calculateAccuracy = () => {
+  const calculateWPM = useCallback(() => {
+    const minutes = getElapsedMinutes()
+    return minutes > 0 ? Math.round(correctChars / 5 / minutes) : 0
+  }, [getElapsedMinutes, correctChars])
+
+  const calculateAccuracy = useCallback(() => {
     // If no words were attempted, accuracy should be 0
     if (currentWordIndex === 0 && totalChars === 0) return 0
     return totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 0
-  }
+  }, [currentWordIndex, correctChars, totalChars])
 
-  const handleTimeUp = async () => {
+  const handleTimeUp = useCallback(async () => {
     if (!isFinished) {
       setIsFinished(true)
       
@@ -62,7 +67,7 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
     if (onTimeUp) {
       onTimeUp()
     }
-  }
+  }, [isFinished, calculateWPM, calculateAccuracy, onComplete, totalChars, correctChars, errors, roomState.timeLimit, onTimeUp])
 
   const handleTimeUpRef = useRef(handleTimeUp)
   useEffect(() => {
@@ -156,7 +161,7 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
       const stats = statsRef.current
       const progress = Math.round((stats.currentWordIndex / words.length) * 100)
       
-      const minutes = (Date.now() - startTime) / 60000
+      const minutes = getElapsedMinutes()
       const wpm = minutes > 0 ? Math.round(stats.correctChars / 5 / minutes) : 0
       
       let accuracy = 0
@@ -172,7 +177,7 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
         clearInterval(progressIntervalRef.current)
       }
     }
-  }, [startTime, isFinished, words.length, onProgress])
+  }, [startTime, isFinished, words.length, onProgress, getElapsedMinutes])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isFinished) return
@@ -217,7 +222,8 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
         const finalCorrectChars = correctChars + (isCorrect ? currentWord.length + 1 : 0)
         const finalTotalChars = totalChars + typedWord.length + 1
         
-        const minutes = (Date.now() - startTime!) / 60000
+        const baseStartTime = roomState.startedAt ?? startTime!
+        const minutes = (Date.now() - baseStartTime) / 60000
         const wpm = minutes > 0 ? Math.round(finalCorrectChars / 5 / minutes) : 0
         const accuracy = finalTotalChars > 0 ? Math.round((finalCorrectChars / finalTotalChars) * 100) : 0
         
@@ -255,7 +261,7 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
         <div className="flex gap-6 text-sm">
           <div>
             <div className="text-muted-foreground">WPM</div>
-            <div className="text-2xl font-semibold">{calculateWPM()}</div>
+              <div className="text-2xl font-semibold">{calculateWPM()}</div>
           </div>
           <div>
             <div className="text-muted-foreground">Accuracy</div>
