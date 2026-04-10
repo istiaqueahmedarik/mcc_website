@@ -239,13 +239,22 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
 
   const getWordClassName = (globalIndex: number) => {
     const result = wordResults[globalIndex]
+    const typedPrefix = input.trimEnd()
     
     if (result === 'correct') {
       return 'text-green-500'
     } else if (result === 'incorrect') {
       return 'text-red-500 line-through'
     } else if (globalIndex === currentWordIndex) {
-      return 'text-foreground underline underline-offset-4'
+      if (!typedPrefix) {
+        return 'text-foreground underline underline-offset-4'
+      }
+
+      if (currentWord.startsWith(typedPrefix)) {
+        return 'text-green-500 underline underline-offset-4'
+      }
+
+      return 'text-red-500 underline underline-offset-4'
     } else {
       return 'text-muted-foreground'
     }
