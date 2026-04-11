@@ -226,7 +226,6 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
           participants: prev?.participants ?? [],
         }));
 
-        await fetchParticipants();
       } else {
         setError(data.error || "Failed to fetch room state");
       }
@@ -234,7 +233,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       console.error("Error fetching room state:", err);
       setError("Failed to fetch room state");
     }
-  }, [roomCode, fetchParticipants, apiUrl]);
+  }, [roomCode, apiUrl]);
 
   // Fetch leaderboard
   const fetchLeaderboard = useCallback(async () => {
@@ -294,6 +293,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         setError(null);
         setParticipantId(data.participant.id);
         await fetchRoomState();
+        await fetchParticipants();
 
         channelRef.current?.send({
           type: "broadcast",
@@ -309,7 +309,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       console.error("Error joining room:", err);
       setError(err instanceof Error ? err.message : "Failed to join room");
     }
-  }, [roomCode, userName, fetchRoomState, apiUrl]);
+  }, [roomCode, userName, fetchRoomState, fetchParticipants, apiUrl]);
 
   useEffect(() => {
     if (!userName || !roomCode) return;
@@ -440,7 +440,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     const intervalId = setInterval(() => {
       fetchRoomState();
       fetchParticipants();
-    }, 2000);
+    }, 3000);
 
     return () => clearInterval(intervalId);
   }, [roomState, isConnected, fetchParticipants, fetchRoomState]);
@@ -451,7 +451,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
     const intervalId = setInterval(() => {
       fetchRoomState();
-    }, 1000);
+    }, 3000);
 
     return () => clearInterval(intervalId);
   }, [roomState?.status, fetchRoomState, isConnected]);
@@ -652,6 +652,13 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       );
 
       if (!response.ok) {
+        // Another participant may have completed the room first.
+        if (response.status === 404) {
+          await fetchRoomState();
+          await fetchLeaderboard();
+          return;
+        }
+
         throw new Error(`Failed to complete room (${response.status})`);
       }
 
@@ -676,7 +683,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     } finally {
       completingRoomRef.current = false;
     }
-  }, [roomCode, fetchLeaderboard, apiUrl, roomState?.status]);
+  }, [roomCode, fetchLeaderboard, fetchRoomState, apiUrl, roomState?.status]);
 
   return {
     isConnected,
