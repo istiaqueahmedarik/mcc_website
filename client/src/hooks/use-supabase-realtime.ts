@@ -52,6 +52,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const hasJoinedRef = useRef(false);
+  const completingRoomRef = useRef(false);
   const finalStatsByIdRef = useRef<Record<string, CachedFinalStats>>({});
   const finalStatsByNameRef = useRef<Record<string, CachedFinalStats>>({});
   const participantNamesByIdRef = useRef<Record<string, string>>({});
@@ -437,22 +438,23 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     if (!roomState || isConnected) return;
 
     const intervalId = setInterval(() => {
+      fetchRoomState();
       fetchParticipants();
     }, 2000);
 
     return () => clearInterval(intervalId);
-  }, [roomState, isConnected, fetchParticipants]);
+  }, [roomState, isConnected, fetchParticipants, fetchRoomState]);
 
   // Lightweight room-state polling while waiting so scheduled auto-start is reflected for everyone.
   useEffect(() => {
-    if (roomState?.status !== "waiting") return;
+    if (roomState?.status !== "waiting" || !isConnected) return;
 
     const intervalId = setInterval(() => {
       fetchRoomState();
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, [roomState?.status, fetchRoomState]);
+  }, [roomState?.status, fetchRoomState, isConnected]);
 
   // Send progress update
   const sendProgress = useCallback(
@@ -636,6 +638,11 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   );
 
   const completeRoom = useCallback(async () => {
+    if (completingRoomRef.current) return;
+    if (roomState?.status === "completed") return;
+
+    completingRoomRef.current = true;
+
     try {
       const response = await fetch(
         apiUrl(`/typing/rooms/${roomCode}/complete`),
@@ -643,6 +650,10 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
           method: "POST",
         },
       );
+
+      if (!response.ok) {
+        throw new Error(`Failed to complete room (${response.status})`);
+      }
 
       const data = await response.json();
       if (data.success) {
@@ -662,8 +673,10 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
       }
     } catch (err) {
       console.error("Error completing room:", err);
+    } finally {
+      completingRoomRef.current = false;
     }
-  }, [roomCode, fetchLeaderboard, apiUrl]);
+  }, [roomCode, fetchLeaderboard, apiUrl, roomState?.status]);
 
   return {
     isConnected,

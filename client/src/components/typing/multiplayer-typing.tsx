@@ -27,6 +27,7 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
   const inputRef = useRef<HTMLInputElement>(null)
   const progressIntervalRef = useRef<any>(null)
   const wordsContainerRef = useRef<HTMLDivElement>(null)
+  const hasHandledTimeUpRef = useRef(false)
 
   const words = useMemo(() => roomState.wordSet || [], [roomState.wordSet])
   const currentWord = words[currentWordIndex]
@@ -49,6 +50,9 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
   }, [currentWordIndex, correctChars, totalChars])
 
   const handleTimeUp = useCallback(async () => {
+    if (hasHandledTimeUpRef.current) return
+    hasHandledTimeUpRef.current = true
+
     if (!isFinished) {
       setIsFinished(true)
       
@@ -68,6 +72,10 @@ export function MultiplayerTyping({ roomState, participantId, onProgress, onComp
       onTimeUp()
     }
   }, [isFinished, calculateWPM, calculateAccuracy, onComplete, totalChars, correctChars, errors, roomState.timeLimit, onTimeUp])
+
+  useEffect(() => {
+    hasHandledTimeUpRef.current = false
+  }, [roomState.startedAt, roomState.status])
 
   const handleTimeUpRef = useRef(handleTimeUp)
   useEffect(() => {
