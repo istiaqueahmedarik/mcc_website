@@ -2,6 +2,27 @@ import { Context } from 'hono';
 import sql from '../db';
 import { uuidv7 } from 'uuidv7';
 
+const RETRYABLE_DB_ERROR_CODES = new Set([
+  'CONNECTION_CLOSED',
+  'CONNECTION_ENDED',
+  'CONNECT_TIMEOUT',
+]);
+
+const SCHEDULER_MAX_DB_RETRIES = 3;
+const SCHEDULER_RETRY_DELAY_MS = 500;
+
+type DbLikeError = {
+  code?: string;
+  message?: string;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const isDbConnectionError = (error: unknown): boolean => {
+  const code = (error as DbLikeError | null | undefined)?.code;
+  return typeof code === 'string' && RETRYABLE_DB_ERROR_CODES.has(code);
+};
+
 // Helper function to generate room code
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Remove ambiguous chars
@@ -501,22 +522,45 @@ export const scheduleRoomStart = async (c: Context) => {
 };
 
 export const autoStartScheduledRooms = async () => {
-  try {
-    const startedRooms = await sql`
-      UPDATE rooms
-      SET status = 'active', started_at = NOW(), scheduled_start_time = NULL
-      WHERE status = 'waiting'
-        AND scheduled_start_time IS NOT NULL
-        AND scheduled_start_time <= NOW()
-      RETURNING id, room_code, started_at
-    `;
+  for (let attempt = 1; attempt <= SCHEDULER_MAX_DB_RETRIES; attempt += 1) {
+    try {
+      const startedRooms = await sql`
+        UPDATE rooms
+        SET status = 'active', started_at = NOW(), scheduled_start_time = NULL
+        WHERE status = 'waiting'
+          AND scheduled_start_time IS NOT NULL
+          AND scheduled_start_time <= NOW()
+        RETURNING id, room_code, started_at
+      `;
 
-    if (startedRooms.length > 0) {
-      for (const room of startedRooms as Array<{ room_code: string; started_at: Date }>) {
-        console.log(`⏰ Auto-started typing room ${room.room_code} at ${room.started_at.toISOString()}`);
+      if (startedRooms.length > 0) {
+        const startedRoomsList = startedRooms as unknown as Array<{
+          room_code: string;
+          started_at: Date;
+        }>;
+
+        for (const room of startedRoomsList) {
+          console.log(`⏰ Auto-started typing room ${room.room_code} at ${room.started_at.toISOString()}`);
+        }
       }
+
+      return;
+    } catch (error) {
+      const timestamp = new Date().toISOString();
+      const canRetry = isDbConnectionError(error) && attempt < SCHEDULER_MAX_DB_RETRIES;
+
+      if (canRetry) {
+        const delayMs = SCHEDULER_RETRY_DELAY_MS * attempt;
+        console.warn(
+          `[${timestamp}] Auto-start scheduler DB disconnect on attempt ${attempt}/${SCHEDULER_MAX_DB_RETRIES}. Retrying in ${delayMs}ms.`,
+          error,
+        );
+        await sleep(delayMs);
+        continue;
+      }
+
+      console.error(`[${timestamp}] Error auto-starting scheduled typing rooms:`, error);
+      throw error;
     }
-  } catch (error) {
-    console.error('Error auto-starting scheduled typing rooms:', error);
   }
 };

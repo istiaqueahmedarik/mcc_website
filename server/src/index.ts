@@ -21,7 +21,13 @@ import vjudgeRoute from "./routes/vjudgeRoute";
 import wordRoute from "./routes/wordRoute";
 import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
-import { autoStartScheduledRooms } from "./controllers/typingRoomController";
+import {
+  autoStartScheduledRooms,
+  isDbConnectionError,
+} from "./controllers/typingRoomController";
+
+const AUTO_START_INTERVAL_MS = 1000;
+const AUTO_START_MAX_CONSECUTIVE_DB_FAILURES = 5;
 
 const app = new Hono<{ Variables: JwtVariables }>();
 
@@ -48,9 +54,52 @@ app.route("/typing/words", wordRoute);
 app.route("/typing/rooms", typingRoomRoute);
 app.route("/typing/participants", typingParticipantRoute);
 
-setInterval(() => {
-  autoStartScheduledRooms();
-}, 1000);
+let autoStartSchedulerInFlight = false;
+let autoStartConsecutiveDbFailures = 0;
+
+setInterval(async () => {
+  if (autoStartSchedulerInFlight) return;
+  autoStartSchedulerInFlight = true;
+
+  try {
+    await autoStartScheduledRooms();
+
+    if (autoStartConsecutiveDbFailures > 0) {
+      console.log(
+        `[${new Date().toISOString()}] Auto-start scheduler recovered after ${autoStartConsecutiveDbFailures} DB failure(s).`,
+      );
+    }
+
+    autoStartConsecutiveDbFailures = 0;
+  } catch (error) {
+    const timestamp = new Date().toISOString();
+
+    if (isDbConnectionError(error)) {
+      autoStartConsecutiveDbFailures += 1;
+      console.error(
+        `[${timestamp}] Auto-start scheduler DB failure ${autoStartConsecutiveDbFailures}/${AUTO_START_MAX_CONSECUTIVE_DB_FAILURES}.`,
+        error,
+      );
+
+      if (
+        autoStartConsecutiveDbFailures >=
+        AUTO_START_MAX_CONSECUTIVE_DB_FAILURES
+      ) {
+        console.error(
+          `[${timestamp}] Auto-start scheduler reached max consecutive DB failures; exiting for PM2 restart.`,
+        );
+        process.exit(1);
+      }
+    } else {
+      console.error(
+        `[${timestamp}] Auto-start scheduler failed with non-retryable error:`,
+        error,
+      );
+    }
+  } finally {
+    autoStartSchedulerInFlight = false;
+  }
+}, AUTO_START_INTERVAL_MS);
 
 export default {
   port: process.env.PORT || 5000,
