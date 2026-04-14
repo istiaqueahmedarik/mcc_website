@@ -93,7 +93,10 @@ export default async function ContestRoomsPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {contestRooms.map((room) => (
+                        {contestRooms.map((room) => {
+                            const roomType = String(room?.contest_type || "TFC").toUpperCase();
+
+                            return (
                             <Link key={room.id} href={`/contests_report/details/${room.id}`} className="block group">
                                 <Card className="h-full rounded-3xl overflow-hidden transition-all duration-200 hover:shadow-lg group-hover:border-primary/50">
                                     <CardHeader className="pb-2">
@@ -108,6 +111,16 @@ export default async function ContestRoomsPage() {
                                                 >
                                                     {room["Room Name"]}
                                                 </CardTitle>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-foreground">
+                                                        {roomType}
+                                                    </span>
+                                                    {roomType === "TSC" && (
+                                                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                                                            Combined TFC + TSC
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <CardDescription className="flex items-center mt-1 truncate">
                                                     <Clock className="w-4 h-4 mr-1" />
                                                     <span>Created {formatDistanceToNow(new Date(room.created_at), { addSuffix: true })}</span>
@@ -131,7 +144,7 @@ export default async function ContestRoomsPage() {
                                     </CardFooter>
                                 </Card>
                             </Link>
-                        ))}
+                        )})}
                     </div>
                 )}
             </div>

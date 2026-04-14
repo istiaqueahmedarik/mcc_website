@@ -239,55 +239,59 @@ async function applyDemeritsToContestData(contestData, contestId) {
   }
 }
 
-export async function insertContestRoom(roomName) {
-  const ret = await post_with_token("contest-room/insert", {
+export async function insertContestRoom(roomName, options = {}) {
+  const payload = {
     room_name: roomName,
-  });
-  console.log(ret);
-  return ret;
+  };
+  if (options.contestType) payload.contest_type = options.contestType;
+  if (options.tfcRoomId !== undefined)
+    payload.tfc_room_id = options.tfcRoomId;
+  if (options.tfcPercentage !== undefined)
+    payload.tfc_percentage = options.tfcPercentage;
+  if (options.tscPercentage !== undefined)
+    payload.tsc_percentage = options.tscPercentage;
+
+  return await post_with_token("contest-room/insert", payload);
 }
 
 export async function getAllContestRooms() {
-  const ret = await get_with_token("contest-room/all");
-  console.log(ret);
-  return ret;
+  return await get_with_token("contest-room/all");
 }
 
 export async function getContestRoomById(roomId) {
-  const ret = await post_with_token("contest-room/get", { room_id: roomId });
-  console.log(ret);
-  return ret;
+  return await post_with_token("contest-room/get", { room_id: roomId });
 }
 
-export async function updateContestRoom(roomId, roomName) {
-  const ret = await post_with_token("contest-room/update", {
+export async function updateContestRoom(roomId, roomName, options = {}) {
+  const payload = {
     room_id: roomId,
     room_name: roomName,
-  });
-  console.log(ret);
-  return ret;
+  };
+  if (options.contestType) payload.contest_type = options.contestType;
+  if (options.tfcRoomId !== undefined)
+    payload.tfc_room_id = options.tfcRoomId;
+  if (options.tfcPercentage !== undefined)
+    payload.tfc_percentage = options.tfcPercentage;
+  if (options.tscPercentage !== undefined)
+    payload.tsc_percentage = options.tscPercentage;
+
+  return await post_with_token("contest-room/update", payload);
 }
 
 export async function deleteContestRoom(roomId) {
-  const ret = await post_with_token("contest-room/delete", { room_id: roomId });
-  console.log(ret);
-  return ret;
+  return await post_with_token("contest-room/delete", { room_id: roomId });
 }
 
 export async function insertContestRoomContest(roomId, contestId, contestName) {
-  const ret = await post_with_token("contest-room-contests/insert", {
+  return await post_with_token("contest-room-contests/insert", {
     room_id: roomId,
     contest_id: contestId,
     name: contestName,
   });
-  console.log(ret);
-  return ret;
 }
 
 export async function getAllContestRoomContests() {
-  const ret = await get_with_token("contest-room-contests/all");
-  console.log(ret);
-  return ret;
+  return await get_with_token("contest-room-contests/all");
 }
 
 export async function getContestRoomContestById(contestRoomContestId) {
@@ -302,21 +306,17 @@ export async function updateContestRoomContest(
   roomId,
   contestId
 ) {
-  const ret = await post_with_token("contest-room-contests/update", {
+  return await post_with_token("contest-room-contests/update", {
     contest_room_contest_id: contestRoomContestId,
     room_id: roomId,
     contest_id: contestId,
   });
-  console.log(ret);
-  return ret;
 }
 
 export async function deleteContestRoomContest(contestRoomContestId) {
-  const ret = await post_with_token("contest-room-contests/delete", {
+  return await post_with_token("contest-room-contests/delete", {
     contest_room_contest_id: contestRoomContestId,
   });
-  console.log(ret);
-  return ret;
 }
 
 export async function updateContestRoomContestWithWeight(
@@ -325,14 +325,12 @@ export async function updateContestRoomContestWithWeight(
   contestId,
   weight
 ) {
-  const ret = await post_with_token("contest-room-contests/update", {
+  return await post_with_token("contest-room-contests/update", {
     contest_room_contest_id: contestRoomContestId,
     room_id: roomId,
     contest_id: contestId,
     weight: weight,
   });
-  console.log(ret);
-  return ret;
 }
 
 // Demerit management functions
@@ -343,7 +341,6 @@ export async function createDemerit(contestId, vjudgeId, demeritPoint, reason) {
     demerit_point: parseInt(demeritPoint, 10),
     reason: reason,
   });
-  console.log(ret);
   return ret;
 }
 
@@ -351,7 +348,6 @@ export async function getDemeritsByContestId(contestId) {
   const ret = await post_with_token("demerit/by-contest", {
     contest_id: contestId,
   });
-  console.log(ret);
   return ret;
 }
 
@@ -360,7 +356,6 @@ export async function getDemeritsByVjudgeAndContest(vjudgeId, contestId) {
     vjudge_id: vjudgeId,
     contest_id: contestId,
   });
-  console.log(ret);
   return ret;
 }
 
@@ -378,7 +373,6 @@ export async function updateDemerit(
     demerit_point: parseInt(demeritPoint, 10),
     reason: reason,
   });
-  console.log(ret);
   return ret;
 }
 
@@ -386,13 +380,11 @@ export async function deleteDemerit(demeritId) {
   const ret = await post_with_token("demerit/admin/delete", {
     demerit_id: demeritId,
   });
-  console.log(ret);
   return ret;
 }
 
 export async function getAllDemerits() {
   const ret = await get_with_token("demerit/admin/all");
-  console.log(ret);
   return ret;
 }
 export async function getCurrentLevelData(level) {

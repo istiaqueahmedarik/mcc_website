@@ -14,11 +14,21 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import LiveShareModal from "./LiveShareModal"
 import { ScrollArea } from "./ui/scroll-area"
 
-function ReportTable({ merged, report_id, partial, liveReportId, name }) {
+function ReportTable({ merged, liveReportId, name }) {
+  const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
+  const clampPercentage = (value, fallback = 0) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return fallback
+    return Math.max(0, Math.min(100, numeric))
+  }
+
+  const [tfcPercentageInput, setTfcPercentageInput] = useState(() =>
+    String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)),
+  )
   const [searchText, setSearchText] = useState("")
   const [removeWorstCount, setRemoveWorstCount] = useState(1)
   const [optOutContests, setOptOutContests] = useState({})
-  const [advancedFilters, setAdvancedFilters] = useState({
+  const [advancedFilters] = useState({
     minSolved: 0,
     maxSolved: Number.POSITIVE_INFINITY,
     minContests: 0,
@@ -26,8 +36,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     sortBy: "effectiveTotalSolved", // Default sort by effective solved
     sortDirection: "desc",
   })
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
-  const [liveModal, setLiveModal] = useState(false)
   const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({})
   const [isProfilesLoading, setIsProfilesLoading] = useState(false)
   const [failedAvatars, setFailedAvatars] = useState(new Set())
@@ -38,16 +46,26 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return base ? String(base).replace(/\/+$/, "") : ""
   }, [])
   const debugProfiles = process.env.NEXT_PUBLIC_DEBUG_PROFILE_BATCH === "true"
+  const tfcPercentage = useMemo(
+    () => clampPercentage(tfcPercentageInput, 0),
+    [tfcPercentageInput],
+  )
+  const tscPercentage = useMemo(
+    () => (isTscCombined ? 100 - tfcPercentage : 100),
+    [isTscCombined, tfcPercentage],
+  )
 
-  const users = useMemo(() => {
-    let filtered = merged.users.filter(
-      (u) =>
-        !searchText ||
-        u.username.toLowerCase().includes(searchText.toLowerCase()) ||
-        (u.realName && u.realName.toLowerCase().includes(searchText.toLowerCase())),
-    )
+  const computeStdDeviation = (values) => {
+    if (!Array.isArray(values) || values.length === 0) return 0
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+    const variance =
+      values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+      values.length
+    return Math.sqrt(variance)
+  }
 
-    filtered = filtered.map((u) => {
+  const rankedUsers = useMemo(() => {
+    let processed = merged.users.map((u) => {
       const allContestIds = Object.keys(u.contests).filter((cid) => !optOutContests[cid])
       const attendedContests = allContestIds.map((cid) => [cid, u.contests[cid]])
       const totalContestsAttended = attendedContests.filter(
@@ -93,6 +111,105 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
 
       return processedUser
     })
+
+    if (isTscCombined) {
+      const highestTfcScore = Number(merged?.tscConfig?.highestTfcScore || 0)
+
+      const adjustedUsers = processed.map((u) => {
+        const dropped = new Set([...(u.worstContests || []), ...(u.optedOutContests || [])])
+        const keptContestIds = Object.keys(u.contests || {}).filter((cid) => !dropped.has(cid))
+
+        const adjustedTscScore = keptContestIds.reduce(
+          (sum, cid) => sum + Number(u.contests?.[cid]?.finalScore || 0),
+          0,
+        )
+        const adjustedPenalty = keptContestIds.reduce(
+          (sum, cid) => sum + Number(u.contests?.[cid]?.penalty || 0),
+          0,
+        )
+        const adjustedAttended = keptContestIds.filter((cid) => {
+          const performance = u.contests?.[cid]
+          return (
+            performance &&
+            (performance.solved > 0 ||
+              (performance.submissions && performance.submissions.length > 0))
+          )
+        }).length
+
+        const keptScores = keptContestIds.map((cid) => Number(u.contests?.[cid]?.finalScore || 0))
+        const keptPenalties = keptContestIds.map((cid) => Number(u.contests?.[cid]?.penalty || 0))
+
+        return {
+          ...u,
+          _adjustedTscScore: adjustedTscScore,
+          _adjustedPenalty: adjustedPenalty,
+          _adjustedAttended: adjustedAttended,
+          stdDeviationScore: computeStdDeviation(keptScores),
+          stdDeviationPen: computeStdDeviation(keptPenalties),
+        }
+      })
+
+      const highestAdjustedTscScore = Math.max(
+        ...adjustedUsers.map((u) => Number(u._adjustedTscScore || 0)),
+        0,
+      )
+
+      processed = adjustedUsers.map((u) => {
+        const tfcRawScore = Number(u.tfcScore || 0)
+        const tfcComponent =
+          tfcPercentage > 0 && highestTfcScore > 0
+            ? (tfcRawScore / highestTfcScore) * tfcPercentage
+            : 0
+        const tscComponent =
+          tscPercentage > 0 && highestAdjustedTscScore > 0
+            ? (Number(u._adjustedTscScore || 0) / highestAdjustedTscScore) *
+              tscPercentage
+            : 0
+
+        const combinedScore = tfcComponent + tscComponent
+        const effectivePenalty =
+          Number(u._adjustedPenalty || 0) + Number(u.stdDeviationPen || 0)
+
+        return {
+          ...u,
+          totalContestsAttended: u._adjustedAttended,
+          effectiveTotalSolved: combinedScore,
+          effectiveTotalScore: combinedScore,
+          effectiveTotalPenalty: effectivePenalty,
+          effectiveSolved: combinedScore,
+          effectivePenalty,
+          tfcComponent,
+          tscComponent,
+          tscAdjustedScore: Number(u._adjustedTscScore || 0),
+        }
+      })
+    }
+
+    processed.sort((a, b) => {
+      if (a.effectiveTotalScore !== b.effectiveTotalScore) return b.effectiveTotalScore - a.effectiveTotalScore
+      if (a.effectiveTotalSolved !== b.effectiveTotalSolved) return b.effectiveTotalSolved - a.effectiveTotalSolved
+      if (a.effectiveTotalPenalty !== b.effectiveTotalPenalty) return a.effectiveTotalPenalty - b.effectiveTotalPenalty
+      return b.totalContestsAttended - a.totalContestsAttended
+    })
+
+    return processed
+  }, [
+    merged.users,
+    merged?.tscConfig?.highestTfcScore,
+    removeWorstCount,
+    optOutContests,
+    isTscCombined,
+    tfcPercentage,
+    tscPercentage,
+  ])
+
+  const users = useMemo(() => {
+    let filtered = rankedUsers.filter(
+      (u) =>
+        !searchText ||
+        u.username.toLowerCase().includes(searchText.toLowerCase()) ||
+        (u.realName && u.realName.toLowerCase().includes(searchText.toLowerCase())),
+    )
 
     filtered = filtered.filter((u) => {
       if (u.effectiveTotalSolved < advancedFilters.minSolved) return false
@@ -140,7 +257,11 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     })
 
     return filtered
-  }, [merged.users, searchText, removeWorstCount, optOutContests, advancedFilters])
+  }, [
+    rankedUsers,
+    searchText,
+    advancedFilters,
+  ])
 
   const profileIds = useMemo(() => {
     const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
@@ -200,16 +321,10 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     }))
   }
 
-  const updateFilter = (key, value) => {
-    setAdvancedFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
-  }
-
-  const maxPossibleSolved = useMemo(() => {
-    return Math.max(...merged.users.map((u) => u.totalSolved), 0)
-  }, [merged.users])
+  useEffect(() => {
+    if (!isTscCombined) return
+    setTfcPercentageInput(String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)))
+  }, [isTscCombined, merged?.tscConfig?.tfcPercentage])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -292,7 +407,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return () => {
       controller.abort()
     }
-  }, [profileIdsSignature])
+  }, [profileIdsSignature, profileIds, debugProfiles])
 
   // Progress: build per-contest ranking and compute last vs previous attended
   const { contestRanks, progressByUser } = useMemo(() => {
@@ -384,7 +499,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
     ]
 
-    const rows = users.map((u, idx) => {
+    const rows = rankedUsers.map((u, idx) => {
       const base = [
         idx + 1,
         u.username,
@@ -447,7 +562,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       "Contests Attended",
       ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
     ]
-    const rows = users.map((u, idx) => {
+    const rows = rankedUsers.map((u, idx) => {
       const base = [
         idx + 1,
         u.username,
@@ -530,10 +645,17 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
   const liveReportData = useMemo(
     () => ({
       ...merged,
-      users,
+      tscConfig: isTscCombined
+        ? {
+          ...(merged?.tscConfig || {}),
+          tfcPercentage,
+          tscPercentage,
+        }
+        : merged?.tscConfig,
+      users: rankedUsers,
       name,
     }),
-    [merged, users, name],
+    [merged, rankedUsers, name, isTscCombined, tfcPercentage, tscPercentage],
   )
 
   return (
@@ -637,15 +759,28 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="secondary"
-                  onClick={() => setRemoveWorstCount(removeWorstCount)}
-                  className="whitespace-nowrap"
-                >
-                  Apply
-                </Button>
               </div>
             </div>
+
+            {isTscCombined && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">TFC Percentage</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={tfcPercentageInput}
+                  onChange={(e) => setTfcPercentageInput(e.target.value)}
+                  onBlur={() =>
+                    setTfcPercentageInput(String(clampPercentage(tfcPercentageInput, 0)))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  TSC share is auto-calculated from this TFC percentage.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Actions</label>
