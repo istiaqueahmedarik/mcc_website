@@ -33,6 +33,12 @@ const app = new Hono<{ Variables: JwtVariables }>();
 
 app.use("/*", cors());
 
+// console the endpoint hit for debugging
+app.use("/*", async (c, next) => {
+  console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`);
+  await next();
+});
+
 app.route("/achieve", achievementRoute);
 app.route("/auth", authRoute);
 app.route("/course", courseRoute);

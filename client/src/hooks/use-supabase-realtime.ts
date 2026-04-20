@@ -406,6 +406,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
         if (status === "SUBSCRIBED") {
           setIsConnected(true);
           setError(null);
+          fetchRoomState();
           fetchParticipants();
         } else if (status === "TIMED_OUT") {
           setIsConnected(false);
@@ -428,6 +429,7 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
   }, [
     roomCode,
     userName,
+    fetchRoomState,
     fetchParticipants,
     fetchLeaderboard,
     cacheParticipantStats,
@@ -440,21 +442,10 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     const intervalId = setInterval(() => {
       fetchRoomState();
       fetchParticipants();
-    }, 3000);
+    }, 10000);
 
     return () => clearInterval(intervalId);
   }, [roomState, isConnected, fetchParticipants, fetchRoomState]);
-
-  // Lightweight room-state polling while waiting so scheduled auto-start is reflected for everyone.
-  useEffect(() => {
-    if (roomState?.status !== "waiting" || !isConnected) return;
-
-    const intervalId = setInterval(() => {
-      fetchRoomState();
-    }, 3000);
-
-    return () => clearInterval(intervalId);
-  }, [roomState?.status, fetchRoomState, isConnected]);
 
   // Send progress update
   const sendProgress = useCallback(
