@@ -435,18 +435,6 @@ export function useSupabaseRealtime(roomCode: string, userName: string | null) {
     cacheParticipantStats,
   ]);
 
-  // Fallback polling while realtime is disconnected.
-  useEffect(() => {
-    if (!roomState || isConnected) return;
-
-    const intervalId = setInterval(() => {
-      fetchRoomState();
-      fetchParticipants();
-    }, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [roomState, isConnected, fetchParticipants, fetchRoomState]);
-
   // Send progress update
   const sendProgress = useCallback(
     async (progress: number, currentWpm: number, accuracy: number) => {
