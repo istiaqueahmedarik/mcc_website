@@ -208,43 +208,49 @@ const Navbar = async () => {
                       </SheetClose>
                     ))}
                   <hr className="my-4" />
-                  <ProgressLink
-                    href="/login"
-                    className={`${loggedIn && "hidden"}`}
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-lg"
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href="/login"
+                      className={`${loggedIn && "hidden"}`}
                     >
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Login
-                    </Button>
-                  </ProgressLink>
-                  <ProgressLink
-                    href="/signup"
-                    className={`${loggedIn && "hidden"}`}
-                  >
-                    <Button
-                      variant="default"
-                      className="w-full justify-start text-lg"
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-lg"
+                      >
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Login
+                      </Button>
+                    </ProgressLink>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href="/signup"
+                      className={`${loggedIn && "hidden"}`}
                     >
-                      <UserPlus className="mr-2 h-5 w-5" />
-                      Sign Up
-                    </Button>
-                  </ProgressLink>
-                  <ProgressLink
-                    href="/profile"
-                    className={`${!loggedIn && "hidden"}`}
-                  >
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage
-                        src={user && user.result && user.result[0].profile_pic}
-                      />
-                      <AvatarFallback>
-                        {user && user.result && user.result[0].full_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                  </ProgressLink>
+                      <Button
+                        variant="default"
+                        className="w-full justify-start text-lg"
+                      >
+                        <UserPlus className="mr-2 h-5 w-5" />
+                        Sign Up
+                      </Button>
+                    </ProgressLink>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href="/profile"
+                      className={`${!loggedIn && "hidden"}`}
+                    >
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage
+                          src={user && user.result && user.result[0].profile_pic}
+                        />
+                        <AvatarFallback>
+                          {user && user.result && user.result[0].full_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                    </ProgressLink>
+                  </SheetClose>
                 </div>
               </SheetClose>
             </SheetContent>

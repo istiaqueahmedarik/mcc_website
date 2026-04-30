@@ -4,9 +4,12 @@ import Link from "next/link";
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 
-export default function ProgressLink({ href, children, className }) {
+const ProgressLink = forwardRef(function ProgressLink(
+  { href, children, className, onClick, ...props },
+  ref,
+) {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
 
@@ -17,15 +20,25 @@ export default function ProgressLink({ href, children, className }) {
     }
   }, [pathname]);
 
-  const handleClick = () => {
-    if (pathname !== href) {
-      NProgress.start(); // start immediately on click
+  const handleClick = (event) => {
+    onClick?.(event);
+
+    if (!event.defaultPrevented && pathname !== href) {
+      NProgress.start();
     }
   };
 
   return (
-    <Link href={href} className={className} onClick={handleClick}>
+    <Link
+      ref={ref}
+      href={href}
+      className={className}
+      onClick={handleClick}
+      {...props}
+    >
       {children}
     </Link>
   );
-}
+});
+
+export default ProgressLink;
