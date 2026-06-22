@@ -231,9 +231,9 @@ function processVjudgeRankData(
         const teamData = participants[teamId];
         participantMap.set(parseInt(teamId, 10), {
           teamId: parseInt(teamId, 10),
-          username: teamData[0],
-          realName: teamData[1] || teamData[0],
-          avatarUrl: teamData[2],
+          username: Array.isArray(teamData) ? teamData[0] : teamData.name,
+          realName: Array.isArray(teamData) ? (teamData[1] || teamData[0]) : (teamData.nickname || teamData.name),
+          avatarUrl: Array.isArray(teamData) ? teamData[2] : teamData.image,
           submissions: [],
           solvedCount: 0,
           penalty: 0,
@@ -423,7 +423,7 @@ vjudgeRoute.post("/contest-rank/:contestId", async (c) => {
     }
 
     const contentType = response.headers.get("content-type");
-    const textData = await response.text();
+    const textData = await response.json();
 
     if (!contentType || !contentType.includes("application/json")) {
       try {
@@ -454,7 +454,8 @@ vjudgeRoute.post("/contest-rank/:contestId", async (c) => {
       }
     }
 
-    const rawData = JSON.parse(textData);
+    // const rawData = JSON.parse(textData);
+    const rawData = textData;
     const structuredData = processVjudgeRankData(rawData, problemWeights);
 
     if (structuredData.error) {
