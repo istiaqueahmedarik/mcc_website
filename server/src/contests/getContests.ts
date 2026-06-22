@@ -17,23 +17,25 @@ app.get('/', async (c) => {
 
     const contests: any[] = [];
     $('table tbody tr').each((_: any, row: any) => {
-        const name = $(row).find('a').first().text().trim() || '';
+        const name = $(row).find('a.clist__name').first().text().trim() || $(row).find('a').first().text().trim() || '';
 
         let status = '';
         let endedAt = null;
         let problems = null;
 
-        $(row).find('.flair__item').each((_: any, item: any) => {
-            const imgSrc = $(item).find('img').attr('src') || '';
-            if (imgSrc.includes('clock.svg')) {
-                status = 'Upcoming';
-            } else if (imgSrc.includes('hourglassend.svg')) {
-                status = 'Ended';
-                endedAt = $(item).find('span.timestamp').attr('data-timestamp') || null;
-            } else if (imgSrc.includes('puzzle.svg')) {
-                problems = parseInt($(item).find('span.text').text().trim(), 10) || null;
-            }
-        });
+        // Try to find status from the new labels format
+        const labels = $(row).find('.clist__labels .label').text().trim();
+        if (labels.includes('Ended')) {
+            status = 'Ended';
+        } else if (labels.includes('Upcoming') || labels.includes('Running')) {
+            status = 'Upcoming'; // Treating running as upcoming/ongoing for frontend logic compatibility
+        }
+
+        // Try to get timestamp
+        const timestampSpan = $(row).find('span.timestamp[data-timestamp]');
+        if (timestampSpan.length > 0) {
+            endedAt = timestampSpan.attr('data-timestamp') || null;
+        }
 
         const standingsLink = $(row).find('a[href*="/standings"]').attr('href') || '';
         const practiceLink = $(row).find('a[href*="#intent=practice"]').attr('href') || '';

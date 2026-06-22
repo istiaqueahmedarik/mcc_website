@@ -1505,6 +1505,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
     {
       collection_id: string;
       collection_title: string;
+      room_id: string;
       room_name: string;
       finalized_at: Date | null;
       teams: any[];
@@ -1516,6 +1517,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
       grouped[cid] = {
         collection_id: cid,
         collection_title: t.collection_title,
+        room_id: t.room_id,
         room_name: t.room_name,
         finalized_at: t.finalized_at,
         teams: [],
