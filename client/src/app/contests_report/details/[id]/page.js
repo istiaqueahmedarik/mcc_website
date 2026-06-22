@@ -7,19 +7,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PlusCircle, Trash2, FileText, Scale } from "lucide-react";
+import { PlusCircle, FileText, Scale } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   getContestRoomContestById,
   insertContestRoomContest,
-  deleteContestRoomContest,
   updateContestRoomContestWithWeight,
 } from "@/actions/contest_details";
 import { redirect } from "next/navigation";
-import { revalidateTag } from "next/cache";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import DeleteRoomButton from "@/components/DeleteRoomButton";
+import DeleteContestButton from "@/components/DeleteContestButton";
 
 async function handleAddContest(formData, paramsBox) {
   "use server";
@@ -33,21 +33,6 @@ async function handleAddContest(formData, paramsBox) {
   } else {
     const msg = encodeURIComponent(
       res?.message || res?.error || "Failed to create room"
-    );
-    redirect(`/error/${msg}`);
-  }
-}
-
-async function handleDeleteContest(formData, paramsBox) {
-  "use server";
-  const contestRoomContestId = formData.get("contestRoomContestId");
-  const roomId = paramsBox;
-  const res = await deleteContestRoomContest(contestRoomContestId);
-  if (res && (res.status === "success" || res.success)) {
-    revalidateTag(`/contests_report/details/${roomId}`);
-  } else {
-    const msg = encodeURIComponent(
-      res?.message || res?.error || "Failed to delete contest"
     );
     redirect(`/error/${msg}`);
   }
@@ -84,6 +69,8 @@ async function page({ params, searchParams }) {
 
   if (show) return <Modal paramsBox={id} />;
   const res = await getContestRoomContestById(id);
+  const roomMeta = res?.room || null;
+  const roomType = String(roomMeta?.contest_type || "TFC").toUpperCase();
   /**
        * {
     result: [
@@ -112,21 +99,42 @@ async function page({ params, searchParams }) {
             <p className="text-muted-foreground mt-1">
               Add and find report on contests
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide text-foreground">
+                {roomType}
+              </span>
+            </div>
           </div>
-          <Button
-            asChild
-            className="bg-primary hover:bg-primary/90 rounded-full px-6"
-          >
-            <Link
-              href={`/contests_report/details/${paramsBox.id}?show=true`}
-              className="flex items-center"
+          <div className="flex items-center gap-3">
+            <Button
+              asChild
+              className="bg-primary hover:bg-primary/90 rounded-full px-6"
             >
-              <PlusCircle className="w-5 h-5 mr-2" />
-              Add More Contest
-            </Link>
-          </Button>
+              <Link
+                href={`/contests_report/details/${paramsBox.id}?show=true`}
+                className="flex items-center"
+              >
+                <PlusCircle className="w-5 h-5 mr-2" />
+                Add More Contest
+              </Link>
+            </Button>
+            <DeleteRoomButton roomId={paramsBox.id} roomName={roomMeta?.["Room Name"]} />
+          </div>
         </div>
       </header>
+
+      {roomType === "TSC" && (
+        <div className="mb-6 rounded-lg border border-border bg-muted/20 p-4 text-sm">
+          <p className="font-medium text-foreground">TSC Formula Configuration</p>
+          <p className="mt-1 text-muted-foreground">
+            Reference TFC Room ID: {roomMeta?.tfc_room_id || "Not set"}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            TFC percentage is set during final report generation. TSC percentage is auto-calculated as 100 - TFC.
+          </p>
+        </div>
+      )}
+
       <div className="mb-6 flex items-center justify-between">
         <Button variant="secondary" size="sm" className="rounded-lg w-full">
           <Link
@@ -200,28 +208,11 @@ async function page({ params, searchParams }) {
 
               <CardFooter className="flex flex-col gap-4 pt-4 pb-6 px-6">
                 <div className="flex w-full gap-3">
-                  <form
-                    action={async (formData) => {
-                      "use server";
-                      await handleDeleteContest(formData, paramsBox.id);
-                    }}
-                    className="w-1/2"
-                  >
-                    <input
-                      type="hidden"
-                      name="contestRoomContestId"
-                      value={contest.id}
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="rounded-full w-full border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive dark:hover:bg-destructive/20 bg-card"
-                      type="submit"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </Button>
-                  </form>
+                  <DeleteContestButton
+                    contestRoomContestId={contest.id}
+                    contestName={contest?.contest_name}
+                    className="rounded-full w-1/2 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive dark:hover:bg-destructive/20 bg-card"
+                  />
 
                   <Button
                     variant="secondary"

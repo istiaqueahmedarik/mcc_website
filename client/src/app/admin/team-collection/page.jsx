@@ -18,6 +18,7 @@ import {
 } from "@/actions/team_collection";
 import { CollectionCopyButton } from "@/components/CollectionCopyButton";
 import { CollectionNameEditor } from "@/components/CollectionNameEditor";
+import { DeadlineCountdown } from "@/components/DeadlineCountdown";
 import { TeamActionForm } from "@/components/TeamActionForm";
 import { TeamCollectionTabPanels } from "@/components/TeamCollectionTabPanels";
 import TransitionButton from "@/components/TransitionButton";
@@ -654,39 +655,6 @@ export default async function Page({ searchParams }) {
       </div>
     </div>
   );
-}
-
-// Lightweight server component that renders remaining time (static at render).
-// For simplicity (no client bundle), we just compute diff once on server.
-function DeadlineCountdown({ iso }) {
-  try {
-    const target = new Date(iso);
-    const now = new Date();
-    const diffMs = target.getTime() - now.getTime();
-    if (isNaN(diffMs))
-      return <span className="text-muted-foreground">Invalid date</span>;
-    if (diffMs <= 0)
-      return (
-        <span className="text-destructive font-semibold">Deadline passed</span>
-      );
-    const totalSec = Math.floor(diffMs / 1000);
-    const d = Math.floor(totalSec / 86400);
-    const h = Math.floor((totalSec % 86400) / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    const parts = [];
-    if (d) parts.push(`${d}d`);
-    if (h || d) parts.push(`${h}h`);
-    if (m || h || d) parts.push(`${m}m`);
-    parts.push(`${s}s`);
-    return (
-      <span className="font-mono text-foreground/80">
-        {parts.join(" ")} remaining
-      </span>
-    );
-  } catch {
-    return <span className="text-muted-foreground">Invalid</span>;
-  }
 }
 
 // Format to local datetime-local input value (YYYY-MM-DDTHH:MM) without timezone shift

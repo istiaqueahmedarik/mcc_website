@@ -1,14 +1,26 @@
 import {
-  getContestStructuredRank,
   getContestStructuredRankWithDemerits,
   getContestRoomContestById,
-  getAllContestRoomContests,
   getDemeritsByContestId,
-  getCurrentLevelData,
 } from "@/actions/contest_details";
+import { publicFinalizedTeamsByContest } from "@/actions/team_collection";
 import ReportTable from "@/components/ReportTable";
-import { Button } from "@/components/ui/button";
-import React from "react";
+
+function normalizeRoomType(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "TSC" || normalized === "TPC" || normalized === "TFC") {
+    return normalized;
+  }
+  return "TFC";
+}
+
+function clampPercentage(value, fallback = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  if (numeric < 0) return 0;
+  if (numeric > 100) return 100;
+  return numeric;
+}
 
 function mergeResultsByUser(results, contestIdToWeight = {}, allDemerits = {}) {
   // Add defensive checks
@@ -159,103 +171,321 @@ function mergeResultsByUser(results, contestIdToWeight = {}, allDemerits = {}) {
   return { users: sortedUsers, contestIds, contestIdToTitle };
 }
 
+function mergeResultsForTsc(
+  results,
+  contestIdToWeight = {},
+  tfcScoreByTeam = new Map(),
+  tfcPercentage = 0,
+  tscPercentage = 100
+) {
+  if (!results || !Array.isArray(results) || results.length === 0) {
+    return {
+      users: [],
+      contestIds: [],
+      contestIdToTitle: {},
+      scoringMode: "TSC_COMBINED",
+      tscConfig: {
+        tfcPercentage,
+        tscPercentage,
+        highestTfcScore: 0,
+        highestTscScore: 0,
+      },
+    };
+  }
+
+  const contests = results.map((r) => r?.contestInfo).filter(Boolean);
+  const contestIdToTitle = Object.fromEntries(
+    contests.map((c) => [c.id, c.title])
+  );
+  const contestIds = contests.map((c) => c.id);
+  const teamMap = {};
+
+  for (const contest of results) {
+    if (
+      !contest ||
+      !contest.contestInfo ||
+      !contest.teams ||
+      !Array.isArray(contest.teams)
+    ) {
+      continue;
+    }
+
+    for (const team of contest.teams) {
+      const teamName = String(team?.username || "").trim();
+      if (!teamName) continue;
+
+      if (!teamMap[teamName]) {
+        teamMap[teamName] = {
+          username: teamName,
+          realName: teamName,
+          avatarUrl: null,
+          contests: {},
+          totalSolved: 0,
+          totalPenalty: 0,
+          totalScore: 0,
+          attended: 0,
+          totalDemeritPoints: 0,
+          demerits: {},
+        };
+      }
+
+      const weight = contestIdToWeight[contest.contestInfo.id] ?? 1;
+      const finalScore = (team.finalScore || 0) * weight;
+
+      teamMap[teamName].contests[contest.contestInfo.id] = {
+        solved: team.solvedCount || 0,
+        penalty: team.penalty || 0,
+        finalScore,
+        submissions: team.submissions || [],
+        contestId: contest.contestInfo.id,
+        contestTitle: contest.contestInfo.title,
+        demeritPoints: team.demeritPoints || 0,
+        demerits: [],
+      };
+
+      teamMap[teamName].totalDemeritPoints += team.demeritPoints || 0;
+      teamMap[teamName].totalSolved += team.solvedCount || 0;
+      teamMap[teamName].totalPenalty += team.penalty || 0;
+      teamMap[teamName].totalScore += finalScore;
+      teamMap[teamName].attended += 1;
+    }
+  }
+
+  for (const team of Object.values(teamMap)) {
+    for (const cid of contestIds) {
+      if (!team.contests[cid]) {
+        team.contests[cid] = {
+          solved: 0,
+          penalty: 0,
+          finalScore: 0,
+          submissions: [],
+          contestId: cid,
+          contestTitle: contestIdToTitle[cid] || "Unknown Contest",
+          demeritPoints: 0,
+          demerits: [],
+        };
+      }
+    }
+  }
+
+  const highestTscScore = Math.max(
+    ...Object.values(teamMap).map((team) => Number(team.totalScore) || 0),
+    0
+  );
+  const highestTfcScore = Math.max(
+    ...Array.from(tfcScoreByTeam.values()).map((value) => Number(value) || 0),
+    0
+  );
+
+  for (const team of Object.values(teamMap)) {
+    const tfcRawScore = Number(
+      tfcScoreByTeam.get(String(team.username).toLowerCase()) || 0
+    );
+    const tscRawScore = Number(team.totalScore) || 0;
+
+    const tfcComponent =
+      tfcPercentage > 0 && highestTfcScore > 0
+        ? (tfcRawScore / highestTfcScore) * tfcPercentage
+        : 0;
+    const tscComponent =
+      tscPercentage > 0 && highestTscScore > 0
+        ? (tscRawScore / highestTscScore) * tscPercentage
+        : 0;
+    const combinedScore = tfcComponent + tscComponent;
+
+    team.tfcScore = tfcRawScore;
+    team.tscScore = tscRawScore;
+    team.tfcComponent = tfcComponent;
+    team.tscComponent = tscComponent;
+    team.totalScore = combinedScore;
+    team.stdDeviationPen = 0;
+    team.stdDeviationScore = 0;
+    team.effectiveSolved = combinedScore;
+    team.effectivePenalty = team.totalPenalty;
+  }
+
+  const sortedUsers = Object.values(teamMap).sort((a, b) => {
+    if (b.effectiveSolved !== a.effectiveSolved)
+      return b.effectiveSolved - a.effectiveSolved;
+    if (a.effectivePenalty !== b.effectivePenalty)
+      return a.effectivePenalty - b.effectivePenalty;
+    if (b.attended !== a.attended) return b.attended - a.attended;
+    return String(a.username).localeCompare(String(b.username));
+  });
+
+  return {
+    users: sortedUsers,
+    contestIds,
+    contestIdToTitle,
+    scoringMode: "TSC_COMBINED",
+    tscConfig: {
+      tfcPercentage,
+      tscPercentage,
+      highestTfcScore,
+      highestTscScore,
+    },
+  };
+}
+
+async function getTfcScoreMap(referenceRoomId) {
+  const scoreByTeam = new Map();
+  if (!referenceRoomId) return scoreByTeam;
+
+  try {
+    const finalized = await publicFinalizedTeamsByContest();
+    const blocks = Array.isArray(finalized?.result) ? finalized.result : [];
+    const target = blocks.find(
+      (block) => String(block?.room_id || "") === String(referenceRoomId)
+    );
+
+    if (!target || !Array.isArray(target?.teams)) return scoreByTeam;
+
+    for (const team of target.teams) {
+      const score = Number(team?.combined_score);
+      const normalizedScore = Number.isFinite(score) ? score : 0;
+
+      const title = String(team?.team_title || "").trim().toLowerCase();
+      if (title) {
+        scoreByTeam.set(title, normalizedScore);
+      }
+
+      const members = Array.isArray(team?.members) ? team.members : [];
+      for (const member of members) {
+        const normalizedMember = String(member || "").trim().toLowerCase();
+        if (!normalizedMember) continue;
+        scoreByTeam.set(normalizedMember, normalizedScore);
+      }
+    }
+  } catch (error) {
+    console.error("Failed to build TFC score map", error);
+  }
+
+  return scoreByTeam;
+}
+
+async function fetchContestDataWithDemerits(contestId, contestName, allDemerits) {
+  const response = await getContestStructuredRankWithDemerits(contestId);
+  if (!response || response.status === "error" || !Array.isArray(response.teams)) {
+    return null;
+  }
+
+  if (!response.contestInfo) {
+    response.contestInfo = {
+      id: contestId,
+      title: contestName || `Contest ${contestId}`,
+    };
+  } else if (contestName) {
+    response.contestInfo.title = contestName;
+  }
+
+  try {
+    const demeritRes = await getDemeritsByContestId(contestId);
+    if (demeritRes?.success) {
+      allDemerits[contestId] = demeritRes.data;
+    } else {
+      allDemerits[contestId] = [];
+    }
+  } catch (error) {
+    console.error("Error fetching demerits for contest:", contestId, error);
+    allDemerits[contestId] = [];
+  }
+
+  return response;
+}
+
 async function page({ params, searchParams }) {
+  const paramsBox = await params;
+  const roomId = paramsBox.id;
   const searchParamsBox = await searchParams;
-  let contestIds = [];
+  const requestedContestId =
+    searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)
+      ? String(searchParamsBox.id)
+      : null;
+
   let name = "";
+  let roomType = "TFC";
+  let roomMeta = null;
   let results = [];
-  let usedFallback = false;
   let contestIdToWeight = {};
   let allDemerits = {};
-  /*
-   *  const responseOfVjudge = await getCurrentLevelData(searchParamsBox.id);
-   *  console.log(responseOfVjudge);
-   */
 
-  if (searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)) {
-    const res = await getContestStructuredRankWithDemerits(searchParamsBox.id);
-    if (res && res.status !== "error" && res.teams) {
-      results.push(res);
-      contestIdToWeight[searchParamsBox.id] = searchParamsBox.weight
-        ? Number(searchParamsBox.weight)
+  const roomRes = await getContestRoomContestById(roomId);
+  const roomContests = Array.isArray(roomRes?.result) ? roomRes.result : [];
+  roomMeta = roomRes?.room || null;
+  roomType = normalizeRoomType(roomMeta?.contest_type);
+  name = roomRes?.name || roomMeta?.["Room Name"] || "";
+
+  const defaultTfcPercentage = clampPercentage(roomMeta?.tfc_percentage, 0);
+  const selectedTfcPercentage =
+    roomType === "TSC"
+      ? defaultTfcPercentage
+      : 0;
+  const derivedTscPercentage = roomType === "TSC" ? 100 - selectedTfcPercentage : 100;
+
+  let contestsToFetch = roomContests;
+  if (requestedContestId) {
+    const contestFromRoom = roomContests.find(
+      (contest) => String(contest?.contest_id) === requestedContestId
+    );
+
+    contestsToFetch = [
+      contestFromRoom || {
+        contest_id: requestedContestId,
+        contest_name: `Contest ${requestedContestId}`,
+        weight: searchParamsBox.weight ? Number(searchParamsBox.weight) : 1,
+      },
+    ];
+  }
+
+  for (const contest of contestsToFetch) {
+    const contestId = String(contest?.contest_id || "").trim();
+    if (!/^\d+$/.test(contestId)) continue;
+
+    const fromContestRow = Number(contest?.weight);
+    const fromQuery = Number(searchParamsBox.weight);
+    const weight = Number.isFinite(fromContestRow)
+      ? fromContestRow
+      : requestedContestId && Number.isFinite(fromQuery)
+        ? fromQuery
         : 1;
 
-      // Fetch demerits for tooltip functionality
-      try {
-        const demeritRes = await getDemeritsByContestId(searchParamsBox.id);
-        if (demeritRes.success) {
-          allDemerits[searchParamsBox.id] = demeritRes.data;
-        } else {
-          allDemerits[searchParamsBox.id] = [];
-        }
-      } catch (error) {
-        console.error(
-          "Error fetching demerits for contest:",
-          searchParamsBox.id,
-          error
-        );
-        allDemerits[searchParamsBox.id] = [];
-      }
-    } else {
-      console.warn(
-        "Failed to fetch contest data for ID:",
-        searchParamsBox.id,
-        res
-      );
-      usedFallback = true;
+    contestIdToWeight[contestId] = weight;
+
+    const result = await fetchContestDataWithDemerits(
+      contestId,
+      contest?.contest_name,
+      allDemerits
+    );
+    if (!result) {
+      continue;
     }
+    results.push(result);
+  }
+
+  let merged = null;
+  if (roomType === "TSC") {
+    const tfcPercentage = selectedTfcPercentage;
+    const tscPercentage = derivedTscPercentage;
+    const tfcRoomId = roomMeta?.tfc_room_id ? String(roomMeta.tfc_room_id) : null;
+    const tfcScoreByTeam = await getTfcScoreMap(tfcRoomId);
+
+    merged = mergeResultsForTsc(
+      results,
+      contestIdToWeight,
+      tfcScoreByTeam,
+      tfcPercentage,
+      tscPercentage
+    );
+    merged.tscConfig = {
+      ...(merged.tscConfig || {}),
+      tfcRoomId,
+    };
   } else {
-    usedFallback = true;
+    merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
   }
 
-  if (usedFallback) {
-    const roomId = (await params).id;
-    const roomRes = await getContestRoomContestById(roomId);
-    console.log(roomRes);
-    if (roomRes && roomRes.result && Array.isArray(roomRes.result)) {
-      name = roomRes.name;
-      contestIds = roomRes.result.map((x) => ({
-        id: x.contest_id,
-        title: x.contest_name,
-      }));
-      console.log(contestIds);
-      for (const c of roomRes.result) {
-        contestIdToWeight[c.contest_id] = c.weight ?? 1;
-      }
-      for (const cid of contestIds) {
-        if (/^\d+$/.test(cid.id)) {
-          let r = await getContestStructuredRankWithDemerits(cid.id);
-          if (r.status && r.status === "error") continue;
-          console.log(r, cid.title);
-          if (cid.title) r.contestInfo.title = cid.title;
-          if (r && r.status !== "error" && r.teams) {
-            results.push(r);
-
-            // Fetch demerits for tooltip functionality
-            try {
-              const demeritRes = await getDemeritsByContestId(cid.id);
-              if (demeritRes.success) {
-                allDemerits[cid.id] = demeritRes.data;
-              } else {
-                allDemerits[cid.id] = [];
-              }
-            } catch (error) {
-              console.error(
-                "Error fetching demerits for contest:",
-                cid.id,
-                error
-              );
-              allDemerits[cid.id] = [];
-            }
-          } else {
-            console.warn("Failed to fetch contest data for ID:", cid.id, r);
-          }
-        }
-      }
-    }
-  }
-
-  const merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
+  merged.name = name;
+  merged.roomType = roomType;
 
   // Add defensive check to ensure merged data is valid
   if (!merged || !merged.users || !Array.isArray(merged.users)) {
@@ -267,16 +497,12 @@ async function page({ params, searchParams }) {
     );
   }
 
-  console.log(merged);
-  const liveReportId =
-    (await params).id + (searchParamsBox.id ? `_${searchParamsBox.id}` : "");
+  const liveReportId = roomId + (requestedContestId ? `_${requestedContestId}` : "");
   return (
-    <div>
+    <div className="space-y-4">
       <ReportTable
         merged={merged}
         liveReportId={liveReportId}
-        report_id={(await params).id}
-        partial={searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)}
         name={name}
       />
     </div>
