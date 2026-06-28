@@ -1,0 +1,28 @@
+
+> client@0.1.0 build
+> node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build --webpack
+
+▲ Next.js 16.1.1 (webpack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · optimizePackageImports
+  · serverActions
+  ✓ viewTransition
+  ✓ webpackMemoryOptimizations
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 23.5s
+  Running TypeScript ...
+Failed to compile.
+
+./src/actions/contest.ts:153:9
+Type error: Object literal may only specify known properties, and 'isSaved' does not exist in type 'UnifiedStandingsResponse'.
+
+[0m [90m 151 |[39m       [36mreturn[39m {
+ [90m 152 |[39m         [33m...[39mliveData[33m,[39m
+[31m[1m>[22m[39m[90m 153 |[39m         isSaved[33m:[39m [36mfalse[39m
+ [90m     |[39m         [31m[1m^[22m[39m
+ [90m 154 |[39m       }[33m;[39m
+ [90m 155 |[39m     }
+ [90m 156 |[39m     [36mreturn[39m [36mnull[39m[33m;[39m[0m
+Next.js build worker exited with code: 1 and signal: null

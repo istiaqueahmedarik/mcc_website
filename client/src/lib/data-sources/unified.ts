@@ -7,6 +7,8 @@ export interface UnifiedContest {
   provider: ContestProvider;
   startsAt: string;
   durationMinutes: number;
+  published?: boolean;
+  isSaved?: boolean;
 }
 
 export interface ProblemStat {
@@ -26,6 +28,7 @@ export interface UnifiedStandingsRow {
   score: number;
   penalty: number;
   problems: ProblemStat[];
+  skippedTeams?: UnifiedStandingsRow[];
 }
 
 export interface UnifiedStandingsResponse {
@@ -37,10 +40,12 @@ export interface UnifiedStandingsResponse {
 export function processCustomRanks(rows: UnifiedStandingsRow[]): UnifiedStandingsRow[] {
   let currentRank = 1;
   const seenUniversities = new Set<string>();
+  const universityToMainTeam = new Map<string, UnifiedStandingsRow>();
+  const output: UnifiedStandingsRow[] = [];
 
-  return rows.map(row => {
-    const institutionLower = row.institution.toLowerCase().trim();
-    const teamLower = row.teamName.toLowerCase().trim();
+  rows.forEach(row => {
+    const institutionLower = (row.institution || '').toLowerCase().trim();
+    const teamLower = (row.teamName || '').toLowerCase().trim();
 
     const isMist = 
       teamLower.startsWith('mist_') || 
@@ -49,14 +54,28 @@ export function processCustomRanks(rows: UnifiedStandingsRow[]): UnifiedStanding
 
     if (isMist) {
       row.displayRank = '-';
-    } else if (seenUniversities.has(institutionLower)) {
-      row.displayRank = '-';
+      row.skippedTeams = [];
+      output.push(row);
     } else {
-      row.displayRank = currentRank;
-      currentRank++;
-      seenUniversities.add(institutionLower);
+      if (seenUniversities.has(institutionLower)) {
+        row.displayRank = '-';
+        const mainTeam = universityToMainTeam.get(institutionLower);
+        if (mainTeam) {
+          if (!mainTeam.skippedTeams) {
+            mainTeam.skippedTeams = [];
+          }
+          mainTeam.skippedTeams.push(row);
+        }
+      } else {
+        row.displayRank = currentRank;
+        currentRank++;
+        seenUniversities.add(institutionLower);
+        row.skippedTeams = [];
+        universityToMainTeam.set(institutionLower, row);
+        output.push(row);
+      }
     }
-
-    return row;
   });
+
+  return output;
 }

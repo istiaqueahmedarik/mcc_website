@@ -28,6 +28,7 @@ import {
   Menu,
   Settings,
   ShieldHalf,
+  Trophy,
   UserCheck,
   UserPlus,
   Users
@@ -44,6 +45,7 @@ const Navbar = async () => {
       icon: CalendarClock,
       label: 'Reminders',
     },
+    { href: '/contests', icon: Trophy, label: 'Contests' },
     { href: '/icpc_journey', icon: Globe, label: 'ICPC' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
@@ -61,6 +63,7 @@ const Navbar = async () => {
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
     { href: '/admin/icpc', icon: CalendarClock, label: 'ICPC' },
+    { href: '/admin/contests', icon: Trophy, label: 'Contest Manager' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },

@@ -8,18 +8,26 @@ export async function getTophContests(): Promise<UnifiedContest[]> {
     const $ = cheerio.load(html);
     const contests: UnifiedContest[] = [];
 
-    $('a[href^="/c/"]').each((i, el) => {
-      const href = $(el).attr('href');
-      const text = $(el).text().trim();
-      if (href && text && !text.includes('Standings') && href.split('/').length === 3) {
+    $('table.table tbody tr').each((i, row) => {
+      const nameLink = $(row).find('a.clist__name');
+      const href = nameLink.attr('href');
+      const text = nameLink.text().trim();
+      const timestampSpan = $(row).find('.timestamp[data-timestamp]');
+      const timestamp = timestampSpan.attr('data-timestamp');
+      
+      if (href && text && href.split('/').length === 3) {
         const slug = href.split('/')[2];
+        const startsAt = timestamp 
+          ? new Date(parseInt(timestamp, 10) * 1000).toISOString()
+          : new Date().toISOString();
+        
         if (!contests.find(c => c.slug === slug)) {
           contests.push({
             id: slug,
             slug: slug,
             title: text,
             provider: 'toph',
-            startsAt: new Date().toISOString(),
+            startsAt: startsAt,
             durationMinutes: 300,
           });
         }
@@ -79,27 +87,54 @@ export async function getTophStandings(slug: string): Promise<UnifiedStandingsRe
     let rawStandings: UnifiedStandingsRow[] = [];
     table.find('tbody tr').each((i, el) => {
       const tds = $(el).find('td');
-      if (tds.length < 4) return;
+      if (tds.length < 3) return;
       
       const rank = $(tds[0]).text().trim();
       const teamCell = $(tds[1]);
-      const teamName = teamCell.find('a').first().text().trim() || teamCell.text().split('\n')[0].trim();
-      const institution = teamCell.find('.text-muted').text().trim() || teamCell.find('small').text().trim() || '';
       
-      const score = parseInt($(tds[2]).text().trim(), 10) || 0;
-      const penalty = parseInt($(tds[3]).text().trim(), 10) || 0;
+      const teamDiv = teamCell.find('div.d-flex > div');
+      const institution = teamDiv.find('.adjunct').text().trim();
+      const teamName = teamDiv.clone().children().remove().end().text().trim();
+      
+      const scoreCell = $(tds[2]);
+      const score = parseInt(scoreCell.find('strong').text().trim(), 10) || 0;
+      const penalty = parseInt(scoreCell.find('.adjunct').text().trim(), 10) || 0;
 
       const problems: any[] = [];
-      for (let p = 4; p < tds.length; p++) {
+      for (let p = 3; p < tds.length; p++) {
         const pCell = $(tds[p]);
-        const cellText = pCell.text().trim();
-        let solved = pCell.hasClass('accepted') || pCell.find('.fa-check').length > 0;
+        
+        const isSolved = pCell.hasClass('-perfect') || 
+                         pCell.hasClass('-accepted') || 
+                         pCell.hasClass('-firstsolve') || 
+                         pCell.find('use').attr('href')?.includes('#check') || 
+                         pCell.find('use').attr('href')?.includes('#star');
+                         
+        const isFailed = pCell.hasClass('-failed') || 
+                         pCell.find('use').attr('href')?.includes('#cross');
+
+        let tries = 0;
+        let pPen = 0;
+
+        if (isSolved) {
+          const adjunct = pCell.find('.adjunct');
+          const titleText = adjunct.attr('title') || '';
+          
+          const rejectionsMatch = titleText.match(/Rejections:\s*(\d+)/);
+          tries = rejectionsMatch ? parseInt(rejectionsMatch[1], 10) + 1 : 1;
+          
+          const penaltyMatch = titleText.match(/Penalty:\s*(\d+)/);
+          pPen = penaltyMatch ? parseInt(penaltyMatch[1], 10) : 0;
+        } else if (isFailed) {
+          tries = 1;
+        }
+
         problems.push({
-          label: unifiedProblems[p - 4]?.label || '?',
-          title: unifiedProblems[p - 4]?.title || '?',
-          solved: solved,
-          tries: parseInt(cellText) || 0,
-          penalty: 0,
+          label: unifiedProblems[p - 3]?.label || '?',
+          title: unifiedProblems[p - 3]?.title || '?',
+          solved: isSolved,
+          tries: tries,
+          penalty: pPen,
         });
       }
 
