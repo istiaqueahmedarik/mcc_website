@@ -33,71 +33,13 @@ const sql: Sql = postgres(connectionString, {
   },
 });
 
-// Test connection and auto-initialize tables on startup
-sql`SELECT 1`.then(async () => {
+// Test connection on startup
+sql`SELECT 1`.then(() => {
   console.log('✅ Database connection established successfully');
   if (isSupabaseTransactionMode) {
     console.log('🔄 Using Supabase transaction mode (prepared statements disabled)');
   } else {
     console.log('📋 Using session mode or direct connection (prepared statements enabled)');
-  }
-
-  // Auto-create required caching tables if they don't exist
-  try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS saved_contests (
-          id SERIAL PRIMARY KEY,
-          provider VARCHAR(50) NOT NULL,
-          slug VARCHAR(255) NOT NULL,
-          title VARCHAR(255) NOT NULL,
-          starts_at TIMESTAMP WITH TIME ZONE,
-          duration_minutes INTEGER NOT NULL,
-          saved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE (provider, slug)
-      )
-    `;
-    await sql`
-      CREATE TABLE IF NOT EXISTS saved_standings (
-          id SERIAL PRIMARY KEY,
-          provider VARCHAR(50) NOT NULL,
-          slug VARCHAR(255) NOT NULL,
-          data JSONB NOT NULL,
-          saved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          UNIQUE (provider, slug)
-      )
-    `;
-    await sql`
-      CREATE TABLE IF NOT EXISTS saved_lists (
-          list_name VARCHAR(100) PRIMARY KEY,
-          saved_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
-    await sql`
-      CREATE TABLE IF NOT EXISTS university_aliases (
-          id SERIAL PRIMARY KEY,
-          alias_name VARCHAR(255) NOT NULL UNIQUE,
-          canonical_name VARCHAR(255) NOT NULL
-      )
-    `;
-    // Legacy cleanup: delete old BAPS entries saved with a numeric ID slug
-    await sql`
-      DELETE FROM saved_standings 
-      WHERE provider = 'baps' AND slug ~ '^[0-9]+$'
-    `;
-    await sql`
-      DELETE FROM saved_contests 
-      WHERE provider = 'baps' AND slug ~ '^[0-9]+$'
-    `;
-    // Add published column if it doesn't exist
-    try {
-      await sql`ALTER TABLE saved_contests ADD COLUMN published BOOLEAN DEFAULT false`;
-      console.log('✅ Added published column to saved_contests');
-    } catch (e: any) {
-      // Column already exists — ignore
-    }
-    console.log('✅ Caching database tables verified/initialized successfully');
-  } catch (error: any) {
-    console.error('❌ Failed to initialize caching database tables:', error.message);
   }
 }).catch((error) => {
   console.error('❌ Database connection failed:', error.message);
