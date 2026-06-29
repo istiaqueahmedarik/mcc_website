@@ -226,7 +226,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
             You can view the original standings page on{' '}
             <a 
               href={data.contest.provider === 'baps' 
-                ? `https://baps.amarbari.net/contests/${data.contest.slug}` 
+                ? `https://bapsoj.org/contests/${data.contest.slug}` 
                 : `https://toph.co/c/${data.contest.slug}/standings`
               }
               target="_blank"
