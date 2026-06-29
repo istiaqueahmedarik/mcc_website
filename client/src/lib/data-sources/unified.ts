@@ -39,6 +39,16 @@ export interface UnifiedStandingsResponse {
   savedAt?: string;
 }
 
+export function isMistTeam(teamName: string, institution: string): boolean {
+  const teamLower = (teamName || '').toLowerCase().trim();
+  const instLower = (institution || '').toLowerCase().trim();
+  return (
+    teamLower.startsWith('mist_') ||
+    instLower === 'mist' ||
+    instLower.includes('military institute of science')
+  );
+}
+
 export function processCustomRanks(rows: UnifiedStandingsRow[]): UnifiedStandingsRow[] {
   let currentRank = 1;
   const seenUniversities = new Set<string>();
@@ -49,10 +59,7 @@ export function processCustomRanks(rows: UnifiedStandingsRow[]): UnifiedStanding
     const institutionLower = (row.institution || '').toLowerCase().trim();
     const teamLower = (row.teamName || '').toLowerCase().trim();
 
-    const isMist = 
-      teamLower.startsWith('mist_') || 
-      institutionLower === 'mist' || 
-      institutionLower === 'military institute of science and technology';
+    const isMist = isMistTeam(row.teamName, row.institution);
 
     if (isMist) {
       row.displayRank = '-';

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { UnifiedStandingsResponse, UnifiedStandingsRow } from '@/lib/data-sources/unified';
+import { UnifiedStandingsResponse, UnifiedStandingsRow, isMistTeam } from '@/lib/data-sources/unified';
 import { Search, Download, Users, Info, Shield, AlertTriangle, Database, RefreshCw, CheckCircle, ExternalLink } from 'lucide-react';
 import { saveContestStandings, deleteSavedStandings } from '@/actions/contest';
 
@@ -43,13 +43,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
   const filteredStandings = useMemo(() => {
     let list = standingsWithUniqueRank;
     if (viewMode === 'mist') {
-      list = list.filter(row => {
-        const institutionLower = (row.institution || '').toLowerCase().trim();
-        const teamLower = (row.teamName || '').toLowerCase().trim();
-        return teamLower.startsWith('mist_') || 
-               institutionLower === 'mist' || 
-               institutionLower === 'military institute of science and technology';
-      });
+      list = list.filter(row => isMistTeam(row.teamName, row.institution));
     }
     return list.filter(row => 
       row.teamName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -299,12 +293,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
             const isExpanded = expandedRows.has(rowKey);
             const hasSkipped = row.skippedTeams && row.skippedTeams.length > 0;
 
-            const institutionLower = (row.institution || '').toLowerCase().trim();
-            const teamLower = (row.teamName || '').toLowerCase().trim();
-            const isMist = 
-              teamLower.startsWith('mist_') || 
-              institutionLower === 'mist' || 
-              institutionLower === 'military institute of science and technology';
+            const isMist = isMistTeam(row.teamName, row.institution);
 
             const isEven = idx % 2 === 0;
              const rowClass = isMist 
