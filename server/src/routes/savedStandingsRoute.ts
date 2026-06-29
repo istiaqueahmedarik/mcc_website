@@ -541,6 +541,41 @@ route.get("/raw-universities", async (c) => {
     console.error("Error getting raw universities:", error);
     return c.json({ error: error.message }, 500);
   }
+});
+
+// Get all distinct raw team names found across all saved standings
+route.get("/raw-teams", async (c) => {
+  try {
+    const standingsRows = await sql`
+      SELECT data 
+      FROM saved_standings
+    `;
+    
+    const teamSet = new Set<string>();
+
+    standingsRows.forEach(row => {
+      const standings = row.data?.standings || [];
+      standings.forEach((team: any) => {
+        if (team.teamName) {
+          teamSet.add(team.teamName.trim());
+        }
+        if (team.skippedTeams && Array.isArray(team.skippedTeams)) {
+          team.skippedTeams.forEach((skip: any) => {
+            if (skip.teamName) {
+              teamSet.add(skip.teamName.trim());
+            }
+          });
+        }
+      });
+    });
+
+    return c.json({ success: true, rawTeams: Array.from(teamSet).sort() });
+  } catch (error: any) {
+    console.error("Error getting raw teams:", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
 // GET /blacklist - Get all blacklisted team names
 route.get("/blacklist", async (c) => {
   try {

@@ -437,6 +437,83 @@ export async function splitUniversityAlias(aliasName: string): Promise<{ success
   }
 }
 
+export async function getTeamBlacklist(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API}/saved-standings/blacklist`, { cache: 'no-store' });
+    if (res.ok) {
+      const result = await res.json();
+      if (result.success && result.blacklist) {
+        return result.blacklist;
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to get team blacklist', error);
+    return [];
+  }
+}
+
+export async function addTeamToBlacklist(teamName: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API}/saved-standings/blacklist/add`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ teamName })
+    });
+    const result = await res.json().catch(() => ({}));
+    if (res.ok && result.success) {
+      revalidatePath('/contests');
+      revalidatePath('/admin/contests');
+      return { success: true, message: result.message };
+    }
+    return { success: false, message: result.error || 'Failed to blacklist team' };
+  } catch (error: any) {
+    console.error('Failed to add team to blacklist', error);
+    return { success: false, message: error.message || 'An error occurred' };
+  }
+}
+
+export async function removeTeamFromBlacklist(teamName: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API}/saved-standings/blacklist/remove`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ teamName })
+    });
+    const result = await res.json().catch(() => ({}));
+    if (res.ok && result.success) {
+      revalidatePath('/contests');
+      revalidatePath('/admin/contests');
+      return { success: true, message: result.message };
+    }
+    return { success: false, message: result.error || 'Failed to remove team from blacklist' };
+  } catch (error: any) {
+    console.error('Failed to remove team from blacklist', error);
+    return { success: false, message: error.message || 'An error occurred' };
+  }
+}
+
+
+export async function getRawTeams(): Promise<string[]> {
+  try {
+    const res = await fetch(`${API}/saved-standings/raw-teams`, { cache: 'no-store' });
+    if (res.ok) {
+      const result = await res.json();
+      if (result.success && result.rawTeams) {
+        return result.rawTeams;
+      }
+    }
+    return [];
+  } catch (error) {
+    console.error('Failed to get raw teams', error);
+    return [];
+  }
+}
+
 export async function toggleContestPublish(provider: string, slug: string): Promise<{ success: boolean; published?: boolean; message?: string }> {
   try {
     const res = await fetch(`${API}/saved-standings/toggle-publish`, {
