@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { GitMerge } from 'lucide-react';
 import ContestsClient from './ContestsClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ContestsPage() {
   const [contests, listStatus] = await Promise.all([
     getAllContests(),

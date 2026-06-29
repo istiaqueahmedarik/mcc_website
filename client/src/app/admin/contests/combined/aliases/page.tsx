@@ -2,6 +2,8 @@ import { getRawUniversities, getUniversityAliases } from '@/actions/contest';
 import { ShieldAlert } from 'lucide-react';
 import AliasesManagerClient from './AliasesManagerClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function UniversityAliasesPage() {
   const [rawUniversities, aliases] = await Promise.all([
     getRawUniversities(),
@@ -13,8 +15,7 @@ export default async function UniversityAliasesPage() {
       <div className="container mx-auto px-4 max-w-[1400px]">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 border-b border-slate-800/60 pb-8 gap-4">
           <div>
-            <h1 className="text-4xl font-extrabold text-white flex items-center gap-3 tracking-tight mb-2">
-              <ShieldAlert className="h-9 w-9 text-blue-500 fill-blue-500/10" />
+            <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">
               University Alias Manager
             </h1>
             <p className="text-sm text-slate-400">

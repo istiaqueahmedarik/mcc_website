@@ -1,6 +1,8 @@
 import { getCombinedUniversityStandings } from '@/actions/contest';
 import CombinedStandingsClient from './CombinedStandingsClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function CombinedUniversityStandingsPage() {
   const data = await getCombinedUniversityStandings();
 

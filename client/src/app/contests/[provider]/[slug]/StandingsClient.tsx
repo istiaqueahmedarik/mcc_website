@@ -3,13 +3,10 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { UnifiedStandingsResponse, UnifiedStandingsRow } from '@/lib/data-sources/unified';
-import { Search, Download, Users, Info, Shield, AlertTriangle, Database, RefreshCw, CheckCircle, ExternalLink } from 'lucide-react';
-import { saveContestStandings, deleteSavedStandings } from '@/actions/contest';
+import { Search, Download, Users, Info, Shield, ExternalLink, RefreshCw } from 'lucide-react';
 
 export default function StandingsClient({ data }: { data: UnifiedStandingsResponse }) {
   const router = useRouter();
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'standard' | 'combined' | 'mist'>('standard');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -173,88 +170,10 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
     document.body.removeChild(link);
   };
 
-  const handleSaveToDb = async () => {
-    setIsSaving(true);
-    try {
-      const res = await saveContestStandings(data.contest.provider, data.contest.slug, data);
-      if (res.success) {
-        router.refresh();
-      } else {
-        alert(res.message || 'Failed to save standings');
-      }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred while saving standings');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
-  const handleResyncLive = async () => {
-    if (!confirm('Are you sure you want to re-sync this contest with live data? This will clear the database copy.')) {
-      return;
-    }
-    setIsSyncing(true);
-    try {
-      const res = await deleteSavedStandings(data.contest.provider, data.contest.slug);
-      if (res.success) {
-        router.refresh();
-      } else {
-        alert(res.message || 'Failed to clear database copy');
-      }
-    } catch (err: any) {
-      alert(err.message || 'An error occurred while clearing database copy');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   return (
     <div>
-      {/* DB Saved Status Banner */}
-      <div className="mb-6">
-        {!data.isSaved ? (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300">
-            <div className="flex items-start sm:items-center gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-              <div className="text-xs sm:text-sm">
-                <span className="font-bold text-white">Warning:</span> This standings page is not saved in the database yet. Live crawler data might expire or become invalid.
-              </div>
-            </div>
-            <button
-              onClick={handleSaveToDb}
-              disabled={isSaving}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-amber-600 hover:bg-amber-700 disabled:bg-amber-700/50 text-white transition-all shadow-md shadow-amber-600/10 whitespace-nowrap self-end sm:self-auto"
-            >
-              <Database className="h-3.5 w-3.5" />
-              {isSaving ? 'Saving...' : 'Save to Database'}
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-slate-300">
-            <div className="flex items-start sm:items-center gap-3">
-              <CheckCircle className="h-5 w-5 shrink-0 text-emerald-500" />
-              <div className="text-xs sm:text-sm">
-                <span className="font-bold text-white">Saved in Database:</span> This standings page is safely archived. Saved on {data.savedAt ? new Date(data.savedAt).toLocaleString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                  hour: 'numeric',
-                  minute: 'numeric',
-                  hour12: true
-                }) : 'N/A'}.
-              </div>
-            </div>
-            <button
-              onClick={handleResyncLive}
-              disabled={isSyncing}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-slate-800 hover:bg-slate-700 disabled:bg-slate-700/50 text-slate-300 transition-all border border-slate-700 whitespace-nowrap self-end sm:self-auto"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Syncing...' : 'Re-sync with Live'}
-            </button>
-          </div>
-        )}
-      </div>
 
       {/* Actual Standings Link */}
       <div className="mb-6 flex items-center justify-between p-4 rounded-2xl bg-slate-900/40 border border-slate-800/80 text-slate-300">

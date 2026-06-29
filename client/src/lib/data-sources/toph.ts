@@ -50,13 +50,49 @@ export async function getTophStandings(slug: string): Promise<UnifiedStandingsRe
 
     const title = $('title').text().split('Standings')[0].trim();
     
+    let startsAt = '';
+    let durationMinutes = 300;
+    
+    try {
+      const mainRes = await fetch(`https://toph.co/c/${slug}`, { next: { revalidate: 60 } });
+      if (mainRes.ok) {
+        const mainHtml = await mainRes.text();
+        const $main = cheerio.load(mainHtml);
+        const timestamps: number[] = [];
+        $main('.timestamp[data-timestamp]').each((i, el) => {
+          const ts = parseInt($main(el).attr('data-timestamp') || '', 10);
+          if (ts && !timestamps.includes(ts)) {
+            timestamps.push(ts);
+          }
+        });
+        if (timestamps.length >= 2) {
+          timestamps.sort((a, b) => a - b);
+          startsAt = new Date(timestamps[0] * 1000).toISOString();
+          durationMinutes = Math.round((timestamps[1] - timestamps[0]) / 60);
+        } else if (timestamps.length === 1) {
+          startsAt = new Date(timestamps[0] * 1000).toISOString();
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch/parse Toph contest main page timestamps', e);
+    }
+
+    if (!startsAt) {
+      const standingsTimestamp = parseInt($('.timestamp[data-timestamp]').first().attr('data-timestamp') || '', 10);
+      if (standingsTimestamp) {
+        startsAt = new Date((standingsTimestamp - 300 * 60) * 1000).toISOString();
+      } else {
+        startsAt = new Date().toISOString();
+      }
+    }
+
     const unifiedContest: UnifiedContest = {
       id: slug,
       slug: slug,
       title: title || slug,
       provider: 'toph',
-      startsAt: new Date().toISOString(),
-      durationMinutes: 300,
+      startsAt: startsAt,
+      durationMinutes: durationMinutes,
     };
 
     const unifiedProblems: any[] = [];
@@ -98,7 +134,7 @@ export async function getTophStandings(slug: string): Promise<UnifiedStandingsRe
       
       const scoreCell = $(tds[2]);
       const score = parseInt(scoreCell.find('strong').text().trim(), 10) || 0;
-      const penalty = parseInt(scoreCell.find('.adjunct').text().trim(), 10) || 0;
+      const penaltyText = scoreCell.find('.adjunct').text().trim().toLowerCase();
 
       const problems: any[] = [];
       for (let p = 3; p < tds.length; p++) {
@@ -136,6 +172,18 @@ export async function getTophStandings(slug: string): Promise<UnifiedStandingsRe
           tries: tries,
           penalty: pPen,
         });
+      }
+
+      let penalty = 0;
+      if (penaltyText.includes('k')) {
+        const sum = problems.reduce((acc, p) => acc + (p.solved ? p.penalty : 0), 0);
+        if (sum > 0) {
+          penalty = sum;
+        } else {
+          penalty = Math.round(parseFloat(penaltyText.replace('k', '')) * 1000);
+        }
+      } else {
+        penalty = parseInt(penaltyText, 10) || 0;
       }
 
       rawStandings.push({

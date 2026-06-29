@@ -11,7 +11,7 @@ export async function getAllContests(): Promise<UnifiedContest[]> {
   try {
     // 1. Check if the contests list is saved in DB
     let isListSaved = false;
-    const resStatus = await fetch(`${API}/saved-standings/list-status`, { next: { revalidate: 0 } });
+    const resStatus = await fetch(`${API}/saved-standings/list-status`, { cache: 'no-store' });
     if (resStatus.ok) {
       const statusData = await resStatus.json();
       isListSaved = statusData.success && statusData.saved;
@@ -19,7 +19,7 @@ export async function getAllContests(): Promise<UnifiedContest[]> {
 
     // 2. If list is saved, ONLY load from the database
     if (isListSaved) {
-      const resDb = await fetch(`${API}/saved-standings/all`, { next: { revalidate: 0 } });
+      const resDb = await fetch(`${API}/saved-standings/all`, { cache: 'no-store' });
       if (resDb.ok) {
         const dbData = await resDb.json();
         if (dbData.success && dbData.contests) {
@@ -57,7 +57,7 @@ export async function getAllContests(): Promise<UnifiedContest[]> {
   // 4. Fetch whatever saved contests are in the database (e.g. manually added ones)
   let savedContests: UnifiedContest[] = [];
   try {
-    const resDb = await fetch(`${API}/saved-standings/all`, { next: { revalidate: 0 } });
+    const resDb = await fetch(`${API}/saved-standings/all`, { cache: 'no-store' });
     if (resDb.ok) {
       const dbData = await resDb.json();
       if (dbData.success && dbData.contests) {
@@ -99,7 +99,7 @@ export async function getContestStandings(provider: ContestProvider, slug: strin
   try {
     // 1. Try to fetch from backend DB first
     try {
-      const resDb = await fetch(`${API}/saved-standings?provider=${provider}&slug=${slug}`, { next: { revalidate: 0 } });
+      const resDb = await fetch(`${API}/saved-standings?provider=${provider}&slug=${slug}`, { cache: 'no-store' });
       if (resDb.ok) {
         const dbData = await resDb.json();
         if (dbData.success && dbData.saved) {
@@ -183,7 +183,8 @@ export async function saveContestStandings(provider: ContestProvider, slug: stri
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
-        revalidatePath(`/contests/${provider}/${slug}`);
+        revalidatePath(`/admin/contests/${provider}/${slug}`);
+        revalidatePath('/admin/contests');
         revalidatePath('/contests');
         return { success: true, message: 'Standings saved successfully' };
       }
@@ -208,7 +209,8 @@ export async function deleteSavedStandings(provider: ContestProvider, slug: stri
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
-        revalidatePath(`/contests/${provider}/${slug}`);
+        revalidatePath(`/admin/contests/${provider}/${slug}`);
+        revalidatePath('/admin/contests');
         revalidatePath('/contests');
         return { success: true, message: 'Saved standings deleted successfully' };
       }
@@ -222,7 +224,7 @@ export async function deleteSavedStandings(provider: ContestProvider, slug: stri
 
 export async function getContestsListStatus(): Promise<{ saved: boolean; savedAt: string | null }> {
   try {
-    const res = await fetch(`${API}/saved-standings/list-status`, { next: { revalidate: 0 } });
+    const res = await fetch(`${API}/saved-standings/list-status`, { cache: 'no-store' });
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
@@ -249,6 +251,7 @@ export async function saveContestsList(contests: UnifiedContest[]): Promise<{ su
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
+        revalidatePath('/admin/contests');
         revalidatePath('/contests');
         return { success: true, message: 'Contests list saved successfully' };
       }
@@ -272,6 +275,7 @@ export async function deleteContestsList(): Promise<{ success: boolean; message:
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
+        revalidatePath('/admin/contests');
         revalidatePath('/contests');
         return { success: true, message: 'Contests list unsaved successfully' };
       }
@@ -285,7 +289,7 @@ export async function deleteContestsList(): Promise<{ success: boolean; message:
 
 export async function getCombinedUniversityStandings(): Promise<{ success: boolean; contests: any[]; universities: any[] }> {
   try {
-    const res = await fetch(`${API}/saved-standings/combined-universities`, { next: { revalidate: 0 } });
+    const res = await fetch(`${API}/saved-standings/combined-universities`, { cache: 'no-store' });
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
@@ -301,7 +305,7 @@ export async function getCombinedUniversityStandings(): Promise<{ success: boole
 
 export async function getUniversityAliases(): Promise<{ aliasName: string; canonicalName: string }[]> {
   try {
-    const res = await fetch(`${API}/saved-standings/aliases`, { next: { revalidate: 0 } });
+    const res = await fetch(`${API}/saved-standings/aliases`, { cache: 'no-store' });
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
@@ -317,7 +321,7 @@ export async function getUniversityAliases(): Promise<{ aliasName: string; canon
 
 export async function getRawUniversities(): Promise<string[]> {
   try {
-    const res = await fetch(`${API}/saved-standings/raw-universities`, { next: { revalidate: 0 } });
+    const res = await fetch(`${API}/saved-standings/raw-universities`, { cache: 'no-store' });
     if (res.ok) {
       const result = await res.json();
       if (result.success) {
@@ -346,6 +350,8 @@ export async function mergeUniversities(aliasName: string, canonicalName: string
       if (result.success) {
         revalidatePath('/contests');
         revalidatePath('/contests/combined');
+        revalidatePath('/admin/contests');
+        revalidatePath('/admin/contests/combined');
         return { success: true, message: result.message };
       }
       return { success: false, message: result.error || 'Failed to merge universities' };
@@ -410,7 +416,7 @@ export async function toggleContestPublish(provider: string, slug: string): Prom
 
 export async function getPublishedContests(): Promise<UnifiedContest[]> {
   try {
-    const res = await fetch(`${API}/saved-standings/published`, { next: { revalidate: 0 } });
+    const res = await fetch(`${API}/saved-standings/published`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.contests) {

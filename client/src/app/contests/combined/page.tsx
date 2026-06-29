@@ -1,6 +1,8 @@
 import { getCombinedUniversityStandings } from '@/actions/contest';
 import CombinedStandingsClient from './CombinedStandingsClient';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Combined University Leaderboard | MIST Computer Club',
   description: 'Aggregated standings of all universities computed across all published contests.',

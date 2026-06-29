@@ -22,8 +22,7 @@ export default function PublicContestsClient({ contests }: { contests: UnifiedCo
       {/* Header section with modern design */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800/60 pb-8 gap-6">
         <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-400 flex items-center gap-3">
-            <Trophy className="h-9 w-9 text-yellow-500 animate-pulse" />
+          <h1 className="text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-400">
             Programming Contests
           </h1>
           <p className="text-sm text-slate-400 mt-2">
@@ -60,9 +59,10 @@ export default function PublicContestsClient({ contests }: { contests: UnifiedCo
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredContests.map((contest) => (
-            <div 
+            <Link 
               key={`${contest.provider}-${contest.slug}`}
-              className="bg-slate-900/40 backdrop-blur rounded-2xl border border-slate-800/80 p-6 transition-all duration-300 hover:border-slate-700/50 hover:bg-slate-900/60 shadow-lg shadow-slate-950/15 flex flex-col h-full"
+              href={`/contests/${contest.provider}/${contest.slug}`}
+              className="bg-slate-900/40 backdrop-blur rounded-2xl border border-slate-800/80 p-6 transition-all duration-300 hover:border-slate-700/50 hover:bg-slate-900/60 hover:scale-[1.01] shadow-lg shadow-slate-950/15 flex flex-col h-full group"
             >
               <div className="flex justify-between items-start mb-5">
                 <span className={`px-3 py-1 text-xs font-bold rounded-full ${
@@ -74,7 +74,7 @@ export default function PublicContestsClient({ contests }: { contests: UnifiedCo
                 </span>
               </div>
               
-              <h2 className="text-lg font-bold text-white mb-4 line-clamp-2 leading-snug">
+              <h2 className="text-lg font-bold text-white mb-4 line-clamp-2 leading-snug group-hover:text-blue-400 transition-colors">
                 {contest.title}
               </h2>
               
@@ -90,12 +90,8 @@ export default function PublicContestsClient({ contests }: { contests: UnifiedCo
                     hour12: true
                   })}</span>
                 </div>
-                <div className="flex items-center gap-2.5">
-                  <Clock className="h-4 w-4 text-slate-500" />
-                  <span>Duration: {(contest.durationMinutes / 60).toFixed(1)} hrs</span>
-                </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

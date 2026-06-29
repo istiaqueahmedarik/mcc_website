@@ -25,6 +25,7 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
   const [isSplitting, setIsSplitting] = useState(false);
   const [draggedUni, setDraggedUni] = useState<string | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+  const [selectedLeftUni, setSelectedLeftUni] = useState<string | null>(null);
 
   // Group mappings by canonical name: Map<canonicalName, Array<aliasName>>
   const aliasGroups = useMemo(() => {
@@ -63,6 +64,37 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
       aliases.some(alias => alias.toLowerCase().includes(searchRight.toLowerCase()))
     );
   }, [aliasGroups, searchRight]);
+
+  // Click and Selection Merge Handlers
+  const handleUniCardClick = (uniName: string) => {
+    if (selectedLeftUni === uniName) {
+      setSelectedLeftUni(null);
+    } else {
+      setSelectedLeftUni(uniName);
+    }
+  };
+
+  const handleMergeAction = async (source: string, target: string) => {
+    if (source === target) return;
+    
+    setSelectedLeftUni(null);
+
+    if (confirm(`Merge university statistics?\n\nThis will redirect all standings from:\n⚠️ "${source}"\n\nto point to:\n✅ "${target}"`)) {
+      setIsMerging(true);
+      try {
+        const res = await mergeUniversities(source, target);
+        if (res.success) {
+          router.refresh();
+        } else {
+          alert(res.message);
+        }
+      } catch (err: any) {
+        alert(err.message || 'An error occurred during merging');
+      } finally {
+        setIsMerging(false);
+      }
+    }
+  };
 
   // Drag and Drop Handlers
   const handleDragStart = (uni: string) => {
@@ -144,7 +176,7 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
       <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-start gap-3">
         <HelpCircle className="h-5 w-5 shrink-0 text-blue-400 mt-0.5" />
         <div className="text-xs sm:text-sm leading-relaxed">
-          <span className="font-bold text-white">How it works:</span> Drag any card from the **Independent Universities** list on the left, and **drop it directly onto another card** (on the left to start a new group, or on the right to append to an existing canonical group).
+          <span className="font-bold text-white">How it works:</span> Either **drag** any card from the left list and drop it onto another card/group, or **click** a card on the left to select it, then click **"Merge Here"** on any other card or group.
         </div>
       </div>
 
@@ -161,7 +193,7 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
                   {independentUnis.length}
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">Draggable cards that can be merged.</p>
+              <p className="text-xs text-slate-500 mt-0.5">Click to select, then merge. Or drag them.</p>
             </div>
           </div>
 
@@ -182,6 +214,7 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
             {filteredLeft.map((uni) => {
               const isTarget = dragOverTarget === uni;
               const isDragged = draggedUni === uni;
+              const isSelected = selectedLeftUni === uni;
 
               return (
                 <div
@@ -192,17 +225,34 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
                   onDragOver={(e) => handleDragOver(e, uni)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, uni)}
-                  className={`p-3.5 rounded-xl border text-xs font-semibold select-none cursor-grab active:cursor-grabbing transition-all ${
+                  onClick={() => handleUniCardClick(uni)}
+                  className={`p-3.5 rounded-xl border text-xs font-semibold select-none cursor-pointer transition-all ${
                     isDragged 
                       ? 'opacity-40 border-slate-800 bg-slate-950/30'
-                      : isTarget
-                        ? 'border-blue-500 bg-blue-500/10 scale-[1.02] shadow-[0_0_15px_rgba(59,130,246,0.15)] text-blue-400'
-                        : 'border-slate-850 bg-slate-950/40 text-slate-300 hover:border-slate-700/60 hover:bg-slate-900/40 hover:text-white'
+                      : isSelected
+                        ? 'border-blue-500 bg-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] text-blue-400'
+                        : isTarget
+                          ? 'border-blue-500 bg-blue-500/10 scale-[1.02] shadow-[0_0_15px_rgba(59,130,246,0.15)] text-blue-400'
+                          : 'border-slate-850 bg-slate-950/40 text-slate-300 hover:border-slate-700/60 hover:bg-slate-900/40 hover:text-white'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="truncate">{uni}</span>
-                    <Plus className="h-3 w-3 text-slate-500 opacity-0 group-hover:opacity-100 shrink-0" />
+                    {selectedLeftUni && !isSelected && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMergeAction(selectedLeftUni, uni);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] flex items-center gap-1 transition-all"
+                      >
+                        <GitMerge className="h-3 w-3" />
+                        <span>Merge Here</span>
+                      </button>
+                    )}
+                    {!selectedLeftUni && (
+                      <Plus className="h-3 w-3 text-slate-500 opacity-40 shrink-0" />
+                    )}
                   </div>
                 </div>
               );
@@ -261,10 +311,19 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
                   }`}
                 >
                   {/* Canonical Title */}
-                  <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-850/60">
-                    <span className="text-xs font-black text-white truncate w-full">
+                  <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-850/60 gap-3">
+                    <span className="text-xs font-black text-white truncate">
                       {canonicalName}
                     </span>
+                    {selectedLeftUni && (
+                      <button
+                        onClick={() => handleMergeAction(selectedLeftUni, canonicalName)}
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] flex items-center gap-1 transition-all shrink-0"
+                      >
+                        <GitMerge className="h-3.5 w-3.5" />
+                        <span>Merge Here</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Aliases List nested */}

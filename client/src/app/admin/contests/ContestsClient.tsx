@@ -101,8 +101,8 @@ export default function ContestsClient({
         if (month !== 'all' && contestDate.getMonth().toString() !== month) return false;
       }
 
-      // 4. Force show only past contests (duration completed)
-      if (c.startsAt) {
+      // 4. Force show only past contests (duration completed) - except saved ones
+      if (c.startsAt && !c.isSaved) {
         const now = new Date();
         const start = new Date(c.startsAt);
         const end = new Date(start.getTime() + c.durationMinutes * 60000);

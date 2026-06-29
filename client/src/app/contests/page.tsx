@@ -1,6 +1,8 @@
 import { getPublishedContests } from '@/actions/contest';
 import PublicContestsClient from './PublicContestsClient';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'Programming Contests | MIST Computer Club',
   description: 'View the list of programming contests and overall standings.',

@@ -35,6 +35,8 @@ export interface UnifiedStandingsResponse {
   contest: UnifiedContest;
   problems: { label: string; title: string; solvedBy: number; attemptedBy: number }[];
   standings: UnifiedStandingsRow[];
+  isSaved?: boolean;
+  savedAt?: string;
 }
 
 export function processCustomRanks(rows: UnifiedStandingsRow[]): UnifiedStandingsRow[] {
