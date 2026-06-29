@@ -76,7 +76,7 @@ export async function getBapsStandings(slug: string): Promise<UnifiedStandingsRe
     let rawStandings: UnifiedStandingsRow[] = allResults.map((r: any) => ({
       originalRank: r.rank,
       displayRank: r.rank,
-      teamName: r.username || 'Unknown',
+      teamName: (r.fullname || r.username || 'Unknown').trim(),
       institution: r.institution || '',
       score: r.problem_total_points || 0,
       penalty: r.total_fine || 0,
