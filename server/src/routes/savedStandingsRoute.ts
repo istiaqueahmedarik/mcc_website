@@ -541,6 +541,59 @@ route.get("/raw-universities", async (c) => {
     console.error("Error getting raw universities:", error);
     return c.json({ error: error.message }, 500);
   }
+// GET /blacklist - Get all blacklisted team names
+route.get("/blacklist", async (c) => {
+  try {
+    const rows = await sql`
+      SELECT team_name as "teamName" 
+      FROM team_blacklist
+      ORDER BY team_name ASC
+    `;
+    const blacklist = rows.map(r => r.teamName);
+    return c.json({ success: true, blacklist });
+  } catch (error: any) {
+    console.error("Error getting team blacklist:", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// POST /blacklist/add - Add a team name to the blacklist
+route.post("/blacklist/add", async (c) => {
+  try {
+    const { teamName } = await c.req.json();
+    if (!teamName) {
+      return c.json({ error: "Missing teamName" }, 400);
+    }
+    
+    await sql`
+      INSERT INTO team_blacklist (team_name)
+      VALUES (${teamName.trim()})
+      ON CONFLICT (team_name) DO NOTHING
+    `;
+    return c.json({ success: true, message: `Successfully blacklisted team '${teamName}'` });
+  } catch (error: any) {
+    console.error("Error adding team to blacklist:", error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// POST /blacklist/remove - Remove a team name from the blacklist
+route.post("/blacklist/remove", async (c) => {
+  try {
+    const { teamName } = await c.req.json();
+    if (!teamName) {
+      return c.json({ error: "Missing teamName" }, 400);
+    }
+    
+    await sql`
+      DELETE FROM team_blacklist 
+      WHERE LOWER(team_name) = ${teamName.trim().toLowerCase()}
+    `;
+    return c.json({ success: true, message: `Successfully removed team '${teamName}' from blacklist` });
+  } catch (error: any) {
+    console.error("Error removing team from blacklist:", error);
+    return c.json({ error: error.message }, 500);
+  }
 });
 
 export default route;

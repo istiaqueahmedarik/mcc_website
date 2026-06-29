@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getBapsContests, getBapsStandings } from '@/lib/data-sources/baps';
 import { getTophContests, getTophStandings } from '@/lib/data-sources/toph';
-import { UnifiedContest, UnifiedStandingsResponse, ContestProvider } from '@/lib/data-sources/unified';
+import { UnifiedContest, UnifiedStandingsResponse, ContestProvider, processCustomRanks } from '@/lib/data-sources/unified';
 
 const API = (process.env.SERVER_URL || process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000').replace(/\/+$/, '');
 
@@ -95,16 +95,59 @@ export async function getAllContests(): Promise<UnifiedContest[]> {
   return all;
 }
 
+function filterAndReprocessStandings(standings: any[] | undefined, blacklist: Set<string>) {
+  if (!standings || blacklist.size === 0) return standings || [];
+  
+  // 1. Flatten all rows (main + skipped)
+  const flattened: any[] = [];
+  standings.forEach(row => {
+    const { skippedTeams, ...mainTeam } = row;
+    flattened.push(mainTeam);
+    if (skippedTeams && Array.isArray(skippedTeams)) {
+      flattened.push(...skippedTeams);
+    }
+  });
+  
+  // 2. Filter blacklisted
+  const filtered = flattened.filter(t => !blacklist.has(t.teamName.toLowerCase().trim()));
+  
+  // 3. Sort by score desc, penalty asc, then originalRank asc
+  filtered.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.penalty !== b.penalty) return a.penalty - b.penalty;
+    return (a.originalRank || 0) - (b.originalRank || 0);
+  });
+  
+  // 4. Reprocess custom ranks
+  return processCustomRanks(filtered);
+}
+
 export async function getContestStandings(provider: ContestProvider, slug: string): Promise<UnifiedStandingsResponse | null> {
   try {
+    // Fetch blacklist
+    const blacklistSet = new Set<string>();
+    try {
+      const blacklistRes = await fetch(`${API}/saved-standings/blacklist`, { cache: 'no-store' });
+      if (blacklistRes.ok) {
+        const blData = await blacklistRes.json();
+        if (blData.success && blData.blacklist) {
+          blData.blacklist.forEach((b: string) => blacklistSet.add(b.toLowerCase().trim()));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load blacklist', err);
+    }
+
     // 1. Try to fetch from backend DB first
     try {
       const resDb = await fetch(`${API}/saved-standings?provider=${provider}&slug=${slug}`, { cache: 'no-store' });
       if (resDb.ok) {
         const dbData = await resDb.json();
         if (dbData.success && dbData.saved) {
+          const finalStandings = filterAndReprocessStandings(dbData.data?.standings, blacklistSet);
           return {
             ...dbData.data,
+            standings: finalStandings,
             isSaved: true,
             savedAt: dbData.savedAt
           };
@@ -152,8 +195,11 @@ export async function getContestStandings(provider: ContestProvider, slug: strin
         console.error('Failed to apply aliases to live standings data', e);
       }
 
+      const finalStandings = filterAndReprocessStandings(liveData.standings, blacklistSet);
+
       return {
         ...liveData,
+        standings: finalStandings,
         isSaved: false
       };
     }
