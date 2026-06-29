@@ -11,7 +11,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'standard' | 'combined' | 'mist'>('standard');
+  const [viewMode, setViewMode] = useState<'standard' | 'mist'>('standard');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const [displayCount, setDisplayCount] = useState(50);
@@ -27,8 +27,21 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
     setExpandedRows(newExpanded);
   };
 
+  const standingsWithUniqueRank = useMemo(() => {
+    const seenUniversities = new Set<string>();
+    return data.standings.map((row) => {
+      if (row.institution) {
+        seenUniversities.add(row.institution.trim().toLowerCase());
+      }
+      return {
+        ...row,
+        uniqueUniRank: seenUniversities.size
+      };
+    });
+  }, [data.standings]);
+
   const filteredStandings = useMemo(() => {
-    let list = data.standings;
+    let list = standingsWithUniqueRank;
     if (viewMode === 'mist') {
       list = list.filter(row => {
         const institutionLower = (row.institution || '').toLowerCase().trim();
@@ -42,7 +55,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
       row.teamName.toLowerCase().includes(searchTerm.toLowerCase()) || 
       row.institution.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [data.standings, searchTerm, viewMode]);
+  }, [standingsWithUniqueRank, searchTerm, viewMode]);
 
   // Reset pagination count when filters or views change
   useEffect(() => {
@@ -73,95 +86,50 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
     return filteredStandings.slice(0, displayCount);
   }, [filteredStandings, displayCount]);
 
-  const combinedUniversities = useMemo(() => {
-    const uniMap = new Map<string, { institution: string, score: number, penalty: number, teams: number }>();
-    
-    data.standings.forEach(row => {
-      const inst = row.institution || 'Unknown';
-      if (!uniMap.has(inst)) {
-        uniMap.set(inst, { institution: inst, score: 0, penalty: 0, teams: 0 });
-      }
-      const u = uniMap.get(inst)!;
-      u.score += row.score;
-      u.penalty += row.penalty;
-      u.teams += 1;
-
-      if (row.skippedTeams) {
-        row.skippedTeams.forEach(skipRow => {
-          u.score += skipRow.score;
-          u.penalty += skipRow.penalty;
-          u.teams += 1;
-        });
-      }
-    });
-
-    const arr = Array.from(uniMap.values());
-    arr.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.penalty - b.penalty;
-    });
-    return arr;
-  }, [data.standings]);
-
   const downloadCSV = () => {
     let csv = '';
     
-    if (viewMode === 'standard' || viewMode === 'mist') {
-      const headers = [viewMode === 'mist' ? 'MIST Rank' : 'Rank', 'Team', 'Institution', 'Score', 'Penalty'];
-      data.problems.forEach(p => headers.push(p.label));
-      csv += headers.join(',') + '\n';
+    const headers = [viewMode === 'mist' ? 'Unique University Rank' : 'Rank', 'Team', 'Institution', 'Score', 'Penalty'];
+    data.problems.forEach(p => headers.push(p.label));
+    csv += headers.join(',') + '\n';
 
-      filteredStandings.forEach((row, i) => {
-        const rowData = [
-          viewMode === 'mist' ? i + 1 : row.displayRank,
-          `"${row.teamName.replace(/"/g, '""')}"`,
-          `"${row.institution.replace(/"/g, '""')}"`,
-          row.score,
-          row.penalty
-        ];
-        data.problems.forEach(p => {
-          const stat = row.problems.find(pr => pr.label === p.label);
-          if (!stat) rowData.push('');
-          else if (stat.solved) rowData.push(`1 (${stat.tries})`);
-          else if (stat.tries > 0) rowData.push(`0 (${stat.tries})`);
-          else rowData.push('');
-        });
-        csv += rowData.join(',') + '\n';
+    filteredStandings.forEach((row, i) => {
+      const rowData = [
+        viewMode === 'mist' ? row.uniqueUniRank : row.displayRank,
+        `"${row.teamName.replace(/"/g, '""')}"`,
+        `"${row.institution.replace(/"/g, '""')}"`,
+        row.score,
+        row.penalty
+      ];
+      data.problems.forEach(p => {
+        const stat = row.problems.find(pr => pr.label === p.label);
+        if (!stat) rowData.push('');
+        else if (stat.solved) rowData.push(`1 (${stat.tries})`);
+        else if (stat.tries > 0) rowData.push(`0 (${stat.tries})`);
+        else rowData.push('');
+      });
+      csv += rowData.join(',') + '\n';
 
-        if (row.skippedTeams) {
-          row.skippedTeams.forEach(skipRow => {
-            const skipRowData = [
-              '-',
-              `"${skipRow.teamName.replace(/"/g, '""')}"`,
-              `"${skipRow.institution.replace(/"/g, '""')}"`,
-              skipRow.score,
-              skipRow.penalty
-            ];
-            data.problems.forEach(p => {
-              const stat = skipRow.problems.find(pr => pr.label === p.label);
-              if (!stat) skipRowData.push('');
-              else if (stat.solved) skipRowData.push(`1 (${stat.tries})`);
-              else if (stat.tries > 0) skipRowData.push(`0 (${stat.tries})`);
-              else skipRowData.push('');
-            });
-            csv += skipRowData.join(',') + '\n';
+      if (row.skippedTeams) {
+        row.skippedTeams.forEach(skipRow => {
+          const skipRowData = [
+            '-',
+            `"${skipRow.teamName.replace(/"/g, '""')}"`,
+            `"${skipRow.institution.replace(/"/g, '""')}"`,
+            skipRow.score,
+            skipRow.penalty
+          ];
+          data.problems.forEach(p => {
+            const stat = skipRow.problems.find(pr => pr.label === p.label);
+            if (!stat) skipRowData.push('');
+            else if (stat.solved) skipRowData.push(`1 (${stat.tries})`);
+            else if (stat.tries > 0) skipRowData.push(`0 (${stat.tries})`);
+            else skipRowData.push('');
           });
-        }
-      });
-    } else {
-      const headers = ['Rank', 'Institution', 'Total Score', 'Total Penalty', 'Teams Count'];
-      csv += headers.join(',') + '\n';
-      combinedUniversities.forEach((u, i) => {
-        if (!u.institution.toLowerCase().includes(searchTerm.toLowerCase())) return;
-        csv += [
-          i + 1,
-          `"${u.institution.replace(/"/g, '""')}"`,
-          u.score,
-          u.penalty,
-          u.teams
-        ].join(',') + '\n';
-      });
-    }
+          csv += skipRowData.join(',') + '\n';
+        });
+      }
+    });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -289,16 +257,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
           >
             Standard Standings
           </button>
-          <button
-            onClick={() => setViewMode('combined')}
-            className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              viewMode === 'combined' 
-                ? 'bg-slate-800 text-white shadow-lg shadow-slate-950/20' 
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Combined University Rank
-          </button>
+
           <button
             onClick={() => setViewMode('mist')}
             className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
@@ -311,8 +270,8 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
           </button>
         </div>
 
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="relative flex-1 md:w-72">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+          <div className="relative w-full sm:flex-1 md:w-72">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input 
               type="text" 
@@ -324,7 +283,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
           </div>
           <button 
             onClick={downloadCSV}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-2xl text-sm font-semibold transition-all shadow-lg shadow-blue-600/10 hover:shadow-blue-600/20"
           >
             <Download className="h-4 w-4" />
             <span>Export Results</span>
@@ -363,12 +322,12 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 w-full">
                   {/* Left section: Rank */}
                   {(!isMist || viewMode === 'mist') && (
-                    <div className="flex lg:flex-col items-center lg:items-center justify-between lg:justify-center pr-0 lg:pr-6 border-b lg:border-b-0 lg:border-r border-slate-700/50 pb-3 lg:pb-0 min-w-[70px]">
-                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                        {viewMode === 'mist' ? 'MIST Rank' : 'Rank'}
+                    <div className="flex lg:flex-col items-center lg:items-center justify-between lg:justify-center pr-0 lg:pr-6 border-b lg:border-b-0 lg:border-r border-slate-700/50 pb-3 lg:pb-0 min-w-[120px]">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider text-center">
+                        {viewMode === 'mist' ? 'Unique University Rank' : 'Rank'}
                       </span>
                       <span className="text-2xl font-black mt-0.5 lg:mt-1 text-white">
-                        {viewMode === 'mist' ? idx + 1 : row.displayRank}
+                        {viewMode === 'mist' ? row.uniqueUniRank : row.displayRank}
                       </span>
                     </div>
                   )}
@@ -425,7 +384,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
                   </div>
 
                   {/* Problems Badges Section */}
-                  <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto py-1 pl-0 lg:pl-4 no-scrollbar">
+                  <div className="w-full lg:flex-1 min-w-0 flex items-center gap-2 overflow-x-auto py-1 pl-0 lg:pl-4 no-scrollbar">
                     {data.problems.map(p => {
                       const stat = row.problems.find(pr => pr.label === p.label);
                       let statusClass = "bg-slate-800/80 text-slate-400 border border-slate-700/30";
@@ -489,48 +448,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
               </div>
             );
           })
-        ) : (
-          combinedUniversities
-            .filter(u => u.institution.toLowerCase().includes(searchTerm.toLowerCase()))
-            .map((u, idx) => (
-              <div 
-                key={idx} 
-                className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-slate-800/40 border border-slate-800 rounded-2xl transition-all duration-300 hover:border-slate-700/50 hover:bg-slate-800/60"
-              >
-                {/* Left section: Rank */}
-                <div className="flex md:flex-col items-center justify-between md:justify-center pr-0 md:pr-6 border-b md:border-b-0 md:border-r border-slate-700/50 pb-3 md:pb-0 min-w-[70px]">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Rank</span>
-                  <span className="text-2xl font-black mt-0.5 md:mt-1 text-white">{idx + 1}</span>
-                </div>
-
-                {/* Institution Details */}
-                <div className="flex-1 min-w-0">
-                  <span className="text-lg font-bold text-white break-words whitespace-normal">
-                    {u.institution}
-                  </span>
-                </div>
-
-                {/* Score, Penalty & Teams Count */}
-                <div className="flex items-center gap-8 px-0 md:px-8 py-2 md:py-0 border-t md:border-t-0 border-slate-700/50 justify-around md:justify-start">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Score</span>
-                    <span className="text-xl font-black text-white mt-0.5">{u.score}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Penalty</span>
-                    <span className="text-xl font-extrabold text-slate-300 mt-0.5">{u.penalty}</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-0.5">Teams</span>
-                    <div className="flex items-center gap-1.5 bg-slate-700/40 px-3 py-1 rounded-xl text-slate-300">
-                      <Users className="h-4 w-4 text-slate-400" />
-                      <span className="text-sm font-bold">{u.teams}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
-        )}
+        ) : null}
 
         {/* Infinite Scroll Sentinel */}
         {(viewMode === 'standard' || viewMode === 'mist') && visibleStandings.length < filteredStandings.length && (
@@ -544,8 +462,7 @@ export default function StandingsClient({ data }: { data: UnifiedStandingsRespon
         )}
 
         {/* Empty States */}
-        {((viewMode === 'standard' && filteredStandings.length === 0) || 
-          (viewMode === 'combined' && combinedUniversities.filter(u => u.institution.toLowerCase().includes(searchTerm.toLowerCase())).length === 0)) && (
+        {((viewMode === 'standard' || viewMode === 'mist') && filteredStandings.length === 0) && (
           <div className="text-center py-20 text-slate-500 bg-slate-900/40 rounded-2xl border border-slate-800/80">
             No results found matching your search criteria.
           </div>
