@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Pull latest changes
+        run: |
+          source /home/mcc/env.sh
+          cd ~/mcc_website
+          git pull origin master
+        shell: bash
+
+      - name: Install and build client
+        run: |
+          source /home/mcc/env.sh
+          cd ~/mcc_website/client
+          npm install
+          npm run build
+        shell: bash
+
+      - name: Install server dependencies
+        run: |
+          source /home/mcc/env.sh
+          cd ~/mcc_website/server
+          npm install
+        shell: bash
+
+      - name: Run startup script
+        run: |
+          source /home/mcc/env.sh
+          cd ~/mcc_website
+          ./startup.sh
+        shell: bash
