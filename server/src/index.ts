@@ -22,6 +22,9 @@ import vjudgeRoute from "./routes/vjudgeRoute";
 import wordRoute from "./routes/wordRoute";
 import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
+import classroomRoute from "./routes/classroomRoute";
+import trainerFormRoute from "./routes/trainerFormRoute";
+import { initDb } from "./utils/dbInit";
 import {
   autoStartScheduledRooms,
   isDbConnectionError,
@@ -29,6 +32,13 @@ import {
 
 const AUTO_START_INTERVAL_MS = 1000;
 const AUTO_START_MAX_CONSECUTIVE_DB_FAILURES = 5;
+
+// Initialize database schema tables
+initDb().then(() => {
+  console.log("Database initialized successfully!");
+}).catch(err => {
+  console.error("Database initialization failed:", err);
+});
 
 const app = new Hono<{ Variables: JwtVariables }>();
 
@@ -61,6 +71,8 @@ app.route("/team-collection", teamCollectionRoute);
 app.route("/typing/words", wordRoute);
 app.route("/typing/rooms", typingRoomRoute);
 app.route("/typing/participants", typingParticipantRoute);
+app.route("/classroom", classroomRoute);
+app.route("/trainer-forms", trainerFormRoute);
 
 let autoStartSchedulerInFlight = false;
 let autoStartConsecutiveDbFailures = 0;

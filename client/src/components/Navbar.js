@@ -37,6 +37,7 @@ import { cookies } from "next/headers";
 import MccLogo from "./IconChanger/MccLogo";
 import ProgressLink from "./ProgressLink";
 import ThemeChanger from "./ThemeChanger";
+import NotificationBell from "./NotificationBell";
 
 const Navbar = async () => {
   const navItems = [
@@ -55,13 +56,13 @@ const Navbar = async () => {
   ]
 
   const userTools = [
-    // { href: '/courses', icon: BookOpen, label: 'Course Details' },
-    // { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
+    { href: '/classroom/list', icon: Users, label: 'Classrooms' },
   ]
 
   const adminTools = [
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
+    { href: '/admin/trainers', icon: UserCheck, label: 'Manage Trainers' },
     { href: '/admin/icpc', icon: CalendarClock, label: 'ICPC' },
     { href: '/admin/contests', icon: Trophy, label: 'Contest Manager' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
@@ -76,6 +77,17 @@ const Navbar = async () => {
   const loggedIn = (await cookies()).get("token");
   const user = await get_with_token("auth/user/profile");
 
+  const profile = (user && user.result && user.result[0]) || null;
+  const isLoggedIn = Boolean(loggedIn && profile);
+  const isAdmin = Boolean(profile && profile.admin);
+  const isTrainer = Boolean(profile && profile.trainer);
+  const canUseTrainerDashboard = isTrainer || isAdmin;
+
+  const trainerTools = [];
+  if (canUseTrainerDashboard) {
+    trainerTools.push({ href: '/trainer/dashboard', icon: Code, label: 'Trainer Dashboard' });
+  }
+
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -84,7 +96,7 @@ const Navbar = async () => {
             <MccLogo w={60} h={60} />
           </ProgressLink>
 
-          <div className="hidden lg:flex items-center justify-center w-full space-x-2">
+          <div className="hidden lg:flex flex-wrap items-center justify-center w-full gap-1">
             {navItems.map((item) => (
               <ProgressLink key={item.href} href={item.href}>
                 <Button
@@ -97,7 +109,7 @@ const Navbar = async () => {
                 </Button>
               </ProgressLink>
             ))}
-            {loggedIn &&
+            {isLoggedIn && !canUseTrainerDashboard &&
               userTools.map((item) => (
                 <ProgressLink key={item.href} href={item.href}>
                   <Button
@@ -110,7 +122,20 @@ const Navbar = async () => {
                   </Button>
                 </ProgressLink>
               ))}
-            {user && user.result && user.result[0].admin && (
+            {isLoggedIn &&
+              trainerTools.map((item) => (
+                <ProgressLink key={item.href} href={item.href}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm font-medium"
+                  >
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                  </Button>
+                </ProgressLink>
+              ))}
+            {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gap-2">
                   {" "}
@@ -132,6 +157,11 @@ const Navbar = async () => {
         </div>
 
         <div className="flex items-center space-x-4">
+          {loggedIn && (
+            <NotificationBell
+              userId={user && user.result && user.result[0] && user.result[0].id}
+            />
+          )}
           <ThemeChanger />
           <div className="hidden md:flex items-center space-x-2">
             <ProgressLink href="/login" className={`${loggedIn && "hidden"}`}>
@@ -155,7 +185,7 @@ const Navbar = async () => {
                   src={user && user.result && user.result[0].profile_pic}
                 />
                 <AvatarFallback>
-                  {user && user.result && user.result[0].full_name[0]}
+                  {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
                 </AvatarFallback>
               </Avatar>
             </ProgressLink>
@@ -193,10 +223,38 @@ const Navbar = async () => {
                     </SheetClose>
                   ))}
 
-                  <hr className="my-4" />
-                  {user &&
-                    user.result &&
-                    user.result[0].admin &&
+                  {isLoggedIn && !canUseTrainerDashboard &&
+                    userTools.map((item, index) => (
+                      <SheetClose asChild key={index}>
+                        <ProgressLink key={item.href} href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-lg"
+                          >
+                            <item.icon className="mr-2 h-5 w-5" />
+                            {item.label}
+                          </Button>
+                        </ProgressLink>
+                      </SheetClose>
+                    ))}
+
+                  {isLoggedIn &&
+                    trainerTools.map((item, index) => (
+                      <SheetClose asChild key={index}>
+                        <ProgressLink key={item.href} href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-lg"
+                          >
+                            <item.icon className="mr-2 h-5 w-5" />
+                            {item.label}
+                          </Button>
+                        </ProgressLink>
+                      </SheetClose>
+                    ))}
+
+                  {isAdmin && <hr className="my-4" />}
+                  {isAdmin &&
                     adminTools.map((item, index) => (
                       <SheetClose asChild key={index}>
                         <ProgressLink key={item.href} href={item.href}>
@@ -244,7 +302,7 @@ const Navbar = async () => {
                         src={user && user.result && user.result[0].profile_pic}
                       />
                       <AvatarFallback>
-                        {user && user.result && user.result[0].full_name[0]}
+                        {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
                       </AvatarFallback>
                     </Avatar>
                   </ProgressLink>
