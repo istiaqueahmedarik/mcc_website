@@ -24,7 +24,6 @@ import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
 import classroomRoute from "./routes/classroomRoute";
 import trainerFormRoute from "./routes/trainerFormRoute";
-import { initDb } from "./utils/dbInit";
 import { websocket } from "./utils/bunWebSocket";
 import {
   autoStartScheduledRooms,
@@ -33,13 +32,6 @@ import {
 
 const AUTO_START_INTERVAL_MS = 1000;
 const AUTO_START_MAX_CONSECUTIVE_DB_FAILURES = 5;
-
-// Initialize database schema tables
-initDb().then(() => {
-  console.log("Database initialized successfully!");
-}).catch(err => {
-  console.error("Database initialization failed:", err);
-});
 
 const app = new Hono<{ Variables: JwtVariables }>();
 
