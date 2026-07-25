@@ -1080,3 +1080,22 @@ export async function resetPassword(email, otp, password) {
     }
   }
 }
+
+export async function changeOwnPassword(currentPassword, newPassword) {
+  try {
+    const response = await post_with_token('auth/user/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return {
+      success: !response?.error && (response?.success === true || !!response?.message),
+      message: response?.error || response?.message || 'Password updated successfully',
+    };
+  } catch (error) {
+    console.error('Change Own Password Error:', error);
+    return {
+      success: false,
+      message: 'An error occurred while updating password',
+    };
+  }
+}

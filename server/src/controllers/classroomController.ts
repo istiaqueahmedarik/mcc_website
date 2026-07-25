@@ -340,6 +340,42 @@ export const createAdminUser = async (c: Context) => {
   }
 };
 
+// Admin endpoint to change/reset password for any user
+export const changeUserPassword = async (c: Context) => {
+  const { id } = c.get('jwtPayload');
+  try {
+    // Check if requester is Admin
+    const adminCheck = await sql`SELECT admin FROM users WHERE id = ${id}`;
+    if (adminCheck.length === 0 || !adminCheck[0].admin) {
+      return c.json({ error: 'Unauthorized: Admins only' }, 403);
+    }
+
+    const { targetUserId, newPassword } = await c.req.json();
+    if (!targetUserId || !newPassword) {
+      return c.json({ error: 'User ID and new password are required' }, 400);
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters long' }, 400);
+    }
+
+    const userCheck = await sql`SELECT id, full_name, email FROM users WHERE id = ${targetUserId}`;
+    if (userCheck.length === 0) {
+      return c.json({ error: 'Target user not found' }, 404);
+    }
+
+    const hash = await Bun.password.hash(newPassword);
+    await sql`UPDATE users SET password = ${hash} WHERE id = ${targetUserId}`;
+
+    return c.json({
+      success: true,
+      message: `Successfully updated password for "${userCheck[0].full_name}".`
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 // -------------------------------------------------------------
 // Classroom Authorization Helper
 // -------------------------------------------------------------

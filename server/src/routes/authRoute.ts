@@ -13,6 +13,7 @@ import {
   sendResetOTP,
   signup,
   verifyOTP,
+  changeOwnPassword,
 } from "../controllers/authController";
 
 const route = new Hono();
@@ -64,6 +65,7 @@ route.get("/user/pendings", pendingUser);
 route.post("/user/reject", rejectUser);
 route.post("/user/accept", acceptUser);
 route.get("/user/profile", getProfile);
+route.post("/user/change-password", changeOwnPassword);
 route.post("/profile", getProfilePost);
 
 // Public endpoints (no auth)

@@ -639,3 +639,42 @@ export const resetPassword = async (c: any) => {
     return c.json({ error: "Failed to reset password" }, 500);
   }
 };
+
+export const changeOwnPassword = async (c: any) => {
+  const { id } = c.get("jwtPayload") || {};
+  if (!id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const { currentPassword, newPassword } = await c.req.json();
+    if (!currentPassword || !newPassword) {
+      return c.json({ error: "Current password and new password are required" }, 400);
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return c.json({ error: "New password must be at least 8 characters long" }, 400);
+    }
+
+    const userRows = await sql`SELECT id, password FROM users WHERE id = ${id}`;
+    if (userRows.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const user = userRows[0];
+    if (user.password) {
+      const isMatch = await Bun.password.verify(currentPassword, user.password);
+      if (!isMatch) {
+        return c.json({ error: "Incorrect current password" }, 400);
+      }
+    }
+
+    const hash = await Bun.password.hash(newPassword);
+    await sql`UPDATE users SET password = ${hash} WHERE id = ${id}`;
+
+    return c.json({ success: true, message: "Password updated successfully" });
+  } catch (error: any) {
+    console.error("Error in changeOwnPassword:", error.message);
+    return c.json({ error: "Failed to change password. Please try again." }, 500);
+  }
+};

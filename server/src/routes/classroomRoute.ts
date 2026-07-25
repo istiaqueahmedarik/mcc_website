@@ -41,6 +41,7 @@ import {
   markNotificationsRead,
   createTrainerUser,
   createAdminUser,
+  changeUserPassword,
   listClassroomTopics,
   startClassroomBoardSession,
   stopClassroomBoardSession,
@@ -130,6 +131,7 @@ route.post('/admin/toggle-trainer', toggleTrainerRole);
 route.post('/admin/create-trainer', createTrainerUser);
 route.post('/admin/toggle-admin', toggleAdminRole);
 route.post('/admin/create-admin', createAdminUser);
+route.post('/admin/change-password', changeUserPassword);
 route.get('/admin/users', listAllUsers);
 route.get('/admin/trainers-list', listTrainers);
 

@@ -327,3 +327,37 @@ Modifying trainer form response control, session creation forms, session attenda
 
 Do not overgeneralize:
 Database table and API route names (`classroom_teams`, `create-team`, `teams/:teamId/members`) remain unchanged to preserve schema and endpoint stability.
+
+## 2026-07-26 - admin-change-user-password-20260726 - Admin Password Reset for Any User
+
+Source:
+- `docs/decisions/admin-change-user-password-20260726-decisions.md`
+
+Decision:
+1. Endpoint: Added `POST /classroom/admin/change-password` endpoint in `server/src/routes/classroomRoute.ts` backed by `changeUserPassword` in `server/src/controllers/classroomController.ts`.
+2. Authorization: Strictly requires JWT authentication and `admin === true` status.
+3. Password Validation & Hashing: Password must be at least 8 characters long and is hashed using `Bun.password.hash(newPassword)`.
+4. User Management Interface: Integrated password modification into `/admin/trainers` (`TrainersManagementClient.js`) via a "Password" button per user row and a dedicated `Dialog` modal with visibility toggles and validation feedback.
+
+Applies when:
+Modifying admin user management, user credentials, password overrides, or `/admin/trainers`.
+
+Do not overgeneralize:
+Does not alter public email OTP password reset flow (`resetPassword`) or logged-in user profile password changes.
+
+## 2026-07-26 - user-change-own-password-20260726 - Self-Service Password Change for Authenticated Users
+
+Source:
+- `docs/decisions/user-change-own-password-20260726-decisions.md`
+
+Decision:
+1. Endpoint: `POST /auth/user/change-password` in `authRoute.ts` backed by `changeOwnPassword` in `authController.ts`, secured by existing `/user/*` JWT middleware.
+2. Authorization: Requires valid JWT token; verifies current password via `Bun.password.verify` before applying hash update.
+3. Client Action: `changeOwnPassword(currentPassword, newPassword)` exported from `client/src/lib/action.js`.
+4. UI: Shared `ChangePasswordModal` component at `client/src/components/ChangePasswordModal.js` with eye-toggle inputs, client-side validation, and success/error alerts — mounted in both `ProfileSidebarEditor.jsx` (`/profile`) and `TrainerProfileClient.jsx` (`/trainer/profile`).
+
+Applies when:
+Modifying user profile pages, account security settings, or password management flows.
+
+Do not overgeneralize:
+Does not alter admin-initiated password override (`POST /classroom/admin/change-password`) or OTP-based public password reset (`POST /auth/reset-password`).

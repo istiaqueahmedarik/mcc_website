@@ -16,11 +16,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import ProgressLink from "@/components/ProgressLink";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 import {
   Award,
   CheckCircle2,
   Edit3,
   IdCard,
+  Key,
   LogOut,
   Mail,
   Phone,
@@ -36,6 +38,7 @@ import { useFormStatus } from "react-dom";
 
 export default function ProfileSidebarEditor({ user, saveAction, logoutAction }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   return (
     <div className="profile-card space-y-2" aria-label="Profile Summary">
@@ -349,21 +352,41 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
         </div>
       </form>
 
-      <form action={logoutAction}>
+      <div className="space-y-2">
         <Button
-          type="submit"
+          type="button"
           variant="outline"
+          onClick={() => setChangePasswordOpen(true)}
           className="w-full profile-focus-ring"
           style={{
             borderRadius: "var(--profile-radius-sm)",
-            color: "hsl(var(--profile-danger))",
-            borderColor: "hsl(var(--profile-danger) / 0.3)",
           }}
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
+          <Key className="h-4 w-4 mr-2" />
+          Change Password
         </Button>
-      </form>
+
+        <form action={logoutAction}>
+          <Button
+            type="submit"
+            variant="outline"
+            className="w-full profile-focus-ring"
+            style={{
+              borderRadius: "var(--profile-radius-sm)",
+              color: "hsl(var(--profile-danger))",
+              borderColor: "hsl(var(--profile-danger) / 0.3)",
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </form>
+      </div>
+
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </div>
   );
 }

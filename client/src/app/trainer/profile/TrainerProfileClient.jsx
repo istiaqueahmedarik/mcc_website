@@ -12,6 +12,7 @@ import {
   Check,
   Github,
   Globe,
+  Key,
   Linkedin,
   Loader2,
   LogOut,
@@ -26,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 
 export default function TrainerProfileClient({
   user,
@@ -40,6 +42,7 @@ export default function TrainerProfileClient({
   const [isLoggingOut, startTransition] = useTransition();
   const [previewPic, setPreviewPic] = useState(user.profile_pic || null);
   const fileInputRef = useRef(null);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const handleLogout = () => {
     if (!logoutAction) return;
@@ -111,6 +114,7 @@ export default function TrainerProfileClient({
     : "Trainer";
 
   return (
+    <>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         {/* Page header */}
@@ -232,6 +236,20 @@ export default function TrainerProfileClient({
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Change Password card */}
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="w-full gap-2"
+                  id="trainer-change-password-btn"
+                >
+                  <Key className="h-4 w-4" />
+                  Change Password
+                </Button>
               </div>
 
               {/* Logout card */}
@@ -424,5 +442,11 @@ export default function TrainerProfileClient({
         </form>
       </div>
     </div>
+
+    <ChangePasswordModal
+      isOpen={changePasswordOpen}
+      onClose={() => setChangePasswordOpen(false)}
+    />
+    </>
   );
 }

@@ -38,6 +38,10 @@ import {
   UserPlus,
   ShieldCheck,
   RefreshCw,
+  Key,
+  Eye,
+  EyeOff,
+  Lock,
 } from "lucide-react";
 
 export default function TrainersManagementClient() {
@@ -117,6 +121,56 @@ export default function TrainersManagementClient() {
       fetchUsers();
     } else {
       setAdminError(res?.error || "Failed to create admin user");
+    }
+  };
+
+  // Change password modal state
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [targetUserForPassword, setTargetUserForPassword] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const openChangePasswordModal = (user) => {
+    setTargetUserForPassword(user);
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
+    setPasswordError("");
+    setChangePasswordOpen(true);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError("");
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters long");
+      return;
+    }
+
+    setPasswordLoading(true);
+    const res = await post_with_token("classroom/admin/change-password", {
+      targetUserId: targetUserForPassword?.id,
+      newPassword: newPassword,
+    });
+    setPasswordLoading(false);
+
+    if (res && res.success) {
+      setChangePasswordOpen(false);
+      setMessage(res.message || `Successfully updated password for "${targetUserForPassword?.full_name}".`);
+      setTargetUserForPassword(null);
+    } else {
+      setPasswordError(res?.error || "Failed to update user password");
     }
   };
 
@@ -329,6 +383,84 @@ export default function TrainersManagementClient() {
                 </form>
               </DialogContent>
             </Dialog>
+
+            {/* Change Password Dialog */}
+            <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Key className="h-5 w-5 text-primary" /> Change User Password
+                  </DialogTitle>
+                  <DialogDescription>
+                    Set a new password for <span className="font-semibold text-foreground">{targetUserForPassword?.full_name}</span> ({targetUserForPassword?.email}).
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleChangePassword} className="space-y-4 py-2">
+                  {passwordError && (
+                    <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {passwordError}
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">New Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        placeholder="Minimum 8 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="pr-10"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                      >
+                        {showNewPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Confirm New Password</label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Re-enter new password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pr-10"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <DialogFooter className="pt-2">
+                    <Button type="submit" disabled={passwordLoading} className="w-full">
+                      {passwordLoading ? "Updating Password..." : "Update Password"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -420,6 +552,7 @@ export default function TrainersManagementClient() {
                   initialsOf={initialsOf}
                   onToggleTrainer={toggleTrainer}
                   onToggleAdmin={toggleAdmin}
+                  onOpenChangePassword={openChangePasswordModal}
                   filterRole="trainer"
                 />
               </TabsContent>
@@ -432,6 +565,7 @@ export default function TrainersManagementClient() {
                   initialsOf={initialsOf}
                   onToggleTrainer={toggleTrainer}
                   onToggleAdmin={toggleAdmin}
+                  onOpenChangePassword={openChangePasswordModal}
                   filterRole="admin"
                 />
               </TabsContent>
@@ -444,6 +578,7 @@ export default function TrainersManagementClient() {
                   initialsOf={initialsOf}
                   onToggleTrainer={toggleTrainer}
                   onToggleAdmin={toggleAdmin}
+                  onOpenChangePassword={openChangePasswordModal}
                   filterRole="all"
                 />
               </TabsContent>
@@ -455,7 +590,7 @@ export default function TrainersManagementClient() {
   );
 }
 
-function UserRoleTable({ users, loading, initialsOf, onToggleTrainer, onToggleAdmin, filterRole }) {
+function UserRoleTable({ users, loading, initialsOf, onToggleTrainer, onToggleAdmin, onOpenChangePassword, filterRole }) {
   const displayUsers = users.filter(u => {
     if (filterRole === "trainer") return u.trainer;
     if (filterRole === "admin") return u.admin;
@@ -538,6 +673,17 @@ function UserRoleTable({ users, loading, initialsOf, onToggleTrainer, onToggleAd
 
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
+                  {/* Change Password Button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onOpenChangePassword(user)}
+                    className="h-8 text-xs font-semibold"
+                    title="Change password for this user"
+                  >
+                    <Key className="h-3.5 w-3.5 mr-1" /> Password
+                  </Button>
+
                   {/* Trainer Toggle Button */}
                   <Button
                     variant={user.trainer ? "outline" : "secondary"}
