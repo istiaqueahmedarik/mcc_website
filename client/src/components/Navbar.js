@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { get_with_token } from "@/lib/action";
+import { get_with_token, logout } from "@/lib/action";
 import {
   AlertTriangle,
   Award,
@@ -25,6 +25,7 @@ import {
   Globe,
   Keyboard,
   LogIn,
+  LogOut,
   Menu,
   Settings,
   ShieldHalf,
@@ -301,15 +302,30 @@ const Navbar = async () => {
                     href={profileHref}
                     className={`${!loggedIn && "hidden"}`}
                   >
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage
-                        src={user && user.result && user.result[0].profile_pic}
-                      />
-                      <AvatarFallback>
-                        {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="flex items-center gap-3 py-1">
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage
+                          src={user && user.result && user.result[0].profile_pic}
+                        />
+                        <AvatarFallback>
+                          {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-base font-medium">My Profile</span>
+                    </div>
                   </ProgressLink>
+                  {loggedIn && (
+                    <form action={logout} className="pt-2">
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        className="w-full justify-start text-lg text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                      >
+                        <LogOut className="mr-2 h-5 w-5" />
+                        Logout
+                      </Button>
+                    </form>
+                  )}
                 </div>
               </SheetClose>
             </SheetContent>

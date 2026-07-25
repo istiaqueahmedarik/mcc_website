@@ -1,4 +1,4 @@
-import { get_with_token, post_with_token } from "@/lib/action";
+import { get_with_token, logout, post_with_token } from "@/lib/action";
 import { createClient } from "@/utils/supabase/server";
 import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
@@ -31,6 +31,7 @@ export default async function TrainerProfilePage() {
       saveTrainerProfileAction={saveTrainerProfile}
       saveProfilePicAction={saveProfilePic}
       saveBasicProfileAction={saveBasicProfile}
+      logoutAction={logout}
     />
   );
 }

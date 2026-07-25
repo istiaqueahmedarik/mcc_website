@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-07-26 - trainer-logout-option - Dedicated Trainer Logout Button and Mobile Nav Support
+
+Source:
+- `docs/decisions/trainer-logout-option-20260726-decisions.md`
+
+Decision:
+1. Pass the `logout` server action (`client/src/lib/action.js`) from `client/src/app/trainer/profile/page.js` to `TrainerProfileClient.jsx`.
+2. Add a styled Logout form/button in `TrainerProfileClient.jsx` sidebar.
+3. Render a Logout form button in `Navbar.js` mobile sheet for logged-in users.
+
+Applies when:
+Managing profile actions for trainers or mobile navigation menu items.
+
+Do not overgeneralize:
+Does not change cookie names or server auth endpoints.
+
 ## 2026-07-25 - admin-trainers-and-roles-management - Admin Roles Management & UI Standardization
 
 Source:

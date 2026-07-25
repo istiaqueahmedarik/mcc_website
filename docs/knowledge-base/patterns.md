@@ -252,3 +252,20 @@ Building trainer views for IDE activity, per-student telemetry, or similar live 
 
 Do not overgeneralize:
 Low-cost classroom summary polling can remain periodic when it supports the main live-class surface.
+
+## 2026-07-26 - trainer-logout-option - Shared Logout Action Across Profiles & Navbar
+
+Source:
+- `client/src/app/trainer/profile/page.js`
+- `client/src/app/trainer/profile/TrainerProfileClient.jsx`
+- `client/src/components/Navbar.js`
+
+Fact:
+All profile pages (`/profile`, `/trainer/profile`) and global mobile sheet navigation must provide a clear Logout button bound to the shared `logout` server action in `client/src/lib/action.js`.
+
+Applies when:
+Adding or modifying role-specific profile pages or navigation components.
+
+Do not overgeneralize:
+Do not duplicate token deletion logic in individual page handlers; always reuse `@/lib/action.js#logout`.
+

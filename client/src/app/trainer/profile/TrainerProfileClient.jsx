@@ -14,6 +14,7 @@ import {
   Globe,
   Linkedin,
   Loader2,
+  LogOut,
   Mail,
   Phone,
   Plus,
@@ -24,19 +25,28 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 
 export default function TrainerProfileClient({
   user,
   saveTrainerProfileAction,
   saveProfilePicAction,
   saveBasicProfileAction,
+  logoutAction,
 }) {
   const [saving, setSaving] = useState(false);
   const [picSaving, setPicSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isLoggingOut, startTransition] = useTransition();
   const [previewPic, setPreviewPic] = useState(user.profile_pic || null);
   const fileInputRef = useRef(null);
+
+  const handleLogout = () => {
+    if (!logoutAction) return;
+    startTransition(async () => {
+      await logoutAction();
+    });
+  };
 
   // Specialization tags state
   const [tags, setTags] = useState(
@@ -223,6 +233,27 @@ export default function TrainerProfileClient({
                   </div>
                 </div>
               </div>
+
+              {/* Logout card */}
+              {logoutAction && (
+                <div className="rounded-xl border bg-card p-5 shadow-sm">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                    id="trainer-logout-btn"
+                  >
+                    {isLoggingOut ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <LogOut className="h-4 w-4" />
+                    )}
+                    Logout
+                  </Button>
+                </div>
+              )}
             </aside>
 
             {/* ── Right main ── */}

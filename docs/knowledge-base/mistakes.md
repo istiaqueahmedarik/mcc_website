@@ -1,4 +1,16 @@
-# Mistakes
+## 2026-07-26 - trainer-logout-option - Hydration Error: Nested HTML Forms
+
+Source:
+- `docs/reviews/trainer-logout-option-20260726-review.md`
+
+What happened:
+Placing a `<form action={logoutAction}>` inside a client component page wrapped by an outer `<form onSubmit={handleSave}>` caused HTML nesting invalidation (`<form>` inside `<form>`) and a Next.js hydration error.
+
+Detection:
+Console runtime error: `In HTML, <form> cannot be a descendant of <form>. This will cause a hydration error.`
+
+Prevention:
+When adding secondary actions (e.g. Logout) inside a component already wrapped by an outer form, use `<Button type="button" onClick={handleLogout}>` with `useTransition` to trigger server actions without creating nested `<form>` elements.
 
 ## 2026-07-25 - hide-classrooms-tab-for-trainers - Near Miss
 
