@@ -12,6 +12,7 @@ import {
   setMistId,
   setMistIdCard,
   setProfilePic,
+  setTrainerProfile,
   setTshirtSize,
   setVjudgeId,
   verifyCodeforces,
@@ -44,5 +45,6 @@ route.post("/profile-pic/set", setProfilePic);
 route.post("/mist-id-card/set", setMistIdCard);
 route.post("/mist-id/set", setMistId);
 route.get("/search", searchUsers);
+route.post("/trainer-profile/set", setTrainerProfile);
 
 export default route;

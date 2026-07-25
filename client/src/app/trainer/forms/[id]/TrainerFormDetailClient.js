@@ -133,6 +133,26 @@ export default function TrainerFormDetailClient({ formId }) {
   const mappedCount = fields.filter((field) => field.mapUserField).length;
   const customCount = fields.length - mappedCount;
 
+  const handleToggleAcceptingResponses = async () => {
+    try {
+      const nextState = form.accepting_responses === false;
+      const res = await fetch(`/api/trainer-forms/manage/forms/${formId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          accepting_responses: nextState,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setForm((prev) => (prev ? { ...prev, accepting_responses: nextState } : prev));
+      setNotice(nextState ? "Form is now accepting responses." : "Form submission is now turned OFF.");
+    } catch (err) {
+      setError(err.message || "Failed to update form response setting.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -149,6 +169,9 @@ export default function TrainerFormDetailClient({ formId }) {
                 <Badge className={form.status === "published" ? "bg-emerald-600" : "bg-muted text-foreground"}>
                   {form.status}
                 </Badge>
+                <Badge className={form.accepting_responses !== false ? "bg-emerald-600 text-white" : "bg-rose-600 text-white font-bold"}>
+                  {form.accepting_responses !== false ? "Accepting Responses" : "Submissions Closed"}
+                </Badge>
               </div>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 {form.description || "No description provided."}
@@ -156,6 +179,14 @@ export default function TrainerFormDetailClient({ formId }) {
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className={`gap-2 font-semibold ${form.accepting_responses !== false ? "text-amber-600 border-amber-500/30 hover:bg-amber-500/10" : "text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"}`}
+                onClick={handleToggleAcceptingResponses}
+              >
+                {form.accepting_responses !== false ? "Turn Off Submissions" : "Turn On Submissions"}
+              </Button>
               <Button type="button" variant="outline" className="gap-2 font-semibold" onClick={copyShareLink}>
                 <Copy className="h-4 w-4" />
                 Copy Link

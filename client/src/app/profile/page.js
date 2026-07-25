@@ -46,6 +46,12 @@ export default async function page({ searchParams }) {
     redirect("/login");
   }
   const user = res.result[0];
+
+  // Trainers and admins have a dedicated profile page
+  if (user.trainer || user.admin) {
+    redirect("/trainer/profile");
+  }
+
   const myTeamsRes = await get_with_token("team-collection/my-teams");
   console.log("My Teams Response:", myTeamsRes);
   const myTeams = myTeamsRes?.result || [];

@@ -69,3 +69,58 @@ Designing classroom tldraw broadcast, board join, and board recovery states.
 
 Do not overgeneralize:
 Persistent whiteboards need different recovery and history UX.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - IDE Monitoring Must Be Visible
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+Student IDE surfaces must visibly state that focus, visibility, paste, large insert, and code update activity is logged for trainer review.
+
+Applies when:
+Changing classroom IDE, telemetry, focus logging, or trainer monitor UX.
+
+Do not overgeneralize:
+Visibility does not make paste/large-insert evidence a cheating verdict; UI must keep that distinction clear.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Team Dashboard Shows Work in Context
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+Trainer team dashboards should show team, member, current problem, open/done counts, IDE state, and a problem/member matrix together so trainers do not have to mentally join separate lists.
+
+Applies when:
+Changing trainer team analytics, topic problem progress, live problem assignment, or IDE monitor UI.
+
+Do not overgeneralize:
+Topic library cards still should not expose topic-to-team mapping; this rule applies to the trainer team dashboard context.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Team Matrix Responsiveness
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+For teams with many members, use a full-width team card, responsive member focus cards, and a horizontally/vertically scrollable matrix with sticky problem/header cells.
+
+Applies when:
+Designing team dashboards with 5+ members or many problem rows.
+
+Do not overgeneralize:
+Small summary cards can still wrap normally; the matrix is for comparison-heavy work views.
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Target Before Live Monitoring
+
+Source:
+- `docs/reviews/trainer-ide-tracking-team-edit-20260725-implementation-review.md`
+
+Fact:
+Trainer live-monitoring surfaces should make the tracked target explicit before short-interval polling starts, then show state badges such as live, paused, recent, stale, and loading.
+
+Applies when:
+Designing trainer IDE monitoring, per-student telemetry, board-like live views, or other high-attention tracking surfaces.
+
+Do not overgeneralize:
+This does not require target selection for low-cost summary refreshes where the whole class is the natural object.

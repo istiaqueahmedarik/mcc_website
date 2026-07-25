@@ -88,6 +88,9 @@ const Navbar = async () => {
     trainerTools.push({ href: '/trainer/dashboard', icon: Code, label: 'Trainer Dashboard' });
   }
 
+  // Trainers/admins get their own dedicated profile page
+  const profileHref = canUseTrainerDashboard ? '/trainer/profile' : '/profile';
+
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -177,9 +180,10 @@ const Navbar = async () => {
               </Button>
             </ProgressLink>
             <ProgressLink
-              href="/profile"
+              href={profileHref}
               className={`${!loggedIn && "hidden"}`}
             >
+
               <Avatar className="w-8 h-8">
                 <AvatarImage
                   src={user && user.result && user.result[0].profile_pic}
@@ -294,7 +298,7 @@ const Navbar = async () => {
                     </Button>
                   </ProgressLink>
                   <ProgressLink
-                    href="/profile"
+                    href={profileHref}
                     className={`${!loggedIn && "hidden"}`}
                   >
                     <Avatar className="w-8 h-8">

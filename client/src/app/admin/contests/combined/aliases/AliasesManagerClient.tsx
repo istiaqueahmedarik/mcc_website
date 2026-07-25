@@ -176,7 +176,7 @@ export default function AliasesManagerClient({ rawUniversities, initialAliases }
       <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 flex items-start gap-3">
         <HelpCircle className="h-5 w-5 shrink-0 text-blue-400 mt-0.5" />
         <div className="text-xs sm:text-sm leading-relaxed">
-          <span className="font-bold text-white">How it works:</span> Either **drag** any card from the left list and drop it onto another card/group, or **click** a card on the left to select it, then click **"Merge Here"** on any other card or group.
+          <span className="font-bold text-white">How it works:</span> Either **drag** any card from the left list and drop it onto another card/group, or **click** a card on the left to select it, then click &quot;Merge Here&quot; on any other card or group.
         </div>
       </div>
 

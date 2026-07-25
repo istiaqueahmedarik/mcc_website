@@ -181,3 +181,30 @@ Implementing or reviewing tldraw board sync, WebSocket auth, or classroom realti
 
 Do not overgeneralize:
 This rule is for board sync; other authenticated HTTP endpoints still use existing bearer token flow.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Bound IDE Telemetry
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+Classroom IDE monitor endpoints should bound event types, languages, event detail JSON, and code snapshot length, and must keep student write access separate from trainer monitor reads.
+
+Applies when:
+Adding IDE events, monitor APIs, activity dashboards, or retention logic.
+
+Do not overgeneralize:
+This does not authorize execution, filesystem access, hidden surveillance, or cross-classroom monitor reads.
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Server Owns Team Membership Validity
+
+Source:
+- `docs/reviews/trainer-ide-tracking-team-edit-20260725-implementation-review.md`
+
+Fact:
+Team membership update endpoints must validate team ownership and classroom enrollment on the server; client checkboxes are only UI state.
+
+Applies when:
+Changing classroom team create/edit flows or assignment logic that trusts team members.
+
+Do not overgeneralize:
+This does not replace route-level authorization; keep both permission checks and domain validation.

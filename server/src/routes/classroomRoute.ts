@@ -16,6 +16,7 @@ import {
   addStudentToClassroom,
   removeStudentFromClassroom,
   createTeam,
+  updateTeamMembers,
   scheduleClass,
   startClass,
   completeClass,
@@ -41,8 +42,15 @@ import {
   startClassroomBoardSession,
   stopClassroomBoardSession,
   assignClassroomTopicToTeam,
+  listClassroomIdeActivity,
+  recordClassroomIdeActivity,
+  resetClassroomIdeSession,
   updateClassroomTopic,
   updateClassroomTopicProblemProgress,
+  verifyClassroomTopicProblemProgress,
+  getClassroomSessionAttendance,
+  updateClassroomSessionAttendance,
+  getClassroomAttendanceSummary,
   validateClassroomBoardSocketToken
 } from '../controllers/classroomController';
 import { upgradeWebSocket } from '../utils/bunWebSocket';
@@ -52,6 +60,13 @@ import {
   handleClassroomBoardSocketError,
   handleClassroomBoardSocketMessage,
 } from '../utils/classroomBoardSync';
+import {
+  connectClassroomIdeSocket,
+  handleClassroomIdeSocketClose,
+  handleClassroomIdeSocketError,
+  handleClassroomIdeSocketMessage,
+  validateClassroomIdeSocketToken,
+} from '../utils/classroomIdeStream';
 
 const route = new Hono();
 
@@ -72,6 +87,26 @@ route.get('/:id/board/ws', upgradeWebSocket(async (c) => {
     onMessage: (event) => handleClassroomBoardSocketMessage(connection, event.data),
     onClose: () => handleClassroomBoardSocketClose(connection),
     onError: () => handleClassroomBoardSocketError(connection),
+  };
+}));
+
+route.get('/:id/ide/ws', upgradeWebSocket(async (c) => {
+  const classroomId = c.req.param('id');
+  const token = c.req.query('token');
+  const joinContext = await validateClassroomIdeSocketToken(classroomId, token);
+  let connection: ReturnType<typeof connectClassroomIdeSocket> | null = null;
+
+  return {
+    onOpen: (_event, ws) => {
+      if (!joinContext) {
+        ws.close(1008, 'Invalid or expired IDE socket token');
+        return;
+      }
+      connection = connectClassroomIdeSocket(ws, joinContext);
+    },
+    onMessage: (event) => handleClassroomIdeSocketMessage(connection, event.data),
+    onClose: () => handleClassroomIdeSocketClose(connection),
+    onError: () => handleClassroomIdeSocketError(connection),
   };
 }));
 
@@ -100,11 +135,15 @@ route.post('/:id/remove-student', removeStudentFromClassroom);
 
 // Team management
 route.post('/:id/create-team', createTeam);
+route.post('/:id/teams/:teamId/members', updateTeamMembers);
 
 // Class sessions & scheduling
 route.post('/:id/schedule-class', scheduleClass);
 route.post('/class/:id/start', startClass);
 route.post('/class/:id/complete', completeClass);
+route.get('/:id/class/:classId/attendance', getClassroomSessionAttendance);
+route.post('/:id/class/:classId/attendance', updateClassroomSessionAttendance);
+route.get('/:id/attendance/summary', getClassroomAttendanceSummary);
 
 // Problem assigning & tracking
 route.post('/assign-problem', assignProblem);
@@ -126,7 +165,11 @@ route.post('/:id/topics/:topicId/problems', addClassroomTopicProblem);
 route.post('/:id/topics/:topicId/assign-team', assignClassroomTopicToTeam);
 route.get('/:id/topic-assignments', getClassroomTopicAssignments);
 route.post('/:id/topic-progress/status', updateClassroomTopicProblemProgress);
+route.post('/:id/topic-progress/verify', verifyClassroomTopicProblemProgress);
 route.get('/:id/topic-analytics', getClassroomTopicAnalytics);
+route.post('/:id/ide/activity', recordClassroomIdeActivity);
+route.post('/:id/ide/activity/list', listClassroomIdeActivity);
+route.post('/:id/ide/reset', resetClassroomIdeSession);
 
 // Ephemeral board broadcast
 route.get('/:id/board/session', getClassroomBoardSession);

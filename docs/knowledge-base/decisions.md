@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-07-25 - student-perceived-difficulty-dashboard-tabs-20260725 - Student Perceived Difficulty & Tabbed Dashboard
+
+Source:
+- `docs/decisions/student-perceived-difficulty-dashboard-tabs-20260725-technical-decisions.md`
+
+Decision:
+1. Store student perceived difficulty ratings in `classroom_topic_problem_progress.student_difficulty` and `class_problems.student_difficulty`. Allow students to rate/update perceived difficulty when solving/trying problems in the Student Dashboard.
+2. In `TeamMatrixClient.js`, render each student's submitted perceived difficulty rating under their matrix column (falling back to trainer default problem difficulty if unrated), and calculate row `AVERAGE DIFFICULTY` directly from student perceived difficulty ratings.
+3. Reorganize non-trainer Student Dashboard UI in `ClassroomLiveClient.js` using `<Tabs>` navigation (Topics, Live Session & IDE, Challenges, Class History, Team & Roster).
+
+Applies when:
+Managing student problem progress, classroom student dashboard navigation, or Team Matrix difficulty aggregations.
+
+Do not overgeneralize:
+This adds student-perceived difficulty ratings and reorganizes the student classroom view into tabs; core classroom live sockets, board sync, and trainer views remain intact.
+
 ## 2026-07-25 - hide-classrooms-tab-for-trainers - Local Navbar Condition
 
 Source:
@@ -186,3 +202,95 @@ Changing classroom board broadcast, tldraw integration, WebSocket authorization,
 
 Do not overgeneralize:
 This does not approve public tldraw demo rooms, Cloudflare Durable Objects/R2 deployment, permanent drawing storage, or asset uploads.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Classroom IDE Monitor Storage
+
+Source:
+- `docs/adr/0005-classroom-ide-monitoring.md`
+
+Fact:
+Classroom IDE monitoring stores one latest session snapshot per classroom/student plus append-only event rows for focus, visibility, paste, large insert, language change, code update, and heartbeat activity.
+
+Applies when:
+Adding, reviewing, or querying classroom IDE monitor features.
+
+Do not overgeneralize:
+This is not a code runner, cheating detector, or global IDE outside classroom live pages.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Hide Topic-to-Team Mapping in Topic Cards
+
+Source:
+- `docs/decisions/trainer-team-dashboard-ide-monitor-20260725-technical-decisions.md`
+
+Fact:
+Topic library cards should show aggregate assignment state without rendering which team received which topic.
+
+Applies when:
+Changing topic library assignment badges or team dashboard presentation.
+
+Do not overgeneralize:
+Trainer-only analytics may show team progress and IDE snapshots, but topic cards should not expose the topic-to-team mapping.
+
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Selected Student IDE Reads
+
+Source:
+- `docs/decisions/trainer-ide-tracking-team-edit-20260725-technical-decisions.md`
+
+Decision:
+Trainer IDE monitoring should reuse `classroom_ide_sessions` latest snapshots and filter `listClassroomIdeActivity` by selected `studentId` instead of polling all classroom IDE sessions.
+
+Applies when:
+Changing trainer IDE monitoring, activity logs, polling, or classroom telemetry queries.
+
+Do not overgeneralize:
+Whole-class session reads remain available for compatibility, but live polling UI should prefer selected-student reads.
+
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Team Membership Replacement Endpoint
+
+Source:
+- `docs/decisions/trainer-ide-tracking-team-edit-20260725-technical-decisions.md`
+- `docs/reviews/trainer-ide-tracking-team-edit-20260725-implementation-review.md`
+
+Decision:
+Trainer team editing replaces a team's member set through one server endpoint after validating trainer permission, team classroom ownership, UUID shape, and student enrollment.
+
+Applies when:
+Changing classroom team membership editing, assignment targeting, or team analytics membership assumptions.
+
+Do not overgeneralize:
+This is not a team rename/delete workflow and does not create trainer-wide team templates.
+
+## 2026-07-25 - trainer-ide-realtime-solution-verification-20260725 - Realtime IDE WebSocket Stream & Solution Verification
+
+Source:
+- `docs/decisions/trainer-ide-realtime-solution-verification-20260725-technical-decisions.md`
+
+Decision:
+1. Real-time IDE Monitoring: Stream student code edits and activity live over Bun/Hono WebSocket endpoint `/classroom/:id/ide/ws`, eliminating 5-second HTTP polling.
+2. CodeMirror Language Support: Add `@codemirror/lang-cpp` and `@codemirror/lang-python` with explicit high-contrast `.cm-cursor` CSS styling.
+3. Full Screen Mode: Add toggleable overlay workspace in `ClassroomIdePanel.jsx`.
+4. Solution Submissions: Require solution links and code snippets for student solve submissions; transition status to `pending_approval` until trainer review/approval (`verifyClassroomTopicProblemProgress`).
+
+Applies when:
+Developing or modifying classroom IDE streaming, problem solve workflows, solution link attachments, or trainer approval features.
+
+Do not overgeneralize:
+Trainer direct solve overrides are preserved, but student progress submissions require verification.
+
+## 2026-07-25 - form-toggle-session-attendance-group-rename-20260725 - Form Toggle, Attendance, Session Type/Duration, Group Rename
+
+Source:
+- `docs/decisions/form-toggle-session-attendance-group-rename-20260725-technical-decisions.md`
+
+Decision:
+1. Form Submission Toggle: Added `accepting_responses` boolean (DEFAULT true) to `trainer_forms`. Server returns 403 on POST when `accepting_responses = false`. Trainer sees a live toggle switch; public form shows a "Submissions Closed" banner.
+2. Session Attendance: Created `class_attendance` table with `status IN ('present', 'absent', 'late', 'very_late', 'excused')` and UNIQUE(class_id, student_id). Trainer opens a per-session Attendance Dialog; attendance is auto-recorded under the authenticated trainer's identity (`recorded_by`, `trainer_name`).
+3. Session Type & Duration: Added `session_type` (DEFAULT 'onsite') and `duration_minutes` (DEFAULT 90) to `classes`. `overflow_minutes` is calculated and persisted at `completeClass`. Live overflow badge (`+Xm`) shown on session cards when elapsed > duration.
+4. Group Terminology: Do NOT rename `classroom_teams` table or API routes. All user-facing labels (tab, headers, buttons, badges) use "Group" / "Groups" instead of "Team" / "Teams".
+5. IDE Feature Beta Mode: Classroom IDE monitoring tab hidden with `/* TODO: Classroom IDE Feature (Beta Mode) */` comments in code; TabsTrigger and TabsContent are commented out.
+
+Applies when:
+Modifying trainer form response control, session creation forms, session attendance workflows, classroom session cards, or any user-facing team/group labels.
+
+Do not overgeneralize:
+Database table and API route names (`classroom_teams`, `create-team`, `teams/:teamId/members`) remain unchanged to preserve schema and endpoint stability.

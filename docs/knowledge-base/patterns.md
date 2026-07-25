@@ -210,3 +210,45 @@ Designing classroom topic libraries, team assignment tabs, or trainer problem/re
 
 Do not overgeneralize:
 This does not require importing an external topic taxonomy or making topics public outside their approved classroom/trainer scope.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Isolate Browser IDE Logic
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+Keep CodeMirror/editor telemetry logic in `client/src/app/classroom/live/[id]/ClassroomIdePanel.jsx` and integrate it into `ClassroomLiveClient.js` through dynamic client-only components.
+
+Applies when:
+Extending student IDE access, trainer monitor views, autocomplete, or coming-soon runner controls.
+
+Do not overgeneralize:
+General classroom UI can stay in `ClassroomLiveClient.js`; this pattern is for browser-editor internals that would bloat the live page.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Derive Member Work Locally
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+The trainer Teams dashboard can derive per-member work and a problem/member matrix from existing active `problems`, `topicAssignments`, and topic `progressRows` without a new endpoint when the classroom live page already has those datasets.
+
+Applies when:
+Showing who is solving which live/topic problem inside `/classroom/live/[id]`.
+
+Do not overgeneralize:
+Large classrooms may need server-side pagination or a dedicated dashboard endpoint later.
+
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Poll After Explicit Selection
+
+Source:
+- `docs/tasks/trainer-ide-tracking-team-edit-20260725-task-plan.md`
+
+Fact:
+Live trainer monitors that can be expensive should require an explicit selected target before starting short-interval polling.
+
+Applies when:
+Building trainer views for IDE activity, per-student telemetry, or similar live monitoring.
+
+Do not overgeneralize:
+Low-cost classroom summary polling can remain periodic when it supports the main live-class surface.

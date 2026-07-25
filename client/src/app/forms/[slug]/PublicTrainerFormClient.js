@@ -156,13 +156,16 @@ export default function PublicTrainerFormClient({ slug }) {
     );
   }
 
-  if (error && !form) {
+  if (form && form.accepting_responses === false) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="w-full max-w-lg rounded-lg border bg-card p-6 text-center">
-          <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
-          <h1 className="mt-4 text-xl font-bold">Form unavailable</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+        <div className="w-full max-w-lg rounded-lg border border-rose-500/30 bg-card p-8 text-center space-y-3">
+          <FileText className="mx-auto h-12 w-12 text-rose-500" />
+          <h1 className="text-2xl font-bold text-foreground">{form.title}</h1>
+          <Badge className="bg-rose-600 text-white font-bold">Submissions Closed</Badge>
+          <p className="text-sm text-muted-foreground pt-2">
+            This form is currently closed for new responses by the trainer.
+          </p>
         </div>
       </div>
     );

@@ -18,6 +18,7 @@ import {
   Copy,
   FileJson,
   FileText,
+  HelpCircle,
   Loader2,
   Plus,
   Send,
@@ -26,6 +27,125 @@ import {
   Trash2,
   UserRoundSearch,
 } from "lucide-react";
+import { useTour } from "@/hooks/useTour";
+
+const trainerFormSteps = [
+  {
+    popover: {
+      title: "📋 Welcome to Form Creator!",
+      description: "This is where you build and manage forms for your classrooms — attendance sheets, invitation flows, or general surveys. Let's walk through each section.",
+      side: "center",
+      align: "center",
+    },
+  },
+  {
+    element: "#forms-tour-header",
+    popover: {
+      title: "📊 Page Overview",
+      description: "The header shows how many forms you've created, how many fields are in the current draft, and the current form mode (Attendance, Invitation, or General).",
+      side: "bottom",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-setup",
+    popover: {
+      title: "⚙️ Form Profile — Step 1",
+      description: "Start by giving your form a title and a short description. Students will see this when they open the shared link. Set status to 'Published' to accept responses, or 'Draft' to hide it.",
+      side: "right",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-type-selector",
+    popover: {
+      title: "🗂️ Form Type — Step 2",
+      description: "Pick a type: 'Classroom Invitation' auto-enrolls submitters, 'Attendance' tracks who showed up for a session, and 'General' collects free-form responses with JSON export.",
+      side: "right",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-primary-key",
+    popover: {
+      title: "🔑 Primary Key — Step 3",
+      description: "This is the student identifier field used to match responses to your user database. 'Student ID' is the default. The label is what students see on the form.",
+      side: "top",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-target",
+    popover: {
+      title: "🎯 Target — Step 4",
+      description: "For Invitation and Attendance forms, link to a classroom and optionally a specific session. General forms skip this and just store responses.",
+      side: "top",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-mapped-cells",
+    popover: {
+      title: "👤 Mapped User Fields — Step 5",
+      description: "These fields pull data from the student's profile (Name, Student ID, Batch, etc.). Click a field to add it to your form — no manual entry needed from students.",
+      side: "right",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-custom-cells",
+    popover: {
+      title: "✏️ Custom Answer Fields — Step 6",
+      description: "Add your own questions here: short text, long answer, number, date, dropdown, or checkbox. Use the preset buttons for quick inserts, or configure each field manually.",
+      side: "left",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-submit-bar",
+    popover: {
+      title: "🚀 Create Shareable Form — Step 7",
+      description: "When your form is ready, click here to publish it. A unique share link is generated that you can paste into chat, your classroom, or any announcement.",
+      side: "top",
+      align: "end",
+    },
+  },
+  {
+    element: "#forms-tour-library",
+    popover: {
+      title: "📚 Existing Forms Library",
+      description: "All your published forms live here. Each card shows the form title, type, number of responses, and status. Click 'Manage' to view responses and analytics, or 'Copy' to grab the share link.",
+      side: "left",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-draft-payload",
+    popover: {
+      title: "🔍 Draft Payload Summary",
+      description: "A live summary of your current form draft — type, status, primary key, and field counts. Use this to double-check before publishing.",
+      side: "left",
+      align: "start",
+    },
+  },
+  {
+    element: "#forms-tour-take-tour-btn",
+    popover: {
+      title: "❓ Take Tour Button",
+      description: "Click this anytime to re-launch this tour. You'll never be stuck wondering what a section does!",
+      side: "top",
+      align: "end",
+    },
+  },
+  {
+    popover: {
+      title: "🎉 Ready to Build Forms!",
+      description: "Start with 'Form Profile', pick a type, add your fields, then publish. Share the link with students and watch the responses roll in!",
+      side: "center",
+      align: "center",
+    },
+  },
+];
 
 const FORM_TYPES = [
   {
@@ -176,6 +296,12 @@ export default function TrainerFormsClient() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
+
+  const { startTour } = useTour({
+    storageKey: "mcc_trainer_forms_toured",
+    steps: trainerFormSteps,
+    autoStart: !loading,
+  });
 
   const selectedType = useMemo(
     () => FORM_TYPES.find((item) => item.value === form.type) || FORM_TYPES[2],
@@ -377,9 +503,9 @@ export default function TrainerFormsClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="border-b pb-6">
+        <section id="forms-tour-header" className="border-b pb-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
               <ProgressLink
@@ -414,7 +540,7 @@ export default function TrainerFormsClient() {
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <form onSubmit={handleCreate} className="space-y-6">
-            <section className="rounded-lg border bg-card p-5 shadow-sm">
+            <section id="forms-tour-setup" className="rounded-lg border bg-card p-5 shadow-sm">
               <SectionTitle
                 icon={Settings2}
                 label="Setup"
@@ -453,7 +579,7 @@ export default function TrainerFormsClient() {
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <div id="forms-tour-type-selector" className="mt-5 grid gap-3 md:grid-cols-3">
                 {FORM_TYPES.map((type) => (
                   <button
                     type="button"
@@ -488,7 +614,7 @@ export default function TrainerFormsClient() {
             </section>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              <section className="rounded-lg border bg-card p-5 shadow-sm">
+              <section id="forms-tour-primary-key" className="rounded-lg border bg-card p-5 shadow-sm">
                 <SectionTitle
                   icon={UserRoundSearch}
                   label="Identity"
@@ -522,7 +648,7 @@ export default function TrainerFormsClient() {
                 </div>
               </section>
 
-              <section className="rounded-lg border bg-card p-5 shadow-sm">
+              <section id="forms-tour-target" className="rounded-lg border bg-card p-5 shadow-sm">
                 <SectionTitle
                   icon={BarChart3}
                   label="Target"
@@ -798,7 +924,7 @@ export default function TrainerFormsClient() {
                 </div>
               )}
 
-              <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div id="forms-tour-submit-bar" className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-muted-foreground">
                   {mappedFieldCount} mapped, {customFieldCount} custom, JSON response saved.
                 </div>
@@ -811,7 +937,7 @@ export default function TrainerFormsClient() {
           </form>
 
           <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-            <section className="rounded-lg border bg-card p-5 shadow-sm">
+            <section id="forms-tour-library" className="rounded-lg border bg-card p-5 shadow-sm">
               <SectionTitle
                 icon={ClipboardList}
                 label="Library"
@@ -819,7 +945,7 @@ export default function TrainerFormsClient() {
                 detail="Share links, analytics, and saved JSON."
               />
 
-              <div className="mt-5 space-y-3">
+              <div className="mt-5 max-h-[480px] space-y-3 overflow-y-auto pr-1">
                 {loading ? (
                   <div className="flex items-center gap-2 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -878,7 +1004,7 @@ export default function TrainerFormsClient() {
               </div>
             </section>
 
-            <section className="rounded-lg border bg-card p-5 shadow-sm">
+            <section id="forms-tour-draft-payload" className="rounded-lg border bg-card p-5 shadow-sm">
               <SectionTitle
                 icon={FileJson}
                 label="Current draft"
@@ -896,6 +1022,16 @@ export default function TrainerFormsClient() {
           </aside>
         </div>
       </main>
+
+      <button
+        id="forms-tour-take-tour-btn"
+        onClick={startTour}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-lg hover:bg-muted transition-all active:scale-95"
+        title="Re-launch Forms tour"
+      >
+        <HelpCircle className="h-4 w-4 text-primary" />
+        <span>Take Tour</span>
+      </button>
     </div>
   );
 }

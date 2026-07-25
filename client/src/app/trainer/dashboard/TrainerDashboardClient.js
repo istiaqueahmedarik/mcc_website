@@ -12,6 +12,7 @@ import {
   BookOpen,
   CalendarDays,
   ClipboardList,
+  HelpCircle,
   Layers,
   Plus,
   Radio,
@@ -29,6 +30,98 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useTour } from "@/hooks/useTour";
+
+const trainerDashboardSteps = [
+  {
+    popover: {
+      title: "👋 Welcome, Trainer!",
+      description: "This is your Trainer Dashboard — your operations hub for managing classrooms, live sessions, forms, and students. Let's take a quick look around!",
+      side: "center",
+      align: "center",
+    },
+  },
+  {
+    element: "#trainer-tour-header",
+    popover: {
+      title: "🏠 Dashboard Overview",
+      description: "The header area shows your role and gives you quick access to all trainer actions. Your top-level tools live right here.",
+      side: "bottom",
+      align: "start",
+    },
+  },
+  {
+    element: "#trainer-tour-new-classroom-btn",
+    popover: {
+      title: "➕ Create a Classroom",
+      description: "Click here to set up a new classroom. Give it a name and description — this becomes your space to add topics, assign problems, and manage students.",
+      side: "bottom",
+      align: "end",
+    },
+  },
+  {
+    element: "#trainer-tour-form-btn",
+    popover: {
+      title: "📋 Form Creator",
+      description: "Build custom forms for registrations, surveys, or student submissions. Forms can be shared with students and have open/closed toggles.",
+      side: "bottom",
+      align: "start",
+    },
+  },
+  {
+    element: "#trainer-tour-live-section",
+    popover: {
+      title: "🔴 Live Sessions Panel",
+      description: "When a class session is running, it appears here with a live badge and a 'Join Live' button. You can jump directly into any active room.",
+      side: "bottom",
+      align: "center",
+    },
+  },
+  {
+    element: "#trainer-tour-classroom-grid",
+    popover: {
+      title: "📚 Classroom Workspace",
+      description: "All your classrooms are shown as cards here. Each card shows the classroom name, description, trainer, and a status badge (Ready or Live).",
+      side: "top",
+      align: "center",
+    },
+  },
+  {
+    element: "#trainer-tour-classroom-card",
+    popover: {
+      title: "🗂️ Classroom Card",
+      description: "Each card shows trainer initials, topic status, and creation date. Click 'Enter Classroom' to open the live interactive room with all tabs and tools.",
+      side: "top",
+      align: "start",
+    },
+  },
+  {
+    element: "#trainer-tour-all-classrooms",
+    popover: {
+      title: "📋 View All Classrooms",
+      description: "Need to see more? Click here to browse the full classroom list page with search and filter options.",
+      side: "bottom",
+      align: "end",
+    },
+  },
+  {
+    element: "#trainer-tour-take-tour-btn",
+    popover: {
+      title: "❓ Take Tour Button",
+      description: "This button is always here for you. Click it at any time to re-launch this tour from the beginning — no need to clear your history.",
+      side: "top",
+      align: "end",
+    },
+  },
+  {
+    popover: {
+      title: "🎉 You're Ready to Teach!",
+      description: "You now know the basics of your Trainer Dashboard. Start by creating a classroom, then open it to schedule sessions and assign topic modules to students.",
+      side: "center",
+      align: "center",
+    },
+  },
+];
 
 export default function TrainerDashboardClient() {
   const [classrooms, setClassrooms] = useState([]);
@@ -38,6 +131,13 @@ export default function TrainerDashboardClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
+
+  const { startTour } = useTour({
+    storageKey: "mcc_trainer_dashboard_toured",
+    steps: trainerDashboardSteps,
+    autoStart: !loading,
+  });
+
 
   const fetchData = async () => {
     setLoading(true);
@@ -123,9 +223,9 @@ export default function TrainerDashboardClient() {
       .join("");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="grid gap-6 border-b pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
+        <section id="trainer-tour-header" className="grid gap-6 border-b pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
             <div className="max-w-3xl">
               <p className="text-xs font-semibold uppercase text-muted-foreground">Trainer dashboard</p>
               <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">
@@ -137,7 +237,7 @@ export default function TrainerDashboardClient() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <ProgressLink href="/trainer/forms">
+              <ProgressLink href="/trainer/forms" id="trainer-tour-form-btn">
                 <Button variant="outline" className="gap-2 font-semibold">
                   <ClipboardList className="h-4 w-4" />
                   Form Creator
@@ -146,7 +246,7 @@ export default function TrainerDashboardClient() {
 
               <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 font-semibold">
+                  <Button id="trainer-tour-new-classroom-btn" className="gap-2 font-semibold">
                     <Plus className="h-4 w-4" />
                     New classroom
                   </Button>
@@ -207,32 +307,10 @@ export default function TrainerDashboardClient() {
             </div>
         </section>
 
-        {!loading && (
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {summaryCards.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className="rounded-lg border bg-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 border-l pl-3">
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 truncate text-2xl font-bold">{item.value}</p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
-                    </div>
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center border-l ${item.tone}`}>
-                      <Icon className="h-5 w-5" />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </section>
-        )}
+
 
         {totalLive > 0 && (
-          <section className="rounded-lg border border-red-500/30 bg-card">
+          <section id="trainer-tour-live-section" className="rounded-lg border border-red-500/30 bg-card">
             <div className="flex flex-col gap-3 border-b border-red-500/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-3 w-3">
@@ -267,13 +345,13 @@ export default function TrainerDashboardClient() {
           </section>
         )}
 
-        <section className="space-y-4">
+        <section id="trainer-tour-classroom-grid" className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-xl font-bold tracking-tight">Classroom workspace</h2>
               <p className="text-sm text-muted-foreground">Open, prepare, or continue.</p>
             </div>
-            <ProgressLink href="/classroom/list" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+            <ProgressLink id="trainer-tour-all-classrooms" href="/classroom/list" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
               All classrooms
               <ArrowRight className="h-4 w-4" />
             </ProgressLink>
@@ -309,11 +387,12 @@ export default function TrainerDashboardClient() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {classrooms.map((classroom) => {
+              {classrooms.map((classroom, idx) => {
                 const isLive = !!classroom.live_url;
                 return (
                   <article
                     key={classroom.id}
+                    id={idx === 0 ? "trainer-tour-classroom-card" : undefined}
                     className={`group flex min-h-[238px] flex-col rounded-lg border bg-card p-5 transition hover:border-foreground/20 hover:shadow-sm ${
                       isLive ? "border-red-500/40" : "hover:border-foreground/20"
                     }`}
@@ -369,6 +448,17 @@ export default function TrainerDashboardClient() {
           )}
         </section>
       </main>
+
+      <button
+        id="trainer-tour-take-tour-btn"
+        onClick={startTour}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-lg hover:bg-muted transition-all active:scale-95"
+        title="Re-launch onboarding tour"
+      >
+        <HelpCircle className="h-4 w-4 text-primary" />
+        <span>Take Tour</span>
+      </button>
     </div>
   );
 }
+

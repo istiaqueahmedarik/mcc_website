@@ -284,6 +284,7 @@ function publicFormPayload(form: any, currentUser: any = null) {
     class_id: form.class_id,
     classroom_name: form.classroom_name || null,
     class_name: form.class_name || null,
+    accepting_responses: form.accepting_responses !== false,
     fields,
     user_field_labels: USER_FIELD_LABELS,
     authenticated_user: currentUser
@@ -439,6 +440,8 @@ export const createTrainerForm = async (c: Context) => {
       "Student ID";
     const shareSlug = await createShareSlug(title);
 
+    const acceptingResponses = body.accepting_responses !== undefined ? Boolean(body.accepting_responses) : true;
+
     const result = await sql`
       INSERT INTO trainer_forms (
         created_by,
@@ -447,6 +450,7 @@ export const createTrainerForm = async (c: Context) => {
         type,
         share_slug,
         status,
+        accepting_responses,
         primary_key_field,
         primary_key_label,
         classroom_id,
@@ -461,6 +465,7 @@ export const createTrainerForm = async (c: Context) => {
         ${type},
         ${shareSlug},
         ${body.status === "draft" ? "draft" : "published"},
+        ${acceptingResponses},
         ${primaryKeyField},
         ${primaryKeyLabel},
         ${body.classroom_id || null},
@@ -532,6 +537,7 @@ export const updateTrainerForm = async (c: Context) => {
       sanitizeText(body.primary_key_label) ||
       USER_FIELD_LABELS[primaryKeyField] ||
       "Student ID";
+    const acceptingResponses = body.accepting_responses !== undefined ? Boolean(body.accepting_responses) : true;
 
     const result = await sql`
       UPDATE trainer_forms
@@ -540,6 +546,7 @@ export const updateTrainerForm = async (c: Context) => {
         description = ${sanitizeText(body.description) || null},
         type = ${type},
         status = ${body.status === "draft" ? "draft" : "published"},
+        accepting_responses = ${acceptingResponses},
         primary_key_field = ${primaryKeyField},
         primary_key_label = ${primaryKeyLabel},
         classroom_id = ${body.classroom_id || null},
@@ -568,6 +575,21 @@ export const getTrainerFormResponses = async (c: Context) => {
       : await sql`SELECT id FROM trainer_forms WHERE id = ${formId} AND created_by = ${trainer.id} LIMIT 1`;
     if (forms.length === 0) return c.json({ error: "Form not found" }, 404);
 
+    const pageParam = parseInt(c.req.query("page") || "1", 10);
+    const limitParam = parseInt(c.req.query("limit") || "50", 10);
+    const fetchAll = c.req.query("all") === "true";
+
+    const page = Math.max(1, isNaN(pageParam) ? 1 : pageParam);
+    const limit = fetchAll ? 5000 : Math.min(250, Math.max(1, isNaN(limitParam) ? 50 : limitParam));
+    const offset = (page - 1) * limit;
+
+    const countResult = await sql`
+      SELECT COUNT(*)::int AS total
+      FROM trainer_form_responses
+      WHERE form_id = ${formId}
+    `;
+    const totalCount = countResult[0]?.total || 0;
+
     const responses = await sql`
       SELECT
         tfr.*,
@@ -579,8 +601,18 @@ export const getTrainerFormResponses = async (c: Context) => {
       LEFT JOIN users u ON tfr.matched_user_id = u.id
       WHERE tfr.form_id = ${formId}
       ORDER BY tfr.submitted_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
-    return c.json({ responses });
+
+    return c.json({
+      responses,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        total_pages: Math.ceil(totalCount / limit) || 1,
+      },
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -789,6 +821,10 @@ export const submitPublicTrainerForm = async (c: Context) => {
     `;
     if (forms.length === 0) return c.json({ error: "Form not found" }, 404);
     const form = forms[0];
+
+    if (form.accepting_responses === false) {
+      return c.json({ error: "This form is currently closed for new responses by the trainer." }, 403);
+    }
 
     let user = currentUser;
     if (currentUser) {

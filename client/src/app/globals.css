@@ -800,6 +800,77 @@
   }
 }
 
+/* Driver.js ADHD Tour Popover Styling */
+.driver-popover {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 1rem !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  max-width: 340px !important;
+  font-family: inherit !important;
+}
+
+.driver-popover-title {
+  font-size: 1.125rem !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  color: hsl(var(--foreground)) !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.driver-popover-description {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+  color: hsl(var(--muted-foreground)) !important;
+  margin-bottom: 0.75rem !important;
+}
+
+.driver-popover-footer {
+  margin-top: 1rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.driver-popover-progress-text {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: hsl(var(--primary)) !important;
+  background-color: hsl(var(--primary) / 0.1) !important;
+  padding: 0.2rem 0.6rem !important;
+  border-radius: 9999px !important;
+}
+
+.driver-popover-footer-btn {
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  padding: 0.4rem 0.85rem !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.2s ease !important;
+  border: 1px solid hsl(var(--border)) !important;
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+.driver-popover-footer-btn:hover {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.driver-popover-next-btn,
+.driver-popover-done-btn {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: transparent !important;
+}
+
+.driver-popover-next-btn:hover,
+.driver-popover-done-btn:hover {
+  opacity: 0.9 !important;
+}
+
+
 #nprogress {
   pointer-events: none;
 }

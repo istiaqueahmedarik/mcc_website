@@ -67,11 +67,16 @@ export async function initDb() {
         difficulty character varying,
         timer_minutes integer,
         status character varying NOT NULL DEFAULT 'not_solved', -- 'not_solved', 'tried', 'solved'
+        student_difficulty character varying,
         solved_at timestamp with time zone,
         assigned_at timestamp with time zone NOT NULL DEFAULT now(),
         tags text[] DEFAULT '{}'::text[],
         CONSTRAINT class_problems_pkey PRIMARY KEY (id)
       );
+    `;
+    await sql`
+      ALTER TABLE public.class_problems
+      ADD COLUMN IF NOT EXISTS student_difficulty character varying;
     `;
     await sql`
       CREATE TABLE IF NOT EXISTS public.problem_tag_dictionary (
@@ -223,11 +228,28 @@ export async function initDb() {
         topic_problem_id uuid NOT NULL REFERENCES public.classroom_topic_problems(id) ON DELETE CASCADE,
         student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
         status character varying NOT NULL DEFAULT 'not_solved',
+        student_difficulty character varying,
         solved_at timestamp with time zone,
         updated_at timestamp with time zone NOT NULL DEFAULT now(),
         CONSTRAINT classroom_topic_problem_progress_pkey PRIMARY KEY (id),
         CONSTRAINT classroom_topic_problem_progress_unique UNIQUE (assignment_id, topic_problem_id, student_id)
       );
+    `;
+    await sql`
+      ALTER TABLE public.classroom_topic_problem_progress
+      ADD COLUMN IF NOT EXISTS student_difficulty character varying;
+    `;
+    await sql`
+      ALTER TABLE public.classroom_topic_problem_progress
+      ADD COLUMN IF NOT EXISTS solution_link text,
+      ADD COLUMN IF NOT EXISTS solution_code text,
+      ADD COLUMN IF NOT EXISTS submission_notes text;
+    `;
+    await sql`
+      ALTER TABLE public.class_problems
+      ADD COLUMN IF NOT EXISTS solution_link text,
+      ADD COLUMN IF NOT EXISTS solution_code text,
+      ADD COLUMN IF NOT EXISTS submission_notes text;
     `;
     await sql`
       CREATE INDEX IF NOT EXISTS classroom_topic_problem_progress_student_id_idx
@@ -260,7 +282,58 @@ export async function initDb() {
       ON public.classroom_board_sessions(classroom_id)
       WHERE status = 'active';
     `;
-    console.log('Checked/Created classroom topic, assignment, and board tables.');
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_ide_sessions (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        updated_at timestamp with time zone NOT NULL DEFAULT now(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
+        student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        language character varying NOT NULL DEFAULT 'javascript',
+        code text NOT NULL DEFAULT '',
+        focused boolean NOT NULL DEFAULT true,
+        code_length integer NOT NULL DEFAULT 0,
+        paste_count integer NOT NULL DEFAULT 0,
+        large_insert_count integer NOT NULL DEFAULT 0,
+        last_event_type character varying,
+        last_event_at timestamp with time zone,
+        CONSTRAINT classroom_ide_sessions_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_ide_sessions_unique_student UNIQUE (classroom_id, student_id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_ide_sessions_classroom_id_idx
+      ON public.classroom_ide_sessions(classroom_id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_ide_sessions_student_id_idx
+      ON public.classroom_ide_sessions(student_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_ide_events (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        session_id uuid NOT NULL REFERENCES public.classroom_ide_sessions(id) ON DELETE CASCADE,
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        event_type character varying NOT NULL,
+        event_detail jsonb NOT NULL DEFAULT '{}'::jsonb,
+        language character varying NOT NULL DEFAULT 'javascript',
+        code_length integer NOT NULL DEFAULT 0,
+        focused boolean NOT NULL DEFAULT true,
+        CONSTRAINT classroom_ide_events_pkey PRIMARY KEY (id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_ide_events_classroom_created_idx
+      ON public.classroom_ide_events(classroom_id, created_at DESC);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_ide_events_student_created_idx
+      ON public.classroom_ide_events(student_id, created_at DESC);
+    `;
+    console.log('Checked/Created classroom topic, assignment, board, and IDE tables.');
 
     // 10. Create class_problem_hints table
     await sql`
@@ -400,6 +473,63 @@ export async function initDb() {
       CREATE INDEX IF NOT EXISTS trainer_form_responses_matched_user_idx
       ON public.trainer_form_responses(matched_user_id);
     `;
+
+    // 16. Schema extensions & Attendance table
+    await sql`
+      ALTER TABLE public.trainer_forms
+      ADD COLUMN IF NOT EXISTS accepting_responses boolean DEFAULT true;
+    `;
+
+    await sql`
+      ALTER TABLE public.classes
+      ADD COLUMN IF NOT EXISTS session_type text DEFAULT 'onsite',
+      ADD COLUMN IF NOT EXISTS duration_minutes integer DEFAULT 90,
+      ADD COLUMN IF NOT EXISTS overflow_minutes integer DEFAULT 0;
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.class_attendance (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        class_id uuid NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
+        student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        status text NOT NULL DEFAULT 'present',
+        recorded_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
+        trainer_name text,
+        remarks text,
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        updated_at timestamp with time zone NOT NULL DEFAULT now(),
+        CONSTRAINT class_attendance_pkey PRIMARY KEY (id),
+        CONSTRAINT class_attendance_unique_class_student UNIQUE (class_id, student_id),
+        CONSTRAINT class_attendance_status_check CHECK (status IN ('present', 'absent', 'late', 'very_late', 'excused'))
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS class_attendance_class_idx
+      ON public.class_attendance(class_id);
+    `;
+
+    // 17. Trainer profile columns
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_title text;`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_bio text;`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_experience text;`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_specializations text[] DEFAULT '{}'::text[];`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_linkedin text;`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_github text;`;
+    await sql`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS trainer_website text;`;
+    console.log('✅ Checked/Added trainer profile columns to "users" table.');
+
+    // 18. Case-insensitive expression indexes on users for high-performance form submissions & matching
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_email_idx ON public.users (lower(email));`;
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_vjudge_idx ON public.users (lower(vjudge_id)) WHERE vjudge_id IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_cf_idx ON public.users (lower(cf_id)) WHERE cf_id IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_codechef_idx ON public.users (lower(codechef_id)) WHERE codechef_id IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_atcoder_idx ON public.users (lower(atcoder_id)) WHERE atcoder_id IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_lower_batch_idx ON public.users (lower(batch_name)) WHERE batch_name IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_mist_id_idx ON public.users (mist_id) WHERE mist_id IS NOT NULL;`;
+    await sql`CREATE INDEX IF NOT EXISTS users_phone_idx ON public.users (phone) WHERE phone IS NOT NULL;`;
+    console.log('✅ Checked/Created performance indexes on "users" table.');
 
   } catch (error) {
     console.error('❌ Database initialization failed:', error);

@@ -118,3 +118,32 @@ Auditing implementation sequencing or why no parallel worktrees were used.
 
 Do not overgeneralize:
 Future classroom tasks can use parallel worktrees when write scopes are genuinely disjoint.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Docs Used
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+Fact:
+This task used AGENTS, RSD orchestrator HCI/code-quality/doc-audit references, ADR-0002, ADR-0003, classroom knowledge-base entries, `ClassroomLiveClient.js`, `classroomController.ts`, `classroomRoute.ts`, and `dbInit.ts` to implement topic editor reuse, assignment visibility reduction, team dashboard, and IDE monitor storage/API/UI.
+
+Applies when:
+Auditing future classroom IDE monitor, topic assignment visibility, markdown resource editor, or trainer team dashboard work.
+
+Do not overgeneralize:
+No current doc defines IDE log retention; future retention work needs a new decision.
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Docs Used
+
+Source:
+- `docs/rsd/trainer-ide-tracking-team-edit-20260725-rsd.md`
+- `docs/decisions/trainer-ide-tracking-team-edit-20260725-technical-decisions.md`
+- `docs/tasks/trainer-ide-tracking-team-edit-20260725-task-plan.md`
+
+Fact:
+This task used `AGENTS.md`, project knowledge-base entries for IDE/team work, and RSD orchestrator references for auto gates, HCI, code quality, and documentation audit.
+
+Applies when:
+Auditing whether trainer IDE and team-edit implementation followed repository planning rules.
+
+Do not overgeneralize:
+This entry records documentation use for this scoped task only.

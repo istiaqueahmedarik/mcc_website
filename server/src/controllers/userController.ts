@@ -378,3 +378,51 @@ export const searchUsers = async (c: any) => {
     return c.json({ error: "Search failed" }, 500);
   }
 };
+
+// ---- Trainer profile ----
+export const setTrainerProfile = async (c: any) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  // Only trainers and admins may update trainer-profile fields
+  const rows = await sql`SELECT trainer, admin FROM users WHERE id = ${id}`;
+  if (rows.length === 0) return c.json({ error: "Unauthorized" }, 401);
+  if (!rows[0].trainer && !rows[0].admin) return c.json({ error: "Forbidden" }, 403);
+
+  try {
+    const {
+      trainer_title,
+      trainer_bio,
+      trainer_experience,
+      trainer_specializations,
+      trainer_linkedin,
+      trainer_github,
+      trainer_website,
+    } = await c.req.json();
+
+    const specializations = Array.isArray(trainer_specializations)
+      ? trainer_specializations.filter((s: any) => typeof s === "string" && s.trim()).map((s: string) => s.trim())
+      : [];
+
+    const updated = await sql`
+      UPDATE users SET
+        trainer_title       = COALESCE(${trainer_title ?? null}, trainer_title),
+        trainer_bio         = COALESCE(${trainer_bio ?? null}, trainer_bio),
+        trainer_experience  = COALESCE(${trainer_experience ?? null}, trainer_experience),
+        trainer_specializations = ${specializations as any},
+        trainer_linkedin    = COALESCE(${trainer_linkedin ?? null}, trainer_linkedin),
+        trainer_github      = COALESCE(${trainer_github ?? null}, trainer_github),
+        trainer_website     = COALESCE(${trainer_website ?? null}, trainer_website)
+      WHERE id = ${id}
+      RETURNING
+        id, trainer_title, trainer_bio, trainer_experience,
+        trainer_specializations, trainer_linkedin, trainer_github, trainer_website
+    `;
+    if (updated.length === 0) return c.json({ error: "User not found" }, 404);
+    return c.json({ result: updated[0] });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to update trainer profile" }, 400);
+  }
+};
+

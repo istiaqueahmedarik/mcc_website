@@ -138,3 +138,30 @@ User screenshot showed `Preview` and `Assign problem` crossing into the chat sid
 
 Prevention:
 For classroom dashboard forms beside sticky sidebars, use `min-w-0` on grid children, `minmax(0,...)` grid tracks, and short/truncated action labels inside narrow tracks.
+
+## 2026-07-25 - trainer-team-dashboard-ide-monitor-20260725 - Monitoring Evidence Near Miss
+
+Source:
+- `docs/reviews/trainer-team-dashboard-ide-monitor-20260725-implementation-review.md`
+
+What happened:
+The requirement asked to log copied code, but browsers can reliably log paste events and large inserts, not prove where code originated or whether misconduct occurred.
+
+Detection:
+RSD Grill Mode and security/HCI review identified the privacy and evidence wording risk before final response.
+
+Prevention:
+Future IDE monitor changes must label paste and large-insert events as activity signals, keep monitoring visible to students, and avoid automatic cheating verdict copy unless a future approved RSD defines evidence policy.
+## 2026-07-25 - trainer-ide-tracking-team-edit-20260725 - Near Miss
+
+Source:
+- `docs/reviews/trainer-ide-tracking-team-edit-20260725-implementation-review.md`
+
+What happened:
+The first IDE monitor shape mixed all-student IDE activity into Teams and used short-interval whole-class polling.
+
+Detection:
+User reported the logic was broken and too server-heavy.
+
+Prevention:
+For live trainer telemetry, require explicit target selection before short-interval polling and keep unrelated dashboard tabs decoupled.

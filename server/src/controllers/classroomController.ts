@@ -90,6 +90,7 @@ async function fetchCodeforcesProblemFromApi(problemLink: string) {
   try {
     const res = await fetch('https://codeforces.com/api/problemset.problems', {
       headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(3000),
     });
     const data: any = await res.json();
     if (data?.status !== 'OK' || !Array.isArray(data?.result?.problems)) return null;
@@ -117,7 +118,10 @@ async function fetchProblemMetadata(platform: string, problemLink: string) {
       const apiMeta = await fetchCodeforcesProblemFromApi(cleanLink);
       if (apiMeta) return apiMeta;
 
-      const res = await fetch(cleanLink, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const res = await fetch(cleanLink, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(3000),
+      });
       const html = await res.text();
       const $ = cheerio.load(html);
       const title = $('.problem-statement .header .title').first().text().trim() || 'Codeforces Problem';
@@ -130,7 +134,10 @@ async function fetchProblemMetadata(platform: string, problemLink: string) {
         difficulty: ratingTag || 'Medium'
       };
     } else if (platform === 'atcoder') {
-      const res = await fetch(cleanLink, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      const res = await fetch(cleanLink, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(3000),
+      });
       const html = await res.text();
       const $ = cheerio.load(html);
       const title = $('#main-container h1, .h2').first().text().trim() || 'AtCoder Problem';
@@ -254,10 +261,28 @@ async function canManageClassroom(userId: string, classroomId: string): Promise<
 
 const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
 const CHAT_REACTIONS = new Set(['like', 'heart', 'celebrate']);
-const PROBLEM_STATUS_VALUES = new Set(['not_solved', 'tried', 'solved']);
+const PROBLEM_STATUS_VALUES = new Set(['not_solved', 'tried', 'pending_approval', 'solved']);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const IDE_EVENT_TYPES = new Set([
+  'session_open',
+  'heartbeat',
+  'code_update',
+  'paste',
+  'large_insert',
+  'language_change',
+  'tab_focus',
+  'tab_blur',
+  'visibility_visible',
+  'visibility_hidden',
+]);
+const IDE_LANGUAGES = new Set(['javascript', 'python', 'cpp', 'text']);
 
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
+}
+
+function boundRawText(value: unknown, maxLength = 500): string {
+  return String(value ?? '').slice(0, maxLength);
 }
 
 function normalizeNullableText(value: unknown, maxLength = 500): string | null {
@@ -265,10 +290,39 @@ function normalizeNullableText(value: unknown, maxLength = 500): string | null {
   return text || null;
 }
 
+function normalizeUuid(value: unknown): string | null {
+  const text = normalizeText(value, 80);
+  return UUID_REGEX.test(text) ? text : null;
+}
+
 function normalizePositiveInteger(value: unknown): number | null {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return null;
   return Math.floor(num);
+}
+
+function normalizeIdeEventType(value: unknown): string {
+  const eventType = normalizeText(value, 40);
+  return IDE_EVENT_TYPES.has(eventType) ? eventType : 'heartbeat';
+}
+
+function normalizeIdeLanguage(value: unknown): string {
+  const language = normalizeText(value || 'javascript', 40).toLowerCase();
+  return IDE_LANGUAGES.has(language) ? language : 'text';
+}
+
+function normalizeIdeEventDetail(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const detail: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>).slice(0, 12)) {
+    const normalizedKey = normalizeText(key, 60);
+    if (!normalizedKey) continue;
+    if (typeof raw === 'string') detail[normalizedKey] = raw.slice(0, 500);
+    else if (typeof raw === 'number' && Number.isFinite(raw)) detail[normalizedKey] = raw;
+    else if (typeof raw === 'boolean') detail[normalizedKey] = raw;
+    else if (raw === null) detail[normalizedKey] = null;
+  }
+  return detail;
 }
 
 function normalizeProgressStatus(value: unknown) {
@@ -598,6 +652,77 @@ export const createTeam = async (c: Context) => {
   }
 };
 
+export const updateTeamMembers = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const teamId = normalizeUuid(c.req.param('teamId'));
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    if (!teamId) return c.json({ error: 'Team is required' }, 400);
+
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { studentIds } = await c.req.json();
+    if (!Array.isArray(studentIds)) {
+      return c.json({ error: 'Student list is required' }, 400);
+    }
+
+    const normalizedStudentIds = studentIds.map((studentId: unknown) => normalizeUuid(studentId));
+    if (normalizedStudentIds.some((studentId: string | null) => !studentId)) {
+      return c.json({ error: 'Student list contains an invalid student' }, 400);
+    }
+
+    const uniqueStudentIds = [...new Set(normalizedStudentIds.filter((studentId): studentId is string => Boolean(studentId)))];
+    const teamRows = await sql`
+      SELECT id, name
+      FROM trainer_teams
+      WHERE id = ${teamId} AND classroom_id = ${classroomId}
+    `;
+    if (teamRows.length === 0) return c.json({ error: 'Team not found' }, 404);
+
+    if (uniqueStudentIds.length > 0) {
+      const enrolledRows = await sql`
+        SELECT student_id
+        FROM classroom_students
+        WHERE classroom_id = ${classroomId} AND student_id = ANY(${uniqueStudentIds})
+      `;
+      if (enrolledRows.length !== uniqueStudentIds.length) {
+        return c.json({ error: 'All team members must be enrolled in this classroom' }, 400);
+      }
+    }
+
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM trainer_team_members WHERE team_id = ${teamId}`;
+      if (uniqueStudentIds.length > 0) {
+        await tx`
+          INSERT INTO trainer_team_members ${tx(
+            uniqueStudentIds.map((studentId: string) => ({ team_id: teamId, student_id: studentId }))
+          )}
+          ON CONFLICT DO NOTHING
+        `;
+      }
+    });
+
+    const members = await sql`
+      SELECT u.id, u.full_name AS name, u.email
+      FROM trainer_team_members tm
+      JOIN users u ON u.id = tm.student_id
+      WHERE tm.team_id = ${teamId}
+      ORDER BY u.full_name ASC
+    `;
+
+    return c.json({
+      success: true,
+      team: {
+        ...teamRows[0],
+        members,
+      },
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 // -------------------------------------------------------------
 // Class & Scheduling
 // -------------------------------------------------------------
@@ -609,12 +734,15 @@ export const scheduleClass = async (c: Context) => {
     const isAuthorized = await canManageClassroom(trainerId, classroomId);
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
-    const { name, scheduledTime } = await c.req.json();
+    const { name, scheduledTime, sessionType, durationMinutes } = await c.req.json();
     if (!name || !scheduledTime) return c.json({ error: 'Name and scheduled time are required' }, 400);
 
+    const normSessionType = sessionType === 'online' ? 'online' : 'onsite';
+    const normDuration = Number(durationMinutes) > 0 ? Math.min(1440, Math.max(15, Number(durationMinutes))) : 90;
+
     const result = await sql`
-      INSERT INTO classes (classroom_id, name, scheduled_time)
-      VALUES (${classroomId}, ${name}, ${scheduledTime})
+      INSERT INTO classes (classroom_id, name, scheduled_time, session_type, duration_minutes, overflow_minutes)
+      VALUES (${classroomId}, ${name}, ${scheduledTime}, ${normSessionType}, ${normDuration}, 0)
       RETURNING *
     `;
 
@@ -698,9 +826,17 @@ export const completeClass = async (c: Context) => {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
+    const startedAt = classData[0].started_at ? new Date(classData[0].started_at).getTime() : null;
+    const durationMins = classData[0].duration_minutes || 90;
+    let overflowMins = 0;
+    if (startedAt) {
+      const elapsedMins = Math.max(0, Math.floor((Date.now() - startedAt) / 60000));
+      overflowMins = Math.max(0, elapsedMins - durationMins);
+    }
+
     const completed = await sql`
       UPDATE classes 
-      SET status = 'completed' 
+      SET status = 'completed', overflow_minutes = ${overflowMins} 
       WHERE id = ${classId} 
       RETURNING *
     `;
@@ -713,6 +849,174 @@ export const completeClass = async (c: Context) => {
     `;
 
     return c.json({ success: true, class: completed[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomSessionAttendance = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const classId = c.req.param('classId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+
+    const roster = await sql`
+      SELECT 
+        u.id AS student_id,
+        u.full_name,
+        u.email,
+        u.mist_id,
+        u.batch_name,
+        ca.id AS attendance_id,
+        ca.status AS presence_status,
+        ca.recorded_by,
+        ca.trainer_name,
+        ca.remarks,
+        ca.updated_at AS attendance_updated_at
+      FROM classroom_students cs
+      JOIN users u ON cs.student_id = u.id
+      LEFT JOIN class_attendance ca ON ca.class_id = ${classId} AND ca.student_id = u.id
+      WHERE cs.classroom_id = ${classroomId}
+      ORDER BY u.full_name ASC
+    `;
+
+    return c.json({ success: true, roster });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassroomSessionAttendance = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const classId = c.req.param('classId');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isManager = await canManageClassroom(trainerId, classroomId);
+    if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
+
+    const trainerUser = await sql`SELECT full_name, email FROM users WHERE id = ${trainerId} LIMIT 1`;
+    const trainerName = trainerUser[0]?.full_name || 'Trainer';
+
+    const { attendance } = await c.req.json();
+    if (!Array.isArray(attendance)) {
+      return c.json({ error: 'Attendance array is required' }, 400);
+    }
+
+    const validStatuses = ['present', 'absent', 'late', 'very_late', 'excused'];
+
+    for (const item of attendance) {
+      if (!item.studentId) continue;
+      const presenceStatus = validStatuses.includes(item.status) ? item.status : 'present';
+      const remarks = item.remarks ? String(item.remarks).trim().slice(0, 500) : null;
+
+      await sql`
+        INSERT INTO class_attendance (
+          classroom_id,
+          class_id,
+          student_id,
+          status,
+          recorded_by,
+          trainer_name,
+          remarks,
+          updated_at
+        )
+        VALUES (
+          ${classroomId},
+          ${classId},
+          ${item.studentId},
+          ${presenceStatus},
+          ${trainerId},
+          ${trainerName},
+          ${remarks},
+          now()
+        )
+        ON CONFLICT (class_id, student_id)
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          recorded_by = EXCLUDED.recorded_by,
+          trainer_name = EXCLUDED.trainer_name,
+          remarks = EXCLUDED.remarks,
+          updated_at = now()
+      `;
+    }
+
+    return c.json({ success: true, message: 'Attendance updated successfully' });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+// Returns a cross-session attendance summary for the whole classroom.
+// Trainers get full view; students get only their own row.
+export const getClassroomAttendanceSummary = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+
+    const isManager = await canManageClassroom(userId, classroomId);
+
+    // Fetch all completed/started sessions for this classroom ordered by schedule
+    const sessions = await sql`
+      SELECT id, name, scheduled_time, session_type, duration_minutes, overflow_minutes, status
+      FROM classes
+      WHERE classroom_id = ${classroomId}
+        AND status IN ('started', 'completed', 'scheduled')
+      ORDER BY scheduled_time ASC
+    `;
+
+    if (sessions.length === 0) {
+      return c.json({ success: true, sessions: [], students: [], matrix: {} });
+    }
+
+    // For trainers: fetch all students + their attendance across all sessions
+    // For students: fetch only their own record
+    let studentsRes;
+    let attendanceRes;
+
+    if (isManager) {
+      studentsRes = await sql`
+        SELECT u.id, u.full_name, u.email, u.mist_id, u.batch_name
+        FROM classroom_students cs
+        JOIN users u ON cs.student_id = u.id
+        WHERE cs.classroom_id = ${classroomId}
+        ORDER BY u.full_name ASC
+      `;
+      attendanceRes = await sql`
+        SELECT ca.class_id, ca.student_id, ca.status, ca.trainer_name, ca.updated_at
+        FROM class_attendance ca
+        JOIN classes c ON ca.class_id = c.id
+        WHERE ca.classroom_id = ${classroomId}
+      `;
+    } else {
+      // Student: check enrollment
+      const enrolled = await sql`
+        SELECT 1 FROM classroom_students WHERE classroom_id = ${classroomId} AND student_id = ${userId}
+      `;
+      if (enrolled.length === 0) return c.json({ error: 'Not enrolled' }, 403);
+
+      studentsRes = await sql`
+        SELECT u.id, u.full_name, u.email, u.mist_id, u.batch_name
+        FROM users u WHERE u.id = ${userId}
+      `;
+      attendanceRes = await sql`
+        SELECT ca.class_id, ca.student_id, ca.status, ca.trainer_name, ca.updated_at
+        FROM class_attendance ca
+        WHERE ca.classroom_id = ${classroomId} AND ca.student_id = ${userId}
+      `;
+    }
+
+    // Build matrix: { studentId -> { classId -> status } }
+    const matrix: Record<string, Record<string, string>> = {};
+    for (const row of attendanceRes) {
+      if (!matrix[row.student_id]) matrix[row.student_id] = {};
+      matrix[row.student_id][row.class_id] = row.status;
+    }
+
+    return c.json({ success: true, sessions, students: studentsRes, matrix });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -909,8 +1213,9 @@ export const updateProblemStatus = async (c: Context) => {
   const problemId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
-    const { status } = await c.req.json();
-    if (!['not_solved', 'tried', 'solved'].includes(status)) {
+    const { status, studentDifficulty, difficulty, solutionLink, solutionCode, submissionNotes } = await c.req.json();
+    const targetDifficulty = studentDifficulty || difficulty || null;
+    if (!['not_solved', 'tried', 'pending_approval', 'solved'].includes(status)) {
       return c.json({ error: 'Invalid status' }, 400);
     }
 
@@ -931,21 +1236,32 @@ export const updateProblemStatus = async (c: Context) => {
 
     if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized' }, 403);
 
-    const solvedAt = status === 'solved' ? new Date() : null;
+    // If student submits solve status, enforce pending_approval status unless trainer approves
+    let effectiveStatus = status;
+    if (isStudent && !isTrainer && (status === 'solved' || status === 'pending_approval')) {
+      effectiveStatus = 'pending_approval';
+    }
+
+    const solvedAt = effectiveStatus === 'solved' ? new Date() : null;
 
     const result = await sql`
       UPDATE class_problems 
-      SET status = ${status}, solved_at = ${solvedAt} 
+      SET status = ${effectiveStatus}, 
+          solved_at = ${solvedAt},
+          student_difficulty = COALESCE(${targetDifficulty}, student_difficulty),
+          solution_link = COALESCE(${solutionLink || null}, solution_link),
+          solution_code = COALESCE(${solutionCode || null}, solution_code),
+          submission_notes = COALESCE(${submissionNotes || null}, submission_notes)
       WHERE id = ${problemId} 
       RETURNING *
     `;
 
-    // Notify trainer if solved by student
-    if (isStudent && status === 'solved') {
+    // Notify trainer if pending approval
+    if (isStudent && effectiveStatus === 'pending_approval') {
       await createNotification(
         check[0].created_by,
-        'Problem Solved!',
-        `Student "${check[0].student_name || 'A student'}" marked problem "${check[0].title}" as solved.`,
+        'Solution Approval Required',
+        `Student "${check[0].student_name || 'A student'}" submitted a solution for problem "${check[0].title}". Trainer review required.`,
         `/classroom/live/${check[0].classroom_id}`
       );
     }
@@ -1455,8 +1771,9 @@ export const updateClassroomTopicProblemProgress = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
-    const { assignmentId, topicProblemId, studentId, status } = await c.req.json();
+    const { assignmentId, topicProblemId, studentId, status, studentDifficulty, difficulty, solutionLink, solutionCode, submissionNotes } = await c.req.json();
     const normalizedStatus = normalizeProgressStatus(status);
+    const targetDifficulty = studentDifficulty || difficulty || null;
     if (!assignmentId || !topicProblemId) return c.json({ error: 'Assignment and topic problem are required' }, 400);
     if (!normalizedStatus) return c.json({ error: 'Invalid status' }, 400);
 
@@ -1480,32 +1797,109 @@ export const updateClassroomTopicProblemProgress = async (c: Context) => {
     if (memberRows.length === 0) return c.json({ error: 'Student is not a member of this assigned team' }, 403);
     if (!isManager && targetStudentId !== userId) return c.json({ error: 'Unauthorized' }, 403);
 
-    const solvedAt = normalizedStatus === 'solved' ? new Date() : null;
+    // If student submits solve status, enforce pending_approval status unless trainer approves
+    let effectiveStatus = normalizedStatus;
+    if (!isManager && (normalizedStatus === 'solved' || normalizedStatus === 'pending_approval')) {
+      effectiveStatus = 'pending_approval';
+    }
+
+    const solvedAt = effectiveStatus === 'solved' ? new Date() : null;
     const progress = await sql`
       INSERT INTO classroom_topic_problem_progress (
         assignment_id,
         topic_problem_id,
         student_id,
         status,
+        student_difficulty,
+        solution_link,
+        solution_code,
+        submission_notes,
         solved_at,
         updated_at
       )
-      VALUES (${assignmentId}, ${topicProblemId}, ${targetStudentId}, ${normalizedStatus}, ${solvedAt}, now())
+      VALUES (
+        ${assignmentId}, ${topicProblemId}, ${targetStudentId}, ${effectiveStatus}, ${targetDifficulty},
+        ${solutionLink || null}, ${solutionCode || null}, ${submissionNotes || null},
+        ${solvedAt}, now()
+      )
       ON CONFLICT (assignment_id, topic_problem_id, student_id)
-      DO UPDATE SET status = EXCLUDED.status, solved_at = EXCLUDED.solved_at, updated_at = now()
+      DO UPDATE SET 
+        status = EXCLUDED.status, 
+        student_difficulty = COALESCE(EXCLUDED.student_difficulty, classroom_topic_problem_progress.student_difficulty),
+        solution_link = COALESCE(EXCLUDED.solution_link, classroom_topic_problem_progress.solution_link),
+        solution_code = COALESCE(EXCLUDED.solution_code, classroom_topic_problem_progress.solution_code),
+        submission_notes = COALESCE(EXCLUDED.submission_notes, classroom_topic_problem_progress.submission_notes),
+        solved_at = EXCLUDED.solved_at, 
+        updated_at = now()
       RETURNING *
     `;
 
-    if (!isManager && normalizedStatus === 'solved') {
+    if (!isManager && effectiveStatus === 'pending_approval') {
       await createNotification(
         assignmentRows[0].assigned_by,
-        'Topic Problem Solved',
-        `A student solved "${assignmentRows[0].problem_title}" in topic "${assignmentRows[0].topic_title}".`,
+        'Solution Approval Required',
+        `A student submitted a solution for "${assignmentRows[0].problem_title}" in topic "${assignmentRows[0].topic_title}". Trainer review required.`,
         `/classroom/live/${classroomId}`
       );
     }
 
     return c.json({ success: true, progress: progress[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const verifyClassroomTopicProblemProgress = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const { progressId, problemId, action, rejectionReason } = await c.req.json();
+    const isManager = await canManageClassroom(trainerId, classroomId);
+    if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
+
+    const isApproved = action === 'approve';
+    const nextStatus = isApproved ? 'solved' : 'in_progress';
+    const solvedAt = isApproved ? new Date() : null;
+
+    if (progressId) {
+      const rows = await sql`
+        UPDATE classroom_topic_problem_progress
+        SET status = ${nextStatus}, solved_at = ${solvedAt}, updated_at = now()
+        WHERE id = ${progressId}
+        RETURNING *
+      `;
+      if (rows.length > 0) {
+        await createNotification(
+          rows[0].student_id,
+          isApproved ? 'Solution Approved!' : 'Solution Returned for Re-submission',
+          isApproved
+            ? 'Your solution was verified and approved by the trainer.'
+            : `Your solution requires update: ${rejectionReason || 'Please review and resubmit.'}`,
+          `/classroom/live/${classroomId}`
+        );
+        return c.json({ success: true, progress: rows[0] });
+      }
+    } else if (problemId) {
+      const rows = await sql`
+        UPDATE class_problems
+        SET status = ${nextStatus}, solved_at = ${solvedAt}
+        WHERE id = ${problemId}
+        RETURNING *
+      `;
+      if (rows.length > 0) {
+        await createNotification(
+          rows[0].student_id,
+          isApproved ? 'Solution Approved!' : 'Solution Returned for Re-submission',
+          isApproved
+            ? 'Your solution was verified and approved by the trainer.'
+            : `Your solution requires update: ${rejectionReason || 'Please review and resubmit.'}`,
+          `/classroom/live/${classroomId}`
+        );
+        return c.json({ success: true, problem: rows[0] });
+      }
+    }
+
+    return c.json({ error: 'Progress or problem target not found' }, 404);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1596,6 +1990,216 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
     })).sort((a, b) => b.solved - a.solved || b.solveRate - a.solveRate || a.name.localeCompare(b.name));
 
     return c.json({ teams: analytics });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+// -------------------------------------------------------------
+// Classroom IDE Activity Monitor
+// -------------------------------------------------------------
+
+export const recordClassroomIdeActivity = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+
+    const isManager = await canManageClassroom(userId, classroomId);
+    if (isManager) return c.json({ error: 'IDE activity is recorded for students only' }, 403);
+
+    const body = await c.req.json();
+    const classId = normalizeUuid(body.classId);
+    if (classId) {
+      const classRows = await sql`SELECT id FROM classes WHERE id = ${classId} AND classroom_id = ${classroomId}`;
+      if (classRows.length === 0) return c.json({ error: 'Class does not belong to this classroom' }, 400);
+    }
+
+    const eventType = normalizeIdeEventType(body.eventType);
+    const eventDetail = normalizeIdeEventDetail(body.eventDetail);
+    const language = normalizeIdeLanguage(body.language);
+    const code = boundRawText(body.code, 50000);
+    const focused = Boolean(body.focused);
+    const codeLength = code.length;
+    const pasteIncrement = eventType === 'paste' ? 1 : 0;
+    const largeInsertIncrement = eventType === 'large_insert' ? 1 : 0;
+
+    const sessions = await sql`
+      INSERT INTO classroom_ide_sessions (
+        classroom_id,
+        class_id,
+        student_id,
+        language,
+        code,
+        focused,
+        code_length,
+        paste_count,
+        large_insert_count,
+        last_event_type,
+        last_event_at,
+        updated_at
+      )
+      VALUES (
+        ${classroomId},
+        ${classId},
+        ${userId},
+        ${language},
+        ${code},
+        ${focused},
+        ${codeLength},
+        ${pasteIncrement},
+        ${largeInsertIncrement},
+        ${eventType},
+        now(),
+        now()
+      )
+      ON CONFLICT (classroom_id, student_id)
+      DO UPDATE SET
+        class_id = EXCLUDED.class_id,
+        language = EXCLUDED.language,
+        code = EXCLUDED.code,
+        focused = EXCLUDED.focused,
+        code_length = EXCLUDED.code_length,
+        paste_count = classroom_ide_sessions.paste_count + ${pasteIncrement},
+        large_insert_count = classroom_ide_sessions.large_insert_count + ${largeInsertIncrement},
+        last_event_type = EXCLUDED.last_event_type,
+        last_event_at = now(),
+        updated_at = now()
+      RETURNING *
+    `;
+
+    await sql`
+      INSERT INTO classroom_ide_events (
+        session_id,
+        classroom_id,
+        student_id,
+        event_type,
+        event_detail,
+        language,
+        code_length,
+        focused
+      )
+      VALUES (
+        ${sessions[0].id},
+        ${classroomId},
+        ${userId},
+        ${eventType},
+        ${JSON.stringify(eventDetail)}::jsonb,
+        ${language},
+        ${codeLength},
+        ${focused}
+      )
+    `;
+
+    return c.json({ success: true, session: sessions[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const listClassroomIdeActivity = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const body = await c.req.json().catch(() => ({}));
+    const limit = Math.min(Math.max(normalizePositiveInteger(body.limit) || 80, 20), 200);
+    const requestedStudentId = body.studentId ? normalizeUuid(body.studentId) : null;
+    if (body.studentId && !requestedStudentId) {
+      return c.json({ error: 'Student is required' }, 400);
+    }
+
+    if (requestedStudentId) {
+      const studentRows = await sql`
+        SELECT student_id
+        FROM classroom_students
+        WHERE classroom_id = ${classroomId} AND student_id = ${requestedStudentId}
+      `;
+      if (studentRows.length === 0) {
+        return c.json({ error: 'Student is not enrolled in this classroom' }, 400);
+      }
+    }
+
+    const sessionsQuery = requestedStudentId
+      ? sql`
+        SELECT
+          s.*,
+          u.full_name AS student_name,
+          u.email AS student_email,
+          cl.name AS class_name
+        FROM classroom_ide_sessions s
+        JOIN users u ON u.id = s.student_id
+        LEFT JOIN classes cl ON cl.id = s.class_id
+        WHERE s.classroom_id = ${classroomId} AND s.student_id = ${requestedStudentId}
+        ORDER BY s.updated_at DESC
+      `
+      : sql`
+        SELECT
+          s.*,
+          u.full_name AS student_name,
+          u.email AS student_email,
+          cl.name AS class_name
+        FROM classroom_ide_sessions s
+        JOIN users u ON u.id = s.student_id
+        LEFT JOIN classes cl ON cl.id = s.class_id
+        WHERE s.classroom_id = ${classroomId}
+        ORDER BY s.updated_at DESC
+      `;
+    const eventsQuery = requestedStudentId
+      ? sql`
+        SELECT
+          e.*,
+          u.full_name AS student_name,
+          u.email AS student_email
+        FROM classroom_ide_events e
+        JOIN users u ON u.id = e.student_id
+        WHERE e.classroom_id = ${classroomId} AND e.student_id = ${requestedStudentId}
+        ORDER BY e.created_at DESC
+        LIMIT ${limit}
+      `
+      : sql`
+        SELECT
+          e.*,
+          u.full_name AS student_name,
+          u.email AS student_email
+        FROM classroom_ide_events e
+        JOIN users u ON u.id = e.student_id
+        WHERE e.classroom_id = ${classroomId}
+        ORDER BY e.created_at DESC
+        LIMIT ${limit}
+      `;
+    const [sessions, events] = await Promise.all([
+      sessionsQuery,
+      eventsQuery,
+    ]);
+
+    return c.json({ sessions, events, studentId: requestedStudentId });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const resetClassroomIdeSession = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isManager = await canManageClassroom(trainerId, classroomId);
+    if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
+
+    const { studentId } = await c.req.json();
+    if (!studentId) return c.json({ error: 'Student ID is required' }, 400);
+
+    const updated = await sql`
+      UPDATE classroom_ide_sessions
+      SET paste_count = 0, large_insert_count = 0, updated_at = now()
+      WHERE classroom_id = ${classroomId} AND student_id = ${studentId}
+      RETURNING *
+    `;
+
+    return c.json({ success: true, session: updated[0] || null });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
