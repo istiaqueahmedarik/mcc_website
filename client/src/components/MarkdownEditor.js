@@ -12,7 +12,12 @@ import { Editor } from "./Editor";
 import { useTheme } from "next-themes";
 const toaster = new Toaster();
 
-const MarkdownEditor = ({ handleChange, value }) => {
+const MarkdownEditor = ({
+  editorClassName = "",
+  handleChange,
+  minHeightClassName,
+  value,
+}) => {
   const { theme } = useTheme();
   return (
     <div className="rounded-full">
@@ -25,7 +30,8 @@ const MarkdownEditor = ({ handleChange, value }) => {
         <ToasterProvider toaster={toaster}>
           <ToasterComponent />
           <Editor
-            className="text-[var(--g-color-text-primary)]"
+            className={`text-[var(--g-color-text-primary)] ${editorClassName}`.trim()}
+            minHeightClassName={minHeightClassName}
             onChange={handleChange}
             value={value}
           />

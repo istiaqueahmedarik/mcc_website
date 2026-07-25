@@ -103,10 +103,12 @@ export default function TrainerFormDetailClient({ formId }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading form
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="rounded-lg border bg-card px-5 py-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading form
+          </div>
         </div>
       </div>
     );
@@ -114,12 +116,12 @@ export default function TrainerFormDetailClient({ formId }) {
 
   if (error || !form) {
     return (
-      <div className="container mx-auto max-w-3xl px-4 py-12">
+      <div className="mx-auto max-w-3xl px-4 py-12">
         <ProgressLink href="/trainer/forms" className="inline-flex items-center gap-2 text-sm text-muted-foreground">
           <ArrowLeft className="h-4 w-4" />
           Forms
         </ProgressLink>
-        <div className="mt-6 rounded-lg border bg-card p-6">
+        <div className="mt-6 rounded-lg border bg-card p-6 shadow-sm">
           <h1 className="text-xl font-bold">Form unavailable</h1>
           <p className="mt-2 text-sm text-muted-foreground">{error || "Form not found."}</p>
         </div>
@@ -128,40 +130,45 @@ export default function TrainerFormDetailClient({ formId }) {
   }
 
   const dynamic = analytics?.dynamic || {};
+  const mappedCount = fields.filter((field) => field.mapUserField).length;
+  const customCount = fields.length - mappedCount;
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-7xl px-4 py-8 space-y-6">
-        <div className="flex flex-col gap-4 border-b pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <ProgressLink href="/trainer/forms" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-              Forms
-            </ProgressLink>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <h1 className="text-3xl font-bold tracking-tight">{form.title}</h1>
-              <Badge variant="outline">{FORM_LABELS[form.type] || "General"}</Badge>
-              <Badge className={form.status === "published" ? "bg-emerald-600" : "bg-muted text-foreground"}>
-                {form.status}
-              </Badge>
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="border-b pb-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 max-w-3xl">
+              <ProgressLink href="/trainer/forms" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+                Forms
+              </ProgressLink>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <h1 className="min-w-0 text-3xl font-bold tracking-tight sm:text-4xl">{form.title}</h1>
+                <Badge variant="outline">{FORM_LABELS[form.type] || "General"}</Badge>
+                <Badge className={form.status === "published" ? "bg-emerald-600" : "bg-muted text-foreground"}>
+                  {form.status}
+                </Badge>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                {form.description || "No description provided."}
+              </p>
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              {form.description || "No description provided."}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" className="gap-2" onClick={copyShareLink}>
-              <Copy className="h-4 w-4" />
-              Copy Link
-            </Button>
-            <ProgressLink href={`/forms/${form.share_slug}`}>
-              <Button type="button" className="gap-2">
-                <Share2 className="h-4 w-4" />
-                Open Form
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="gap-2 font-semibold" onClick={copyShareLink}>
+                <Copy className="h-4 w-4" />
+                Copy Link
               </Button>
-            </ProgressLink>
+              <ProgressLink href={`/forms/${form.share_slug}`}>
+                <Button type="button" className="gap-2 font-semibold">
+                  <Share2 className="h-4 w-4" />
+                  Open Form
+                </Button>
+              </ProgressLink>
+            </div>
           </div>
-        </div>
+        </section>
 
         {notice && (
           <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-300">
@@ -170,22 +177,20 @@ export default function TrainerFormDetailClient({ formId }) {
           </div>
         )}
 
-        <section className="rounded-lg border bg-card p-4 shadow-sm">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Share URL</p>
-              <p className="mt-1 truncate font-mono text-sm">{shareUrl}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Metric label="Responses" value={analytics?.total_responses || 0} />
-              <Metric label="Matched" value={analytics?.matched_responses || 0} />
-              <Metric label="Mapped Cells" value={fields.filter((field) => field.mapUserField).length} />
-              <Metric label="Custom Cells" value={fields.filter((field) => !field.mapUserField).length} />
-            </div>
+        <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_520px]">
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Share URL</p>
+            <p className="mt-2 truncate font-mono text-sm">{shareUrl}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Metric label="Responses" value={analytics?.total_responses || 0} />
+            <Metric label="Matched" value={analytics?.matched_responses || 0} />
+            <Metric label="Mapped" value={mappedCount} />
+            <Metric label="Custom" value={customCount} />
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 rounded-lg border bg-card p-2 shadow-sm">
           <TabButton active={activeTab === "visualize"} onClick={() => setActiveTab("visualize")}>
             <BarChart3 className="h-4 w-4" />
             Visualize
@@ -201,20 +206,17 @@ export default function TrainerFormDetailClient({ formId }) {
         </div>
 
         {activeTab === "visualize" && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,0.75fr)_minmax(320px,0.25fr)]">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
             <section className="rounded-lg border bg-card p-5 shadow-sm">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-bold">Response Timeline</h2>
-              </div>
+              <SectionTitle icon={BarChart3} label="Analytics" title="Response timeline" />
               <div className="mt-5 space-y-3">
                 {analytics?.by_day?.length ? (
                   analytics.by_day.map((item) => (
-                    <div key={item.date} className="grid grid-cols-[110px_1fr_42px] items-center gap-3 text-sm">
-                      <span className="text-muted-foreground">{item.date}</span>
+                    <div key={item.date} className="grid grid-cols-[96px_1fr_42px] items-center gap-3 text-sm sm:grid-cols-[120px_1fr_42px]">
+                      <span className="truncate text-muted-foreground">{item.date}</span>
                       <div className="h-3 overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-primary"
+                          className="h-full rounded-full bg-foreground"
                           style={{ width: `${Math.max(6, (Number(item.count) / maxDaily) * 100)}%` }}
                         />
                       </div>
@@ -222,21 +224,19 @@ export default function TrainerFormDetailClient({ formId }) {
                     </div>
                   ))
                 ) : (
-                  <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    No responses yet.
-                  </p>
+                  <EmptyState>No responses yet.</EmptyState>
                 )}
               </div>
 
               <div className="mt-8">
-                <h3 className="text-sm font-bold">Field Summary</h3>
+                <h3 className="text-sm font-bold">Field summary</h3>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
                   {Object.entries(analytics?.field_summary || {}).length === 0 ? (
                     <p className="text-sm text-muted-foreground">Summary appears after first response.</p>
                   ) : (
                     Object.entries(analytics.field_summary).map(([label, summary]) => (
                       <div key={label} className="rounded-lg border bg-background p-4">
-                        <p className="text-sm font-semibold">{label}</p>
+                        <p className="truncate text-sm font-semibold">{label}</p>
                         <div className="mt-3 space-y-2">
                           {Object.entries(summary)
                             .sort((a, b) => Number(b[1]) - Number(a[1]))
@@ -255,49 +255,44 @@ export default function TrainerFormDetailClient({ formId }) {
               </div>
             </section>
 
-            <aside className="space-y-4">
-              <section className="rounded-lg border bg-card p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  {form.type === "attendance" ? (
-                    <ClipboardList className="h-5 w-5 text-primary" />
-                  ) : (
-                    <Users className="h-5 w-5 text-primary" />
-                  )}
-                  <h2 className="text-lg font-bold">Dynamic Track</h2>
-                </div>
-                {form.type === "classroom_invitation" ? (
-                  <div className="mt-4 space-y-3">
-                    <Metric label="Joined From Form" value={dynamic.joined_from_form || 0} wide />
-                    <Metric label="Classroom Roster" value={dynamic.classroom_roster_count || 0} wide />
-                    <p className="text-xs text-muted-foreground">
-                      Successful invitation responses add matched students to the linked classroom.
-                    </p>
-                  </div>
-                ) : form.type === "attendance" ? (
-                  <div className="mt-4 space-y-3">
-                    <Metric label="Present" value={dynamic.present_count || 0} wide />
-                    <Metric label="Absent" value={dynamic.absent_count || 0} wide />
-                    <Metric label="Present Rate" value={`${dynamic.present_rate || 0}%`} wide />
-                    {dynamic.absent?.length > 0 && (
-                      <div className="rounded-lg border bg-background p-3">
-                        <p className="text-xs font-bold uppercase text-muted-foreground">Absent</p>
-                        <div className="mt-2 max-h-52 space-y-2 overflow-y-auto">
-                          {dynamic.absent.map((student) => (
-                            <div key={student.id} className="text-xs">
-                              <p className="font-semibold">{student.full_name}</p>
-                              <p className="text-muted-foreground">{student.mist_id || student.email}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    General forms store responses as JSON and support visualization plus explore.
+            <aside className="rounded-lg border bg-card p-5 shadow-sm">
+              <SectionTitle
+                icon={form.type === "attendance" ? ClipboardList : Users}
+                label="Dynamic"
+                title="Track"
+              />
+              {form.type === "classroom_invitation" ? (
+                <div className="mt-5 space-y-3">
+                  <Metric label="Joined From Form" value={dynamic.joined_from_form || 0} wide />
+                  <Metric label="Classroom Roster" value={dynamic.classroom_roster_count || 0} wide />
+                  <p className="text-xs text-muted-foreground">
+                    Successful invitation responses add matched students to the linked classroom.
                   </p>
-                )}
-              </section>
+                </div>
+              ) : form.type === "attendance" ? (
+                <div className="mt-5 space-y-3">
+                  <Metric label="Present" value={dynamic.present_count || 0} wide />
+                  <Metric label="Absent" value={dynamic.absent_count || 0} wide />
+                  <Metric label="Present Rate" value={`${dynamic.present_rate || 0}%`} wide />
+                  {dynamic.absent?.length > 0 && (
+                    <div className="rounded-lg border bg-background p-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Absent</p>
+                      <div className="mt-3 max-h-56 space-y-2 overflow-y-auto">
+                        {dynamic.absent.map((student) => (
+                          <div key={student.id} className="rounded-md border bg-card px-3 py-2 text-xs">
+                            <p className="truncate font-semibold">{student.full_name}</p>
+                            <p className="truncate text-muted-foreground">{student.mist_id || student.email}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-5 rounded-lg border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                  General forms store response JSON for visualization and explore.
+                </p>
+              )}
             </aside>
           </div>
         )}
@@ -305,10 +300,7 @@ export default function TrainerFormDetailClient({ formId }) {
         {activeTab === "explore" && (
           <section className="rounded-lg border bg-card p-5 shadow-sm">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-bold">Explore Responses</h2>
-                <p className="text-sm text-muted-foreground">Search mapped aliases, custom fields, user data, and JSON.</p>
-              </div>
+              <SectionTitle icon={Search} label="Responses" title="Explore" />
               <div className="relative w-full md:w-80">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -322,13 +314,13 @@ export default function TrainerFormDetailClient({ formId }) {
 
             <div className="mt-5 overflow-x-auto rounded-lg border">
               <table className="w-full min-w-[860px] text-sm">
-                <thead className="bg-muted/60 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
-                    <th className="px-3 py-2">Submitted</th>
-                    <th className="px-3 py-2">{form.primary_key_label}</th>
-                    <th className="px-3 py-2">User</th>
+                    <th className="px-3 py-3">Submitted</th>
+                    <th className="px-3 py-3">{form.primary_key_label}</th>
+                    <th className="px-3 py-3">User</th>
                     {fields.map((field) => (
-                      <th key={field.id} className="px-3 py-2">
+                      <th key={field.id} className="px-3 py-3">
                         {field.label}
                       </th>
                     ))}
@@ -337,23 +329,23 @@ export default function TrainerFormDetailClient({ formId }) {
                 <tbody className="divide-y">
                   {filteredResponses.length === 0 ? (
                     <tr>
-                      <td colSpan={3 + fields.length} className="px-3 py-8 text-center text-muted-foreground">
+                      <td colSpan={3 + fields.length} className="px-3 py-10 text-center text-muted-foreground">
                         No responses found.
                       </td>
                     </tr>
                   ) : (
                     filteredResponses.map((response) => (
-                      <tr key={response.id} className="align-top">
-                        <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground">
+                      <tr key={response.id} className="align-top hover:bg-muted/30">
+                        <td className="whitespace-nowrap px-3 py-3 text-xs text-muted-foreground">
                           {compactDate(response.submitted_at)}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs">{response.primary_key_value}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-3 font-mono text-xs">{response.primary_key_value}</td>
+                        <td className="px-3 py-3">
                           <p className="font-semibold">{response.user_name || "-"}</p>
                           <p className="text-xs text-muted-foreground">{response.user_email || ""}</p>
                         </td>
                         {fields.map((field) => (
-                          <td key={field.id} className="max-w-[220px] px-3 py-2">
+                          <td key={field.id} className="max-w-[220px] px-3 py-3">
                             <span className="line-clamp-3">{fieldValue(response, field.label)}</span>
                           </td>
                         ))}
@@ -368,15 +360,10 @@ export default function TrainerFormDetailClient({ formId }) {
 
         {activeTab === "json" && (
           <section className="rounded-lg border bg-card p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <FileJson className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold">Saved JSON</h2>
-            </div>
-            <div className="mt-5 grid gap-4">
+            <SectionTitle icon={FileJson} label="Storage" title="Saved JSON" />
+            <div className="mt-5 grid gap-3">
               {responses.length === 0 ? (
-                <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  No JSON responses yet.
-                </p>
+                <EmptyState>No JSON responses yet.</EmptyState>
               ) : (
                 responses.map((response) => (
                   <details key={response.id} className="rounded-lg border bg-background p-4">
@@ -392,16 +379,30 @@ export default function TrainerFormDetailClient({ formId }) {
             </div>
           </section>
         )}
+      </main>
+    </div>
+  );
+}
+
+function SectionTitle({ icon: Icon, label, title }) {
+  return (
+    <div>
+      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-4 w-4" />
+        {label}
       </div>
+      <h2 className="mt-1 text-lg font-bold tracking-tight">{title}</h2>
     </div>
   );
 }
 
 function Metric({ label, value, wide = false }) {
   return (
-    <div className={`rounded-lg border bg-background px-3 py-2 ${wide ? "w-full" : ""}`}>
-      <p className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-bold">{value}</p>
+    <div className={`rounded-lg border bg-card px-3 py-3 shadow-sm ${wide ? "w-full" : ""}`}>
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xl font-bold">{value}</p>
     </div>
   );
 }
@@ -411,11 +412,19 @@ function TabButton({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition ${
-        active ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:border-primary/50"
+      className={`inline-flex min-h-10 items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition ${
+        active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       {children}
     </button>
+  );
+}
+
+function EmptyState({ children }) {
+  return (
+    <p className="rounded-lg border border-dashed bg-background p-6 text-center text-sm text-muted-foreground">
+      {children}
+    </p>
   );
 }

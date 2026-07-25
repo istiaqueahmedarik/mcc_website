@@ -73,6 +73,23 @@ export async function initDb() {
         CONSTRAINT class_problems_pkey PRIMARY KEY (id)
       );
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.problem_tag_dictionary (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        name text NOT NULL,
+        created_by uuid REFERENCES public.users(id) ON DELETE SET NULL,
+        CONSTRAINT problem_tag_dictionary_pkey PRIMARY KEY (id),
+        CONSTRAINT problem_tag_dictionary_name_unique UNIQUE (name)
+      );
+    `;
+    await sql`
+      INSERT INTO public.problem_tag_dictionary (name)
+      SELECT DISTINCT lower(trim(tag))
+      FROM public.class_problems cp, unnest(cp.tags) AS tag
+      WHERE trim(tag) <> ''
+      ON CONFLICT (name) DO NOTHING;
+    `;
     console.log('✅ Checked/Created "class_problems" table.');
 
     // 6. Create classroom_resources table
@@ -83,9 +100,18 @@ export async function initDb() {
         classroom_id uuid REFERENCES public.classrooms(id) ON DELETE CASCADE,
         class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE,
         title character varying NOT NULL,
-        url character varying NOT NULL,
+        url character varying,
+        content text,
         CONSTRAINT classroom_resources_pkey PRIMARY KEY (id)
       );
+    `;
+    await sql`
+      ALTER TABLE public.classroom_resources
+      ADD COLUMN IF NOT EXISTS content text;
+    `;
+    await sql`
+      ALTER TABLE public.classroom_resources
+      ALTER COLUMN url DROP NOT NULL;
     `;
     console.log('✅ Checked/Created "classroom_resources" table.');
 
@@ -114,7 +140,129 @@ export async function initDb() {
     `;
     console.log('✅ Checked/Created "trainer_team_members" table.');
 
-    // 9. Create class_problem_hints table
+    // 9. Create classroom topic library and team-topic assignment tables
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_topics (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        updated_at timestamp with time zone NOT NULL DEFAULT now(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        created_by uuid NOT NULL REFERENCES public.users(id),
+        title character varying NOT NULL,
+        module character varying,
+        description text,
+        status character varying NOT NULL DEFAULT 'active',
+        CONSTRAINT classroom_topics_pkey PRIMARY KEY (id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_topics_classroom_id_idx
+      ON public.classroom_topics(classroom_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_topic_resources (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        topic_id uuid NOT NULL REFERENCES public.classroom_topics(id) ON DELETE CASCADE,
+        title character varying NOT NULL,
+        url character varying,
+        content text,
+        position integer NOT NULL DEFAULT 0,
+        CONSTRAINT classroom_topic_resources_pkey PRIMARY KEY (id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_topic_resources_topic_id_idx
+      ON public.classroom_topic_resources(topic_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_topic_problems (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        topic_id uuid NOT NULL REFERENCES public.classroom_topics(id) ON DELETE CASCADE,
+        platform character varying NOT NULL,
+        problem_link character varying NOT NULL,
+        title character varying NOT NULL,
+        details text,
+        difficulty character varying,
+        timer_minutes integer,
+        tags text[] DEFAULT '{}'::text[],
+        position integer NOT NULL DEFAULT 0,
+        CONSTRAINT classroom_topic_problems_pkey PRIMARY KEY (id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_topic_problems_topic_id_idx
+      ON public.classroom_topic_problems(topic_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_team_topic_assignments (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        topic_id uuid NOT NULL REFERENCES public.classroom_topics(id) ON DELETE CASCADE,
+        team_id uuid NOT NULL REFERENCES public.trainer_teams(id) ON DELETE CASCADE,
+        assigned_by uuid NOT NULL REFERENCES public.users(id),
+        assigned_at timestamp with time zone NOT NULL DEFAULT now(),
+        status character varying NOT NULL DEFAULT 'active',
+        CONSTRAINT classroom_team_topic_assignments_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_team_topic_assignments_unique UNIQUE (topic_id, team_id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_team_topic_assignments_classroom_id_idx
+      ON public.classroom_team_topic_assignments(classroom_id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_team_topic_assignments_team_id_idx
+      ON public.classroom_team_topic_assignments(team_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_topic_problem_progress (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        assignment_id uuid NOT NULL REFERENCES public.classroom_team_topic_assignments(id) ON DELETE CASCADE,
+        topic_problem_id uuid NOT NULL REFERENCES public.classroom_topic_problems(id) ON DELETE CASCADE,
+        student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        status character varying NOT NULL DEFAULT 'not_solved',
+        solved_at timestamp with time zone,
+        updated_at timestamp with time zone NOT NULL DEFAULT now(),
+        CONSTRAINT classroom_topic_problem_progress_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_topic_problem_progress_unique UNIQUE (assignment_id, topic_problem_id, student_id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_topic_problem_progress_student_id_idx
+      ON public.classroom_topic_problem_progress(student_id);
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_topic_problem_progress_problem_id_idx
+      ON public.classroom_topic_problem_progress(topic_problem_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_board_sessions (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        class_id uuid REFERENCES public.classes(id) ON DELETE SET NULL,
+        room_id character varying NOT NULL,
+        started_by uuid NOT NULL REFERENCES public.users(id),
+        started_at timestamp with time zone NOT NULL DEFAULT now(),
+        ended_at timestamp with time zone,
+        status character varying NOT NULL DEFAULT 'active',
+        CONSTRAINT classroom_board_sessions_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_board_sessions_room_id_unique UNIQUE (room_id)
+      );
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_board_sessions_classroom_id_idx
+      ON public.classroom_board_sessions(classroom_id);
+    `;
+    await sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS classroom_board_sessions_active_classroom_idx
+      ON public.classroom_board_sessions(classroom_id)
+      WHERE status = 'active';
+    `;
+    console.log('Checked/Created classroom topic, assignment, and board tables.');
+
+    // 10. Create class_problem_hints table
     await sql`
       CREATE TABLE IF NOT EXISTS public.class_problem_hints (
         id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -127,7 +275,7 @@ export async function initDb() {
     `;
     console.log('✅ Checked/Created "class_problem_hints" table.');
 
-    // 10. Create class_problem_notes table
+    // 11. Create class_problem_notes table
     await sql`
       CREATE TABLE IF NOT EXISTS public.class_problem_notes (
         id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -140,21 +288,41 @@ export async function initDb() {
     `;
     console.log('✅ Checked/Created "class_problem_notes" table.');
 
-    // 11. Create classroom_messages table
+    // 12. Create classroom_messages table
     await sql`
       CREATE TABLE IF NOT EXISTS public.classroom_messages (
         id uuid NOT NULL DEFAULT gen_random_uuid(),
         created_at timestamp with time zone NOT NULL DEFAULT now(),
         classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE,
         sender_id uuid NOT NULL REFERENCES public.users(id),
         recipient_id uuid REFERENCES public.users(id),
         message text NOT NULL,
         CONSTRAINT classroom_messages_pkey PRIMARY KEY (id)
       );
     `;
+    await sql`
+      ALTER TABLE public.classroom_messages
+      ADD COLUMN IF NOT EXISTS class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE;
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS classroom_messages_class_id_idx
+      ON public.classroom_messages(class_id);
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_message_reactions (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        message_id uuid NOT NULL REFERENCES public.classroom_messages(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        reaction text NOT NULL,
+        CONSTRAINT classroom_message_reactions_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_message_reactions_unique UNIQUE (message_id, user_id, reaction)
+      );
+    `;
     console.log('✅ Checked/Created "classroom_messages" table.');
 
-    // 12. Create in_app_notifications table
+    // 13. Create in_app_notifications table
     await sql`
       CREATE TABLE IF NOT EXISTS public.in_app_notifications (
         id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -170,7 +338,7 @@ export async function initDb() {
     console.log('✅ Checked/Created "in_app_notifications" table.');
 
     console.log('🎉 Database initialization complete!');
-    // 13. Create trainer_forms table
+    // 14. Create trainer_forms table
     await sql`
       CREATE TABLE IF NOT EXISTS public.trainer_forms (
         id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -195,7 +363,7 @@ export async function initDb() {
     `;
     console.log('Checked/Created "trainer_forms" table.');
 
-    // 14. Create trainer_form_responses table
+    // 15. Create trainer_form_responses table
     await sql`
       CREATE TABLE IF NOT EXISTS public.trainer_form_responses (
         id uuid NOT NULL DEFAULT gen_random_uuid(),

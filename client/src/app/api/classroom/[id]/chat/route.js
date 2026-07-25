@@ -11,13 +11,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request, { params }) {
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const classId = searchParams.get("classId");
   const token = (await cookies()).get("token");
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const res = await fetch(`${serverBase}/classroom/${id}/chat/history`, {
+    const classQuery = classId ? `?classId=${encodeURIComponent(classId)}` : "";
+
+    const res = await fetch(`${serverBase}/classroom/${id}/chat/history${classQuery}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

@@ -42,3 +42,171 @@ Adding or hiding navbar items tied to Trainer Dashboard access.
 
 Do not overgeneralize:
 This is not a route authorization helper.
+
+## 2026-07-25 - trainer-dashboard-ai-resource-writing-assistant - Hide Browser AI Volatility
+
+Source:
+- `docs/decisions/trainer-dashboard-ai-resource-writing-assistant-technical-decisions.md`
+
+Fact:
+Superseded for classroom/resource authoring by `classroom-resource-reader-problem-preview-20260725`: browser-side WebGPU/model lifecycle is no longer part of trainer classroom/resource authoring.
+
+Applies when:
+Adding or adjusting trainer AI writing assistance.
+
+Do not overgeneralize:
+Do not apply this to current classroom/resource authoring unless AI is re-approved later.
+
+## 2026-07-25 - trainer-dashboard-ai-resource-writing-assistant - Serial Resource AI Work
+
+Source:
+- `docs/tasks/trainer-dashboard-ai-resource-writing-assistant-task-plan.md`
+
+Fact:
+Trainer AI writing, markdown resource editing, resource schema, and resource rendering share package/component/API files, so this task should run serially in the main workspace rather than split across parallel worktrees.
+
+Applies when:
+Implementing the approved trainer dashboard AI resource writing assistant plan.
+
+Do not overgeneralize:
+Future trainer/classroom work can still use parallel worktrees when write scopes are disjoint.
+
+## 2026-07-25 - trainer-dashboard-ai-resource-writing-assistant - Trainer Writing Assistant Boundary
+
+Source:
+- `docs/reviews/trainer-dashboard-ai-resource-writing-assistant-implementation-review.md`
+
+Fact:
+Superseded for classroom/resource authoring by `classroom-resource-reader-problem-preview-20260725`: `client/src/lib/trainer-writing-ai.js` and `TrainerWritingAssistant` were removed.
+
+Applies when:
+Changing trainer AI draft behavior for classroom/resource authoring.
+
+Do not overgeneralize:
+Do not import or reference removed trainer AI helpers in classroom/resource code.
+
+## 2026-07-25 - trainer-mode-ui-refresh-20260725 - UI-Only Trainer Refresh Boundary
+
+Source:
+- `docs/tasks/trainer-mode-ui-refresh-20260725-task-plan.md`
+
+Fact:
+For trainer-mode design refreshes, preserve existing handler/state/API shapes and change JSX structure, Tailwind classes, local display constants, and small presentational helpers only.
+
+Applies when:
+Redesigning `/trainer/dashboard`, `/trainer/forms`, or `/trainer/forms/[id]` without workflow changes.
+
+Do not overgeneralize:
+If a task changes business process, route paths, data shape, or authorization, create new technical decisions and broader verification.
+
+## 2026-07-25 - trainer-mode-ui-refresh-20260725 - Local Presentation Helpers
+
+Source:
+- `docs/reviews/trainer-mode-ui-refresh-20260725-implementation-review.md`
+
+Fact:
+For large trainer UI files, small local helpers such as section titles, metric tiles, icon buttons, tabs, draft rows, and empty states can reduce repeated JSX without creating a global design-system abstraction.
+
+Applies when:
+Cleaning up repeated presentation markup inside a single trainer page component.
+
+Do not overgeneralize:
+Promote helpers to shared components only when multiple files need the same behavior and the interface stays meaningful.
+
+## 2026-07-25 - swiss-minimal-learning-ui-refresh-20260725 - Swiss UI Local Helpers
+
+Source:
+- `docs/decisions/swiss-minimal-learning-ui-refresh-20260725-technical-decisions.md`
+
+Fact:
+For this Swiss minimal refresh, add only small local presentational helpers/constants when they reduce repeated JSX or clarify repeated status, section, metric, tab, or empty-state UI without hiding behavior logic.
+
+Applies when:
+Editing `TrainerDashboardClient.js`, `ClassroomListClient.js`, `ClassroomLiveClient.js`, or `MyDashboardClient.js`.
+
+Do not overgeneralize:
+Do not split behavior into new modules or create global design-system abstractions in this task.
+
+## 2026-07-25 - swiss-minimal-learning-ui-refresh-20260725 - Demote Empty Future Sections
+
+Source:
+- `docs/reviews/swiss-minimal-learning-ui-refresh-20260725-implementation-review.md`
+
+Fact:
+When a student dashboard section has no live data yet, keep it as a small low-emphasis status strip instead of a primary tab/panel.
+
+Applies when:
+Reducing noise in `/my_dashboard` or similar student operational pages.
+
+Do not overgeneralize:
+Do not demote sections that contain current required actions, errors, verification status, or assigned work.
+
+## 2026-07-25 - past-class-detail-visualization-20260725 - Separate Live And Past Problem State
+
+Source:
+- `docs/tasks/past-class-detail-visualization-20260725-task-plan.md`
+
+Fact:
+Classroom live pages should keep active live problem state separate from selected past-class problem state so polling and review views do not overwrite each other.
+
+Applies when:
+Adding completed-class summaries, history panels, or review views inside `ClassroomLiveClient.js`.
+
+Do not overgeneralize:
+This is a local classroom-live pattern, not a global state-management rule.
+
+## 2026-07-25 - trainer-class-tags-chat-shadcn-refresh-20260725 - Dictionary Plus Array Tags
+
+Source:
+- `docs/decisions/trainer-class-tags-chat-shadcn-refresh-20260725-technical-decisions.md`
+
+Fact:
+For classroom problem topics, use a dictionary table for suggestions/create-new UX while keeping assignment rows as normalized `text[]` tags until a broader relational tag model is approved.
+
+Applies when:
+Adding tag selectors, tag filters, or tag normalization around `class_problems`.
+
+Do not overgeneralize:
+Do not apply this to achievement tags, course content, or other domains without checking their existing storage model.
+
+## 2026-07-25 - classroom-resource-reader-problem-preview-20260725 - Preview Before Assign
+
+Source:
+- `docs/tasks/classroom-resource-reader-problem-preview-20260725-task-plan.md`
+
+Fact:
+Problem assignment should use an explicit preview action that calls the server metadata scraper, then shows the trainer what students will see before assignment.
+
+Applies when:
+Changing trainer problem assignment, metadata scraping, or student challenge-card previews.
+
+Do not overgeneralize:
+Do not scrape on every keystroke; keep fetch timing user-controlled unless telemetry later justifies automatic preview.
+
+## 2026-07-25 - classroom-resource-reader-problem-preview-20260725 - Client-Side List First
+
+Source:
+- `docs/tasks/classroom-resource-reader-problem-preview-20260725-task-plan.md`
+
+Fact:
+For classroom live lists, start with bounded scroll areas and incremental display counts before changing API contracts to server pagination.
+
+Applies when:
+Handling resources, live problems, history, students, or teams in `ClassroomLiveClient.js`.
+
+Do not overgeneralize:
+Very large classrooms may still need server pagination later.
+
+## 2026-07-25 - classroom-team-topic-board-chat-20260725 - Topic Unit Before Team Assignment
+
+Source:
+- `docs/rsd/classroom-team-topic-board-chat-20260725-rsd.md`
+
+Fact:
+Trainer topic workflow should present "build topic unit" before "assign to team", so resources and problems feel prebuilt rather than tied to a single live class form.
+
+Applies when:
+Designing classroom topic libraries, team assignment tabs, or trainer problem/resource setup flows.
+
+Do not overgeneralize:
+This does not require importing an external topic taxonomy or making topics public outside their approved classroom/trainer scope.

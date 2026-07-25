@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import ProgressLink from '@/components/ProgressLink';
-import { Users, Plus, BookOpen, AlertCircle, Radio, ArrowRight, GraduationCap, Sparkles } from 'lucide-react';
+import { Users, Plus, BookOpen, AlertCircle, Radio, ArrowRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -78,58 +78,59 @@ export default function ClassroomListClient() {
       .join('');
 
   return (
-    <div className="relative min-h-screen">
-      {/* Ambient gradient backdrop */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-24 h-72 w-72 rounded-full bg-[hsl(var(--profile-accent-1))]/20 blur-3xl" />
-        <div className="absolute -top-16 right-0 h-72 w-72 rounded-full bg-[hsl(var(--profile-accent-3))]/20 blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid gap-6 border-b pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">Classrooms</p>
+            <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">
+              Training rooms
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Open active classrooms and join live practice from one focused list.
+            </p>
+          </div>
 
-      <div className="relative container mx-auto py-10 px-4 max-w-6xl">
-        {/* Hero header */}
-        <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-[hsl(var(--profile-accent-solid))]/[0.12] via-card to-card p-8 shadow-sm mb-10">
-          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[hsl(var(--profile-accent-2))]/20 blur-2xl" />
-          <div className="relative flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs font-semibold text-muted-foreground backdrop-blur">
-                <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--profile-accent-solid))]" />
-                Training Hub
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:justify-end">
+            {!loading && (
+              <div className="grid grid-cols-2 gap-2 text-sm sm:min-w-[220px]">
+                <div className="border-l pl-3">
+                  <p className="text-2xl font-bold">{classrooms.length}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+                <div className="border-l pl-3">
+                  <p className="text-2xl font-bold text-red-600">{liveCount}</p>
+                  <p className="text-xs text-muted-foreground">Live</p>
+                </div>
               </div>
-              <h1 className="mt-4 text-4xl font-extrabold tracking-tight flex items-center gap-3">
-                <span className="grid place-items-center h-12 w-12 rounded-2xl bg-[hsl(var(--profile-accent-solid))] text-white shadow-lg shadow-[hsl(var(--profile-accent-solid))]/30">
-                  <GraduationCap className="h-7 w-7" />
-                </span>
-                Classrooms
-              </h1>
-              <p className="text-muted-foreground mt-3 max-w-xl">
-                Access your active training classrooms and jump into live practice sessions the moment your trainer goes live.
-              </p>
-            </div>
+            )}
 
             {isTrainer && (
               <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="font-semibold shadow-lg shadow-[hsl(var(--profile-accent-solid))]/25 flex items-center gap-2 rounded-2xl bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white">
-                    <Plus className="h-5 w-5" /> Create Classroom
+                  <Button className="gap-2 font-semibold">
+                    <Plus className="h-4 w-4" />
+                    Create classroom
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
-                    <DialogTitle>Create New Classroom</DialogTitle>
+                    <DialogTitle>Create classroom</DialogTitle>
                     <DialogDescription>
-                      Start a new class, add students, and manage interactive CP problems.
+                      Name the classroom. Description stays optional.
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleCreateClassroom} className="space-y-4 py-4">
                     {error && (
-                      <div className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                        <AlertCircle className="h-4 w-4" /> {error}
+                      <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
+                        <AlertCircle className="h-4 w-4" />
+                        {error}
                       </div>
                     )}
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold">Classroom Name</label>
+                      <label className="text-sm font-semibold">Classroom name</label>
                       <Input
-                        placeholder="e.g., Advanced DP & Graphs"
+                        placeholder="Advanced DP & Graphs"
                         value={newClassName}
                         onChange={(e) => setNewClassName(e.target.value)}
                         required
@@ -138,14 +139,14 @@ export default function ClassroomListClient() {
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Description</label>
                       <Textarea
-                        placeholder="Provide description of this training classroom..."
+                        placeholder="Audience, topics, schedule"
                         value={newClassDesc}
                         onChange={(e) => setNewClassDesc(e.target.value)}
                       />
                     </div>
                     <DialogFooter>
-                      <Button type="submit" className="w-full font-semibold rounded-xl">
-                        Create Classroom
+                      <Button type="submit" className="w-full font-semibold sm:w-auto">
+                        Create classroom
                       </Button>
                     </DialogFooter>
                   </form>
@@ -153,128 +154,91 @@ export default function ClassroomListClient() {
               </Dialog>
             )}
           </div>
-
-          {/* Quick stats */}
-          {!loading && classrooms.length > 0 && (
-            <div className="relative mt-8 flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-4 py-2 backdrop-blur">
-                <BookOpen className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
-                <span className="text-sm font-bold">{classrooms.length}</span>
-                <span className="text-xs text-muted-foreground">Total</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-4 py-2 backdrop-blur">
-                <span className="flex h-2.5 w-2.5 relative">
-                  {liveCount > 0 && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />}
-                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${liveCount > 0 ? 'bg-red-600' : 'bg-muted-foreground/40'}`} />
-                </span>
-                <span className="text-sm font-bold">{liveCount}</span>
-                <span className="text-xs text-muted-foreground">Live now</span>
-              </div>
-            </div>
-          )}
-        </div>
+        </section>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="rounded-3xl border bg-card p-6 animate-pulse space-y-4">
-                <div className="h-4 w-20 rounded-full bg-muted" />
-                <div className="h-6 w-3/4 rounded-lg bg-muted" />
-                <div className="h-4 w-full rounded bg-muted" />
-                <div className="h-4 w-2/3 rounded bg-muted" />
-                <div className="h-10 w-full rounded-xl bg-muted mt-6" />
+              <div key={i} className="animate-pulse rounded-lg border bg-card p-5">
+                <div className="h-3 w-20 rounded bg-muted" />
+                <div className="mt-5 h-7 w-3/4 rounded bg-muted" />
+                <div className="mt-3 h-4 w-full rounded bg-muted" />
+                <div className="mt-2 h-4 w-2/3 rounded bg-muted" />
+                <div className="mt-6 h-10 w-full rounded bg-muted" />
               </div>
             ))}
           </div>
         ) : classrooms.length === 0 ? (
-          <div className="relative overflow-hidden rounded-3xl border border-dashed text-center p-14 bg-card">
-            <div className="inline-flex p-4 bg-[hsl(var(--profile-accent-solid))]/10 rounded-2xl">
-              <Users className="h-9 w-9 text-[hsl(var(--profile-accent-solid))]" />
+          <div className="rounded-lg border border-dashed bg-card p-10 text-center">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-muted">
+              <Users className="h-6 w-6 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-bold mt-5">No Classrooms Yet</h3>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-2">
+            <h3 className="mt-4 text-lg font-bold">No classrooms</h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
               {isTrainer
-                ? "You haven't created any classrooms yet. Get started by creating your first classroom."
-                : "You are not enrolled in any classrooms yet. Contact your trainer to add you by email."}
+                ? "Create the first classroom when training is ready."
+                : "No classroom enrollment found yet."}
             </p>
             {isTrainer && (
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="mt-6 rounded-2xl font-semibold bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white gap-2"
-              >
-                <Plus className="h-4 w-4" /> Create your first classroom
+              <Button onClick={() => setModalOpen(true)} className="mt-5 gap-2 font-semibold">
+                <Plus className="h-4 w-4" />
+                Create classroom
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {classrooms.map((classroom) => {
               const isLive = !!classroom.live_url;
               return (
-                <div
+                <article
                   key={classroom.id}
-                  className={`group relative overflow-hidden rounded-3xl border bg-card p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                    isLive ? 'border-red-500/40 shadow-lg shadow-red-500/5' : 'hover:border-[hsl(var(--profile-accent-solid))]/40'
+                  className={`group flex min-h-[238px] flex-col rounded-lg border bg-card p-5 transition hover:border-foreground/20 hover:shadow-sm ${
+                    isLive ? 'border-red-500/40' : ''
                   }`}
                 >
-                  {/* Accent glow on hover */}
-                  <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-[hsl(var(--profile-accent-2))]/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className={`inline-flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold uppercase ${
+                        isLive ? 'border-red-600 text-red-600' : 'border-muted-foreground/40 text-muted-foreground'
+                      }`}
+                    >
+                      {isLive ? <Radio className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
+                      {isLive ? 'Live' : 'Ready'}
+                    </span>
+                    <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-xs font-bold">
+                      {initialsOf(classroom.trainer_name) || '?'}
+                    </span>
+                  </div>
 
-                  <div className="relative">
-                    <div className="flex items-center justify-between">
-                      {isLive ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-red-500 border border-red-500/20">
-                          <Radio className="h-3 w-3" /> Live Session
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                          <BookOpen className="h-3 w-3" /> Classroom
-                        </span>
-                      )}
-                      {isLive && (
-                        <span className="flex h-2.5 w-2.5 relative">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600" />
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="text-xl font-bold mt-4 line-clamp-1">{classroom.name}</h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px] mt-1.5">
-                      {classroom.description || "No description provided."}
+                  <div className="mt-5 min-w-0 flex-1">
+                    <h3 className="line-clamp-2 text-lg font-bold leading-snug">{classroom.name}</h3>
+                    <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+                      {classroom.description || 'No description provided.'}
                     </p>
                   </div>
 
-                  <div className="relative mt-5 flex items-center gap-3 rounded-2xl border bg-muted/30 p-3">
-                    <span className="grid place-items-center h-9 w-9 rounded-full bg-[hsl(var(--profile-accent-solid))]/15 text-[hsl(var(--profile-accent-solid))] text-xs font-bold">
-                      {initialsOf(classroom.trainer_name)}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{classroom.trainer_name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Created {new Date(classroom.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
+                  <div className="mt-5 border-t pt-3 text-xs text-muted-foreground">
+                    <p className="truncate font-medium text-foreground">{classroom.trainer_name || 'Trainer'}</p>
+                    <p>Created {new Date(classroom.created_at).toLocaleDateString()}</p>
                   </div>
 
-                  <ProgressLink href={`/classroom/live/${classroom.id}`} className="relative w-full mt-4">
+                  <ProgressLink href={`/classroom/live/${classroom.id}`} className="mt-4">
                     <Button
-                      className={`w-full font-semibold rounded-2xl flex items-center justify-center gap-2 group/btn ${
-                        isLive
-                          ? 'bg-red-600 hover:bg-red-700 text-white'
-                          : 'bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white'
+                      className={`w-full justify-between gap-2 font-semibold ${
+                        isLive ? 'bg-red-600 text-white hover:bg-red-700' : ''
                       }`}
                     >
-                      {isLive ? 'Join Live Session' : 'Enter Classroom'}
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                      {isLive ? 'Join live session' : 'Enter classroom'}
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </ProgressLink>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

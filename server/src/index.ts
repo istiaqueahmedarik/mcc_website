@@ -25,6 +25,7 @@ import typingParticipantRoute from "./routes/typingParticipantRoute";
 import classroomRoute from "./routes/classroomRoute";
 import trainerFormRoute from "./routes/trainerFormRoute";
 import { initDb } from "./utils/dbInit";
+import { websocket } from "./utils/bunWebSocket";
 import {
   autoStartScheduledRooms,
   isDbConnectionError,
@@ -124,4 +125,5 @@ setInterval(async () => {
 export default {
   port: process.env.PORT || 5000,
   fetch: app.fetch,
+  websocket,
 };

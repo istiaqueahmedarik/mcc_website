@@ -2,12 +2,9 @@
 import React, { memo } from "react";
 import {
   MarkdownEditorView,
-  MarkupString,
   useMarkdownEditor,
 } from "@gravity-ui/markdown-editor";
-import { Button } from "@gravity-ui/uikit";
 import * as htmlExtension from "@diplodoc/html-extension";
-import { useYfmHtmlBlockStyles } from "../hooks/useYfmHtmlBlockStyles";
 import { wYfmHtmlBlockItemData } from "@gravity-ui/markdown-editor";
 
 const resolveHtmlTransform = () => {
@@ -24,37 +21,36 @@ const resolveHtmlTransform = () => {
 
 const htmlTransform = resolveHtmlTransform();
 
-export const Editor = memo(({ onChange, value }) => {
-  const yfmHtmlBlockStyles = useYfmHtmlBlockStyles();
-  const mdPlugins = htmlTransform ? [htmlTransform({ bundle: false })] : [];
+export const Editor = memo(
+  ({ className = "", minHeightClassName = "min-h-[80vh]", onChange, value }) => {
+    const mdPlugins = htmlTransform ? [htmlTransform({ bundle: false })] : [];
 
-  const editor = useMarkdownEditor({
-    md: {
-      html: true,
-      plugins: mdPlugins,
-    },
-    initialValue: value,
-    initial: {
-      markup: value,
-    },
-    extensionOptions: {
-      commandMenu: { actions: [wYfmHtmlBlockItemData] },
-    },
-  });
+    const editor = useMarkdownEditor({
+      md: {
+        html: true,
+        plugins: mdPlugins,
+      },
+      initialValue: value,
+      initial: {
+        markup: value,
+      },
+      extensionOptions: {
+        commandMenu: { actions: [wYfmHtmlBlockItemData] },
+      },
+    });
 
-  React.useEffect(() => {
-    const changeHandler = (e) => {
-      const value = editor.getValue();
-      onChange(value);
-    };
-    editor.on("change", changeHandler);
-    return () => {
-      editor.off("change", changeHandler);
-    };
-  }, [onChange, editor]);
+    React.useEffect(() => {
+      const changeHandler = () => {
+        const value = editor.getValue();
+        onChange(value);
+      };
+      editor.on("change", changeHandler);
+      return () => {
+        editor.off("change", changeHandler);
+      };
+    }, [onChange, editor]);
 
-  return (
-    <>
+    return (
       <MarkdownEditorView
         settingsVisible
         enableSubmitInPreview={true}
@@ -62,8 +58,8 @@ export const Editor = memo(({ onChange, value }) => {
         stickyToolbar
         autofocus
         editor={editor}
-        className="min-h-[80vh]"
+        className={`${minHeightClassName} ${className}`.trim()}
       />
-    </>
-  );
-});
+    );
+  }
+);

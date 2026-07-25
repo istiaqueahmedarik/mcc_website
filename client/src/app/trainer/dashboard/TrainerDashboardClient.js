@@ -1,26 +1,25 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { get_with_token, post_with_token } from '@/lib/action';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import ProgressLink from '@/components/ProgressLink';
-import { 
-  Users, 
-  Plus, 
-  BookOpen, 
-  AlertCircle, 
-  Radio, 
-  ArrowRight, 
-  ShieldCheck, 
-  Layers, 
-  UserCheck, 
-  Compass, 
-  Award,
+import { useEffect, useState } from "react";
+import { get_with_token, post_with_token } from "@/lib/action";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import ProgressLink from "@/components/ProgressLink";
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  ClipboardList,
+  Layers,
+  Plus,
+  Radio,
+  ShieldCheck,
+  UserCheck,
+  Users,
   Video,
-  ClipboardList
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,20 +33,20 @@ import {
 export default function TrainerDashboardClient() {
   const [classrooms, setClassrooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newClassName, setNewClassName] = useState('');
-  const [newClassDesc, setNewClassDesc] = useState('');
+  const [newClassName, setNewClassName] = useState("");
+  const [newClassDesc, setNewClassDesc] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
-    const userRes = await get_with_token('auth/user/profile');
+    const userRes = await get_with_token("auth/user/profile");
     if (userRes && userRes.result && userRes.result[0]) {
       setProfile(userRes.result[0]);
     }
 
-    const res = await get_with_token('classroom/list');
+    const res = await get_with_token("classroom/list");
     if (res && res.result) {
       setClassrooms(res.result);
     }
@@ -60,109 +59,136 @@ export default function TrainerDashboardClient() {
 
   const handleCreateClassroom = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     if (!newClassName.trim()) {
-      setError('Classroom name is required');
+      setError("Classroom name is required");
       return;
     }
-    const res = await post_with_token('classroom/create', {
+    const res = await post_with_token("classroom/create", {
       name: newClassName,
       description: newClassDesc,
     });
     if (res && res.success) {
-      setNewClassName('');
-      setNewClassDesc('');
+      setNewClassName("");
+      setNewClassDesc("");
       setModalOpen(false);
       fetchData();
     } else {
-      setError(res.error || 'Failed to create classroom');
+      setError(res.error || "Failed to create classroom");
     }
   };
 
   const liveClassrooms = classrooms.filter((c) => c.live_url);
   const totalLive = liveClassrooms.length;
+  const quietClassrooms = classrooms.length - totalLive;
+  const roleLabel = profile?.admin ? "Admin + Trainer" : "Trainer";
+
+  const summaryCards = [
+    {
+      label: "Classrooms",
+      value: classrooms.length,
+      detail: `${quietClassrooms} ready`,
+      icon: BookOpen,
+      tone: "border-sky-600 text-sky-600",
+    },
+    {
+      label: "Live now",
+      value: totalLive,
+      detail: totalLive ? "Instructor action" : "No live room",
+      icon: Radio,
+      tone: "border-red-600 text-red-600",
+    },
+    {
+      label: "Role",
+      value: roleLabel,
+      detail: profile?.admin ? "Trainer controls unlocked" : "Trainer access",
+      icon: ShieldCheck,
+      tone: "border-emerald-600 text-emerald-600",
+    },
+    {
+      label: "Forms",
+      value: "Builder",
+      detail: "Create and manage",
+      icon: ClipboardList,
+      tone: "border-violet-600 text-violet-600",
+    },
+  ];
 
   const initialsOf = (name) =>
-    (name || '?')
-      .split(' ')
+    (name || "?")
+      .split(" ")
       .filter(Boolean)
       .slice(0, 2)
       .map((n) => n[0]?.toUpperCase())
-      .join('');
+      .join("");
 
   return (
-    <div className="relative min-h-screen pb-16">
-      {/* Background ambient lighting */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-20 h-96 w-96 rounded-full bg-[hsl(var(--profile-accent-solid))]/15 blur-3xl" />
-        <div className="absolute top-40 right-0 h-96 w-96 rounded-full bg-[hsl(var(--profile-accent-3))]/15 blur-3xl" />
-      </div>
-
-      <div className="relative container mx-auto py-10 px-4 max-w-7xl space-y-10">
-        
-        {/* Banner Section */}
-        <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-[hsl(var(--profile-accent-solid))]/[0.15] via-card to-card p-8 md:p-10 shadow-lg">
-          <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-[hsl(var(--profile-accent-2))]/20 blur-3xl" />
-          
-          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/80 px-3.5 py-1 text-xs font-semibold text-muted-foreground backdrop-blur">
-                <ShieldCheck className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
-                Trainer Command Center
-              </div>
-              <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight flex items-center gap-3">
-                Trainer Dashboard
+    <div className="min-h-screen bg-background">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid gap-6 border-b pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Trainer dashboard</p>
+              <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">
+                Learning operations
               </h1>
-              <p className="text-muted-foreground mt-3 max-w-xl text-sm md:text-base">
-                Manage your live classes, launch new training sessions, assign competitive programming problems, and track student performance in real-time.
+              <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+                Live rooms, classroom setup, and form tools without the noise.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <ProgressLink href="/trainer/forms">
-                <Button variant="outline" className="font-semibold rounded-2xl gap-2 py-6">
-                  <ClipboardList className="h-4 w-4" /> Form Creator
+                <Button variant="outline" className="gap-2 font-semibold">
+                  <ClipboardList className="h-4 w-4" />
+                  Form Creator
                 </Button>
               </ProgressLink>
 
               <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogTrigger asChild>
-                  <Button className="font-semibold shadow-xl shadow-[hsl(var(--profile-accent-solid))]/25 flex items-center gap-2 rounded-2xl bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white px-5 py-6">
-                    <Plus className="h-5 w-5" /> Create New Classroom
+                  <Button className="gap-2 font-semibold">
+                    <Plus className="h-4 w-4" />
+                    New classroom
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[560px]">
                   <DialogHeader>
-                    <DialogTitle>Create New Classroom</DialogTitle>
+                    <DialogTitle>Create classroom</DialogTitle>
                     <DialogDescription>
-                      Set up a new training classroom to invite students and run live CP problem sessions.
+                      Set a clear name and short description for students.
                     </DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleCreateClassroom} className="space-y-4 py-4">
+                  <form onSubmit={handleCreateClassroom} className="space-y-4 py-2">
                     {error && (
-                      <div className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                        <AlertCircle className="h-4 w-4" /> {error}
+                      <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+                        <AlertCircle className="h-4 w-4" />
+                        {error}
                       </div>
                     )}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Classroom Name</label>
-                      <Input
-                        placeholder="e.g. Advanced Graph Theory & Segment Trees"
-                        value={newClassName}
-                        onChange={(e) => setNewClassName(e.target.value)}
-                        required
-                      />
+
+                    <div className="grid gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold">Classroom name</label>
+                        <Input
+                          placeholder="Advanced Graph Theory"
+                          value={newClassName}
+                          onChange={(e) => setNewClassName(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold">Description</label>
+                        <Textarea
+                          placeholder="Topics, schedule, audience, outcomes"
+                          value={newClassDesc}
+                          onChange={(e) => setNewClassDesc(e.target.value)}
+                          className="min-h-24"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Description</label>
-                      <Textarea
-                        placeholder="Topics covered, schedule details, target audience..."
-                        value={newClassDesc}
-                        onChange={(e) => setNewClassDesc(e.target.value)}
-                      />
-                    </div>
+
                     <DialogFooter>
-                      <Button type="submit" className="w-full font-semibold rounded-xl">
+                      <Button type="submit" className="w-full font-semibold sm:w-auto">
                         Create Classroom
                       </Button>
                     </DialogFooter>
@@ -172,183 +198,177 @@ export default function TrainerDashboardClient() {
 
               {profile?.admin && (
                 <ProgressLink href="/admin/trainers">
-                  <Button variant="outline" className="font-semibold rounded-2xl gap-2 py-6">
-                    <UserCheck className="h-4 w-4" /> Manage Trainers
+                  <Button variant="outline" className="gap-2 font-semibold">
+                    <UserCheck className="h-4 w-4" />
+                    Manage Trainers
                   </Button>
                 </ProgressLink>
               )}
             </div>
-          </div>
+        </section>
 
-          {/* Quick Metrics */}
-          {!loading && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-8 border-t border-border/50">
-              <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Classrooms</span>
-                  <BookOpen className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
+        {!loading && (
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {summaryCards.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-lg border bg-card p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 border-l pl-3">
+                      <p className="text-xs font-semibold uppercase text-muted-foreground">
+                        {item.label}
+                      </p>
+                      <p className="mt-2 truncate text-2xl font-bold">{item.value}</p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</p>
+                    </div>
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center border-l ${item.tone}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                  </div>
                 </div>
-                <p className="text-2xl font-black mt-2">{classrooms.length}</p>
-              </div>
+              );
+            })}
+          </section>
+        )}
 
-              <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Live Now</span>
-                  <Radio className="h-4 w-4 text-red-500" />
-                </div>
-                <p className="text-2xl font-black mt-2 text-red-500">{totalLive}</p>
-              </div>
-
-              <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Role Status</span>
-                  <Award className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
-                </div>
-                <p className="text-lg font-extrabold mt-2 capitalize">{profile?.admin ? "Admin & Trainer" : "Trainer"}</p>
-              </div>
-
-              <div className="rounded-2xl border bg-background/60 p-4 backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Hub</span>
-                  <Compass className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <ProgressLink href="/classroom/list" className="inline-block mt-2 text-xs font-bold text-[hsl(var(--profile-accent-solid))] hover:underline">
-                  View All Hubs &rarr;
-                </ProgressLink>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Live Active Sessions Notice */}
         {totalLive > 0 && (
-          <div className="rounded-3xl border border-red-500/30 bg-red-500/5 p-6 shadow-md">
-            <div className="flex items-center gap-3">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600" />
-              </span>
-              <h2 className="text-lg font-bold text-red-500">Active Live Sessions ({totalLive})</h2>
+          <section className="rounded-lg border border-red-500/30 bg-card">
+            <div className="flex flex-col gap-3 border-b border-red-500/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+                </span>
+                <div>
+                    <h2 className="text-base font-bold text-red-700 dark:text-red-300">
+                      Live sessions
+                    </h2>
+                  <p className="text-sm text-muted-foreground">{totalLive} active room{totalLive === 1 ? "" : "s"}</p>
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              You have active live sessions in progress. Click to join directly as instructor.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+
+            <div className="divide-y divide-red-500/10">
               {liveClassrooms.map((c) => (
-                <div key={c.id} className="rounded-2xl border bg-card p-4 flex items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-bold text-sm line-clamp-1">{c.name}</h4>
-                    <p className="text-xs text-muted-foreground">{c.trainer_name}</p>
+                <div key={c.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-bold">{c.name}</h3>
+                    <p className="truncate text-xs text-muted-foreground">{c.trainer_name}</p>
                   </div>
                   <ProgressLink href={`/classroom/live/${c.id}`}>
-                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl gap-1.5">
-                      <Video className="h-3.5 w-3.5" /> Join Live
+                    <Button size="sm" className="w-full gap-2 bg-red-600 text-white hover:bg-red-700 sm:w-auto">
+                      <Video className="h-4 w-4" />
+                      Join Live
                     </Button>
                   </ProgressLink>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Managed Classrooms List */}
-        <div>
-          <div className="flex items-center justify-between mb-6">
+        <section className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight">Your Classrooms</h2>
-              <p className="text-sm text-muted-foreground">Select a classroom to launch live sessions or manage student rosters.</p>
+              <h2 className="text-xl font-bold tracking-tight">Classroom workspace</h2>
+              <p className="text-sm text-muted-foreground">Open, prepare, or continue.</p>
             </div>
+            <ProgressLink href="/classroom/list" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+              All classrooms
+              <ArrowRight className="h-4 w-4" />
+            </ProgressLink>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-3xl border bg-card p-6 animate-pulse space-y-4">
-                  <div className="h-4 w-20 rounded-full bg-muted" />
-                  <div className="h-6 w-3/4 rounded-lg bg-muted" />
-                  <div className="h-4 w-full rounded bg-muted" />
-                  <div className="h-10 w-full rounded-xl bg-muted mt-6" />
+                <div key={i} className="rounded-lg border bg-card p-5">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-4 w-24 rounded bg-muted" />
+                    <div className="h-7 w-3/4 rounded bg-muted" />
+                    <div className="h-4 w-full rounded bg-muted" />
+                    <div className="h-4 w-2/3 rounded bg-muted" />
+                    <div className="h-10 w-full rounded bg-muted" />
+                  </div>
                 </div>
               ))}
             </div>
           ) : classrooms.length === 0 ? (
-            <div className="relative overflow-hidden rounded-3xl border border-dashed text-center p-14 bg-card">
-              <div className="inline-flex p-4 bg-[hsl(var(--profile-accent-solid))]/10 rounded-2xl">
-                <Layers className="h-9 w-9 text-[hsl(var(--profile-accent-solid))]" />
+            <div className="rounded-lg border border-dashed bg-card p-8 text-center">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-muted">
+                <Layers className="h-6 w-6 text-muted-foreground" />
               </div>
-              <h3 className="text-xl font-bold mt-5">No Classrooms Created Yet</h3>
-              <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-2">
-                Start by creating your first interactive training classroom to onboard students.
+              <h3 className="mt-4 text-lg font-bold">No classrooms yet</h3>
+              <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+                Create the first classroom to start trainer operations.
               </p>
-              <Button
-                onClick={() => setModalOpen(true)}
-                className="mt-6 rounded-2xl font-semibold bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white gap-2"
-              >
-                <Plus className="h-4 w-4" /> Create First Classroom
+              <Button onClick={() => setModalOpen(true)} className="mt-5 gap-2 font-semibold">
+                <Plus className="h-4 w-4" />
+                Create Classroom
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {classrooms.map((classroom) => {
                 const isLive = !!classroom.live_url;
                 return (
-                  <div
+                  <article
                     key={classroom.id}
-                    className={`group relative overflow-hidden rounded-3xl border bg-card p-6 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                      isLive ? 'border-red-500/40 shadow-lg shadow-red-500/5' : 'hover:border-[hsl(var(--profile-accent-solid))]/40'
+                    className={`group flex min-h-[238px] flex-col rounded-lg border bg-card p-5 transition hover:border-foreground/20 hover:shadow-sm ${
+                      isLive ? "border-red-500/40" : "hover:border-foreground/20"
                     }`}
                   >
-                    <div className="relative">
-                      <div className="flex items-center justify-between">
-                        {isLive ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-red-500 border border-red-500/20">
-                            <Radio className="h-3 w-3" /> Live Session
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                            <BookOpen className="h-3 w-3" /> Classroom
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span
+                        className={`inline-flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold uppercase ${
+                          isLive
+                            ? "border-red-600 text-red-600"
+                            : "border-muted-foreground/40 text-muted-foreground"
+                        }`}
+                      >
+                        {isLive ? <Radio className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        {isLive ? "Live" : "Ready"}
+                      </span>
+                      <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-xs font-bold">
+                        {initialsOf(classroom.trainer_name) || "?"}
+                      </span>
+                    </div>
 
-                      <h3 className="text-xl font-bold mt-4 line-clamp-1">{classroom.name}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-2 min-h-[40px] mt-1.5">
+                    <div className="mt-4 min-w-0 flex-1">
+                      <h3 className="line-clamp-2 text-lg font-bold">{classroom.name}</h3>
+                      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
                         {classroom.description || "No description provided."}
                       </p>
                     </div>
 
-                    <div className="relative mt-5 flex items-center gap-3 rounded-2xl border bg-muted/30 p-3">
-                      <span className="grid place-items-center h-9 w-9 rounded-full bg-[hsl(var(--profile-accent-solid))]/15 text-[hsl(var(--profile-accent-solid))] text-xs font-bold">
-                        {initialsOf(classroom.trainer_name)}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold truncate">{classroom.trainer_name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Created {new Date(classroom.created_at).toLocaleDateString()}
-                        </p>
+                    <div className="mt-5 grid gap-2 border-t pt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span className="truncate">{classroom.trainer_name || "Trainer"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="h-4 w-4" />
+                        <span>Created {new Date(classroom.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
 
-                    <ProgressLink href={`/classroom/live/${classroom.id}`} className="relative w-full mt-4">
+                    <ProgressLink href={`/classroom/live/${classroom.id}`} className="mt-5">
                       <Button
-                        className={`w-full font-semibold rounded-2xl flex items-center justify-center gap-2 group/btn ${
-                          isLive
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white'
+                        className={`w-full justify-between gap-2 font-semibold ${
+                          isLive ? "bg-red-600 text-white hover:bg-red-700" : ""
                         }`}
                       >
-                        {isLive ? 'Manage Live Session' : 'Enter Classroom'}
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                          <span>{isLive ? "Manage live session" : "Enter classroom"}</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </Button>
                     </ProgressLink>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           )}
-        </div>
-
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

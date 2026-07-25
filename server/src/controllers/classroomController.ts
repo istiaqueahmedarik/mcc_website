@@ -3,6 +3,12 @@ import sql from '../db';
 import { sendEmail } from '../sendEmail';
 import * as cheerio from 'cheerio';
 import { broadcast, userNotificationChannel } from '../utils/realtime';
+import {
+  closeClassroomBoardRoom,
+  consumeClassroomBoardJoinToken,
+  createClassroomBoardJoinToken,
+  type BoardJoinContext,
+} from '../utils/classroomBoardSync';
 
 // Fire-and-forget email delivery so the SMTP round-trip never blocks the HTTP response.
 function dispatchNotificationEmail(email: string, fullName: string | null, title: string, message: string, link?: string) {
@@ -62,10 +68,55 @@ async function createNotifications(userIds: string[], title: string, message: st
 }
 
 // Scrape helper for problem details
+function cleanProblemTitle(title: string, fallback: string) {
+  const normalized = title.trim();
+  if (!normalized) return fallback;
+  return normalized.replace(/^(?:[0-9]+)?[A-Z][0-9]?\.\s+/, '').trim() || fallback;
+}
+
+function parseCodeforcesProblem(problemLink: string) {
+  const match = problemLink.match(/codeforces\.com\/(?:contest|problemset\/problem)\/(\d+)\/(?:problem\/)?([A-Za-z][0-9]?)/i);
+  if (!match) return null;
+  return {
+    contestId: Number(match[1]),
+    index: match[2].toUpperCase(),
+  };
+}
+
+async function fetchCodeforcesProblemFromApi(problemLink: string) {
+  const parsed = parseCodeforcesProblem(problemLink);
+  if (!parsed || !Number.isFinite(parsed.contestId)) return null;
+
+  try {
+    const res = await fetch('https://codeforces.com/api/problemset.problems', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    const data: any = await res.json();
+    if (data?.status !== 'OK' || !Array.isArray(data?.result?.problems)) return null;
+
+    const problem = data.result.problems.find((item: any) => (
+      item.contestId === parsed.contestId &&
+      String(item.index || '').toUpperCase() === parsed.index
+    ));
+    if (!problem) return null;
+
+    return {
+      title: problem.name || `Codeforces ${parsed.contestId}${parsed.index}`,
+      details: `${problem.timeLimit || 'Standard'} sec | ${problem.memoryLimit || 'Standard'} MB`,
+      difficulty: problem.rating ? `${problem.rating}` : 'Unrated',
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 async function fetchProblemMetadata(platform: string, problemLink: string) {
   try {
     const cleanLink = problemLink.trim();
     if (platform === 'codeforces') {
+      const apiMeta = await fetchCodeforcesProblemFromApi(cleanLink);
+      if (apiMeta) return apiMeta;
+
       const res = await fetch(cleanLink, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       const html = await res.text();
       const $ = cheerio.load(html);
@@ -74,7 +125,7 @@ async function fetchProblemMetadata(platform: string, problemLink: string) {
       const memoryLimit = $('.problem-statement .header .memory-limit').first().text().trim() || 'Standard Memory Limit';
       const ratingTag = $('.tag-box[title="Difficulty"]').first().text().trim() || 'Medium';
       return {
-        title: title.replace(/^[A-Z0-9\.\s]+/, ''), // clean A. Problem Title to just Problem Title
+        title: cleanProblemTitle(title, 'Codeforces Problem'),
         details: `${timeLimit} | ${memoryLimit}`,
         difficulty: ratingTag || 'Medium'
       };
@@ -201,6 +252,108 @@ async function canManageClassroom(userId: string, classroomId: string): Promise<
   return true;
 }
 
+const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
+const CHAT_REACTIONS = new Set(['like', 'heart', 'celebrate']);
+const PROBLEM_STATUS_VALUES = new Set(['not_solved', 'tried', 'solved']);
+
+function normalizeText(value: unknown, maxLength = 500): string {
+  return String(value ?? '').trim().slice(0, maxLength);
+}
+
+function normalizeNullableText(value: unknown, maxLength = 500): string | null {
+  const text = normalizeText(value, maxLength);
+  return text || null;
+}
+
+function normalizePositiveInteger(value: unknown): number | null {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return null;
+  return Math.floor(num);
+}
+
+function normalizeProgressStatus(value: unknown) {
+  const status = String(value ?? '').trim();
+  return PROBLEM_STATUS_VALUES.has(status) ? status : null;
+}
+
+function normalizeProblemTag(value: unknown): string | null {
+  const tag = String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  if (!tag || !TAG_ALLOWED_REGEX.test(tag)) return null;
+  return tag;
+}
+
+function normalizeProblemTags(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : String(value ?? '').split(',');
+  const normalized = values
+    .map(normalizeProblemTag)
+    .filter((tag): tag is string => Boolean(tag));
+  return [...new Set(normalized)];
+}
+
+async function ensureProblemTags(tags: string[], createdBy: string) {
+  if (tags.length === 0) return;
+  await sql`
+    INSERT INTO public.problem_tag_dictionary ${sql(
+      tags.map((name) => ({ name, created_by: createdBy }))
+    )}
+    ON CONFLICT (name) DO NOTHING
+  `;
+}
+
+async function getClassAccess(userId: string, classroomId: string, classId: string) {
+  const classRows = await sql`
+    SELECT c.id AS class_id, c.status, cr.id AS classroom_id, cr.created_by, cs.id AS student_check
+    FROM classes c
+    JOIN classrooms cr ON c.classroom_id = cr.id
+    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId}
+    WHERE c.id = ${classId} AND cr.id = ${classroomId}
+  `;
+
+  if (classRows.length === 0) {
+    return { error: 'Class not found', status: 404 as const };
+  }
+
+  const userRows = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
+  const isTrainer = classRows[0].created_by === userId || Boolean(userRows[0]?.admin || userRows[0]?.trainer);
+  const isStudent = Boolean(classRows[0].student_check);
+
+  if (!isTrainer && !isStudent) {
+    return { error: 'Unauthorized access to class', status: 403 as const };
+  }
+
+  return {
+    classId: classRows[0].class_id,
+    classroomId: classRows[0].classroom_id,
+    createdBy: classRows[0].created_by,
+    isTrainer,
+    isStudent,
+    status: classRows[0].status,
+  };
+}
+
+async function isClassroomParticipant(userId: string, classroomId: string, trainerId: string) {
+  if (userId === trainerId) return true;
+  const participant = await sql`
+    SELECT cs.id
+    FROM classroom_students cs
+    WHERE cs.classroom_id = ${classroomId} AND cs.student_id = ${userId}
+  `;
+  return participant.length > 0;
+}
+
+async function canAccessClassroom(userId: string, classroomId: string): Promise<boolean> {
+  const rows = await sql`
+    SELECT cr.created_by, u.admin, u.trainer, cs.id AS student_check
+    FROM classrooms cr
+    JOIN users u ON u.id = ${userId}
+    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId}
+    WHERE cr.id = ${classroomId}
+  `;
+
+  if (rows.length === 0) return false;
+  return rows[0].created_by === userId || Boolean(rows[0].admin || rows[0].trainer || rows[0].student_check);
+}
+
 // -------------------------------------------------------------
 // Classroom CRUD & Management
 // -------------------------------------------------------------
@@ -290,7 +443,7 @@ export const getClassroomDetails = async (c: Context) => {
         SELECT * FROM classes WHERE classroom_id = ${classroomId} ORDER BY scheduled_time ASC
       `,
       sql`
-        SELECT * FROM classroom_resources WHERE classroom_id = ${classroomId} AND class_id IS NULL ORDER BY created_at DESC
+        SELECT * FROM classroom_resources WHERE classroom_id = ${classroomId} ORDER BY created_at DESC
       `,
       sql`
         SELECT t.id, t.name, 
@@ -315,8 +468,41 @@ export const getClassroomDetails = async (c: Context) => {
       classes,
       resources,
       teams,
+      currentUserId,
       isTrainer
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getProblemTagDictionary = async (c: Context) => {
+  try {
+    const tags = await sql`
+      SELECT name
+      FROM public.problem_tag_dictionary
+      ORDER BY name ASC
+    `;
+    return c.json({ tags: tags.map((tag: any) => tag.name) });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const createProblemTag = async (c: Context) => {
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const userRows = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
+    if (!Boolean(userRows[0]?.admin || userRows[0]?.trainer)) {
+      return c.json({ error: 'Only instructors can create problem tags' }, 403);
+    }
+
+    const { name } = await c.req.json();
+    const tag = normalizeProblemTag(name);
+    if (!tag) return c.json({ error: 'Invalid tag name' }, 400);
+
+    await ensureProblemTags([tag], userId);
+    return c.json({ success: true, tag });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -539,10 +725,14 @@ export const completeClass = async (c: Context) => {
 export const assignProblem = async (c: Context) => {
   const { id: trainerId } = c.get('jwtPayload');
   try {
-    const { classId, studentId, teamId, platform, problemLink, timerMinutes, tags } = await c.req.json();
+    const { classId, studentId, teamId, platform, problemLink, timerMinutes, difficulty, tags } = await c.req.json();
     if (!classId || (!studentId && !teamId) || !platform || !problemLink) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
+    const normalizedTags = normalizeProblemTags(tags);
+    const trainerDifficulty = typeof difficulty === 'string' && difficulty.trim()
+      ? difficulty.trim().slice(0, 60)
+      : 'Medium';
 
     // Verify trainer authorization
     const classCheck = await sql`
@@ -560,13 +750,12 @@ export const assignProblem = async (c: Context) => {
 
     // Fetch rich metadata for CF/CC/Atcoder
     let title = 'CP Problem';
-    let difficulty = 'Medium';
+    const difficultyLabel = trainerDifficulty;
     let details = '';
     
     if (platform !== 'custom') {
       const meta = await fetchProblemMetadata(platform, problemLink);
       title = meta.title;
-      difficulty = meta.difficulty;
       details = meta.details;
     } else {
       // Clean custom titles if url-based
@@ -585,6 +774,7 @@ export const assignProblem = async (c: Context) => {
 
     let assignedProblems: any[] = [];
     if (targetStudentIds.length > 0) {
+      await ensureProblemTags(normalizedTags, trainerId);
       assignedProblems = await sql`
         INSERT INTO class_problems ${sql(
           targetStudentIds.map(sId => ({
@@ -593,10 +783,10 @@ export const assignProblem = async (c: Context) => {
             platform,
             problem_link: problemLink,
             title,
-            difficulty,
+            difficulty: difficultyLabel,
             points: details,
             timer_minutes: timerMinutes || null,
-            tags: tags || [],
+            tags: normalizedTags,
           }))
         )}
         RETURNING *
@@ -611,6 +801,60 @@ export const assignProblem = async (c: Context) => {
     }
 
     return c.json({ success: true, result: assignedProblems });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const previewProblem = async (c: Context) => {
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const { classId, platform, problemLink } = await c.req.json();
+    const normalizedPlatform = String(platform || '').trim().toLowerCase();
+    const normalizedLink = String(problemLink || '').trim();
+    const allowedPlatforms = new Set(['codeforces', 'codechef', 'atcoder', 'custom']);
+
+    if (!classId || !normalizedPlatform || !normalizedLink) {
+      return c.json({ error: 'Class, platform, and problem link are required' }, 400);
+    }
+    if (!allowedPlatforms.has(normalizedPlatform)) {
+      return c.json({ error: 'Unsupported problem platform' }, 400);
+    }
+
+    const classCheck = await sql`
+      SELECT cr.id AS classroom_id
+      FROM classes c
+      JOIN classrooms cr ON c.classroom_id = cr.id
+      WHERE c.id = ${classId}
+    `;
+    if (classCheck.length === 0) return c.json({ error: 'Class not found' }, 404);
+
+    const isAuthorized = await canManageClassroom(trainerId, classCheck[0].classroom_id);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    let meta;
+    if (normalizedPlatform === 'custom') {
+      const parts = normalizedLink.split('/').filter(Boolean);
+      const slug = parts[parts.length - 1] || 'Problem';
+      meta = {
+        title: `Custom: ${slug}`,
+        details: 'Custom practice task',
+        difficulty: 'Trainer selected',
+      };
+    } else {
+      meta = await fetchProblemMetadata(normalizedPlatform, normalizedLink);
+    }
+
+    return c.json({
+      success: true,
+      preview: {
+        platform: normalizedPlatform,
+        problemLink: normalizedLink,
+        title: meta.title,
+        difficulty: meta.difficulty,
+        details: meta.details,
+      },
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -846,6 +1090,663 @@ export const addHint = async (c: Context) => {
 };
 
 // -------------------------------------------------------------
+// Classroom Topics, Team Assignments, and Analytics
+// -------------------------------------------------------------
+
+export const listClassroomTopics = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const topics = await sql`
+      SELECT
+        t.*,
+        COALESCE(resource_counts.count, 0)::int AS resource_count,
+        COALESCE(problem_counts.count, 0)::int AS problem_count,
+        COALESCE(assignment_counts.count, 0)::int AS assignment_count
+      FROM classroom_topics t
+      LEFT JOIN (
+        SELECT topic_id, COUNT(*) AS count
+        FROM classroom_topic_resources
+        GROUP BY topic_id
+      ) resource_counts ON resource_counts.topic_id = t.id
+      LEFT JOIN (
+        SELECT topic_id, COUNT(*) AS count
+        FROM classroom_topic_problems
+        GROUP BY topic_id
+      ) problem_counts ON problem_counts.topic_id = t.id
+      LEFT JOIN (
+        SELECT topic_id, COUNT(*) AS count
+        FROM classroom_team_topic_assignments
+        WHERE status = 'active'
+        GROUP BY topic_id
+      ) assignment_counts ON assignment_counts.topic_id = t.id
+      WHERE t.classroom_id = ${classroomId}
+      ORDER BY t.updated_at DESC, t.created_at DESC
+    `;
+
+    if (topics.length === 0) return c.json({ topics: [] });
+
+    const topicIds = topics.map((topic: any) => topic.id);
+    const [resources, problems, assignments] = await Promise.all([
+      sql`
+        SELECT *
+        FROM classroom_topic_resources
+        WHERE topic_id = ANY(${topicIds})
+        ORDER BY position ASC, created_at ASC
+      `,
+      sql`
+        SELECT *
+        FROM classroom_topic_problems
+        WHERE topic_id = ANY(${topicIds})
+        ORDER BY position ASC, created_at ASC
+      `,
+      sql`
+        SELECT a.*, tm.name AS team_name
+        FROM classroom_team_topic_assignments a
+        JOIN trainer_teams tm ON tm.id = a.team_id
+        WHERE a.topic_id = ANY(${topicIds})
+        ORDER BY a.assigned_at DESC
+      `,
+    ]);
+
+    return c.json({
+      topics: topics.map((topic: any) => ({
+        ...topic,
+        resources: resources.filter((resource: any) => resource.topic_id === topic.id),
+        problems: problems.filter((problem: any) => problem.topic_id === topic.id),
+        assignments: assignments.filter((assignment: any) => assignment.topic_id === topic.id),
+      })),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const createClassroomTopic = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { title, module, description } = await c.req.json();
+    const normalizedTitle = normalizeText(title, 120);
+    if (!normalizedTitle) return c.json({ error: 'Topic title is required' }, 400);
+
+    const topic = await sql`
+      INSERT INTO classroom_topics (classroom_id, created_by, title, module, description)
+      VALUES (
+        ${classroomId},
+        ${userId},
+        ${normalizedTitle},
+        ${normalizeNullableText(module, 80)},
+        ${normalizeNullableText(description, 1000)}
+      )
+      RETURNING *
+    `;
+    return c.json({ success: true, topic: topic[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassroomTopic = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { title, module, description, status } = await c.req.json();
+    const normalizedTitle = normalizeText(title, 120);
+    if (!normalizedTitle) return c.json({ error: 'Topic title is required' }, 400);
+    const normalizedStatus = ['active', 'archived'].includes(String(status || 'active')) ? String(status || 'active') : 'active';
+
+    const topic = await sql`
+      UPDATE classroom_topics
+      SET
+        title = ${normalizedTitle},
+        module = ${normalizeNullableText(module, 80)},
+        description = ${normalizeNullableText(description, 1000)},
+        status = ${normalizedStatus},
+        updated_at = now()
+      WHERE id = ${topicId} AND classroom_id = ${classroomId}
+      RETURNING *
+    `;
+    if (topic.length === 0) return c.json({ error: 'Topic not found' }, 404);
+    return c.json({ success: true, topic: topic[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const addClassroomTopicResource = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const topicRows = await sql`SELECT id FROM classroom_topics WHERE id = ${topicId} AND classroom_id = ${classroomId}`;
+    if (topicRows.length === 0) return c.json({ error: 'Topic not found' }, 404);
+
+    const { title, url, content, position } = await c.req.json();
+    const normalizedTitle = normalizeText(title, 160);
+    const normalizedUrl = normalizeNullableText(url, 1000);
+    const normalizedContent = normalizeNullableText(content, 10000);
+    if (!normalizedTitle) return c.json({ error: 'Resource title is required' }, 400);
+    if (!normalizedUrl && !normalizedContent) return c.json({ error: 'Add a URL or markdown content' }, 400);
+
+    const resource = await sql`
+      INSERT INTO classroom_topic_resources (topic_id, title, url, content, position)
+      VALUES (${topicId}, ${normalizedTitle}, ${normalizedUrl}, ${normalizedContent}, ${normalizePositiveInteger(position) || 0})
+      RETURNING *
+    `;
+    return c.json({ success: true, resource: resource[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const addClassroomTopicProblem = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const topicRows = await sql`SELECT id FROM classroom_topics WHERE id = ${topicId} AND classroom_id = ${classroomId}`;
+    if (topicRows.length === 0) return c.json({ error: 'Topic not found' }, 404);
+
+    const { platform, problemLink, title, difficulty, timerMinutes, tags, position } = await c.req.json();
+    const normalizedPlatform = normalizeText(platform || 'custom', 40).toLowerCase();
+    const normalizedLink = normalizeText(problemLink, 1200);
+    if (!normalizedPlatform || !normalizedLink) return c.json({ error: 'Platform and problem link are required' }, 400);
+
+    let metadata;
+    if (normalizedPlatform === 'custom') {
+      const parts = normalizedLink.split('/').filter(Boolean);
+      const slug = parts[parts.length - 1] || 'Problem';
+      metadata = {
+        title: normalizeText(title, 200) || `Custom: ${slug}`,
+        details: '',
+      };
+    } else {
+      metadata = await fetchProblemMetadata(normalizedPlatform, normalizedLink);
+    }
+
+    const normalizedTags = normalizeProblemTags(tags);
+    await ensureProblemTags(normalizedTags, userId);
+
+    const problem = await sql`
+      INSERT INTO classroom_topic_problems (
+        topic_id,
+        platform,
+        problem_link,
+        title,
+        details,
+        difficulty,
+        timer_minutes,
+        tags,
+        position
+      )
+      VALUES (
+        ${topicId},
+        ${normalizedPlatform},
+        ${normalizedLink},
+        ${normalizeText(title, 200) || metadata.title || 'CP Problem'},
+        ${metadata.details || null},
+        ${normalizeText(difficulty, 80) || metadata.difficulty || 'Trainer selected'},
+        ${normalizePositiveInteger(timerMinutes)},
+        ${normalizedTags},
+        ${normalizePositiveInteger(position) || 0}
+      )
+      RETURNING *
+    `;
+    return c.json({ success: true, problem: problem[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const assignClassroomTopicToTeam = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { teamId } = await c.req.json();
+    if (!teamId) return c.json({ error: 'Team is required' }, 400);
+
+    const [topicRows, teamRows, problemRows] = await Promise.all([
+      sql`SELECT id, title FROM classroom_topics WHERE id = ${topicId} AND classroom_id = ${classroomId}`,
+      sql`SELECT id, name FROM trainer_teams WHERE id = ${teamId} AND classroom_id = ${classroomId}`,
+      sql`SELECT id FROM classroom_topic_problems WHERE topic_id = ${topicId}`,
+    ]);
+    if (topicRows.length === 0) return c.json({ error: 'Topic not found' }, 404);
+    if (teamRows.length === 0) return c.json({ error: 'Team not found' }, 404);
+    if (problemRows.length === 0) return c.json({ error: 'Add at least one problem before assigning a topic' }, 400);
+
+    const assignment = await sql`
+      INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, assigned_by, status)
+      VALUES (${classroomId}, ${topicId}, ${teamId}, ${userId}, 'active')
+      ON CONFLICT (topic_id, team_id)
+      DO UPDATE SET assigned_by = EXCLUDED.assigned_by, assigned_at = now(), status = 'active'
+      RETURNING *
+    `;
+
+    const members = await sql`
+      SELECT student_id
+      FROM trainer_team_members
+      WHERE team_id = ${teamId}
+    `;
+    await createNotifications(
+      members.map((member: any) => member.student_id),
+      'Topic Assigned',
+      `Your team "${teamRows[0].name}" has been assigned topic "${topicRows[0].title}".`,
+      `/classroom/live/${classroomId}`
+    );
+
+    return c.json({ success: true, assignment: { ...assignment[0], team_name: teamRows[0].name, topic_title: topicRows[0].title } });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomTopicAssignments = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+    const isManager = await canManageClassroom(userId, classroomId);
+
+    const assignments = isManager
+      ? await sql`
+          SELECT a.*, t.title AS topic_title, t.module AS topic_module, t.description AS topic_description, tm.name AS team_name
+          FROM classroom_team_topic_assignments a
+          JOIN classroom_topics t ON t.id = a.topic_id
+          JOIN trainer_teams tm ON tm.id = a.team_id
+          WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
+          ORDER BY a.assigned_at DESC
+        `
+      : await sql`
+          SELECT a.*, t.title AS topic_title, t.module AS topic_module, t.description AS topic_description, tm.name AS team_name
+          FROM classroom_team_topic_assignments a
+          JOIN classroom_topics t ON t.id = a.topic_id
+          JOIN trainer_teams tm ON tm.id = a.team_id
+          JOIN trainer_team_members member ON member.team_id = a.team_id AND member.student_id = ${userId}
+          WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
+          ORDER BY a.assigned_at DESC
+        `;
+
+    if (assignments.length === 0) return c.json({ assignments: [], isTrainer: isManager });
+
+    const topicIds = [...new Set(assignments.map((assignment: any) => assignment.topic_id))];
+    const assignmentIds = assignments.map((assignment: any) => assignment.id);
+    const [resources, problems, progress] = await Promise.all([
+      sql`
+        SELECT *
+        FROM classroom_topic_resources
+        WHERE topic_id = ANY(${topicIds})
+        ORDER BY position ASC, created_at ASC
+      `,
+      sql`
+        SELECT *
+        FROM classroom_topic_problems
+        WHERE topic_id = ANY(${topicIds})
+        ORDER BY position ASC, created_at ASC
+      `,
+      isManager
+        ? sql`
+            SELECT *
+            FROM classroom_topic_problem_progress
+            WHERE assignment_id = ANY(${assignmentIds})
+          `
+        : sql`
+            SELECT *
+            FROM classroom_topic_problem_progress
+            WHERE assignment_id = ANY(${assignmentIds}) AND student_id = ${userId}
+          `,
+    ]);
+
+    return c.json({
+      isTrainer: isManager,
+      assignments: assignments.map((assignment: any) => {
+        const assignmentProblems = problems.filter((problem: any) => problem.topic_id === assignment.topic_id);
+        return {
+          ...assignment,
+          topic: {
+            id: assignment.topic_id,
+            title: assignment.topic_title,
+            module: assignment.topic_module,
+            description: assignment.topic_description,
+            resources: resources.filter((resource: any) => resource.topic_id === assignment.topic_id),
+            problems: assignmentProblems.map((problem: any) => {
+              const progressRows = progress.filter((row: any) => (
+                row.assignment_id === assignment.id && row.topic_problem_id === problem.id
+              ));
+              const ownProgress = progressRows.find((row: any) => row.student_id === userId);
+              return {
+                ...problem,
+                progress: ownProgress || null,
+                progressRows: isManager ? progressRows : undefined,
+                status: ownProgress?.status || 'not_solved',
+              };
+            }),
+          },
+        };
+      }),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassroomTopicProblemProgress = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const { assignmentId, topicProblemId, studentId, status } = await c.req.json();
+    const normalizedStatus = normalizeProgressStatus(status);
+    if (!assignmentId || !topicProblemId) return c.json({ error: 'Assignment and topic problem are required' }, 400);
+    if (!normalizedStatus) return c.json({ error: 'Invalid status' }, 400);
+
+    const assignmentRows = await sql`
+      SELECT a.*, topic.title AS topic_title, problem.title AS problem_title
+      FROM classroom_team_topic_assignments a
+      JOIN classroom_topics topic ON topic.id = a.topic_id
+      JOIN classroom_topic_problems problem ON problem.topic_id = a.topic_id AND problem.id = ${topicProblemId}
+      WHERE a.id = ${assignmentId} AND a.classroom_id = ${classroomId} AND a.status = 'active'
+    `;
+    if (assignmentRows.length === 0) return c.json({ error: 'Topic assignment not found' }, 404);
+
+    const isManager = await canManageClassroom(userId, classroomId);
+    const targetStudentId = isManager && studentId ? String(studentId) : userId;
+
+    const memberRows = await sql`
+      SELECT id
+      FROM trainer_team_members
+      WHERE team_id = ${assignmentRows[0].team_id} AND student_id = ${targetStudentId}
+    `;
+    if (memberRows.length === 0) return c.json({ error: 'Student is not a member of this assigned team' }, 403);
+    if (!isManager && targetStudentId !== userId) return c.json({ error: 'Unauthorized' }, 403);
+
+    const solvedAt = normalizedStatus === 'solved' ? new Date() : null;
+    const progress = await sql`
+      INSERT INTO classroom_topic_problem_progress (
+        assignment_id,
+        topic_problem_id,
+        student_id,
+        status,
+        solved_at,
+        updated_at
+      )
+      VALUES (${assignmentId}, ${topicProblemId}, ${targetStudentId}, ${normalizedStatus}, ${solvedAt}, now())
+      ON CONFLICT (assignment_id, topic_problem_id, student_id)
+      DO UPDATE SET status = EXCLUDED.status, solved_at = EXCLUDED.solved_at, updated_at = now()
+      RETURNING *
+    `;
+
+    if (!isManager && normalizedStatus === 'solved') {
+      await createNotification(
+        assignmentRows[0].assigned_by,
+        'Topic Problem Solved',
+        `A student solved "${assignmentRows[0].problem_title}" in topic "${assignmentRows[0].topic_title}".`,
+        `/classroom/live/${classroomId}`
+      );
+    }
+
+    return c.json({ success: true, progress: progress[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomTopicAnalytics = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const [teams, classRows, topicRows] = await Promise.all([
+      sql`
+        SELECT t.id AS team_id, t.name AS team_name, u.id AS student_id, u.full_name, u.email
+        FROM trainer_teams t
+        LEFT JOIN trainer_team_members tm ON tm.team_id = t.id
+        LEFT JOIN users u ON u.id = tm.student_id
+        WHERE t.classroom_id = ${classroomId}
+        ORDER BY t.name ASC, u.full_name ASC
+      `,
+      sql`
+        SELECT cp.student_id, cp.status
+        FROM class_problems cp
+        JOIN classes cl ON cl.id = cp.class_id
+        WHERE cl.classroom_id = ${classroomId}
+      `,
+      sql`
+        SELECT tm.student_id, COALESCE(progress.status, 'not_solved') AS status
+        FROM classroom_team_topic_assignments a
+        JOIN trainer_team_members tm ON tm.team_id = a.team_id
+        JOIN classroom_topic_problems problem ON problem.topic_id = a.topic_id
+        LEFT JOIN classroom_topic_problem_progress progress
+          ON progress.assignment_id = a.id
+          AND progress.topic_problem_id = problem.id
+          AND progress.student_id = tm.student_id
+        WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
+      `,
+    ]);
+
+    const countsByStudent = new Map<string, { assigned: number; solved: number; tried: number; notSolved: number }>();
+    const bump = (studentId: string, status: string) => {
+      if (!studentId) return;
+      const counts = countsByStudent.get(studentId) || { assigned: 0, solved: 0, tried: 0, notSolved: 0 };
+      counts.assigned += 1;
+      if (status === 'solved') counts.solved += 1;
+      else if (status === 'tried') counts.tried += 1;
+      else counts.notSolved += 1;
+      countsByStudent.set(studentId, counts);
+    };
+
+    classRows.forEach((row: any) => bump(row.student_id, row.status));
+    topicRows.forEach((row: any) => bump(row.student_id, row.status));
+
+    const teamMap = new Map<string, any>();
+    for (const row of teams) {
+      if (!teamMap.has(row.team_id)) {
+        teamMap.set(row.team_id, {
+          id: row.team_id,
+          name: row.team_name,
+          assigned: 0,
+          solved: 0,
+          tried: 0,
+          notSolved: 0,
+          solveRate: 0,
+          members: [],
+        });
+      }
+      if (!row.student_id) continue;
+      const counts = countsByStudent.get(row.student_id) || { assigned: 0, solved: 0, tried: 0, notSolved: 0 };
+      const team = teamMap.get(row.team_id);
+      team.assigned += counts.assigned;
+      team.solved += counts.solved;
+      team.tried += counts.tried;
+      team.notSolved += counts.notSolved;
+      team.members.push({
+        id: row.student_id,
+        name: row.full_name,
+        email: row.email,
+        ...counts,
+        solveRate: counts.assigned ? Math.round((counts.solved / counts.assigned) * 100) : 0,
+      });
+    }
+
+    const analytics = [...teamMap.values()].map((team) => ({
+      ...team,
+      solveRate: team.assigned ? Math.round((team.solved / team.assigned) * 100) : 0,
+    })).sort((a, b) => b.solved - a.solved || b.solveRate - a.solveRate || a.name.localeCompare(b.name));
+
+    return c.json({ teams: analytics });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+// -------------------------------------------------------------
+// Ephemeral Classroom Board
+// -------------------------------------------------------------
+
+export const getClassroomBoardSession = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+    const isTrainer = await canManageClassroom(userId, classroomId);
+    const sessions = await sql`
+      SELECT s.*, u.full_name AS started_by_name, cl.name AS class_name
+      FROM classroom_board_sessions s
+      JOIN users u ON u.id = s.started_by
+      LEFT JOIN classes cl ON cl.id = s.class_id
+      WHERE s.classroom_id = ${classroomId} AND s.status = 'active'
+      ORDER BY s.started_at DESC
+      LIMIT 1
+    `;
+    return c.json({ session: sessions[0] || null, isTrainer });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const startClassroomBoardSession = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { classId } = await c.req.json();
+    const normalizedClassId = classId || null;
+    if (normalizedClassId) {
+      const classRows = await sql`SELECT id FROM classes WHERE id = ${normalizedClassId} AND classroom_id = ${classroomId}`;
+      if (classRows.length === 0) return c.json({ error: 'Class does not belong to this classroom' }, 400);
+    }
+
+    const existing = await sql`
+      UPDATE classroom_board_sessions
+      SET status = 'ended', ended_at = now()
+      WHERE classroom_id = ${classroomId} AND status = 'active'
+      RETURNING room_id
+    `;
+    existing.forEach((row: any) => closeClassroomBoardRoom(row.room_id));
+
+    const roomId = crypto.randomUUID();
+    const session = await sql`
+      INSERT INTO classroom_board_sessions (classroom_id, class_id, room_id, started_by, status)
+      VALUES (${classroomId}, ${normalizedClassId}, ${roomId}, ${userId}, 'active')
+      RETURNING *
+    `;
+    return c.json({ success: true, session: session[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const stopClassroomBoardSession = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const { sessionId } = await c.req.json();
+    const sessions = sessionId
+      ? await sql`
+          UPDATE classroom_board_sessions
+          SET status = 'ended', ended_at = now()
+          WHERE classroom_id = ${classroomId}
+          AND status = 'active'
+          AND id = ${sessionId}
+          RETURNING *
+        `
+      : await sql`
+          UPDATE classroom_board_sessions
+          SET status = 'ended', ended_at = now()
+          WHERE classroom_id = ${classroomId}
+          AND status = 'active'
+          RETURNING *
+        `;
+    sessions.forEach((session: any) => closeClassroomBoardRoom(session.room_id));
+    return c.json({ success: true, session: sessions[0] || null });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const createClassroomBoardJoinTokenHandler = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const canAccess = await canAccessClassroom(userId, classroomId);
+    if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
+
+    const sessions = await sql`
+      SELECT *
+      FROM classroom_board_sessions
+      WHERE classroom_id = ${classroomId} AND status = 'active'
+      ORDER BY started_at DESC
+      LIMIT 1
+    `;
+    if (sessions.length === 0) return c.json({ error: 'No active board broadcast' }, 404);
+
+    const isTrainer = await canManageClassroom(userId, classroomId);
+    const { token, expiresAt } = createClassroomBoardJoinToken({
+      boardSessionId: sessions[0].id,
+      classroomId,
+      roomId: sessions[0].room_id,
+      userId,
+      role: isTrainer ? 'trainer' : 'student',
+    });
+
+    return c.json({
+      token,
+      expiresAt,
+      session: sessions[0],
+      role: isTrainer ? 'trainer' : 'student',
+      websocketPath: `/classroom/${classroomId}/board/ws?token=${encodeURIComponent(token)}`,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const validateClassroomBoardSocketToken = async (classroomId: string, token: string | null | undefined): Promise<BoardJoinContext | null> => {
+  const context = consumeClassroomBoardJoinToken(token);
+  if (!context || context.classroomId !== classroomId) return null;
+
+  const sessions = await sql`
+    SELECT id
+    FROM classroom_board_sessions
+    WHERE id = ${context.boardSessionId}
+    AND classroom_id = ${classroomId}
+    AND room_id = ${context.roomId}
+    AND status = 'active'
+    LIMIT 1
+  `;
+  if (sessions.length === 0) return null;
+  return context;
+};
+
+// -------------------------------------------------------------
 // Classroom Resources
 // -------------------------------------------------------------
 
@@ -853,30 +1754,92 @@ export const addResource = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: trainerId } = c.get('jwtPayload');
   try {
-    const { title, url, classId } = await c.req.json();
-    if (!title || !url) return c.json({ error: 'Title and URL are required' }, 400);
+    const { title, url, content, classId } = await c.req.json();
+    const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+    const normalizedUrl = typeof url === 'string' && url.trim() ? url.trim() : null;
+    const normalizedContent = typeof content === 'string' && content.trim() ? content.trim() : null;
+    const normalizedClassId = classId || null;
+
+    if (!normalizedTitle) return c.json({ error: 'Title is required' }, 400);
+    if (!normalizedUrl && !normalizedContent) {
+      return c.json({ error: 'Add a URL or markdown content' }, 400);
+    }
 
     const isAuthorized = await canManageClassroom(trainerId, classroomId);
     if (!isAuthorized) {
       return c.json({ error: 'Unauthorized' }, 403);
     }
 
+    if (normalizedClassId) {
+      const classRows = await sql`
+        SELECT id FROM classes WHERE id = ${normalizedClassId} AND classroom_id = ${classroomId}
+      `;
+      if (classRows.length === 0) {
+        return c.json({ error: 'Class does not belong to this classroom' }, 400);
+      }
+    }
+
     const result = await sql`
-      INSERT INTO classroom_resources (classroom_id, class_id, title, url)
-      VALUES (${classroomId}, ${classId || null}, ${title}, ${url})
+      INSERT INTO classroom_resources (classroom_id, class_id, title, url, content)
+      VALUES (${classroomId}, ${normalizedClassId}, ${normalizedTitle}, ${normalizedUrl}, ${normalizedContent})
       RETURNING *
     `;
 
     // Notify students
     const students = await sql`SELECT student_id FROM classroom_students WHERE classroom_id = ${classroomId}`;
+    const notificationLink = `/classroom/live/${classroomId}/resources/${result[0].id}`;
     await createNotifications(
       students.map(student => student.student_id),
       'New Resource Added',
-      `A new resource "${title}" has been shared in your classroom.`,
-      url
+      `A new resource "${normalizedTitle}" has been shared in your classroom.`,
+      notificationLink
     );
 
     return c.json({ success: true, resource: result[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassResourceDetail = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const resourceId = c.req.param('resourceId');
+  const { id: userId } = c.get('jwtPayload');
+
+  try {
+    const accessAllowed = await canAccessClassroom(userId, classroomId);
+    if (!accessAllowed) return c.json({ error: 'Unauthorized' }, 403);
+
+    const resources = await sql`
+      SELECT
+        r.*,
+        cr.name AS classroom_name,
+        cr.description AS classroom_description,
+        cl.name AS class_name,
+        cl.status AS class_status
+      FROM classroom_resources r
+      JOIN classrooms cr ON r.classroom_id = cr.id
+      LEFT JOIN classes cl ON r.class_id = cl.id
+      WHERE r.id = ${resourceId} AND r.classroom_id = ${classroomId}
+      LIMIT 1
+    `;
+
+    if (resources.length === 0) return c.json({ error: 'Resource not found' }, 404);
+
+    const row = resources[0];
+    return c.json({
+      resource: row,
+      classroom: {
+        id: classroomId,
+        name: row.classroom_name,
+        description: row.classroom_description,
+      },
+      classItem: row.class_id ? {
+        id: row.class_id,
+        name: row.class_name,
+        status: row.class_status,
+      } : null,
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -904,12 +1867,23 @@ export const sendChatMessage = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: senderId } = c.get('jwtPayload');
   try {
-    const { message, recipientId } = await c.req.json();
-    if (!message) return c.json({ error: 'Message content is required' }, 400);
+    const { message, recipientId, classId } = await c.req.json();
+    const trimmedMessage = String(message ?? '').trim();
+    if (!classId) return c.json({ error: 'Class scope is required' }, 400);
+    if (!trimmedMessage) return c.json({ error: 'Message content is required' }, 400);
+    if (trimmedMessage.length > 2000) return c.json({ error: 'Message is too long' }, 400);
+
+    const access = await getClassAccess(senderId, classroomId, classId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    if (recipientId) {
+      const recipientAllowed = await isClassroomParticipant(recipientId, classroomId, access.createdBy);
+      if (!recipientAllowed) return c.json({ error: 'Recipient is not part of this classroom' }, 400);
+    }
 
     const result = await sql`
-      INSERT INTO classroom_messages (classroom_id, sender_id, recipient_id, message)
-      VALUES (${classroomId}, ${senderId}, ${recipientId || null}, ${message})
+      INSERT INTO classroom_messages (classroom_id, class_id, sender_id, recipient_id, message)
+      VALUES (${classroomId}, ${classId}, ${senderId}, ${recipientId || null}, ${trimmedMessage})
       RETURNING *
     `;
 
@@ -922,7 +1896,7 @@ export const sendChatMessage = async (c: Context) => {
       await createNotification(
         recipientId,
         'New Chat Message',
-        `${senderName} sent you a direct message: "${message.substring(0, 30)}..."`,
+        `${senderName} sent you a direct message: "${trimmedMessage.substring(0, 30)}..."`,
         `/classroom/live/${classroomId}`
       );
     }
@@ -935,19 +1909,84 @@ export const sendChatMessage = async (c: Context) => {
 
 export const getChatMessages = async (c: Context) => {
   const classroomId = c.req.param('id');
+  const classId = c.req.query('classId');
   const { id: userId } = c.get('jwtPayload');
   try {
-    // Return messages belonging to the classroom that are either broadcast OR sent by/to the current user
+    if (!classId) return c.json({ error: 'Class scope is required' }, 400);
+    const access = await getClassAccess(userId, classroomId, classId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    // Return class messages that are either broadcast OR sent by/to the current user.
     const messages = await sql`
-      SELECT cm.*, u.full_name as sender_name, r.full_name as recipient_name
+      SELECT cm.*, u.full_name as sender_name, r.full_name as recipient_name,
+        COALESCE(
+          json_agg(
+            json_build_object(
+              'reaction', mr.reaction,
+              'count', mr.count,
+              'reactedByMe', mr.reacted_by_me
+            )
+            ORDER BY mr.reaction
+          ) FILTER (WHERE mr.reaction IS NOT NULL),
+          '[]'::json
+        ) AS reactions
       FROM classroom_messages cm
       JOIN users u ON cm.sender_id = u.id
       LEFT JOIN users r ON cm.recipient_id = r.id
+      LEFT JOIN (
+        SELECT message_id, reaction, COUNT(*)::int AS count, BOOL_OR(user_id = ${userId}) AS reacted_by_me
+        FROM classroom_message_reactions
+        GROUP BY message_id, reaction
+      ) mr ON mr.message_id = cm.id
       WHERE cm.classroom_id = ${classroomId}
+      AND cm.class_id = ${classId}
       AND (cm.recipient_id IS NULL OR cm.recipient_id = ${userId} OR cm.sender_id = ${userId})
+      GROUP BY cm.id, u.full_name, r.full_name
       ORDER BY cm.created_at ASC
     `;
-    return c.json({ messages });
+    return c.json({ messages, classId, isTrainer: access.isTrainer });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const toggleChatReaction = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const { messageId, reaction } = await c.req.json();
+    if (!messageId) return c.json({ error: 'Message is required' }, 400);
+    if (!CHAT_REACTIONS.has(reaction)) return c.json({ error: 'Unsupported reaction' }, 400);
+
+    const messageRows = await sql`
+      SELECT id, class_id
+      FROM classroom_messages
+      WHERE id = ${messageId} AND classroom_id = ${classroomId}
+    `;
+    if (messageRows.length === 0 || !messageRows[0].class_id) {
+      return c.json({ error: 'Message not found' }, 404);
+    }
+
+    const access = await getClassAccess(userId, classroomId, messageRows[0].class_id);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const existing = await sql`
+      SELECT id
+      FROM classroom_message_reactions
+      WHERE message_id = ${messageId} AND user_id = ${userId} AND reaction = ${reaction}
+    `;
+
+    if (existing.length > 0) {
+      await sql`DELETE FROM classroom_message_reactions WHERE id = ${existing[0].id}`;
+      return c.json({ success: true, active: false });
+    }
+
+    await sql`
+      INSERT INTO classroom_message_reactions (message_id, user_id, reaction)
+      VALUES (${messageId}, ${userId}, ${reaction})
+      ON CONFLICT (message_id, user_id, reaction) DO NOTHING
+    `;
+    return c.json({ success: true, active: true });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

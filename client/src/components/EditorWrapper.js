@@ -6,13 +6,20 @@ const MarkdownEditor = dynamic(() => import("./MarkdownEditor"), {
   ssr: false,
 });
 
-const EditorWrapper = React.memo(({ handleChange, value }) => {
-  return (
-    <div className="w-full">
-      <MarkdownEditor handleChange={handleChange} value={value} />
-    </div>
-  );
-});
+const EditorWrapper = React.memo(
+  ({ handleChange, value, editorClassName = "", minHeightClassName }) => {
+    return (
+      <div className="w-full">
+        <MarkdownEditor
+          editorClassName={editorClassName}
+          handleChange={handleChange}
+          minHeightClassName={minHeightClassName}
+          value={value}
+        />
+      </div>
+    );
+  }
+);
 
 // Set display name for better debugging
 EditorWrapper.displayName = "EditorWrapper";
