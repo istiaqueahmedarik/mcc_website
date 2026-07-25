@@ -1,5 +1,22 @@
 # Decisions
 
+## 2026-07-25 - admin-trainers-and-roles-management - Admin Roles Management & UI Standardization
+
+Source:
+- `docs/decisions/admin-trainers-and-roles-management-technical-decisions.md`
+
+Decision:
+1. Standardize `/admin/trainers` into a modern Trainers & Admin Roles Management Dashboard using standard Shadcn UI components (`Card`, `Table`, `Tabs`, `Badge`, `Button`, `Input`, `Dialog`) instead of ad-hoc custom CSS variables.
+2. Add backend endpoints `POST /classroom/admin/toggle-admin` (with sole-admin safety check) and `POST /classroom/admin/create-admin`.
+3. Update `client/src/components/Navbar.js` adminTools label to "Manage Trainers & Admins".
+
+Applies when:
+Managing user roles (trainers or admins) or updating admin dashboard UI components.
+
+Do not overgeneralize:
+Non-admin routes and database table structures remain untouched.
+
+
 ## 2026-07-25 - student-perceived-difficulty-dashboard-tabs-20260725 - Student Perceived Difficulty & Tabbed Dashboard
 
 Source:

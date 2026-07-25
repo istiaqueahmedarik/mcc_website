@@ -137,6 +137,31 @@ export const post_with_token = cache(async (url, data) => {
   }
 });
 
+export const delete_with_token = cache(async (url) => {
+  const token = (await cookies()).get("token");
+  if (token === undefined)
+    return {
+      error: "Unauthorized",
+    };
+
+  const response = await fetch(
+    server_url + url,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.value}`,
+      },
+    }
+  );
+  try {
+    const json = await response.json();
+    return json;
+  } catch (error) {
+    return { error: "An error occurred " + error };
+  }
+});
+
 export async function uploadImage(folder, uId, file, bucket) {
   const supabase = createClient();
   const fileName = Date.now() + "_" + file.name;

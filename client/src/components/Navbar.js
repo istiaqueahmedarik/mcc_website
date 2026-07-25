@@ -62,7 +62,7 @@ const Navbar = async () => {
   const adminTools = [
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
-    { href: '/admin/trainers', icon: UserCheck, label: 'Manage Trainers' },
+    { href: '/admin/trainers', icon: UserCheck, label: 'Manage Trainers & Admins' },
     { href: '/admin/icpc', icon: CalendarClock, label: 'ICPC' },
     { href: '/admin/contests', icon: Trophy, label: 'Contest Manager' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
@@ -88,8 +88,8 @@ const Navbar = async () => {
     trainerTools.push({ href: '/trainer/dashboard', icon: Code, label: 'Trainer Dashboard' });
   }
 
-  // Trainers/admins get their own dedicated profile page
-  const profileHref = canUseTrainerDashboard ? '/trainer/profile' : '/profile';
+  // Pure trainers go to /trainer/profile; Admins & students go to /profile
+  const profileHref = (isTrainer && !isAdmin) ? '/trainer/profile' : '/profile';
 
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">

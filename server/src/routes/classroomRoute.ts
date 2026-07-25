@@ -4,7 +4,9 @@ import {
   addClassroomTopicProblem,
   addClassroomTopicResource,
   toggleTrainerRole,
+  toggleAdminRole,
   listAllUsers,
+  listTrainers,
   createClassroom,
   createClassroomBoardJoinTokenHandler,
   createClassroomTopic,
@@ -38,6 +40,7 @@ import {
   listInAppNotifications,
   markNotificationsRead,
   createTrainerUser,
+  createAdminUser,
   listClassroomTopics,
   startClassroomBoardSession,
   stopClassroomBoardSession,
@@ -51,7 +54,10 @@ import {
   getClassroomSessionAttendance,
   updateClassroomSessionAttendance,
   getClassroomAttendanceSummary,
-  validateClassroomBoardSocketToken
+  validateClassroomBoardSocketToken,
+  getClassroomSubstitutes,
+  addClassroomSubstitute,
+  removeClassroomSubstitute
 } from '../controllers/classroomController';
 import { upgradeWebSocket } from '../utils/bunWebSocket';
 import {
@@ -122,7 +128,10 @@ route.use(
 // Admin-only endpoints
 route.post('/admin/toggle-trainer', toggleTrainerRole);
 route.post('/admin/create-trainer', createTrainerUser);
+route.post('/admin/toggle-admin', toggleAdminRole);
+route.post('/admin/create-admin', createAdminUser);
 route.get('/admin/users', listAllUsers);
+route.get('/admin/trainers-list', listTrainers);
 
 // Classroom CRUD
 route.post('/create', createClassroom);
@@ -189,6 +198,11 @@ route.post('/:id/chat/reaction', toggleChatReaction);
 // In-app notifications
 route.get('/notifications/list', listInAppNotifications);
 route.post('/notifications/read', markNotificationsRead);
+
+// Substitute trainers management
+route.get('/:id/substitutes', getClassroomSubstitutes);
+route.post('/:id/substitutes', addClassroomSubstitute);
+route.delete('/:id/substitutes/:trainerId', removeClassroomSubstitute);
 
 route.get('/:id', getClassroomDetails);
 

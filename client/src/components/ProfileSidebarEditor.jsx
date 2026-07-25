@@ -15,7 +15,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import ProgressLink from "@/components/ProgressLink";
 import {
+  Award,
   CheckCircle2,
   Edit3,
   IdCard,
@@ -37,7 +39,7 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
 
   return (
     <div className="profile-card space-y-2" aria-label="Profile Summary">
-      <form action={saveAction} encType="multipart/form-data" className="space-y-2">
+      <form action={saveAction} className="space-y-2">
         <div className="flex justify-center">
           <div className="relative group">
             <Avatar
@@ -78,6 +80,18 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
                 Admin
               </span>
             )}
+            {user.trainer && (
+              <span
+                className="profile-badge"
+                style={{
+                  background: "hsl(220 90% 50%)",
+                  color: "white",
+                }}
+              >
+                <Award className="h-3.5 w-3.5" />
+                Trainer
+              </span>
+            )}
             {user.granted && (
               <span className="profile-badge profile-badge-success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -85,6 +99,24 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
               </span>
             )}
           </div>
+          {(user.admin || user.trainer) && (
+            <div className="flex flex-col gap-1.5 mt-3">
+              {user.admin && (
+                <ProgressLink href="/admin/trainers">
+                  <Button variant="default" size="sm" className="w-full font-semibold gap-1.5">
+                    <Shield className="h-4 w-4" /> Admin Dashboard
+                  </Button>
+                </ProgressLink>
+              )}
+              {(user.trainer || user.admin) && (
+                <ProgressLink href="/trainer/dashboard">
+                  <Button variant="outline" size="sm" className="w-full font-semibold gap-1.5">
+                    <Award className="h-4 w-4" /> Trainer Dashboard
+                  </Button>
+                </ProgressLink>
+              )}
+            </div>
+          )}
           <p
             className="mt-2 text-xs"
             style={{ color: "hsl(var(--profile-text-muted))" }}

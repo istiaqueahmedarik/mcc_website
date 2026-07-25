@@ -210,6 +210,21 @@ export const listAllUsers = async (c: Context) => {
   }
 };
 
+// List all trainers and admins
+export const listTrainers = async (c: Context) => {
+  try {
+    const result = await sql`
+      SELECT id, full_name, email, trainer, admin
+      FROM users
+      WHERE trainer = true OR admin = true
+      ORDER BY full_name ASC
+    `;
+    return c.json({ result });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 // Admin endpoint to create a brand new custom trainer user
 export const createTrainerUser = async (c: Context) => {
   const { id } = c.get('jwtPayload');
@@ -248,6 +263,83 @@ export const createTrainerUser = async (c: Context) => {
   }
 };
 
+// Toggle user admin status
+export const toggleAdminRole = async (c: Context) => {
+  const { id } = c.get('jwtPayload');
+  try {
+    // Check if requester is Admin
+    const adminCheck = await sql`SELECT admin FROM users WHERE id = ${id}`;
+    if (adminCheck.length === 0 || !adminCheck[0].admin) {
+      return c.json({ error: 'Unauthorized: Admins only' }, 403);
+    }
+
+    const { targetUserId, adminStatus } = await c.req.json();
+    if (!targetUserId || typeof adminStatus !== 'boolean') {
+      return c.json({ error: 'targetUserId and adminStatus (boolean) are required' }, 400);
+    }
+
+    // Safety check: Prevent removing admin access from self if sole admin
+    if (targetUserId === id && !adminStatus) {
+      const adminCount = await sql`SELECT COUNT(*) as count FROM users WHERE admin = true`;
+      if (Number(adminCount[0]?.count || 0) <= 1) {
+        return c.json({ error: 'Cannot revoke your own admin access when you are the sole administrator' }, 400);
+      }
+    }
+
+    const updated = await sql`
+      UPDATE users 
+      SET admin = ${adminStatus} 
+      WHERE id = ${targetUserId} 
+      RETURNING id, full_name, email, trainer, admin
+    `;
+    
+    if (updated.length === 0) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+    
+    return c.json({ success: true, user: updated[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+// Admin endpoint to create a brand new custom admin user
+export const createAdminUser = async (c: Context) => {
+  const { id } = c.get('jwtPayload');
+  try {
+    // Check if requester is Admin
+    const adminCheck = await sql`SELECT admin FROM users WHERE id = ${id}`;
+    if (adminCheck.length === 0 || !adminCheck[0].admin) {
+      return c.json({ error: 'Unauthorized: Admins only' }, 403);
+    }
+
+    const { full_name, email, phone, password } = await c.req.json();
+    if (!full_name || !email || !password) {
+      return c.json({ error: 'Full name, email and password are required' }, 400);
+    }
+
+    if (password.length < 8) {
+      return c.json({ error: 'Password must be at least 8 characters long' }, 400);
+    }
+
+    const exists = await sql`select * from users where email = ${email}`;
+    if (exists.length > 0) {
+      return c.json({ error: 'This email already exists' }, 400);
+    }
+
+    const hash = await Bun.password.hash(password);
+    const result = await sql`
+      INSERT INTO users (full_name, email, phone, password, admin, granted)
+      VALUES (${full_name}, ${email}, ${phone || null}, ${hash}, true, true)
+      RETURNING id, full_name, email, trainer, admin
+    `;
+
+    return c.json({ success: true, user: result[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 // -------------------------------------------------------------
 // Classroom Authorization Helper
 // -------------------------------------------------------------
@@ -255,8 +347,15 @@ export const createTrainerUser = async (c: Context) => {
 async function canManageClassroom(userId: string, classroomId: string): Promise<boolean> {
   const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
   if (userCheck.length === 0) return false;
-  if (!userCheck[0].admin && !userCheck[0].trainer) return false;
-  return true;
+  if (userCheck[0].admin) return true;
+  if (!userCheck[0].trainer) return false;
+
+  const ownerOrSubCheck = await sql`
+    SELECT id FROM classrooms WHERE id = ${classroomId} AND created_by = ${userId}
+    UNION
+    SELECT id FROM classroom_substitutes WHERE classroom_id = ${classroomId} AND trainer_id = ${userId}
+  `;
+  return ownerOrSubCheck.length > 0;
 }
 
 const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
@@ -447,18 +546,36 @@ export const getClassrooms = async (c: Context) => {
   try {
     const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${id}`;
     let result;
-    if (userCheck.length > 0 && (userCheck[0].admin || userCheck[0].trainer)) {
-      // Admins and trainers can see all classrooms
+    if (userCheck.length > 0 && userCheck[0].admin) {
+      // Admins can see all classrooms
       result = await sql`
-        SELECT c.*, u.full_name as trainer_name 
+        SELECT c.*, u.full_name as trainer_name,
+               (c.created_by = ${id}) as is_owner,
+               EXISTS(SELECT 1 FROM classroom_substitutes cs WHERE cs.classroom_id = c.id AND cs.trainer_id = ${id}) as is_substitute
         FROM classrooms c
         JOIN users u ON c.created_by = u.id
+        ORDER BY c.created_at DESC
+      `;
+    } else if (userCheck.length > 0 && userCheck[0].trainer) {
+      // Trainers see classrooms they created OR where they are assigned as substitute
+      result = await sql`
+        SELECT c.*, u.full_name as trainer_name,
+               (c.created_by = ${id}) as is_owner,
+               EXISTS(SELECT 1 FROM classroom_substitutes cs WHERE cs.classroom_id = c.id AND cs.trainer_id = ${id}) as is_substitute
+        FROM classrooms c
+        JOIN users u ON c.created_by = u.id
+        WHERE c.created_by = ${id}
+        OR c.id IN (
+          SELECT classroom_id FROM classroom_substitutes WHERE trainer_id = ${id}
+        )
         ORDER BY c.created_at DESC
       `;
     } else {
       // Return classrooms where user is creator OR where user is a student
       result = await sql`
-        SELECT c.*, u.full_name as trainer_name 
+        SELECT c.*, u.full_name as trainer_name,
+               (c.created_by = ${id}) as is_owner,
+               false as is_substitute
         FROM classrooms c
         JOIN users u ON c.created_by = u.id
         WHERE c.created_by = ${id}
@@ -478,8 +595,7 @@ export const getClassroomDetails = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: currentUserId } = c.get('jwtPayload');
   try {
-    // Run all 6 queries in parallel — none depend on each other's results
-    const [classroom, students, classes, resources, teams, userCheck] = await Promise.all([
+    const [classroom, students, classes, resources, teams, userCheck, substitutes] = await Promise.all([
       sql`
         SELECT c.*, u.full_name as trainer_name, u.email as trainer_email
         FROM classrooms c
@@ -509,12 +625,22 @@ export const getClassroomDetails = async (c: Context) => {
         GROUP BY t.id, t.name
         ORDER BY t.name ASC
       `,
-      sql`SELECT admin, trainer FROM users WHERE id = ${currentUserId}`
+      sql`SELECT admin, trainer FROM users WHERE id = ${currentUserId}`,
+      sql`
+        SELECT u.id, u.full_name, u.email
+        FROM classroom_substitutes cs
+        JOIN users u ON cs.trainer_id = u.id
+        WHERE cs.classroom_id = ${classroomId}
+        ORDER BY u.full_name ASC
+      `
     ]);
 
     if (classroom.length === 0) return c.json({ error: 'Classroom not found' }, 404);
 
-    const isTrainer = Boolean(userCheck[0]?.admin || userCheck[0]?.trainer);
+    const isOwner = classroom[0].created_by === currentUserId;
+    const isSubstitute = substitutes.some((s: any) => s.id === currentUserId);
+    const isAdmin = Boolean(userCheck[0]?.admin);
+    const isTrainer = isOwner || isSubstitute || isAdmin;
 
     return c.json({
       classroom: classroom[0],
@@ -522,9 +648,91 @@ export const getClassroomDetails = async (c: Context) => {
       classes,
       resources,
       teams,
+      substitutes,
       currentUserId,
-      isTrainer
+      isTrainer,
+      isOwner,
+      isSubstitute,
+      isAdmin
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomSubstitutes = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  try {
+    const substitutes = await sql`
+      SELECT u.id, u.full_name, u.email
+      FROM classroom_substitutes cs
+      JOIN users u ON cs.trainer_id = u.id
+      WHERE cs.classroom_id = ${classroomId}
+      ORDER BY u.full_name ASC
+    `;
+    return c.json({ result: substitutes });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const addClassroomSubstitute = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: currentUserId } = c.get('jwtPayload');
+  try {
+    const { trainerId } = await c.req.json();
+    if (!trainerId) return c.json({ error: 'trainerId is required' }, 400);
+
+    const userCheck = await sql`SELECT admin FROM users WHERE id = ${currentUserId}`;
+    const classroomCheck = await sql`SELECT created_by FROM classrooms WHERE id = ${classroomId}`;
+    if (classroomCheck.length === 0) return c.json({ error: 'Classroom not found' }, 404);
+
+    const isOwnerOrAdmin = classroomCheck[0].created_by === currentUserId || Boolean(userCheck[0]?.admin);
+    if (!isOwnerOrAdmin) {
+      return c.json({ error: 'Only the primary classroom trainer or admin can assign substitute trainers' }, 403);
+    }
+
+    if (trainerId === classroomCheck[0].created_by) {
+      return c.json({ error: 'Primary owner is already the main trainer of this classroom' }, 400);
+    }
+
+    const targetTrainer = await sql`SELECT id, trainer, admin FROM users WHERE id = ${trainerId}`;
+    if (targetTrainer.length === 0 || (!targetTrainer[0].trainer && !targetTrainer[0].admin)) {
+      return c.json({ error: 'Target user must be a trainer or admin' }, 400);
+    }
+
+    await sql`
+      INSERT INTO classroom_substitutes (classroom_id, trainer_id)
+      VALUES (${classroomId}, ${trainerId})
+      ON CONFLICT (classroom_id, trainer_id) DO NOTHING
+    `;
+
+    return c.json({ message: 'Substitute trainer added successfully' });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const removeClassroomSubstitute = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const trainerId = c.req.param('trainerId');
+  const { id: currentUserId } = c.get('jwtPayload');
+  try {
+    const userCheck = await sql`SELECT admin FROM users WHERE id = ${currentUserId}`;
+    const classroomCheck = await sql`SELECT created_by FROM classrooms WHERE id = ${classroomId}`;
+    if (classroomCheck.length === 0) return c.json({ error: 'Classroom not found' }, 404);
+
+    const isOwnerOrAdmin = classroomCheck[0].created_by === currentUserId || Boolean(userCheck[0]?.admin);
+    if (!isOwnerOrAdmin) {
+      return c.json({ error: 'Only the primary classroom trainer or admin can remove substitute trainers' }, 403);
+    }
+
+    await sql`
+      DELETE FROM classroom_substitutes
+      WHERE classroom_id = ${classroomId} AND trainer_id = ${trainerId}
+    `;
+
+    return c.json({ message: 'Substitute trainer removed successfully' });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

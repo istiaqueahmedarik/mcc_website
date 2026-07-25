@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { get_with_token, post_with_token } from "@/lib/action";
+import ProgressLink from "@/components/ProgressLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ShieldAlert, Award, UserCheck, Shield, Plus, AlertCircle, Users, Sparkles, GraduationCap } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -14,42 +25,43 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Search,
+  Shield,
+  ShieldAlert,
+  Award,
+  Plus,
+  AlertCircle,
+  Users,
+  CheckCircle2,
+  GraduationCap,
+  UserPlus,
+  ShieldCheck,
+  RefreshCw,
+} from "lucide-react";
 
 export default function TrainersManagementClient() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState("trainers");
 
-  // Custom trainer creation states
-  const [createOpen, setCreateOpen] = useState(false);
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [createError, setCreateError] = useState("");
+  // Trainer modal state
+  const [createTrainerOpen, setCreateTrainerOpen] = useState(false);
+  const [trainerName, setTrainerName] = useState("");
+  const [trainerEmail, setTrainerEmail] = useState("");
+  const [trainerPhone, setTrainerPhone] = useState("");
+  const [trainerPassword, setTrainerPassword] = useState("");
+  const [trainerError, setTrainerError] = useState("");
 
-  const handleCreateTrainer = async (e) => {
-    e.preventDefault();
-    setCreateError("");
-    const res = await post_with_token("classroom/admin/create-trainer", {
-      full_name: fullName,
-      email,
-      phone,
-      password,
-    });
-    if (res && res.success) {
-      setFullName("");
-      setEmail("");
-      setPhone("");
-      setPassword("");
-      setCreateOpen(false);
-      setMessage(`Successfully created custom trainer user "${fullName}".`);
-      fetchUsers();
-    } else {
-      setCreateError(res.error || "Failed to create trainer user");
-    }
-  };
+  // Admin modal state
+  const [createAdminOpen, setCreateAdminOpen] = useState(false);
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -64,6 +76,50 @@ export default function TrainersManagementClient() {
     fetchUsers();
   }, []);
 
+  const handleCreateTrainer = async (e) => {
+    e.preventDefault();
+    setTrainerError("");
+    const res = await post_with_token("classroom/admin/create-trainer", {
+      full_name: trainerName,
+      email: trainerEmail,
+      phone: trainerPhone,
+      password: trainerPassword,
+    });
+    if (res && res.success) {
+      setTrainerName("");
+      setTrainerEmail("");
+      setTrainerPhone("");
+      setTrainerPassword("");
+      setCreateTrainerOpen(false);
+      setMessage(`Successfully created custom trainer user "${trainerName}".`);
+      fetchUsers();
+    } else {
+      setTrainerError(res?.error || "Failed to create trainer user");
+    }
+  };
+
+  const handleCreateAdmin = async (e) => {
+    e.preventDefault();
+    setAdminError("");
+    const res = await post_with_token("classroom/admin/create-admin", {
+      full_name: adminName,
+      email: adminEmail,
+      phone: adminPhone,
+      password: adminPassword,
+    });
+    if (res && res.success) {
+      setAdminName("");
+      setAdminEmail("");
+      setAdminPhone("");
+      setAdminPassword("");
+      setCreateAdminOpen(false);
+      setMessage(`Successfully created new admin user "${adminName}".`);
+      fetchUsers();
+    } else {
+      setAdminError(res?.error || "Failed to create admin user");
+    }
+  };
+
   const toggleTrainer = async (userId, currentStatus) => {
     setMessage("");
     const res = await post_with_token("classroom/admin/toggle-trainer", {
@@ -74,9 +130,25 @@ export default function TrainersManagementClient() {
       setUsers(prev =>
         prev.map(u => (u.id === userId ? { ...u, trainer: !currentStatus } : u))
       );
-      setMessage(`Successfully updated trainer status for user.`);
+      setMessage(`Successfully ${!currentStatus ? "granted" : "revoked"} trainer status.`);
     } else {
-      setMessage(`Failed to update trainer status: ${res.error || "Unknown error"}`);
+      setMessage(`Failed to update trainer status: ${res?.error || "Unknown error"}`);
+    }
+  };
+
+  const toggleAdmin = async (userId, currentStatus) => {
+    setMessage("");
+    const res = await post_with_token("classroom/admin/toggle-admin", {
+      targetUserId: userId,
+      adminStatus: !currentStatus,
+    });
+    if (res && res.success) {
+      setUsers(prev =>
+        prev.map(u => (u.id === userId ? { ...u, admin: !currentStatus } : u))
+      );
+      setMessage(`Successfully ${!currentStatus ? "assigned" : "revoked"} admin status.`);
+    } else {
+      setMessage(`Failed to update admin status: ${res?.error || "Unknown error"}`);
     }
   };
 
@@ -85,6 +157,9 @@ export default function TrainersManagementClient() {
       u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
       u.email?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const trainerUsers = filteredUsers.filter(u => u.trainer || activeTab === "all");
+  const adminUsers = filteredUsers.filter(u => u.admin || activeTab === "all");
 
   const trainerCount = users.filter(u => u.trainer).length;
   const adminCount = users.filter(u => u.admin).length;
@@ -98,210 +173,411 @@ export default function TrainersManagementClient() {
       .join("");
 
   return (
-    <div className="relative min-h-screen">
-      {/* Ambient gradient backdrop */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-24 h-72 w-72 rounded-full bg-[hsl(var(--profile-accent-1))]/20 blur-3xl" />
-        <div className="absolute -top-16 right-0 h-72 w-72 rounded-full bg-[hsl(var(--profile-accent-3))]/20 blur-3xl" />
-      </div>
-
-      <div className="relative container mx-auto py-10 px-4 max-w-5xl">
-        {/* Hero header */}
-        <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-[hsl(var(--profile-accent-solid))]/[0.12] via-card to-card p-8 shadow-sm mb-8">
-          <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[hsl(var(--profile-accent-2))]/20 blur-2xl" />
-          <div className="relative flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background/60 px-3 py-1 text-xs font-semibold text-muted-foreground backdrop-blur">
-                <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--profile-accent-solid))]" />
-                Admin Control
-              </div>
-              <h1 className="mt-4 text-4xl font-extrabold tracking-tight flex items-center gap-3">
-                <span className="grid place-items-center h-12 w-12 rounded-2xl bg-[hsl(var(--profile-accent-solid))] text-white shadow-lg shadow-[hsl(var(--profile-accent-solid))]/30">
-                  <Shield className="h-7 w-7" />
-                </span>
-                Manage Trainers
-              </h1>
-              <p className="text-muted-foreground mt-3 max-w-xl">
-                Assign or revoke trainer credentials, and onboard new trainers directly with a dedicated account.
-              </p>
+    <div className="min-h-screen w-full py-8 px-4 md:px-8 bg-background">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Admin Control Panel
             </div>
+            <h1 className="text-3xl font-bold tracking-tight">Trainers & Roles Management</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Manage trainer credentials, promote user admin privileges, and onboard new accounts.
+            </p>
+          </div>
 
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <div className="flex flex-wrap items-center gap-3">
+            <ProgressLink href="/trainer/dashboard">
+              <Button variant="outline" className="gap-2 font-semibold">
+                <Award className="h-4 w-4 text-primary" /> Trainer Dashboard
+              </Button>
+            </ProgressLink>
+
+            {/* Create Custom Trainer Dialog */}
+            <Dialog open={createTrainerOpen} onOpenChange={setCreateTrainerOpen}>
               <DialogTrigger asChild>
-                <Button className="font-semibold shadow-lg shadow-[hsl(var(--profile-accent-solid))]/25 flex items-center gap-2 rounded-2xl bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white">
-                  <Plus className="h-5 w-5" /> Create Custom Trainer
+                <Button variant="outline" className="gap-2">
+                  <Plus className="h-4 w-4 text-primary" /> Create Trainer
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                  <DialogTitle>Create Custom Trainer</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-primary" /> Create Custom Trainer
+                  </DialogTitle>
                   <DialogDescription>
-                    Register a new user directly with trainer credentials.
+                    Register a new account directly with trainer credentials.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateTrainer} className="space-y-4 py-4">
-                  {createError && (
-                    <div className="flex items-center gap-2 text-sm text-red-500 bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                      <AlertCircle className="h-4 w-4" /> {createError}
+                <form onSubmit={handleCreateTrainer} className="space-y-4 py-2">
+                  {trainerError && (
+                    <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {trainerError}
                     </div>
                   )}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Full Name</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Full Name</label>
                     <Input
-                      placeholder="e.g. Trainer Jack"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="e.g. Alex Rivera"
+                      value={trainerName}
+                      onChange={(e) => setTrainerName(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Email Address</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Email Address</label>
                     <Input
                       type="email"
-                      placeholder="e.g. trainer.jack@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="e.g. alex.rivera@example.com"
+                      value={trainerEmail}
+                      onChange={(e) => setTrainerEmail(e.target.value)}
                       required
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Phone Number (Optional)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Phone Number (Optional)</label>
                     <Input
                       placeholder="e.g. +123456789"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      value={trainerPhone}
+                      onChange={(e) => setTrainerPhone(e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Password</label>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Password</label>
                     <Input
                       type="password"
                       placeholder="Minimum 8 characters"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      value={trainerPassword}
+                      onChange={(e) => setTrainerPassword(e.target.value)}
                       required
                     />
                   </div>
-                  <DialogFooter>
-                    <Button type="submit" className="w-full font-semibold rounded-xl mt-2 bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white">
-                      Create Trainer User
+                  <DialogFooter className="pt-2">
+                    <Button type="submit" className="w-full">
+                      Create Trainer Account
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Create Custom Admin Dialog */}
+            <Dialog open={createAdminOpen} onOpenChange={setCreateAdminOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <UserPlus className="h-4 w-4" /> Create Admin
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5 text-destructive" /> Create Custom Admin
+                  </DialogTitle>
+                  <DialogDescription>
+                    Register a new account directly with full administrative privileges.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateAdmin} className="space-y-4 py-2">
+                  {adminError && (
+                    <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {adminError}
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Full Name</label>
+                    <Input
+                      placeholder="e.g. Admin Sarah"
+                      value={adminName}
+                      onChange={(e) => setAdminName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Email Address</label>
+                    <Input
+                      type="email"
+                      placeholder="e.g. sarah.admin@example.com"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Phone Number (Optional)</label>
+                    <Input
+                      placeholder="e.g. +123456789"
+                      value={adminPhone}
+                      onChange={(e) => setAdminPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Password</label>
+                    <Input
+                      type="password"
+                      placeholder="Minimum 8 characters"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <DialogFooter className="pt-2">
+                    <Button type="submit" variant="default" className="w-full">
+                      Create Admin Account
                     </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
-
-          {/* Quick stats */}
-          {!loading && (
-            <div className="relative mt-8 flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-4 py-2 backdrop-blur">
-                <Users className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
-                <span className="text-sm font-bold">{users.length}</span>
-                <span className="text-xs text-muted-foreground">Users</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-4 py-2 backdrop-blur">
-                <Award className="h-4 w-4 text-[hsl(var(--profile-accent-solid))]" />
-                <span className="text-sm font-bold">{trainerCount}</span>
-                <span className="text-xs text-muted-foreground">Trainers</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-2xl border bg-background/60 px-4 py-2 backdrop-blur">
-                <ShieldAlert className="h-4 w-4 text-red-500" />
-                <span className="text-sm font-bold">{adminCount}</span>
-                <span className="text-xs text-muted-foreground">Admins</span>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Search bar */}
-        <div className="flex items-center gap-2 bg-card p-2 rounded-2xl border focus-within:border-[hsl(var(--profile-accent-solid))] transition-colors mb-6">
-          <Search className="h-5 w-5 text-muted-foreground ml-1" />
-          <Input
-            type="text"
-            placeholder="Search users by name or email..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none w-full"
-          />
+        {/* Quick Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? "..." : users.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Registered platform accounts</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Trainers</CardTitle>
+              <Award className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">{loading ? "..." : trainerCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Classroom content & grading access</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">System Admins</CardTitle>
+              <ShieldAlert className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{loading ? "..." : adminCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Full platform administration access</p>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* System Feedback Message */}
         {message && (
-          <div className={`mb-6 p-4 rounded-2xl text-sm font-semibold border flex items-center gap-2 ${message.startsWith("Failed") ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-green-500/10 text-green-600 border-green-500/20"}`}>
-            {message.startsWith("Failed") ? <AlertCircle className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-            {message}
+          <div className={`p-4 rounded-lg text-sm font-medium border flex items-center gap-2 ${message.startsWith("Failed") ? "bg-destructive/10 text-destructive border-destructive/20" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"}`}>
+            {message.startsWith("Failed") ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
+            <span>{message}</span>
           </div>
         )}
 
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="rounded-2xl border bg-card p-5 animate-pulse flex items-center gap-4">
-                <div className="h-11 w-11 rounded-full bg-muted" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-2/3 rounded bg-muted" />
-                  <div className="h-3 w-1/2 rounded bg-muted" />
-                </div>
+        {/* Search & Tabs Controls */}
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or email..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-            ))}
-          </div>
-        ) : filteredUsers.length === 0 ? (
-          <div className="rounded-3xl border border-dashed text-center p-14 bg-card">
-            <div className="inline-flex p-4 bg-muted rounded-2xl">
-              <Search className="h-8 w-8 text-muted-foreground" />
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button variant="ghost" size="icon" onClick={fetchUsers} title="Refresh users list">
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
             </div>
-            <h3 className="text-lg font-bold mt-4">No users found</h3>
-            <p className="text-sm text-muted-foreground mt-1">Try a different name or email.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredUsers.map(user => (
-              <div
-                key={user.id}
-                className="group relative overflow-hidden rounded-2xl border bg-card p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg hover:border-[hsl(var(--profile-accent-solid))]/40"
-              >
-                <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[hsl(var(--profile-accent-2))]/10 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="relative flex items-start gap-4">
-                  <span className={`grid place-items-center h-11 w-11 shrink-0 rounded-full text-sm font-bold ${user.admin ? "bg-red-500/15 text-red-500" : user.trainer ? "bg-[hsl(var(--profile-accent-solid))]/15 text-[hsl(var(--profile-accent-solid))]" : "bg-muted text-muted-foreground"}`}>
+          </CardHeader>
+
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid grid-cols-3 w-full max-w-md mb-6">
+                <TabsTrigger value="trainers" className="flex items-center gap-1.5">
+                  <Award className="h-3.5 w-3.5" /> Trainers ({trainerUsers.length})
+                </TabsTrigger>
+                <TabsTrigger value="admins" className="flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5" /> Admins ({adminUsers.length})
+                </TabsTrigger>
+                <TabsTrigger value="all" className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> All Users ({filteredUsers.length})
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Trainers Tab Content */}
+              <TabsContent value="trainers" className="space-y-4">
+                <UserRoleTable
+                  users={filteredUsers}
+                  loading={loading}
+                  initialsOf={initialsOf}
+                  onToggleTrainer={toggleTrainer}
+                  onToggleAdmin={toggleAdmin}
+                  filterRole="trainer"
+                />
+              </TabsContent>
+
+              {/* Admins Tab Content */}
+              <TabsContent value="admins" className="space-y-4">
+                <UserRoleTable
+                  users={filteredUsers}
+                  loading={loading}
+                  initialsOf={initialsOf}
+                  onToggleTrainer={toggleTrainer}
+                  onToggleAdmin={toggleAdmin}
+                  filterRole="admin"
+                />
+              </TabsContent>
+
+              {/* All Users Tab Content */}
+              <TabsContent value="all" className="space-y-4">
+                <UserRoleTable
+                  users={filteredUsers}
+                  loading={loading}
+                  initialsOf={initialsOf}
+                  onToggleTrainer={toggleTrainer}
+                  onToggleAdmin={toggleAdmin}
+                  filterRole="all"
+                />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function UserRoleTable({ users, loading, initialsOf, onToggleTrainer, onToggleAdmin, filterRole }) {
+  const displayUsers = users.filter(u => {
+    if (filterRole === "trainer") return u.trainer;
+    if (filterRole === "admin") return u.admin;
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <div className="space-y-3 py-6">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-12 w-full bg-muted/40 animate-pulse rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (displayUsers.length === 0) {
+    return (
+      <div className="text-center py-12 border border-dashed rounded-lg">
+        <Users className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+        <h4 className="text-sm font-semibold">No users found</h4>
+        <p className="text-xs text-muted-foreground mt-1">
+          {filterRole === "trainer"
+            ? "No users currently have trainer credentials."
+            : filterRole === "admin"
+            ? "No administrators match your search."
+            : "No registered users match your query."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[280px]">User</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Current Roles</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {displayUsers.map((user) => (
+            <TableRow key={user.id}>
+              <TableCell className="font-medium">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center font-bold text-xs text-muted-foreground shrink-0">
                     {initialsOf(user.full_name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold truncate">{user.full_name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {user.admin && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
-                          <ShieldAlert className="h-3 w-3" /> Admin
-                        </span>
-                      )}
-                      {user.trainer ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[hsl(var(--profile-accent-solid))]/10 text-[hsl(var(--profile-accent-solid))] border border-[hsl(var(--profile-accent-solid))]/20">
-                          <Award className="h-3 w-3" /> Trainer
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground border">
-                          <GraduationCap className="h-3 w-3" /> Student
-                        </span>
-                      )}
-                    </div>
                   </div>
+                  <span className="truncate">{user.full_name}</span>
                 </div>
-                <div className="relative mt-4 pt-4 border-t">
+              </TableCell>
+
+              <TableCell className="text-muted-foreground text-sm truncate">
+                {user.email}
+              </TableCell>
+
+              <TableCell>
+                <div className="flex flex-wrap gap-1.5">
+                  {user.admin && (
+                    <Badge variant="destructive" className="gap-1 font-semibold">
+                      <ShieldAlert className="h-3 w-3" /> Admin
+                    </Badge>
+                  )}
+                  {user.trainer ? (
+                    <Badge className="gap-1 bg-primary/15 text-primary hover:bg-primary/20 border-primary/20">
+                      <Award className="h-3 w-3" /> Trainer
+                    </Badge>
+                  ) : (
+                    !user.admin && (
+                      <Badge variant="outline" className="gap-1 text-muted-foreground">
+                        <GraduationCap className="h-3 w-3" /> Student
+                      </Badge>
+                    )
+                  )}
+                </div>
+              </TableCell>
+
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  {/* Trainer Toggle Button */}
                   <Button
-                    variant={user.trainer ? "outline" : "default"}
+                    variant={user.trainer ? "outline" : "secondary"}
                     size="sm"
                     disabled={user.admin}
-                    className={`w-full font-semibold rounded-xl gap-1.5 ${user.trainer ? "text-red-500 hover:text-red-600 border-red-500/30 hover:bg-red-500/10" : "bg-[hsl(var(--profile-accent-solid))] hover:bg-[hsl(var(--profile-accent-solid-alt))] text-white"}`}
-                    onClick={() => toggleTrainer(user.id, user.trainer)}
+                    onClick={() => onToggleTrainer(user.id, user.trainer)}
+                    className="h-8 text-xs font-semibold"
                   >
-                    {user.admin ? "Admin (locked)" : user.trainer ? "Revoke Trainer" : (<><Award className="h-4 w-4" /> Grant Trainer</>)}
+                    {user.admin ? (
+                      "Admin (Trainer Locked)"
+                    ) : user.trainer ? (
+                      "Revoke Trainer"
+                    ) : (
+                      <>
+                        <Award className="h-3.5 w-3.5 mr-1" /> Grant Trainer
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Admin Toggle Button */}
+                  <Button
+                    variant={user.admin ? "destructive" : "default"}
+                    size="sm"
+                    onClick={() => onToggleAdmin(user.id, user.admin)}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    {user.admin ? (
+                      "Revoke Admin"
+                    ) : (
+                      <>
+                        <Shield className="h-3.5 w-3.5 mr-1" /> Assign Admin
+                      </>
+                    )}
                   </Button>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }

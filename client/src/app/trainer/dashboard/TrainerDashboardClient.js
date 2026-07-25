@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { get_with_token, post_with_token } from "@/lib/action";
+import { get_with_token, post_with_token, delete_with_token } from "@/lib/action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,8 +18,10 @@ import {
   Radio,
   ShieldCheck,
   UserCheck,
+  UserPlus,
   Users,
   Video,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -132,6 +134,15 @@ export default function TrainerDashboardClient() {
   const [error, setError] = useState("");
   const [profile, setProfile] = useState(null);
 
+  // Substitute trainer management state
+  const [subModalOpen, setSubModalOpen] = useState(false);
+  const [subModalClassroom, setSubModalClassroom] = useState(null);
+  const [substitutes, setSubstitutes] = useState([]);
+  const [allTrainers, setAllTrainers] = useState([]);
+  const [subSearch, setSubSearch] = useState("");
+  const [subLoading, setSubLoading] = useState(false);
+  const [subError, setSubError] = useState("");
+
   const { startTour } = useTour({
     storageKey: "mcc_trainer_dashboard_toured",
     steps: trainerDashboardSteps,
@@ -156,6 +167,42 @@ export default function TrainerDashboardClient() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const openSubModal = async (classroom) => {
+    setSubModalClassroom(classroom);
+    setSubError("");
+    setSubSearch("");
+    setSubModalOpen(true);
+    setSubLoading(true);
+    const [subRes, trainerRes] = await Promise.all([
+      get_with_token(`classroom/${classroom.id}/substitutes`),
+      get_with_token("classroom/admin/trainers-list"),
+    ]);
+    setSubstitutes(subRes?.result || []);
+    setAllTrainers(trainerRes?.result || []);
+    setSubLoading(false);
+  };
+
+  const handleAddSub = async (trainerId) => {
+    setSubError("");
+    const res = await post_with_token(`classroom/${subModalClassroom.id}/substitutes`, { trainerId });
+    if (res?.message) {
+      const subRes = await get_with_token(`classroom/${subModalClassroom.id}/substitutes`);
+      setSubstitutes(subRes?.result || []);
+    } else {
+      setSubError(res?.error || "Failed to add substitute");
+    }
+  };
+
+  const handleRemoveSub = async (trainerId) => {
+    setSubError("");
+    const res = await delete_with_token(`classroom/${subModalClassroom.id}/substitutes/${trainerId}`);
+    if (res?.message) {
+      setSubstitutes((prev) => prev.filter((s) => s.id !== trainerId));
+    } else {
+      setSubError(res?.error || "Failed to remove substitute");
+    }
+  };
 
   const handleCreateClassroom = async (e) => {
     e.preventDefault();
@@ -237,6 +284,15 @@ export default function TrainerDashboardClient() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {profile?.admin && (
+                <ProgressLink href="/admin/trainers">
+                  <Button variant="default" className="gap-2 font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                    <ShieldCheck className="h-4 w-4" />
+                    Admin Dashboard
+                  </Button>
+                </ProgressLink>
+              )}
+
               <ProgressLink href="/trainer/forms" id="trainer-tour-form-btn">
                 <Button variant="outline" className="gap-2 font-semibold">
                   <ClipboardList className="h-4 w-4" />
@@ -389,6 +445,9 @@ export default function TrainerDashboardClient() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {classrooms.map((classroom, idx) => {
                 const isLive = !!classroom.live_url;
+                const isOwner = classroom.is_owner;
+                const isSubstitute = classroom.is_substitute;
+                const canManageSubs = isOwner || profile?.admin;
                 return (
                   <article
                     key={classroom.id}
@@ -398,16 +457,30 @@ export default function TrainerDashboardClient() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <span
-                        className={`inline-flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold uppercase ${
-                          isLive
-                            ? "border-red-600 text-red-600"
-                            : "border-muted-foreground/40 text-muted-foreground"
-                        }`}
-                      >
-                        {isLive ? <Radio className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
-                        {isLive ? "Live" : "Ready"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold uppercase ${
+                            isLive
+                              ? "border-red-600 text-red-600"
+                              : "border-muted-foreground/40 text-muted-foreground"
+                          }`}
+                        >
+                          {isLive ? <Radio className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
+                          {isLive ? "Live" : "Ready"}
+                        </span>
+                        {isSubstitute && !isOwner && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-600">
+                            <UserCheck className="h-3 w-3" />
+                            Co-Trainer
+                          </span>
+                        )}
+                        {isOwner && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-600">
+                            <ShieldCheck className="h-3 w-3" />
+                            Owner
+                          </span>
+                        )}
+                      </div>
                       <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-xs font-bold">
                         {initialsOf(classroom.trainer_name) || "?"}
                       </span>
@@ -431,16 +504,29 @@ export default function TrainerDashboardClient() {
                       </div>
                     </div>
 
-                    <ProgressLink href={`/classroom/live/${classroom.id}`} className="mt-5">
-                      <Button
-                        className={`w-full justify-between gap-2 font-semibold ${
-                          isLive ? "bg-red-600 text-white hover:bg-red-700" : ""
-                        }`}
-                      >
+                    <div className="mt-5 flex gap-2">
+                      <ProgressLink href={`/classroom/live/${classroom.id}`} className="flex-1">
+                        <Button
+                          className={`w-full justify-between gap-2 font-semibold ${
+                            isLive ? "bg-red-600 text-white hover:bg-red-700" : ""
+                          }`}
+                        >
                           <span>{isLive ? "Manage live session" : "Enter classroom"}</span>
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                      </Button>
-                    </ProgressLink>
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </Button>
+                      </ProgressLink>
+                      {canManageSubs && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Manage substitute trainers"
+                          onClick={() => openSubModal(classroom)}
+                          className="shrink-0"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </article>
                 );
               })}
@@ -458,6 +544,119 @@ export default function TrainerDashboardClient() {
         <HelpCircle className="h-4 w-4 text-primary" />
         <span>Take Tour</span>
       </button>
+
+      {/* Substitute Trainer Management Modal */}
+      {subModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border bg-card shadow-xl">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <div>
+                <h2 className="text-base font-bold">Substitute Trainers</h2>
+                <p className="text-xs text-muted-foreground">{subModalClassroom?.name}</p>
+              </div>
+              <button
+                onClick={() => { setSubModalOpen(false); setSubError(""); }}
+                className="grid h-8 w-8 place-items-center rounded-md hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {subError && (
+                <div className="mb-4 flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {subError}
+                </div>
+              )}
+
+              {subLoading ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
+              ) : (
+                <>
+                  {/* Current substitutes */}
+                  <div className="mb-4">
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Current Co-Trainers</p>
+                    {substitutes.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No substitute trainers assigned yet.</p>
+                    ) : (
+                      <ul className="divide-y rounded-md border">
+                        {substitutes.map((s) => (
+                          <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                            <div>
+                              <p className="text-sm font-medium">{s.full_name}</p>
+                              <p className="text-xs text-muted-foreground">{s.email}</p>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveSub(s.id)}
+                              className="grid h-7 w-7 place-items-center rounded-md text-red-500 hover:bg-red-500/10"
+                              title="Remove substitute"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {/* Add new substitute */}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Add Substitute</p>
+                    <Input
+                      placeholder="Search trainers by name or email…"
+                      value={subSearch}
+                      onChange={(e) => setSubSearch(e.target.value)}
+                      className="mb-2 h-8 text-sm"
+                    />
+                    <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
+                      {allTrainers
+                        .filter(
+                          (t) =>
+                            !substitutes.some((s) => s.id === t.id) &&
+                            t.id !== subModalClassroom?.created_by &&
+                            (subSearch === "" ||
+                              t.full_name?.toLowerCase().includes(subSearch.toLowerCase()) ||
+                              t.email?.toLowerCase().includes(subSearch.toLowerCase()))
+                        )
+                        .map((t) => (
+                          <li
+                            key={t.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-muted"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{t.full_name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{t.email}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="shrink-0 h-7 text-xs gap-1"
+                              onClick={() => handleAddSub(t.id)}
+                            >
+                              <UserPlus className="h-3 w-3" />
+                              Add
+                            </Button>
+                          </li>
+                        ))}
+                      {allTrainers.filter(
+                        (t) =>
+                          !substitutes.some((s) => s.id === t.id) &&
+                          t.id !== subModalClassroom?.created_by &&
+                          (subSearch === "" ||
+                            t.full_name?.toLowerCase().includes(subSearch.toLowerCase()) ||
+                            t.email?.toLowerCase().includes(subSearch.toLowerCase()))
+                      ).length === 0 && (
+                        <li className="px-3 py-3 text-xs text-muted-foreground">No available trainers to add.</li>
+                      )}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

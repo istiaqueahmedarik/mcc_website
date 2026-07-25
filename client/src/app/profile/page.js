@@ -47,8 +47,8 @@ export default async function page({ searchParams }) {
   }
   const user = res.result[0];
 
-  // Trainers and admins have a dedicated profile page
-  if (user.trainer || user.admin) {
+  // Only pure trainers (non-admins) have the dedicated trainer profile page redirect
+  if (user.trainer && !user.admin) {
     redirect("/trainer/profile");
   }
 

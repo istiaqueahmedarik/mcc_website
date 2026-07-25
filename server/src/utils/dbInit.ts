@@ -37,6 +37,20 @@ export async function initDb() {
     `;
     console.log('✅ Checked/Created "classroom_students" table.');
 
+    // 3b. Create classroom_substitutes table
+    await sql`
+      CREATE TABLE IF NOT EXISTS public.classroom_substitutes (
+        id uuid NOT NULL DEFAULT gen_random_uuid(),
+        created_at timestamp with time zone NOT NULL DEFAULT now(),
+        classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
+        trainer_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        CONSTRAINT classroom_substitutes_pkey PRIMARY KEY (id),
+        CONSTRAINT classroom_substitutes_unique UNIQUE (classroom_id, trainer_id)
+      );
+    `;
+    console.log('✅ Checked/Created "classroom_substitutes" table.');
+
+
     // 4. Create classes table
     await sql`
       CREATE TABLE IF NOT EXISTS public.classes (
