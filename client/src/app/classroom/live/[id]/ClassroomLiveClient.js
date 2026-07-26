@@ -292,6 +292,13 @@ const PROBLEM_BATCH_SIZE = 8;
 const HISTORY_BATCH_SIZE = 8;
 const PEOPLE_BATCH_SIZE = 12;
 
+const getStudentIdLabel = (student) => String(student?.mist_id || '').trim();
+const getStudentDisplayName = (student) => student?.full_name || student?.name || student?.email || 'Student';
+const getStudentLabelWithId = (student) => {
+  const idLabel = getStudentIdLabel(student);
+  return idLabel ? `${getStudentDisplayName(student)} [${idLabel}]` : getStudentDisplayName(student);
+};
+
 function toDatetimeLocalValue(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -1288,7 +1295,7 @@ function TeamDashboardPanel({
                             checked={editingTeamStudentIds.includes(student.id)}
                             onChange={() => onToggleEditTeamStudent(student.id)}
                           />
-                          <span className="min-w-0 truncate">{student.full_name}</span>
+                          <span className="min-w-0 truncate">{getStudentLabelWithId(student)}</span>
                         </label>
                         );
                       })}
@@ -1329,7 +1336,7 @@ function TeamDashboardPanel({
                   {team.members.map((member) => (
                     <Badge key={member.id} variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-muted/30">
                       <Users className="h-3 w-3 text-muted-foreground" />
-                      <span>{member.name || member.full_name || member.email}</span>
+                      <span>{getStudentLabelWithId(member)}</span>
                     </Badge>
                   ))}
                 </div>
@@ -1500,7 +1507,7 @@ function FloatingClassChat({
               >
                 <option value="">Broadcast to Class</option>
                 {students.map((student) => (
-                  <option key={student.id} value={student.id}>Chat: {student.full_name}</option>
+                  <option key={student.id} value={student.id}>Chat: {getStudentLabelWithId(student)}</option>
                 ))}
               </select>
             ) : (
@@ -2978,7 +2985,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                             >
                               <option value="">-- Choose student or group --</option>
                                 {students.map(s => (
-                                  <option key={s.id} value={`student-${s.id}`}>{s.full_name}</option>
+                                  <option key={s.id} value={`student-${s.id}`}>{getStudentLabelWithId(s)}</option>
                                 ))}
                                 {teams.map(t => (
                                   <option key={t.id} value={`team-${t.id}`}>Group: {t.name}</option>
@@ -4544,7 +4551,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                             {visibleStudents.map(s => (
                               <div key={s.id} className="flex items-center justify-between p-3 text-sm hover:bg-muted/10">
                                 <div>
-                                  <p className="font-semibold">{s.full_name}</p>
+                                  <p className="font-semibold">{getStudentLabelWithId(s)}</p>
                                   <p className="text-xs text-muted-foreground">{s.email}</p>
                                 </div>
                                 <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveStudent(s.id)}>
@@ -4613,7 +4620,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                   else setTeamStudentIds(prev => prev.filter(id => id !== s.id));
                                 }}
                               />
-                              <span>{s.full_name}</span>
+                              <span>{getStudentLabelWithId(s)}</span>
                             </label>
                             );
                           })}
@@ -4641,7 +4648,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                   <div className="min-w-0">
                                     <p className="truncate font-bold">{t.name}</p>
                                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                      Members: {t.members?.map(m => m.name).join(', ') || 'None'}
+                                      Members: {t.members?.map(m => getStudentLabelWithId(m)).join(', ') || 'None'}
                                     </p>
                                   </div>
                                   {editingTeamId === t.id ? (
@@ -4700,7 +4707,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             checked={editingTeamStudentIds.includes(s.id)}
                                             onChange={() => handleToggleEditingTeamStudent(s.id)}
                                           />
-                                          <span className="min-w-0 truncate">{s.full_name}</span>
+                                          <span className="min-w-0 truncate">{getStudentLabelWithId(s)}</span>
                                         </label>
                                         );
                                       })}
@@ -4996,7 +5003,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {(t.members || []).map((m) => (
-                                  <Badge key={m.id} variant="secondary" className="text-[11px]">{m.full_name}</Badge>
+                                  <Badge key={m.id} variant="secondary" className="text-[11px]">{getStudentLabelWithId(m)}</Badge>
                                 ))}
                               </div>
                             </div>
@@ -5014,7 +5021,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               {s.full_name ? s.full_name.charAt(0).toUpperCase() : 'S'}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold">{s.full_name}</p>
+                              <p className="truncate text-xs font-semibold">{getStudentLabelWithId(s)}</p>
                               <p className="truncate text-[10px] text-muted-foreground">{s.email}</p>
                             </div>
                           </div>
@@ -5671,7 +5678,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     return (
                       <div key={student.student_id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border bg-muted/20 gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate">{student.full_name}</p>
+                          <p className="text-sm font-semibold truncate">{getStudentLabelWithId(student)}</p>
                           <p className="text-xs text-muted-foreground truncate">{student.email} • ID: {student.mist_id || 'N/A'}</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-1 shrink-0">

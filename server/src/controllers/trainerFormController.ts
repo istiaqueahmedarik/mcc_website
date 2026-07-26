@@ -157,7 +157,7 @@ async function getOptionalAuthenticatedUser(c: Context) {
     if (!id || !email) return null;
 
     const rows = await sql`
-      SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+      SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
       FROM users
       WHERE id = ${String(id)} AND email = ${String(email)}
       LIMIT 1
@@ -175,63 +175,63 @@ async function findUserByPrimaryKey(field: string, value: string) {
   switch (field) {
     case "id":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE id::text = ${needle}
         LIMIT 1
       `;
     case "email":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(email) = lower(${needle})
         LIMIT 1
       `;
     case "full_name":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(full_name) = lower(${needle})
         LIMIT 1
       `;
     case "phone":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE phone = ${needle}
         LIMIT 1
       `;
     case "vjudge_id":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(vjudge_id) = lower(${needle})
         LIMIT 1
       `;
     case "cf_id":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(cf_id) = lower(${needle})
         LIMIT 1
       `;
     case "codechef_id":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(codechef_id) = lower(${needle})
         LIMIT 1
       `;
     case "atcoder_id":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(atcoder_id) = lower(${needle})
         LIMIT 1
       `;
     case "batch_name":
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(batch_name) = lower(${needle})
         LIMIT 1
@@ -239,12 +239,16 @@ async function findUserByPrimaryKey(field: string, value: string) {
     case "mist_id":
     default:
       return sql`
-        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size
+        SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE mist_id::text = ${needle}
         LIMIT 1
       `;
   }
+}
+
+function isStudentUser(user: any) {
+  return user && user.admin !== true && user.trainer !== true;
 }
 
 function getUserValue(user: any, field: string | null) {
@@ -783,6 +787,9 @@ export const resolvePublicTrainerFormUser = async (c: Context) => {
     }
 
     if (!user) return c.json({ matched: false, mapped_values: {} });
+    if (form.type === "classroom_invitation" && !isStudentUser(user)) {
+      return c.json({ error: "Trainer/admin accounts cannot be enrolled as classroom students." }, 400);
+    }
     if (!value) {
       return c.json({
         error: `Your profile does not have ${form.primary_key_label || "the required identifier"}`,
@@ -846,6 +853,10 @@ export const submitPublicTrainerForm = async (c: Context) => {
 
     if (!user) {
       return c.json({ error: "No MCC user found for this identifier" }, 404);
+    }
+
+    if (form.type === "classroom_invitation" && !isStudentUser(user)) {
+      return c.json({ error: "Trainer/admin accounts cannot be enrolled as classroom students." }, 400);
     }
 
     const missing = validateResponse(form, user, rawAnswers);

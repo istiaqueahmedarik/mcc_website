@@ -636,7 +636,7 @@ export const getClassroomDetails = async (c: Context) => {
         WHERE c.id = ${classroomId}
       `,
       sql`
-        SELECT u.id, u.full_name, u.email, u.cf_id, u.atcoder_id, u.codechef_id
+        SELECT u.id, u.full_name, u.email, u.mist_id, u.cf_id, u.atcoder_id, u.codechef_id
         FROM classroom_students cs
         JOIN users u ON cs.student_id = u.id
         WHERE cs.classroom_id = ${classroomId}
@@ -652,7 +652,7 @@ export const getClassroomDetails = async (c: Context) => {
       `,
       sql`
         SELECT t.id, t.name, 
-               COALESCE(json_agg(json_build_object('id', u.id, 'name', u.full_name, 'email', u.email)) FILTER (WHERE u.id IS NOT NULL), '[]') as members
+               COALESCE(json_agg(json_build_object('id', u.id, 'name', u.full_name, 'full_name', u.full_name, 'email', u.email, 'mist_id', u.mist_id)) FILTER (WHERE u.id IS NOT NULL), '[]') as members
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON t.id = tm.team_id
         LEFT JOIN users u ON tm.student_id = u.id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
@@ -1006,7 +1006,7 @@ export const updateTeamMembers = async (c: Context) => {
     });
 
     const members = await sql`
-      SELECT u.id, u.full_name AS name, u.email
+      SELECT u.id, u.full_name AS name, u.full_name, u.email, u.mist_id
       FROM trainer_team_members tm
       JOIN users u ON u.id = tm.student_id
       WHERE tm.team_id = ${teamId}
@@ -2328,7 +2328,7 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
 
     const [teams, classRows, topicRows] = await Promise.all([
       sql`
-        SELECT t.id AS team_id, t.name AS team_name, u.id AS student_id, u.full_name, u.email
+        SELECT t.id AS team_id, t.name AS team_name, u.id AS student_id, u.full_name, u.email, u.mist_id
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON tm.team_id = t.id
         LEFT JOIN users u ON u.id = tm.student_id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
@@ -2396,7 +2396,9 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
       team.members.push({
         id: row.student_id,
         name: row.full_name,
+        full_name: row.full_name,
         email: row.email,
+        mist_id: row.mist_id,
         ...counts,
         solveRate: counts.assigned ? Math.round((counts.solved / counts.assigned) * 100) : 0,
       });

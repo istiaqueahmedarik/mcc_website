@@ -48,6 +48,13 @@ function platformName(platform, link) {
   return "HackerRank";
 }
 
+const getStudentIdLabel = (student) => String(student?.mist_id || "").trim();
+const getStudentDisplayName = (student) => student?.full_name || student?.name || student?.email || "Student";
+const getStudentLabelWithId = (student) => {
+  const idLabel = getStudentIdLabel(student);
+  return idLabel ? `${getStudentDisplayName(student)} [${idLabel}]` : getStudentDisplayName(student);
+};
+
 function extractProblemId(title, link) {
   if (title && title.length < 35 && !title.includes("http")) {
     return title.toLowerCase().replace(/\s+/g, "-");
@@ -504,7 +511,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                       onChange={() => handleToggleStudent(student.id)}
                     />
                     <span className="truncate font-medium">
-                      {student.full_name || student.email}
+                      {getStudentLabelWithId(student)}
                     </span>
                   </label>
                   );
@@ -634,7 +641,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                         className="border-r border-border px-3 py-1.5 font-bold text-center text-[11px] bg-muted/90 min-w-[180px]"
                       >
                         <span className="block truncate font-sans font-bold">
-                          {member.full_name || member.name || member.email}
+                          {getStudentLabelWithId(member)}
                         </span>
                       </th>
                     ))}

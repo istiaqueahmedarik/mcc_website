@@ -587,6 +587,13 @@ const EVENT_LABELS = {
   visibility_hidden: "Tab hidden",
 };
 
+const getStudentIdLabel = (student) => String(student?.mist_id || "").trim();
+const getStudentDisplayName = (student) => student?.full_name || student?.name || student?.email || "Student";
+const getStudentLabelWithId = (student) => {
+  const idLabel = getStudentIdLabel(student);
+  return idLabel ? `${getStudentDisplayName(student)} [${idLabel}]` : getStudentDisplayName(student);
+};
+
 export function ClassroomIdeMonitorPanel({
   classroomId = "",
   userId = "",
@@ -727,7 +734,7 @@ export function ClassroomIdeMonitorPanel({
                 <SelectItem value="none">Select student</SelectItem>
                 {students.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
-                    {student.full_name || student.name || student.email}
+                    {getStudentLabelWithId(student)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -777,7 +784,7 @@ export function ClassroomIdeMonitorPanel({
               <div className="rounded-lg border bg-card">
                 <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold">{selectedStudent?.full_name || selectedStudent?.name || selectedStudent?.email || "Student"}</p>
+                    <p className="truncate text-sm font-bold">{getStudentLabelWithId(selectedStudent)}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {(EVENT_LABELS[displaySession.last_event_type] || displaySession.last_event_type || "No event")} - {displaySession.class_name || "Classroom"}
                     </p>
