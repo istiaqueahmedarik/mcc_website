@@ -205,19 +205,19 @@ const studentClassroomSteps = [
     },
   },
   {
-    element: "#student-tour-tab-live",
+    element: "#student-tour-tab-challenges",
     popover: {
-      title: "🎯 Live Session & Board",
-      description: "When your trainer starts a live session, join here to see their whiteboard broadcast and open the coding environment. This tab activates during scheduled class times.",
+      title: "🏆 Challenges Tab",
+      description: "Your assigned practice problems appear here. Click a problem to open it, submit your solution link, and add notes. Your trainer reviews and approves your submissions.",
       side: "bottom",
       align: "start",
     },
   },
   {
-    element: "#student-tour-tab-challenges",
+    element: "#student-tour-tab-live",
     popover: {
-      title: "🏆 Challenges Tab",
-      description: "Your assigned practice problems appear here. Click a problem to open it, submit your solution link, and add notes. Your trainer reviews and approves your submissions.",
+      title: "🎯 Live Sessions & IDE",
+      description: "When your trainer starts a live session, join here to see their whiteboard broadcast and open the coding environment. This tab activates during scheduled class times.",
       side: "bottom",
       align: "start",
     },
@@ -345,6 +345,13 @@ function toDatetimeLocalValue(value) {
   if (Number.isNaN(date.getTime())) return '';
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
+}
+
+function datetimeLocalToIso(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString();
 }
 
 function isValidSubmissionUrl(value) {
@@ -2889,12 +2896,17 @@ export default function ClassroomLiveClient({ classroomId }) {
       setSessionEditError('Session name and time are required');
       return;
     }
+    const scheduledTime = datetimeLocalToIso(sessionEditForm.scheduledTime);
+    if (!scheduledTime) {
+      setSessionEditError('A valid scheduled date and time is required');
+      return;
+    }
 
     setSessionEditSaving(true);
     setSessionEditError('');
     const res = await post_with_token(`classroom/${classroomId}/class/${sessionEditClass.id}/update`, {
       name,
-      scheduledTime: sessionEditForm.scheduledTime,
+      scheduledTime,
       sessionType: sessionEditForm.sessionType,
       durationMinutes: Number(sessionEditForm.durationMinutes) || 90,
     });
@@ -2912,10 +2924,11 @@ export default function ClassroomLiveClient({ classroomId }) {
   // Schedule & Start Classes
   const handleScheduleClass = async (e) => {
     e.preventDefault();
-    if (!className || !classSchedule) return;
+    const scheduledTime = datetimeLocalToIso(classSchedule);
+    if (!className || !scheduledTime) return;
     const res = await post_with_token(`classroom/${classroomId}/schedule-class`, {
       name: className,
-      scheduledTime: classSchedule,
+      scheduledTime,
       sessionType: classSessionType,
       durationMinutes: Number(classDurationMinutes) || 90,
     });
@@ -5674,11 +5687,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <TabsTrigger id="student-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
                   <Layers3 className="h-4 w-4" /> Topics
                 </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Target className="h-4 w-4" /> Live Session &amp; IDE
-                </TabsTrigger>
                 <TabsTrigger id="student-tour-tab-challenges" value="challenges" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
                   <Award className="h-4 w-4" /> Challenges
+                </TabsTrigger>
+                <TabsTrigger id="student-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                  <Target className="h-4 w-4" /> Live Sessions &amp; IDE
                 </TabsTrigger>
                 <TabsTrigger id="student-tour-tab-people" value="people" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
                   <Users className="h-4 w-4" /> Group &amp; Roster

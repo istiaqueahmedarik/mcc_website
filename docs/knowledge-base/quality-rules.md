@@ -1,5 +1,19 @@
 # Quality Rules
 
+## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Normalize Schedule Times At Boundaries
+
+Source:
+- `docs/reviews/trainer-student-tabs-schedule-time-20260727-implementation-review.md`
+
+Rule:
+Class schedule writes must not send raw `datetime-local` strings across the API boundary. Convert browser local selections to ISO on submit and validate/normalize on the server before storing `classes.scheduled_time`.
+
+Applies when:
+Changing classroom session schedule create/edit handlers or adding new schedule-like fields.
+
+Do not overgeneralize:
+This rule does not migrate historical rows or define product-wide timezone preferences.
+
 ## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Separate Trainer Selectability From Student Access
 
 Source:

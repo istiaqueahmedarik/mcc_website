@@ -431,6 +431,14 @@ function normalizeDurationMinutes(value: unknown): number | null {
   return Math.min(minutes, POSTGRES_INTEGER_MAX);
 }
 
+function normalizeScheduledTime(value: unknown): string | null {
+  const text = normalizeText(value, 80);
+  if (!text) return null;
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -1258,7 +1266,8 @@ export const scheduleClass = async (c: Context) => {
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
     const { name, scheduledTime, sessionType, durationMinutes } = await c.req.json();
-    if (!name || !scheduledTime) return c.json({ error: 'Name and scheduled time are required' }, 400);
+    const normalizedScheduledTime = normalizeScheduledTime(scheduledTime);
+    if (!name || !normalizedScheduledTime) return c.json({ error: 'Name and a valid scheduled time are required' }, 400);
 
     const normSessionType = sessionType === 'online' ? 'online' : 'onsite';
     const normDuration = durationMinutes === undefined || durationMinutes === null || durationMinutes === ''
@@ -1268,7 +1277,7 @@ export const scheduleClass = async (c: Context) => {
 
     const result = await sql`
       INSERT INTO classes (classroom_id, name, scheduled_time, session_type, duration_minutes, overflow_minutes)
-      VALUES (${classroomId}, ${name}, ${scheduledTime}, ${normSessionType}, ${normDuration}, 0)
+      VALUES (${classroomId}, ${name}, ${normalizedScheduledTime}, ${normSessionType}, ${normDuration}, 0)
       RETURNING *
     `;
 
@@ -1295,7 +1304,7 @@ export const updateClassSession = async (c: Context) => {
 
     const body = await c.req.json();
     const name = normalizeText(body.name, 160);
-    const scheduledTimeText = normalizeText(body.scheduledTime, 80);
+    const scheduledTimeText = normalizeScheduledTime(body.scheduledTime);
     const sessionType = body.sessionType === 'online' ? 'online' : 'onsite';
     const durationMinutes = body.durationMinutes === undefined || body.durationMinutes === null || body.durationMinutes === ''
       ? 90
@@ -1303,7 +1312,7 @@ export const updateClassSession = async (c: Context) => {
     if (!durationMinutes) return c.json({ error: 'Duration minutes must be a positive integer' }, 400);
 
     if (!name) return c.json({ error: 'Session name is required' }, 400);
-    if (!scheduledTimeText || Number.isNaN(new Date(scheduledTimeText).getTime())) {
+    if (!scheduledTimeText) {
       return c.json({ error: 'A valid scheduled date and time is required' }, 400);
     }
 

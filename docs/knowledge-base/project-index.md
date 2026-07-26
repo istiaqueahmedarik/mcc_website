@@ -1,5 +1,19 @@
 # Project Index
 
+## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-student-tabs-schedule-time-20260727-implementation-review.md`
+
+Fact:
+Student classroom navigation in `ClassroomLiveClient.js` now renders `Topics`, `Challenges`, `Live Sessions & IDE`, `Group & Roster`, and `Attendance` in that order, with matching student tour order. Classroom schedule create/edit converts browser `datetime-local` values to ISO before POST, and `classroomController.ts` validates/normalizes scheduled time before writing `classes.scheduled_time`.
+
+Applies when:
+Maintaining student classroom tabs, student onboarding tour, class schedule create/edit, attendance session dates, or class history time display.
+
+Do not overgeneralize:
+This does not add global timezone preferences, migrate old schedule rows, change trainer tabs, or change attendance/class start/complete behavior.
+
 ## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Approved Requirement Scope
 
 Source:

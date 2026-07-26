@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Student Tabs And Schedule Time
+
+Source:
+- `docs/decisions/trainer-student-tabs-schedule-time-20260727-decisions.md`
+- `docs/reviews/trainer-student-tabs-schedule-time-20260727-implementation-review.md`
+
+Decision:
+Keep student tab values stable while reordering visible navigation to `Topics`, `Challenges`, `Live Sessions & IDE`, `Group & Roster`, and `Attendance`. For class schedule create/edit, treat browser `datetime-local` values as local wall time and convert them to ISO before POST; server endpoints validate and normalize scheduled time to ISO before writing.
+
+Applies when:
+Changing `ClassroomLiveClient.js` student tabs/tour or `classroomController.ts` schedule create/edit paths.
+
+Do not overgeneralize:
+Do not infer a global timezone settings system or old-row migration from this fix.
+
 ## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Pre-Enrolled Identity Model
 
 Source:

@@ -1,5 +1,19 @@
 # Patterns
 
+## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Datetime-Local Submit Pattern
+
+Source:
+- `docs/reviews/trainer-student-tabs-schedule-time-20260727-implementation-review.md`
+
+Fact:
+For classroom schedule forms using `<input type="datetime-local">`, convert the input value to `Date#toISOString()` in the browser before POST, and validate/normalize again server-side before persisting.
+
+Applies when:
+Adding or modifying class/session schedule create/edit forms, especially when stored timestamps are later displayed with `Date` and `toLocale*` helpers.
+
+Do not overgeneralize:
+Date-only fields or intentionally timezone-free labels should not use this pattern without a separate requirement.
+
 ## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Serial Roster Identity Work
 
 Source:
