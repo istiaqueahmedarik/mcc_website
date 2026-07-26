@@ -38,7 +38,6 @@ import { cookies } from "next/headers";
 import MccLogo from "./IconChanger/MccLogo";
 import ProgressLink from "./ProgressLink";
 import ThemeChanger from "./ThemeChanger";
-import NotificationBell from "./NotificationBell";
 
 const Navbar = async () => {
   const navItems = [
@@ -161,11 +160,6 @@ const Navbar = async () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          {isLoggedIn && (
-            <NotificationBell
-              userId={profile?.id}
-            />
-          )}
           <ThemeChanger />
           <div className="hidden md:flex items-center space-x-2">
             <ProgressLink href="/login" className={`${isLoggedIn && "hidden"}`}>

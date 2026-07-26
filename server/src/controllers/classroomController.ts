@@ -1,71 +1,12 @@
 import { Context } from 'hono';
 import sql from '../db';
-import { sendEmail } from '../sendEmail';
 import * as cheerio from 'cheerio';
-import { broadcast, userNotificationChannel } from '../utils/realtime';
 import {
   closeClassroomBoardRoom,
   consumeClassroomBoardJoinToken,
   createClassroomBoardJoinToken,
   type BoardJoinContext,
 } from '../utils/classroomBoardSync';
-
-// Fire-and-forget email delivery so the SMTP round-trip never blocks the HTTP response.
-function dispatchNotificationEmail(email: string, fullName: string | null, title: string, message: string, link?: string) {
-  const emailText = `Hello ${fullName || 'Student'},\n\n${message}\n\nView details here: ${link || 'N/A'}`;
-  const emailHtml = `<p>Hello ${fullName || 'Student'},</p><p>${message}</p><p><a href="${link || '#'}">View Details</a></p>`;
-
-  sendEmail(email, `[MCC Classroom] ${title}`, emailText, emailHtml).catch(err => {
-    console.error('Failed to send notification email:', err);
-  });
-}
-
-// Helper to create a single in-app notification and queue an email.
-async function createNotification(userId: string, title: string, message: string, link?: string) {
-  try {
-    await sql`
-      INSERT INTO public.in_app_notifications (user_id, title, message, link)
-      VALUES (${userId}, ${title}, ${message}, ${link || null})
-    `;
-
-    // Push a content-free signal so the recipient's bell refetches immediately.
-    broadcast(userNotificationChannel(userId), 'new_notification', { at: Date.now() });
-
-    const userRes = await sql`SELECT email, full_name FROM users WHERE id = ${userId}`;
-    if (userRes.length > 0 && userRes[0].email) {
-      dispatchNotificationEmail(userRes[0].email, userRes[0].full_name, title, message, link);
-    }
-  } catch (err) {
-    console.error('Failed to create notification:', err);
-  }
-}
-
-// Notify many users at once: one bulk insert + one batched user lookup, emails dispatched async.
-async function createNotifications(userIds: string[], title: string, message: string, link?: string) {
-  const uniqueIds = [...new Set(userIds.filter(Boolean))];
-  if (uniqueIds.length === 0) return;
-  try {
-    await sql`
-      INSERT INTO public.in_app_notifications ${sql(
-        uniqueIds.map(userId => ({ user_id: userId, title, message, link: link || null }))
-      )}
-    `;
-
-    // Push a content-free signal to each recipient's channel.
-    for (const recipientId of uniqueIds) {
-      broadcast(userNotificationChannel(recipientId), 'new_notification', { at: Date.now() });
-    }
-
-    const recipients = await sql`
-      SELECT email, full_name FROM users WHERE id = ANY(${uniqueIds}) AND email IS NOT NULL
-    `;
-    for (const recipient of recipients) {
-      dispatchNotificationEmail(recipient.email, recipient.full_name, title, message, link);
-    }
-  } catch (err) {
-    console.error('Failed to create notifications:', err);
-  }
-}
 
 // Scrape helper for problem details
 function cleanProblemTitle(title: string, fallback: string) {
@@ -397,7 +338,9 @@ async function canManageClassroom(userId: string, classroomId: string): Promise<
 const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
 const CHAT_REACTIONS = new Set(['like', 'heart', 'celebrate']);
 const PROBLEM_STATUS_VALUES = new Set(['not_solved', 'tried', 'pending_approval', 'solved']);
+const PROBLEM_PLATFORMS = new Set(['codeforces', 'codechef', 'atcoder', 'custom']);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const POSTGRES_INTEGER_MAX = 2147483647;
 const IDE_EVENT_TYPES = new Set([
   'session_open',
   'heartbeat',
@@ -467,6 +410,58 @@ function normalizeIdeEventDetail(value: unknown): Record<string, unknown> {
 function normalizeProgressStatus(value: unknown) {
   const status = String(value ?? '').trim();
   return PROBLEM_STATUS_VALUES.has(status) ? status : null;
+}
+
+function normalizeDurationMinutes(value: unknown): number | null {
+  const minutes = normalizePositiveInteger(value);
+  if (!minutes) return null;
+  return Math.min(minutes, POSTGRES_INTEGER_MAX);
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeProblemPlatform(value: unknown): string {
+  const platform = normalizeText(value || 'custom', 40).toLowerCase();
+  return PROBLEM_PLATFORMS.has(platform) ? platform : '';
+}
+
+type StudentLookupMethod = 'email' | 'mist_id';
+
+function normalizeStudentLookupMethod(value: unknown): StudentLookupMethod {
+  const method = normalizeText(value, 40).toLowerCase();
+  return method === 'mist_id' || method === 'student_id' ? 'mist_id' : 'email';
+}
+
+function normalizeStudentIdentifier(value: unknown, method: StudentLookupMethod): string {
+  const text = normalizeText(value, 320);
+  return method === 'email' ? text.toLowerCase() : text;
+}
+
+function uniqueNormalizedStudentIdentifiers(values: unknown[], method: StudentLookupMethod): string[] {
+  return [...new Set(values.map(value => normalizeStudentIdentifier(value, method)).filter(Boolean))];
+}
+
+async function findStudentsByIdentifiers(method: StudentLookupMethod, identifiers: string[]) {
+  if (identifiers.length === 0) return [];
+  if (method === 'mist_id') {
+    return sql`
+      SELECT id, full_name, email, mist_id, admin, trainer, mist_id::text AS lookup_value
+      FROM users
+      WHERE mist_id::text = ANY(${identifiers})
+    `;
+  }
+  return sql`
+    SELECT id, full_name, email, mist_id, admin, trainer, lower(email) AS lookup_value
+    FROM users
+    WHERE lower(email) = ANY(${identifiers})
+  `;
 }
 
 function normalizeProblemTag(value: unknown): string | null {
@@ -844,9 +839,15 @@ export const addStudentToClassroom = async (c: Context) => {
       return c.json({ error: 'Unauthorized: Only classroom creator or admin can add students' }, 403);
     }
 
-    const { studentEmail } = await c.req.json();
-    const student = await sql`SELECT id, full_name, admin, trainer FROM users WHERE email = ${studentEmail}`;
-    if (student.length === 0) return c.json({ error: 'Student email not registered on MCC' }, 404);
+    const body = await c.req.json();
+    const lookupMethod = normalizeStudentLookupMethod(body.lookupMethod);
+    const studentIdentifier = normalizeStudentIdentifier(body.studentIdentifier ?? body.studentEmail, lookupMethod);
+    if (!studentIdentifier) {
+      return c.json({ error: lookupMethod === 'mist_id' ? 'Student ID is required' : 'Student email is required' }, 400);
+    }
+
+    const student = await findStudentsByIdentifiers(lookupMethod, [studentIdentifier]);
+    if (student.length === 0) return c.json({ error: lookupMethod === 'mist_id' ? 'Student ID not registered on MCC' : 'Student email not registered on MCC' }, 404);
     if (!isStudentRole(student[0])) {
       return c.json({ error: 'This user is a trainer/admin and cannot be enrolled as a classroom student.' }, 400);
     }
@@ -857,14 +858,89 @@ export const addStudentToClassroom = async (c: Context) => {
       ON CONFLICT DO NOTHING
     `;
 
-    await createNotification(
-      student[0].id,
-      'Added to Classroom',
-      `You have been added to the classroom by your trainer.`,
-      `/classroom/${classroomId}`
-    );
-
     return c.json({ success: true, message: `${student[0].full_name} added successfully.` });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const addStudentsToClassroom = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) {
+      return c.json({ error: 'Unauthorized: Only classroom creator or admin can add students' }, 403);
+    }
+
+    const body = await c.req.json();
+    const lookupMethod = normalizeStudentLookupMethod(body.lookupMethod);
+    const rawIdentifiers = Array.isArray(body.identifiers) ? body.identifiers : [];
+    const identifiers = uniqueNormalizedStudentIdentifiers(rawIdentifiers, lookupMethod).slice(0, 1000);
+    if (identifiers.length === 0) return c.json({ error: 'At least one student identifier is required' }, 400);
+
+    const studentRows = await findStudentsByIdentifiers(lookupMethod, identifiers);
+    const studentByIdentifier = new Map<string, any>();
+    for (const student of studentRows) {
+      if (!studentByIdentifier.has(student.lookup_value)) studentByIdentifier.set(student.lookup_value, student);
+    }
+
+    const notFound: string[] = [];
+    const invalidRole: any[] = [];
+    const eligibleStudents: any[] = [];
+    for (const identifier of identifiers) {
+      const student = studentByIdentifier.get(identifier);
+      if (!student) {
+        notFound.push(identifier);
+        continue;
+      }
+      if (!isStudentRole(student)) {
+        invalidRole.push({ identifier, id: student.id, full_name: student.full_name, email: student.email, mist_id: student.mist_id });
+        continue;
+      }
+      eligibleStudents.push(student);
+    }
+
+    const eligibleStudentIds = [...new Set(eligibleStudents.map(student => student.id))];
+    let existingIds = new Set<string>();
+    if (eligibleStudentIds.length > 0) {
+      const existing = await sql`
+        SELECT student_id
+        FROM classroom_students
+        WHERE classroom_id = ${classroomId} AND student_id = ANY(${eligibleStudentIds})
+      `;
+      existingIds = new Set(existing.map((row: any) => row.student_id));
+    }
+
+    const studentsToAdd = eligibleStudents.filter(student => !existingIds.has(student.id));
+    if (studentsToAdd.length > 0) {
+      await sql`
+        INSERT INTO classroom_students ${sql(
+          studentsToAdd.map(student => ({ classroom_id: classroomId, student_id: student.id }))
+        )}
+        ON CONFLICT DO NOTHING
+      `;
+    }
+
+    const alreadyEnrolled = eligibleStudents
+      .filter(student => existingIds.has(student.id))
+      .map(student => ({ id: student.id, full_name: student.full_name, email: student.email, mist_id: student.mist_id }));
+    const added = studentsToAdd.map(student => ({ id: student.id, full_name: student.full_name, email: student.email, mist_id: student.mist_id }));
+
+    return c.json({
+      success: true,
+      added,
+      alreadyEnrolled,
+      notFound,
+      invalidRole,
+      summary: {
+        received: identifiers.length,
+        added: added.length,
+        alreadyEnrolled: alreadyEnrolled.length,
+        notFound: notFound.length,
+        invalidRole: invalidRole.length,
+      },
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -936,12 +1012,6 @@ export const createTeam = async (c: Context) => {
         )}
         ON CONFLICT DO NOTHING
       `;
-      await createNotifications(
-        uniqueStudentIds,
-        'Added to Team',
-        `You have been added to team "${name}" in your classroom.`,
-        `/classroom/${classroomId}`
-      );
     }
 
     return c.json({ success: true, team: team[0] });
@@ -1042,29 +1112,16 @@ export const scheduleClass = async (c: Context) => {
     if (!name || !scheduledTime) return c.json({ error: 'Name and scheduled time are required' }, 400);
 
     const normSessionType = sessionType === 'online' ? 'online' : 'onsite';
-    const normDuration = Number(durationMinutes) > 0 ? Math.min(1440, Math.max(15, Number(durationMinutes))) : 90;
+    const normDuration = durationMinutes === undefined || durationMinutes === null || durationMinutes === ''
+      ? 90
+      : normalizeDurationMinutes(durationMinutes);
+    if (!normDuration) return c.json({ error: 'Duration minutes must be a positive integer' }, 400);
 
     const result = await sql`
       INSERT INTO classes (classroom_id, name, scheduled_time, session_type, duration_minutes, overflow_minutes)
       VALUES (${classroomId}, ${name}, ${scheduledTime}, ${normSessionType}, ${normDuration}, 0)
       RETURNING *
     `;
-
-    // Notify all classroom students
-    const students = await sql`
-      SELECT cs.student_id
-      FROM classroom_students cs
-      JOIN users u ON u.id = cs.student_id
-      WHERE cs.classroom_id = ${classroomId}
-        AND u.admin IS NOT TRUE
-        AND u.trainer IS NOT TRUE
-    `;
-    await createNotifications(
-      students.map(student => student.student_id),
-      'Class Scheduled',
-      `New class "${name}" scheduled for ${new Date(scheduledTime).toLocaleString()}`,
-      `/classroom/${classroomId}`
-    );
 
     return c.json({ success: true, class: result[0] });
   } catch (error: any) {
@@ -1091,9 +1148,10 @@ export const updateClassSession = async (c: Context) => {
     const name = normalizeText(body.name, 160);
     const scheduledTimeText = normalizeText(body.scheduledTime, 80);
     const sessionType = body.sessionType === 'online' ? 'online' : 'onsite';
-    const durationMinutes = Number(body.durationMinutes) > 0
-      ? Math.min(1440, Math.max(15, Number(body.durationMinutes)))
-      : 90;
+    const durationMinutes = body.durationMinutes === undefined || body.durationMinutes === null || body.durationMinutes === ''
+      ? 90
+      : normalizeDurationMinutes(body.durationMinutes);
+    if (!durationMinutes) return c.json({ error: 'Duration minutes must be a positive integer' }, 400);
 
     if (!name) return c.json({ error: 'Session name is required' }, 400);
     if (!scheduledTimeText || Number.isNaN(new Date(scheduledTimeText).getTime())) {
@@ -1149,22 +1207,6 @@ export const startClass = async (c: Context) => {
       SET live_url = ${liveUrl} 
       WHERE id = ${classData[0].classroom_id}
     `;
-
-    // Notify all classroom students
-    const students = await sql`
-      SELECT cs.student_id
-      FROM classroom_students cs
-      JOIN users u ON u.id = cs.student_id
-      WHERE cs.classroom_id = ${classData[0].classroom_id}
-        AND u.admin IS NOT TRUE
-        AND u.trainer IS NOT TRUE
-    `;
-    await createNotifications(
-      students.map(student => student.student_id),
-      'Class Started LIVE!',
-      `Your class "${classData[0].name}" has started live. Join the session now.`,
-      liveUrl
-    );
 
     return c.json({ success: true, class: started[0], liveUrl });
   } catch (error: any) {
@@ -1511,15 +1553,172 @@ export const assignProblem = async (c: Context) => {
         RETURNING *
       `;
 
-      await createNotifications(
-        targetStudentIds,
-        'Problem Assigned',
-        `A problem "${title}" has been assigned to you with a ${timerMinutes || 'unlimited'} min timer.`,
-        `/classroom/live/${classCheck[0].classroom_id}`
-      );
     }
 
     return c.json({ success: true, result: assignedProblems });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const assignProblemsBulk = async (c: Context) => {
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const { classId, rows } = await c.req.json();
+    if (!classId || !Array.isArray(rows)) {
+      return c.json({ error: 'Class and problem rows are required' }, 400);
+    }
+
+    const classCheck = await sql`
+      SELECT cr.id AS classroom_id, cr.created_by
+      FROM classes c
+      JOIN classrooms cr ON c.classroom_id = cr.id
+      WHERE c.id = ${classId}
+    `;
+    if (classCheck.length === 0) return c.json({ error: 'Class not found' }, 404);
+
+    const classroomId = classCheck[0].classroom_id;
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const rejectedRows: any[] = [];
+    const normalizedRows = rows.slice(0, 500).map((row: any, index: number) => {
+      const rowNumber = Number(row?.rowNumber) > 0 ? Number(row.rowNumber) : index + 1;
+      const targetType = row?.targetType === 'team' ? 'team' : row?.targetType === 'student' ? 'student' : '';
+      const targetId = normalizeUuid(row?.targetId);
+      const platform = normalizeProblemPlatform(row?.platform);
+      const problemLink = normalizeText(row?.problemLink, 1200);
+      const timerMinutes = normalizePositiveInteger(row?.timerMinutes);
+      const difficulty = normalizeText(row?.difficulty, 80) || 'Medium';
+      const tags = normalizeProblemTags(row?.tags);
+
+      const errors: string[] = [];
+      if (!targetType) errors.push('Target type must be student or group');
+      if (!targetId) errors.push('Target is required');
+      if (!platform) errors.push('Unsupported platform');
+      if (!problemLink) errors.push('Problem link is required');
+      if (errors.length > 0) rejectedRows.push({ rowNumber, reason: errors.join('; ') });
+
+      return { rowNumber, targetType, targetId, platform, problemLink, timerMinutes, difficulty, tags, valid: errors.length === 0 };
+    }).filter((row: any) => row.valid);
+
+    const studentTargetIds = [...new Set(normalizedRows.filter((row: any) => row.targetType === 'student').map((row: any) => row.targetId))];
+    const teamTargetIds = [...new Set(normalizedRows.filter((row: any) => row.targetType === 'team').map((row: any) => row.targetId))];
+
+    let validStudentIds = new Set<string>();
+    if (studentTargetIds.length > 0) {
+      const studentRows = await sql`
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ANY(${studentTargetIds})
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
+      validStudentIds = new Set(studentRows.map((row: any) => row.student_id));
+    }
+
+    let validTeamIds = new Set<string>();
+    const membersByTeam = new Map<string, string[]>();
+    if (teamTargetIds.length > 0) {
+      const teamRows = await sql`
+        SELECT id
+        FROM trainer_teams
+        WHERE classroom_id = ${classroomId} AND id = ANY(${teamTargetIds})
+      `;
+      validTeamIds = new Set(teamRows.map((row: any) => row.id));
+      const memberRows = await sql`
+        SELECT t.id AS team_id, tm.student_id
+        FROM trainer_teams t
+        JOIN trainer_team_members tm ON tm.team_id = t.id
+        JOIN users u ON u.id = tm.student_id
+        WHERE t.classroom_id = ${classroomId}
+          AND t.id = ANY(${teamTargetIds})
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
+      for (const member of memberRows) {
+        const current = membersByTeam.get(member.team_id) || [];
+        current.push(member.student_id);
+        membersByTeam.set(member.team_id, current);
+      }
+    }
+
+    const rowsWithTargets: any[] = [];
+    for (const row of normalizedRows) {
+      if (row.targetType === 'student') {
+        if (!validStudentIds.has(row.targetId)) {
+          rejectedRows.push({ rowNumber: row.rowNumber, reason: 'Problem target must be an enrolled classroom student' });
+          continue;
+        }
+        rowsWithTargets.push({ ...row, targetStudentIds: [row.targetId] });
+      } else {
+        if (!validTeamIds.has(row.targetId)) {
+          rejectedRows.push({ rowNumber: row.rowNumber, reason: 'Group target was not found in this classroom' });
+          continue;
+        }
+        const memberIds = membersByTeam.get(row.targetId) || [];
+        if (memberIds.length === 0) {
+          rejectedRows.push({ rowNumber: row.rowNumber, reason: 'Group has no enrolled student members' });
+          continue;
+        }
+        rowsWithTargets.push({ ...row, targetStudentIds: memberIds });
+      }
+    }
+
+    const metadataByProblem = new Map<string, any>();
+    for (const row of rowsWithTargets) {
+      const key = `${row.platform}\u0000${row.problemLink}`;
+      if (metadataByProblem.has(key)) continue;
+      if (row.platform === 'custom') {
+        const parts = row.problemLink.split('/').filter(Boolean);
+        const slug = parts[parts.length - 1] || 'Problem';
+        metadataByProblem.set(key, { title: `Custom: ${slug}`, details: '', difficulty: 'Trainer selected' });
+      } else {
+        metadataByProblem.set(key, await fetchProblemMetadata(row.platform, row.problemLink));
+      }
+    }
+
+    const allTags = [...new Set(rowsWithTargets.flatMap((row) => row.tags))];
+    await ensureProblemTags(allTags, trainerId);
+
+    const insertRows: any[] = [];
+    const seenAssignments = new Set<string>();
+    for (const row of rowsWithTargets) {
+      const meta = metadataByProblem.get(`${row.platform}\u0000${row.problemLink}`) || { title: 'CP Problem', details: '' };
+      for (const studentId of row.targetStudentIds) {
+        const dedupeKey = `${studentId}\u0000${row.platform}\u0000${row.problemLink}\u0000${row.timerMinutes || ''}\u0000${row.difficulty}\u0000${row.tags.join('|')}`;
+        if (seenAssignments.has(dedupeKey)) continue;
+        seenAssignments.add(dedupeKey);
+        insertRows.push({
+          class_id: classId,
+          student_id: studentId,
+          platform: row.platform,
+          problem_link: row.problemLink,
+          title: meta.title || 'CP Problem',
+          difficulty: row.difficulty,
+          points: meta.details || '',
+          timer_minutes: row.timerMinutes || null,
+          tags: row.tags,
+        });
+      }
+    }
+
+    const assignedProblems = insertRows.length > 0
+      ? await sql`INSERT INTO class_problems ${sql(insertRows)} RETURNING *`
+      : [];
+
+    return c.json({
+      success: true,
+      result: assignedProblems,
+      rejectedRows,
+      summary: {
+        received: Math.min(rows.length, 500),
+        assigned: assignedProblems.length,
+        rejected: rejectedRows.length,
+      },
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1629,7 +1828,9 @@ export const updateProblemStatus = async (c: Context) => {
   try {
     const { status, studentDifficulty, difficulty, solutionLink, solutionCode, submissionNotes } = await c.req.json();
     const targetDifficulty = studentDifficulty || difficulty || null;
-    if (!['not_solved', 'tried', 'pending_approval', 'solved'].includes(status)) {
+    const normalizedStatus = normalizeProgressStatus(status);
+    const normalizedSolutionLink = normalizeNullableText(solutionLink, 1200);
+    if (!normalizedStatus) {
       return c.json({ error: 'Invalid status' }, 400);
     }
 
@@ -1644,41 +1845,48 @@ export const updateProblemStatus = async (c: Context) => {
     `;
     if (check.length === 0) return c.json({ error: 'Problem assignment not found' }, 404);
 
-    const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
-    const isTrainer = check[0].created_by === userId || Boolean(userCheck[0]?.admin || userCheck[0]?.trainer);
+    const isTrainer = await canManageClassroom(userId, check[0].classroom_id);
     const isStudent = check[0].student_id === userId;
 
     if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized' }, 403);
 
-    // If student submits solve status, enforce pending_approval status unless trainer approves
-    let effectiveStatus = status;
-    if (isStudent && !isTrainer && (status === 'solved' || status === 'pending_approval')) {
-      effectiveStatus = 'pending_approval';
-    }
+    const currentStatus = check[0].status || 'not_solved';
+    let effectiveStatus = normalizedStatus;
+    let solvedAt = effectiveStatus === 'solved' ? new Date() : null;
 
-    const solvedAt = effectiveStatus === 'solved' ? new Date() : null;
+    if (isStudent && !isTrainer) {
+      if (normalizedSolutionLink && !isHttpUrl(normalizedSolutionLink)) {
+        return c.json({ error: 'Valid submission link is required' }, 400);
+      }
+
+      if (currentStatus === 'solved') {
+        effectiveStatus = currentStatus;
+      } else {
+        const wantsReview = normalizedStatus === 'solved' || (normalizedStatus === 'pending_approval' && currentStatus !== 'pending_approval');
+        if (wantsReview) {
+          if (!normalizedSolutionLink) {
+            return c.json({ error: 'Valid submission link is required' }, 400);
+          }
+          effectiveStatus = 'pending_approval';
+        } else {
+          effectiveStatus = currentStatus;
+        }
+      }
+
+      solvedAt = effectiveStatus === currentStatus ? check[0].solved_at : null;
+    }
 
     const result = await sql`
       UPDATE class_problems 
       SET status = ${effectiveStatus}, 
           solved_at = ${solvedAt},
           student_difficulty = COALESCE(${targetDifficulty}, student_difficulty),
-          solution_link = COALESCE(${solutionLink || null}, solution_link),
+          solution_link = COALESCE(${normalizedSolutionLink}, solution_link),
           solution_code = COALESCE(${solutionCode || null}, solution_code),
           submission_notes = COALESCE(${submissionNotes || null}, submission_notes)
       WHERE id = ${problemId} 
       RETURNING *
     `;
-
-    // Notify trainer if pending approval
-    if (isStudent && effectiveStatus === 'pending_approval') {
-      await createNotification(
-        check[0].created_by,
-        'Solution Approval Required',
-        `Student "${check[0].student_name || 'A student'}" submitted a solution for problem "${check[0].title}". Trainer review required.`,
-        `/classroom/live/${check[0].classroom_id}`
-      );
-    }
 
     return c.json({ success: true, problem: result[0] });
   } catch (error: any) {
@@ -1716,13 +1924,6 @@ export const addNote = async (c: Context) => {
       VALUES (${problemId}, ${noteText}, ${trainerId})
       RETURNING *
     `;
-
-    // Notify student
-    await createNotification(
-      check[0].student_id,
-      'New Note Added',
-      `Trainer added a note for problem "${check[0].title}": "${noteText.substring(0, 30)}..."`
-    );
 
     return c.json({ success: true, note: note[0] });
   } catch (error: any) {
@@ -1803,15 +2004,6 @@ export const addHint = async (c: Context) => {
       VALUES (${problemId}, ${hintText}, ${unlockAfterSeconds || 0})
       RETURNING *
     `;
-
-    // Send immediate notification if unlocked immediately
-    if (!unlockAfterSeconds || unlockAfterSeconds === 0) {
-      await createNotification(
-        check[0].student_id,
-        'Hint Available',
-        `A hint is now available for your problem "${check[0].title}".`
-      );
-    }
 
     return c.json({ success: true, hint: hint[0] });
   } catch (error: any) {
@@ -2073,18 +2265,6 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
       RETURNING *
     `;
 
-    const members = await sql`
-      SELECT student_id
-      FROM trainer_team_members
-      WHERE team_id = ${teamId}
-    `;
-    await createNotifications(
-      members.map((member: any) => member.student_id),
-      'Topic Assigned',
-      `Your team "${teamRows[0].name}" has been assigned topic "${topicRows[0].title}".`,
-      `/classroom/live/${classroomId}`
-    );
-
     return c.json({ success: true, assignment: { ...assignment[0], team_name: teamRows[0].name, topic_title: topicRows[0].title } });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2248,15 +2428,6 @@ export const updateClassroomTopicProblemProgress = async (c: Context) => {
       RETURNING *
     `;
 
-    if (!isManager && effectiveStatus === 'pending_approval') {
-      await createNotification(
-        assignmentRows[0].assigned_by,
-        'Solution Approval Required',
-        `A student submitted a solution for "${assignmentRows[0].problem_title}" in topic "${assignmentRows[0].topic_title}". Trainer review required.`,
-        `/classroom/live/${classroomId}`
-      );
-    }
-
     return c.json({ success: true, progress: progress[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2267,7 +2438,7 @@ export const verifyClassroomTopicProblemProgress = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: trainerId } = c.get('jwtPayload');
   try {
-    const { progressId, problemId, action, rejectionReason } = await c.req.json();
+    const { progressId, problemId, action } = await c.req.json();
     const isManager = await canManageClassroom(trainerId, classroomId);
     if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
 
@@ -2283,14 +2454,6 @@ export const verifyClassroomTopicProblemProgress = async (c: Context) => {
         RETURNING *
       `;
       if (rows.length > 0) {
-        await createNotification(
-          rows[0].student_id,
-          isApproved ? 'Solution Approved!' : 'Solution Returned for Re-submission',
-          isApproved
-            ? 'Your solution was verified and approved by the trainer.'
-            : `Your solution requires update: ${rejectionReason || 'Please review and resubmit.'}`,
-          `/classroom/live/${classroomId}`
-        );
         return c.json({ success: true, progress: rows[0] });
       }
     } else if (problemId) {
@@ -2301,14 +2464,6 @@ export const verifyClassroomTopicProblemProgress = async (c: Context) => {
         RETURNING *
       `;
       if (rows.length > 0) {
-        await createNotification(
-          rows[0].student_id,
-          isApproved ? 'Solution Approved!' : 'Solution Returned for Re-submission',
-          isApproved
-            ? 'Your solution was verified and approved by the trainer.'
-            : `Your solution requires update: ${rejectionReason || 'Please review and resubmit.'}`,
-          `/classroom/live/${classroomId}`
-        );
         return c.json({ success: true, problem: rows[0] });
       }
     }
@@ -2823,23 +2978,6 @@ export const addResource = async (c: Context) => {
       RETURNING *
     `;
 
-    // Notify students
-    const students = await sql`
-      SELECT cs.student_id
-      FROM classroom_students cs
-      JOIN users u ON u.id = cs.student_id
-      WHERE cs.classroom_id = ${classroomId}
-        AND u.admin IS NOT TRUE
-        AND u.trainer IS NOT TRUE
-    `;
-    const notificationLink = `/classroom/live/${classroomId}/resources/${result[0].id}`;
-    await createNotifications(
-      students.map(student => student.student_id),
-      'New Resource Added',
-      `A new resource "${normalizedTitle}" has been shared in your classroom.`,
-      notificationLink
-    );
-
     return c.json({ success: true, resource: result[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2973,16 +3111,6 @@ export const sendChatMessage = async (c: Context) => {
     const sender = await sql`SELECT full_name FROM users WHERE id = ${senderId}`;
     const senderName = sender[0]?.full_name || 'Someone';
 
-    // If direct message to trainer or another user, notify them
-    if (recipientId) {
-      await createNotification(
-        recipientId,
-        'New Chat Message',
-        `${senderName} sent you a direct message: "${trimmedMessage.substring(0, 30)}..."`,
-        `/classroom/live/${classroomId}`
-      );
-    }
-
     return c.json({ success: true, message: result[0], senderName });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -3069,39 +3197,6 @@ export const toggleChatReaction = async (c: Context) => {
       ON CONFLICT (message_id, user_id, reaction) DO NOTHING
     `;
     return c.json({ success: true, active: true });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-};
-
-// -------------------------------------------------------------
-// In-App Notifications API
-// -------------------------------------------------------------
-
-export const listInAppNotifications = async (c: Context) => {
-  const { id: userId } = c.get('jwtPayload');
-  try {
-    const notifications = await sql`
-      SELECT * FROM in_app_notifications 
-      WHERE user_id = ${userId} 
-      ORDER BY created_at DESC 
-      LIMIT 50
-    `;
-    return c.json({ notifications });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-};
-
-export const markNotificationsRead = async (c: Context) => {
-  const { id: userId } = c.get('jwtPayload');
-  try {
-    await sql`
-      UPDATE in_app_notifications 
-      SET read = true 
-      WHERE user_id = ${userId}
-    `;
-    return c.json({ success: true });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

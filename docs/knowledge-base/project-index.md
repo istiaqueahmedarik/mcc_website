@@ -1,5 +1,103 @@
 # Project Index
 
+## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-live-progress-design-refresh-20260727-rsd.md`
+
+Fact:
+Trainer Live progress section in `ClassroomLiveClient.js` should be refreshed as a UI-only change: full-width operational table, compact summary metrics, clearer pending submission review CTA, and preserved status/notes/class-completion behavior.
+
+Applies when:
+Changing trainer live-class progress table presentation, pending submission display, or classroom live operational UI.
+
+Do not overgeneralize:
+This does not approve API/server changes, new polling, route changes, or student Challenge behavior changes.
+
+## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Implemented Live Progress UI
+
+Source:
+- `docs/reviews/trainer-live-progress-design-refresh-20260727-implementation-review.md`
+
+Fact:
+Trainer Live progress in `ClassroomLiveClient.js` now renders local summary metrics, a full-width fixed-layout operational table, row-level pending highlighting, and a dedicated `Review` action chip for submitted proof links. Existing status, notes/hints, and class completion handlers remain unchanged.
+
+Applies when:
+Maintaining trainer live progress table presentation, pending submission review affordances, or classroom live UI density.
+
+Do not overgeneralize:
+This is presentation-only and does not modify student Challenge submission policy or server authorization.
+
+## 2026-07-26 - student-challenge-submission-duration-20260726 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/student-challenge-submission-duration-20260726-rsd.md`
+
+Fact:
+Student Challenge tab live-class problems should use a submission-link modal that sends student attempts to `pending_approval`; only trainers can finalize live problem statuses as `solved`, `tried`, or `not_solved`. Class/session duration scheduling should accept custom positive minute values rather than preset max-3-hour choices or unrelated product caps.
+
+Applies when:
+Changing `ClassroomLiveClient.js` Challenge tab, `class_problems` status APIs, trainer live problem review, or class session duration validation.
+
+Do not overgeneralize:
+This does not add external judge verification, new database tables, topic workflow redesign, or hidden polling.
+
+## 2026-07-26 - student-challenge-submission-duration-20260726 - Implemented Entry Points
+
+Source:
+- `docs/reviews/student-challenge-submission-duration-20260726-implementation-review.md`
+
+Fact:
+Student Challenge tab live-class problems in `ClassroomLiveClient.js` now submit proof links through a modal to `pending_approval`. `updateProblemStatus` in `classroomController.ts` uses `canManageClassroom` for trainer final verdicts and prevents student API payloads from directly setting `solved`, `tried`, or `not_solved`. New-session scheduling uses custom duration minutes; server duration normalization accepts positive integer minutes with only PostgreSQL integer safety.
+
+Applies when:
+Maintaining student live Challenge cards, trainer live problem review, `class_problems` proof/status updates, or class session duration scheduling.
+
+Do not overgeneralize:
+Topic assignment progress still has its own workflow. This change does not add automatic judge verification or polling.
+
+## 2026-07-26 - classroom-live-stop-polling-20260726 - Classroom Live Polling Removed
+
+Source:
+- `docs/reviews/classroom-live-stop-polling-20260726-implementation-review.md`
+
+Fact:
+`ClassroomLiveClient.js` no longer polls chat/classroom details or refetches chat, classroom details, topics, and board on browser tab visibility return. IDE activity polling and IDE focus/blur/visibility/heartbeat activity posts were removed from `ClassroomIdePanel.jsx`; WebSocket live IDE monitor remains.
+
+Applies when:
+Investigating tab-return request bursts, classroom live rerenders, chat refresh behavior, classroom detail refresh behavior, or IDE activity tracking.
+
+Do not overgeneralize:
+Explicit refresh buttons and mutation-triggered fetches remain valid. Non-network timers elsewhere are not covered by this task.
+
+## 2026-07-26 - trainer-bulk-import-feedback-notifications-20260726 - Trainer Bulk Import and Notification Removal Scope
+
+Source:
+- `docs/rsd/trainer-bulk-import-feedback-notifications-20260726-rsd.md`
+
+Fact:
+Trainer classroom workflows should support local CSV mapping for bulk student enrollment and problem assignment, manual student enrollment by email or `mist_id`, visible processing feedback, and removal of classroom in-app notification fetch/write/broadcast/email side effects while keeping email fields and display.
+
+Applies when:
+Changing `ClassroomLiveClient.js`, classroom student/problem assignment APIs, navbar notification UI, or classroom notification server routes/helpers.
+
+Do not overgeneralize:
+This does not remove account email fields, auth/password emails, unrelated team collection emails, or non-classroom real-time/polling behavior.
+
+## 2026-07-26 - trainer-bulk-import-feedback-notifications-20260726 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-bulk-import-feedback-notifications-20260726-implementation-review.md`
+
+Fact:
+Trainer bulk import is implemented in `client/src/app/classroom/live/[id]/ClassroomLiveClient.js` with local CSV parsing/mapping dialogs. Batch APIs are `POST /classroom/:id/add-students` and `POST /classroom/assign-problems/bulk`. Classroom notification bell, client notification route proxies, server notification routes/helpers, and `server/src/utils/realtime.ts` were removed.
+
+Applies when:
+Maintaining trainer classroom student enrollment, problem assignment, navbar notification behavior, or classroom notification performance.
+
+Do not overgeneralize:
+This implementation does not add `.xlsx` support, does not remove non-classroom emails, and does not add a uniqueness guarantee for existing problem assignments.
+
 ## 2026-07-26 - trainer-qa-fixes-20260726 - Trainer QA Fix Scope
 
 Source:

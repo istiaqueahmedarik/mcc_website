@@ -17,6 +17,7 @@ import {
   getClassroomTopicAnalytics,
   getClassroomTopicAssignments,
   addStudentToClassroom,
+  addStudentsToClassroom,
   removeStudentFromClassroom,
   createTeam,
   updateTeamMembers,
@@ -25,6 +26,7 @@ import {
   startClass,
   completeClass,
   assignProblem,
+  assignProblemsBulk,
   previewProblem,
   getClassProblems,
   updateProblemStatus,
@@ -39,8 +41,6 @@ import {
   sendChatMessage,
   getChatMessages,
   toggleChatReaction,
-  listInAppNotifications,
-  markNotificationsRead,
   createTrainerUser,
   createAdminUser,
   changeUserPassword,
@@ -144,6 +144,7 @@ route.get('/problem-tags/dictionary', getProblemTagDictionary);
 route.post('/problem-tags/dictionary', createProblemTag);
 route.get('/:id/resources/:resourceId', getClassResourceDetail);
 route.post('/:id/add-student', addStudentToClassroom);
+route.post('/:id/add-students', addStudentsToClassroom);
 route.post('/:id/remove-student', removeStudentFromClassroom);
 route.post('/:id/update', updateClassroom);
 
@@ -162,6 +163,7 @@ route.get('/:id/attendance/summary', getClassroomAttendanceSummary);
 
 // Problem assigning & tracking
 route.post('/assign-problem', assignProblem);
+route.post('/assign-problems/bulk', assignProblemsBulk);
 route.post('/problem-preview', previewProblem);
 route.get('/class/:id/problems', getClassProblems);
 route.post('/problem/:id/status', updateProblemStatus);
@@ -200,10 +202,6 @@ route.get('/:id/resources', getClassResources);
 route.post('/:id/chat/send', sendChatMessage);
 route.get('/:id/chat/history', getChatMessages);
 route.post('/:id/chat/reaction', toggleChatReaction);
-
-// In-app notifications
-route.get('/notifications/list', listInAppNotifications);
-route.post('/notifications/read', markNotificationsRead);
 
 // Substitute trainers management
 route.get('/:id/substitutes', getClassroomSubstitutes);

@@ -1,5 +1,47 @@
 # Patterns
 
+## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Operational Table Refresh Pattern
+
+Source:
+- `docs/reviews/trainer-live-progress-design-refresh-20260727-implementation-review.md`
+
+Fact:
+For trainer operational tables inside `ClassroomLiveClient.js`, prefer full-width table-fixed layouts with explicit columns, compact summary metrics above rows, row-level state tinting, and action chips for review workflows instead of inline links that compete with primary item titles.
+
+Applies when:
+Refreshing trainer live progress, review queues, or dense classroom workflow tables.
+
+Do not overgeneralize:
+Do not introduce global table abstractions unless multiple pages share the same structure and behavior.
+
+## 2026-07-26 - student-challenge-submission-duration-20260726 - Student Proof, Trainer Verdict Pattern
+
+Source:
+- `docs/reviews/student-challenge-submission-duration-20260726-implementation-review.md`
+
+Fact:
+For live-class problem attempts, student UI should collect proof and request `pending_approval`; server code must preserve trainer-owned final verdicts unless `canManageClassroom` passes. Student difficulty/proof updates can be allowed without giving students control of `solved`, `tried`, or `not_solved`.
+
+Applies when:
+Adding or modifying live-class problem status flows, proof submission UI, or trainer review controls.
+
+Do not overgeneralize:
+This pattern is for `class_problems` live-class assignments; topic progress has separate assignment/progress tables and handlers.
+
+## 2026-07-26 - trainer-bulk-import-feedback-notifications-20260726 - Local CSV Mapping Pattern
+
+Source:
+- `docs/reviews/trainer-bulk-import-feedback-notifications-20260726-implementation-review.md`
+
+Fact:
+Trainer bulk imports use browser-side CSV parsing, explicit column mapping, local preview/error counts, then one structured batch API call. Required mappings are blocked before mutation, and server endpoints still revalidate authorization and classroom targets.
+
+Applies when:
+Adding future trainer CSV imports or extending current student/problem import flows.
+
+Do not overgeneralize:
+This pattern is for small-to-medium CSV imports in trainer UI, not large background data migrations or `.xlsx` files.
+
 ## 2026-07-26 - trainer-qa-fixes-20260726 - QA Fix Work Slicing
 
 Source:

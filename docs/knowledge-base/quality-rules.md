@@ -1,5 +1,61 @@
 # Quality Rules
 
+## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Avoid Dead Table Space
+
+Source:
+- `docs/reviews/trainer-live-progress-design-refresh-20260727-implementation-review.md`
+
+Rule:
+Trainer classroom tables should use available width deliberately. Avoid narrow auto-width tables that leave dead space while important review controls and problem text become cramped.
+
+Applies when:
+Editing trainer Live progress, classroom review queues, or dense operational table layouts.
+
+Do not overgeneralize:
+Small content tables can stay compact when full-width layout would reduce readability.
+
+## 2026-07-26 - student-challenge-submission-duration-20260726 - Server Owns Problem Verdicts
+
+Source:
+- `docs/reviews/student-challenge-submission-duration-20260726-implementation-review.md`
+
+Rule:
+Student-facing problem status UI must not be the only control preventing solve self-approval. Live-class problem APIs must enforce trainer-owned final verdicts server-side and treat student solve attempts as proof submissions for trainer review.
+
+Applies when:
+Changing `class_problems.status`, student Challenge cards, trainer problem review, or related status endpoints.
+
+Do not overgeneralize:
+Students can still update allowed self-reported fields such as perceived difficulty when the server preserves final verdict ownership.
+
+## 2026-07-26 - classroom-live-stop-polling-20260726 - No Hidden Classroom Live Polling
+
+Source:
+- `docs/reviews/classroom-live-stop-polling-20260726-implementation-review.md`
+
+Rule:
+Do not add interval polling or browser focus/visibility refetches to classroom live pages. Use explicit refresh/action-driven fetches or event-driven sockets instead.
+
+Applies when:
+Working on classroom live chat, classroom details, topic data, board state, or IDE tracking.
+
+Do not overgeneralize:
+Short-lived UI timers and countdowns are allowed when they do not fetch or post data.
+
+## 2026-07-26 - trainer-bulk-import-feedback-notifications-20260726 - Bulk Actions Need Single Request Feedback
+
+Source:
+- `docs/reviews/trainer-bulk-import-feedback-notifications-20260726-implementation-review.md`
+
+Rule:
+Trainer bulk actions should avoid per-row network loops, show disabled/loading state while the batch request is running, and replace loading feedback with one clear success/error result.
+
+Applies when:
+Implementing trainer bulk imports, batch mutations, or high-latency trainer classroom actions.
+
+Do not overgeneralize:
+Single small actions can remain simple handler calls if they still provide visible processing feedback.
+
 ## 2026-07-25 - Keep Role-Based Navigation Local
 
 Source:

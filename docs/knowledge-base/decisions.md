@@ -1,5 +1,63 @@
 # Decisions
 
+## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Live Progress UI-Only Refresh
+
+Source:
+- `docs/decisions/trainer-live-progress-design-refresh-20260727-decisions.md`
+- `docs/tasks/trainer-live-progress-design-refresh-20260727-task-plan.md`
+
+Decision:
+Refresh trainer Live progress inside `ClassroomLiveClient.js` only, preserving endpoint strings, handlers, status behavior, class completion, notes/hints dialog logic, authorization-bearing checks, and polling behavior. Use local summary counts and a full-width table with a clearer pending submission CTA.
+
+Applies when:
+Editing trainer Live progress table layout or pending submission presentation.
+
+Do not overgeneralize:
+Do not extract global table components or change server/API behavior for this UI-only task.
+
+## 2026-07-26 - student-challenge-submission-duration-20260726 - Student Challenge Verification and Duration
+
+Source:
+- `docs/decisions/student-challenge-submission-duration-20260726-decisions.md`
+- `docs/tasks/student-challenge-submission-duration-20260726-task-plan.md`
+
+Decision:
+Student Challenge tab live-class submissions should reuse existing `class_problems` proof fields and submit a required link to `pending_approval`; server authorization must keep final live problem verdicts (`solved`, `tried`, `not_solved`) trainer-owned. New/edit session duration should be custom positive integer minutes, with only database-safe integer bounds rather than product caps such as 180 or 1440 minutes.
+
+Applies when:
+Changing `ClassroomLiveClient.js` student Challenge cards, `updateProblemStatus`, trainer live problem review, or `classes.duration_minutes` validation.
+
+Do not overgeneralize:
+This does not add external judge verification, new tables, topic workflow redesign, or hidden classroom polling.
+
+## 2026-07-26 - classroom-live-stop-polling-20260726 - Stop Classroom Live Polling
+
+Source:
+- `docs/decisions/classroom-live-stop-polling-20260726-technical-decisions.md`
+
+Decision:
+Classroom live should not use interval polling or browser visibility-triggered refetches for chat, classroom details, topics, board state, or IDE activity. Use initial loads, explicit refresh/action-driven fetches, and event-driven WebSocket streams where present.
+
+Applies when:
+Changing `ClassroomLiveClient.js` or `ClassroomIdePanel.jsx` network behavior.
+
+Do not overgeneralize:
+This does not ban user-clicked refreshes, mutation follow-up fetches, or non-network countdown timers.
+
+## 2026-07-26 - trainer-bulk-import-feedback-notifications-20260726 - Bulk Import and Notification Decisions
+
+Source:
+- `docs/decisions/trainer-bulk-import-feedback-notifications-20260726-technical-decisions.md`
+
+Decision:
+Trainer CSV imports should parse locally in the browser with a mapping/preview step, avoid new CSV dependencies, use explicit student lookup method (`email` or `mist_id`), call batch server endpoints for student enrollment and problem assignment, use existing Sonner plus button disabled/loading state for feedback, and remove the classroom in-app notification path including bell UI, client/server notification routes, DB inserts, broadcasts, and classroom notification email side effects.
+
+Applies when:
+Implementing or reviewing trainer classroom bulk import, classroom notifications, student lookup, or problem assignment changes.
+
+Do not overgeneralize:
+This does not remove email data or unrelated account/team-collection email workflows, and it does not add `.xlsx` support.
+
 ## 2026-07-26 - trainer-qa-fixes-20260726 - Auto-Mode Trainer QA Fix Decisions
 
 Source:

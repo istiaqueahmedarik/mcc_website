@@ -66,6 +66,7 @@ import EditorWrapper from "@/components/EditorWrapper";
 import MarkdownRender from "@/components/MarkdownRenderer";
 import ProgressLink from "@/components/ProgressLink";
 import { useTour } from "@/hooks/useTour";
+import { toast } from 'sonner';
 
 const trainerClassroomSteps = [
   {
@@ -292,6 +293,32 @@ const PROBLEM_BATCH_SIZE = 8;
 const HISTORY_BATCH_SIZE = 8;
 const PEOPLE_BATCH_SIZE = 12;
 
+const emptyStudentImportState = {
+  fileName: '',
+  headers: [],
+  rows: [],
+  mapping: { identifier: '' },
+  parseError: '',
+  result: null,
+};
+
+const emptyProblemImportState = {
+  fileName: '',
+  headers: [],
+  rows: [],
+  mapping: {
+    targetType: '',
+    target: '',
+    platform: '',
+    problemLink: '',
+    timerMinutes: '',
+    difficulty: '',
+    tags: '',
+  },
+  parseError: '',
+  result: null,
+};
+
 const getStudentIdLabel = (student) => String(student?.mist_id || '').trim();
 const getStudentDisplayName = (student) => student?.full_name || student?.name || student?.email || 'Student';
 const getStudentLabelWithId = (student) => {
@@ -305,6 +332,15 @@ function toDatetimeLocalValue(value) {
   if (Number.isNaN(date.getTime())) return '';
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
+}
+
+function isValidSubmissionUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 const statusCopy = {
@@ -341,6 +377,235 @@ const topicDifficultyOptions = ['Easy', 'Medium', 'Hard', 'Advanced', 'Trainer s
 function normalizeTagInput(value) {
   const tag = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
   return tag && tagAllowedRegex.test(tag) ? tag : '';
+}
+
+function normalizeCsvHeaders(headers) {
+  const seen = new Map();
+  return headers.map((header, index) => {
+    const base = String(header || '').trim() || `Column ${index + 1}`;
+    const count = (seen.get(base) || 0) + 1;
+    seen.set(base, count);
+    return count === 1 ? base : `${base} (${count})`;
+  });
+}
+
+function parseCsvText(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(field);
+      field = '';
+    } else if (char === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else if (char !== '\r') {
+      field += char;
+    }
+  }
+
+  if (inQuotes) throw new Error('CSV has an unclosed quoted field.');
+  if (field || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  const nonEmptyRows = rows.filter((item) => item.some((cell) => String(cell || '').trim()));
+  if (nonEmptyRows.length < 2) throw new Error('CSV needs a header row and at least one data row.');
+
+  const headers = normalizeCsvHeaders(nonEmptyRows[0]);
+  const records = nonEmptyRows.slice(1).map((cells, index) => {
+    const record = { __rowNumber: index + 2 };
+    headers.forEach((header, headerIndex) => {
+      record[header] = String(cells[headerIndex] ?? '').trim();
+    });
+    return record;
+  });
+
+  return { headers, rows: records };
+}
+
+function readCsvFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        resolve(parseCsvText(String(reader.result || '')));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read CSV file.'));
+    reader.readAsText(file);
+  });
+}
+
+function normalizedHeader(header) {
+  return String(header || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function guessHeader(headers, candidates) {
+  const normalizedCandidates = candidates.map(normalizedHeader);
+  return headers.find((header) => normalizedCandidates.includes(normalizedHeader(header))) || '';
+}
+
+function guessStudentImportMapping(headers, lookupMethod) {
+  return {
+    identifier: lookupMethod === 'mist_id'
+      ? guessHeader(headers, ['mist_id', 'student_id', 'student id', 'id'])
+      : guessHeader(headers, ['email', 'student_email', 'student email']),
+  };
+}
+
+function guessProblemImportMapping(headers) {
+  return {
+    targetType: guessHeader(headers, ['target_type', 'target type', 'type']),
+    target: guessHeader(headers, ['target', 'target_identifier', 'student_id', 'student email', 'group', 'team']),
+    platform: guessHeader(headers, ['platform', 'judge', 'oj']),
+    problemLink: guessHeader(headers, ['problem_link', 'problem link', 'link', 'url']),
+    timerMinutes: guessHeader(headers, ['timer', 'timer_minutes', 'minutes', 'time']),
+    difficulty: guessHeader(headers, ['difficulty', 'level']),
+    tags: guessHeader(headers, ['tags', 'topics']),
+  };
+}
+
+function buildStudentImportPreview(importState) {
+  const identifierHeader = importState.mapping.identifier;
+  const rowErrors = [];
+  const identifiers = [];
+  const seen = new Set();
+
+  if (!identifierHeader) return { identifiers, rowErrors: [{ rowNumber: '-', reason: 'Map a student identifier column.' }] };
+
+  importState.rows.forEach((row) => {
+    const identifier = String(row[identifierHeader] || '').trim();
+    if (!identifier) {
+      rowErrors.push({ rowNumber: row.__rowNumber, reason: 'Missing student identifier' });
+      return;
+    }
+    const key = identifier.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    identifiers.push(identifier);
+  });
+
+  return { identifiers, rowErrors };
+}
+
+function normalizeProblemImportTargetType(value) {
+  const text = String(value || '').trim().toLowerCase();
+  if (['group', 'team', 'groups', 'teams'].includes(text)) return 'team';
+  if (['student', 'students', 'email', 'mist_id', 'student_id', 'id'].includes(text)) return 'student';
+  return '';
+}
+
+function normalizeProblemImportPlatform(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return ['codeforces', 'codechef', 'atcoder', 'custom'].includes(text) ? text : '';
+}
+
+function resolveStudentImportTarget(value, students) {
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return null;
+  return students.find((student) => (
+    String(student.id || '').toLowerCase() === text ||
+    String(student.email || '').toLowerCase() === text ||
+    String(student.mist_id || '').toLowerCase() === text ||
+    String(student.full_name || student.name || '').toLowerCase() === text
+  )) || null;
+}
+
+function resolveTeamImportTarget(value, teams) {
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return null;
+  return teams.find((team) => (
+    String(team.id || '').toLowerCase() === text ||
+    String(team.name || '').toLowerCase() === text
+  )) || null;
+}
+
+function buildProblemImportPreview(importState, students, teams) {
+  const { mapping } = importState;
+  const required = [
+    ['targetType', 'Map target type column.'],
+    ['target', 'Map target identifier column.'],
+    ['platform', 'Map platform column.'],
+    ['problemLink', 'Map problem link column.'],
+  ];
+  const missing = required.filter(([key]) => !mapping[key]).map(([, reason]) => ({ rowNumber: '-', reason }));
+  if (missing.length > 0) return { rows: [], rowErrors: missing };
+
+  const rows = [];
+  const rowErrors = [];
+  const seen = new Set();
+
+  importState.rows.forEach((record) => {
+    const rowNumber = record.__rowNumber;
+    const targetType = normalizeProblemImportTargetType(record[mapping.targetType]);
+    const targetValue = String(record[mapping.target] || '').trim();
+    const platform = normalizeProblemImportPlatform(record[mapping.platform]);
+    const problemLink = String(record[mapping.problemLink] || '').trim();
+    const timerMinutes = mapping.timerMinutes ? String(record[mapping.timerMinutes] || '').trim() : '';
+    const difficulty = mapping.difficulty ? String(record[mapping.difficulty] || '').trim() : 'Medium';
+    const tags = mapping.tags ? String(record[mapping.tags] || '').trim() : '';
+    const errors = [];
+
+    if (!targetType) errors.push('Target type must be student or group');
+    if (!targetValue) errors.push('Missing target');
+    if (!platform) errors.push('Platform must be codeforces, codechef, atcoder, or custom');
+    if (!problemLink) errors.push('Missing problem link');
+
+    const target = targetType === 'student'
+      ? resolveStudentImportTarget(targetValue, students)
+      : targetType === 'team'
+        ? resolveTeamImportTarget(targetValue, teams)
+        : null;
+    if (targetType && !target) errors.push(targetType === 'student' ? 'Student target not found in roster' : 'Group target not found');
+
+    if (errors.length > 0) {
+      rowErrors.push({ rowNumber, reason: errors.join('; ') });
+      return;
+    }
+
+    const dedupeKey = `${targetType}|${target.id}|${platform}|${problemLink}|${timerMinutes}|${difficulty}|${tags}`.toLowerCase();
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+
+    rows.push({
+      rowNumber,
+      targetType,
+      targetId: target.id,
+      platform,
+      problemLink,
+      timerMinutes,
+      difficulty: difficulty || 'Medium',
+      tags,
+    });
+  });
+
+  return { rows, rowErrors };
 }
 
 function classLabel(classItem) {
@@ -1630,6 +1895,11 @@ export default function ClassroomLiveClient({ classroomId }) {
   
   // Trainer form states
   const [studentEmail, setStudentEmail] = useState('');
+  const [studentLookupMethod, setStudentLookupMethod] = useState('email');
+  const [studentAddLoading, setStudentAddLoading] = useState(false);
+  const [studentImportOpen, setStudentImportOpen] = useState(false);
+  const [studentImport, setStudentImport] = useState(emptyStudentImportState);
+  const [studentImportLoading, setStudentImportLoading] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamStudentIds, setTeamStudentIds] = useState([]);
   const [teamFormError, setTeamFormError] = useState('');
@@ -1658,6 +1928,10 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [problemPreview, setProblemPreview] = useState(null);
   const [problemPreviewLoading, setProblemPreviewLoading] = useState(false);
   const [problemPreviewError, setProblemPreviewError] = useState('');
+  const [assignProblemLoading, setAssignProblemLoading] = useState(false);
+  const [problemImportOpen, setProblemImportOpen] = useState(false);
+  const [problemImport, setProblemImport] = useState(emptyProblemImportState);
+  const [problemImportLoading, setProblemImportLoading] = useState(false);
   const [assignPanelOpen, setAssignPanelOpen] = useState(false);
   const [topics, setTopics] = useState([]);
   const [topicAssignments, setTopicAssignments] = useState([]);
@@ -1717,6 +1991,11 @@ export default function ClassroomLiveClient({ classroomId }) {
   
   // Detail overlay states for notes/hints (for students)
   const [problemDetails, setProblemDetails] = useState({ notes: [], hints: [] });
+  const [challengeSubmissionOpen, setChallengeSubmissionOpen] = useState(false);
+  const [challengeSubmissionProblem, setChallengeSubmissionProblem] = useState(null);
+  const [challengeSubmissionLink, setChallengeSubmissionLink] = useState('');
+  const [challengeSubmissionError, setChallengeSubmissionError] = useState('');
+  const [challengeSubmissionSaving, setChallengeSubmissionSaving] = useState(false);
 
   // Chat states
   const [chatMessages, setChatMessages] = useState([]);
@@ -1737,6 +2016,12 @@ export default function ClassroomLiveClient({ classroomId }) {
   const teams = data?.teams || EMPTY_LIST;
   const isTrainer = data?.isTrainer || false;
   const currentUserId = data?.currentUserId || '';
+  const studentImportPreview = studentImport.rows.length
+    ? buildStudentImportPreview(studentImport)
+    : { identifiers: [], rowErrors: [] };
+  const problemImportPreview = problemImport.rows.length
+    ? buildProblemImportPreview(problemImport, students, teams)
+    : { rows: [], rowErrors: [] };
   const completedClasses = getCompletedClasses(classes);
   const selectedPastClass = completedClasses.find((classItem) => classItem.id === selectedPastClassId) || null;
 
@@ -1768,6 +2053,21 @@ export default function ClassroomLiveClient({ classroomId }) {
   const visibleClassroomResources = classroomResources.slice(0, visibleResourceCount);
   const visibleActiveResources = activeClassResources.slice(0, visibleResourceCount);
   const visibleProblems = problems.slice(0, visibleProblemCount);
+  const liveProgressStats = problems.reduce((stats, problem) => {
+    const status = problem.status || 'not_solved';
+    stats.total += 1;
+    if (status === 'pending_approval') stats.pending += 1;
+    else if (status === 'solved') stats.solved += 1;
+    else if (status === 'tried') stats.tried += 1;
+    else stats.notSolved += 1;
+    return stats;
+  }, { total: 0, pending: 0, solved: 0, tried: 0, notSolved: 0 });
+  const liveProgressMetricItems = [
+    { label: 'Assigned', value: liveProgressStats.total, tone: 'border-border bg-muted/20 text-foreground' },
+    { label: 'Pending review', value: liveProgressStats.pending, tone: 'border-amber-500/25 bg-amber-500/10 text-amber-600' },
+    { label: 'Solved', value: liveProgressStats.solved, tone: 'border-green-500/25 bg-green-500/10 text-green-600' },
+    { label: 'Open', value: liveProgressStats.tried + liveProgressStats.notSolved, tone: 'border-blue-500/25 bg-blue-500/10 text-blue-600' },
+  ];
   const visibleCompletedClasses = completedClasses.slice(0, visibleHistoryCount);
   const visibleStudents = students.slice(0, visiblePeopleCount);
   const visibleTeams = teams.slice(0, visiblePeopleCount);
@@ -2026,73 +2326,17 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   }, [activeClass?.id, selectedPastClassId, classes, chatClassId]);
 
-  // Polling: pauses when tab is hidden, resumes on visible
   useEffect(() => {
     fetchClassroomDetails();
+  }, [fetchClassroomDetails]);
+
+  useEffect(() => {
     fetchChatHistory();
-
-    let chatInterval = null;
-    let detailsInterval = null;
-
-    const startPolling = () => {
-      if (chatInterval) return; // already running
-      // Chat: every 15 seconds.
-      chatInterval = setInterval(fetchChatHistory, 15000);
-      // Classroom details + problems: every 30 seconds (was 10s)
-      detailsInterval = setInterval(fetchClassroomDetails, 30000);
-    };
-
-    const stopPolling = () => {
-      if (chatInterval) { clearInterval(chatInterval); chatInterval = null; }
-      if (detailsInterval) { clearInterval(detailsInterval); detailsInterval = null; }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        // Fetch fresh data on return, then restart intervals
-        fetchChatHistory();
-        fetchClassroomDetails();
-        fetchTopicData();
-        fetchBoardSession();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-
-    if (document.visibilityState === 'visible') {
-      startPolling();
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [classroomId, chatClassId, fetchBoardSession, fetchChatHistory, fetchClassroomDetails, fetchTopicData]);
+  }, [fetchChatHistory]);
 
   useEffect(() => {
     if (!ideLiveTracking) return;
-
-    const fetchIfVisible = () => {
-      if (document.visibilityState === 'visible') {
-        fetchIdeActivity();
-      }
-    };
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchIdeActivity();
-      }
-    };
-
-    fetchIfVisible();
-    const ideInterval = window.setInterval(fetchIfVisible, 5000);
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      window.clearInterval(ideInterval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    fetchIdeActivity();
   }, [fetchIdeActivity, ideLiveTracking]);
 
   useEffect(() => {
@@ -2157,13 +2401,26 @@ export default function ClassroomLiveClient({ classroomId }) {
   // Manage Students
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    if (!studentEmail) return;
-    const res = await post_with_token(`classroom/${classroomId}/add-student`, { studentEmail });
-    if (res && res.success) {
-      setStudentEmail('');
-      fetchClassroomDetails();
-    } else {
-      alert(res?.error || 'Failed to add student');
+    if (!studentEmail.trim() || studentAddLoading) return;
+    setStudentAddLoading(true);
+    const toastId = toast.loading('Adding student...');
+    try {
+      const res = await post_with_token(`classroom/${classroomId}/add-student`, {
+        lookupMethod: studentLookupMethod,
+        studentIdentifier: studentEmail.trim(),
+        studentEmail: studentLookupMethod === 'email' ? studentEmail.trim() : undefined,
+      });
+      if (res && res.success) {
+        setStudentEmail('');
+        fetchClassroomDetails();
+        toast.success(res.message || 'Student added', { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to add student', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to add student', { id: toastId });
+    } finally {
+      setStudentAddLoading(false);
     }
   };
 
@@ -2172,6 +2429,123 @@ export default function ClassroomLiveClient({ classroomId }) {
     const res = await post_with_token(`classroom/${classroomId}/remove-student`, { studentId });
     if (res && res.success) {
       fetchClassroomDetails();
+    }
+  };
+
+  const handleStudentCsvFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = await readCsvFile(file);
+      setStudentImport({
+        ...emptyStudentImportState,
+        fileName: file.name,
+        headers: parsed.headers,
+        rows: parsed.rows,
+        mapping: guessStudentImportMapping(parsed.headers, studentLookupMethod),
+      });
+      toast.success(`Loaded ${parsed.rows.length} student rows`);
+    } catch (error) {
+      setStudentImport({ ...emptyStudentImportState, fileName: file.name, parseError: error?.message || 'Failed to parse CSV' });
+      toast.error(error?.message || 'Failed to parse CSV');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const updateStudentImportMapping = (key, value) => {
+    setStudentImport((current) => ({
+      ...current,
+      mapping: { ...current.mapping, [key]: value },
+      result: null,
+    }));
+  };
+
+  const handleConfirmStudentImport = async () => {
+    const preview = buildStudentImportPreview(studentImport);
+    if (preview.identifiers.length === 0) {
+      toast.error(preview.rowErrors[0]?.reason || 'No valid students to import');
+      return;
+    }
+    setStudentImportLoading(true);
+    const toastId = toast.loading('Importing students...');
+    try {
+      const res = await post_with_token(`classroom/${classroomId}/add-students`, {
+        lookupMethod: studentLookupMethod,
+        identifiers: preview.identifiers,
+      });
+      if (res?.success) {
+        setStudentImport((current) => ({ ...current, result: res }));
+        fetchClassroomDetails();
+        toast.success(`Students imported: ${res.summary?.added || 0} added, ${res.summary?.alreadyEnrolled || 0} already enrolled`, { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to import students', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to import students', { id: toastId });
+    } finally {
+      setStudentImportLoading(false);
+    }
+  };
+
+  const handleProblemCsvFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = await readCsvFile(file);
+      setProblemImport({
+        ...emptyProblemImportState,
+        fileName: file.name,
+        headers: parsed.headers,
+        rows: parsed.rows,
+        mapping: guessProblemImportMapping(parsed.headers),
+      });
+      toast.success(`Loaded ${parsed.rows.length} problem rows`);
+    } catch (error) {
+      setProblemImport({ ...emptyProblemImportState, fileName: file.name, parseError: error?.message || 'Failed to parse CSV' });
+      toast.error(error?.message || 'Failed to parse CSV');
+    } finally {
+      event.target.value = '';
+    }
+  };
+
+  const updateProblemImportMapping = (key, value) => {
+    setProblemImport((current) => ({
+      ...current,
+      mapping: { ...current.mapping, [key]: value },
+      result: null,
+    }));
+  };
+
+  const handleConfirmProblemImport = async () => {
+    if (!activeClass) {
+      toast.error('Start a class before importing problems');
+      return;
+    }
+    const preview = buildProblemImportPreview(problemImport, students, teams);
+    if (preview.rows.length === 0) {
+      toast.error(preview.rowErrors[0]?.reason || 'No valid problems to import');
+      return;
+    }
+    setProblemImportLoading(true);
+    const toastId = toast.loading('Importing problem assignments...');
+    try {
+      const res = await post_with_token('classroom/assign-problems/bulk', {
+        classId: activeClass.id,
+        rows: preview.rows,
+      });
+      if (res?.success) {
+        setProblemImport((current) => ({ ...current, result: res }));
+        fetchProblemTags();
+        fetchProblems(activeClass.id);
+        toast.success(`Problem import done: ${res.summary?.assigned || 0} assignments`, { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to import problems', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to import problems', { id: toastId });
+    } finally {
+      setProblemImportLoading(false);
     }
   };
 
@@ -2666,12 +3040,15 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const handleAssignProblem = async (e) => {
     e.preventDefault();
-    if (!activeClass || !problemLink.trim()) return;
+    if (!activeClass || !problemLink.trim() || assignProblemLoading) return;
     if (!assignTarget.id) {
       setAssignProblemError('Choose a student or group before assigning.');
+      toast.error('Choose a student or group before assigning');
       return;
     }
     setAssignProblemError('');
+    setAssignProblemLoading(true);
+    const toastId = toast.loading('Assigning problem...');
     const payload = {
       classId: activeClass.id,
       platform: problemPlatform,
@@ -2687,29 +3064,65 @@ export default function ClassroomLiveClient({ classroomId }) {
       payload.teamId = assignTarget.id;
     }
 
-    const res = await post_with_token('classroom/assign-problem', payload);
-    if (res && res.success) {
-      setProblemLink('');
-      setProblemTags([]);
-      setProblemPreview(null);
-      setProblemPreviewError('');
-      setAssignTargetStr('');
-      setAssignTarget({ type: 'student', id: '' });
-      fetchProblemTags();
-      fetchProblems(activeClass.id);
-    } else {
-      setAssignProblemError(res?.error || 'Failed to assign problem');
+    try {
+      const res = await post_with_token('classroom/assign-problem', payload);
+      if (res && res.success) {
+        setProblemLink('');
+        setProblemTags([]);
+        setProblemPreview(null);
+        setProblemPreviewError('');
+        setAssignTargetStr('');
+        setAssignTarget({ type: 'student', id: '' });
+        fetchProblemTags();
+        fetchProblems(activeClass.id);
+        toast.success('Problem assigned', { id: toastId });
+      } else {
+        setAssignProblemError(res?.error || 'Failed to assign problem');
+        toast.error(res?.error || 'Failed to assign problem', { id: toastId });
+      }
+    } catch {
+      setAssignProblemError('Failed to assign problem');
+      toast.error('Failed to assign problem', { id: toastId });
+    } finally {
+      setAssignProblemLoading(false);
     }
   };
 
-  // Toggle problem solved status
-  const handleToggleStatus = async (probId, currentStatus, studentDifficulty) => {
-    const nextStatus = currentStatus === 'solved' ? 'tried' : currentStatus === 'tried' ? 'not_solved' : 'solved';
-    const payload = { status: nextStatus };
-    if (studentDifficulty) payload.studentDifficulty = String(studentDifficulty);
-    const res = await post_with_token(`classroom/problem/${probId}/status`, payload);
-    if (res && res.success) {
+  const openChallengeSubmissionDialog = (problem) => {
+    if (!problem || problem.status === 'solved') return;
+    setChallengeSubmissionProblem(problem);
+    setChallengeSubmissionLink(problem.solution_link || '');
+    setChallengeSubmissionError('');
+    setChallengeSubmissionOpen(true);
+  };
+
+  const handleSubmitChallengeSolution = async (e) => {
+    e.preventDefault();
+    if (!challengeSubmissionProblem || challengeSubmissionSaving) return;
+
+    const link = challengeSubmissionLink.trim();
+    if (!isValidSubmissionUrl(link)) {
+      setChallengeSubmissionError('Enter a valid http or https submission link');
+      return;
+    }
+
+    setChallengeSubmissionSaving(true);
+    setChallengeSubmissionError('');
+    const res = await post_with_token(`classroom/problem/${challengeSubmissionProblem.id}/status`, {
+      status: 'pending_approval',
+      solutionLink: link,
+      studentDifficulty: String(challengeSubmissionProblem.student_difficulty || challengeSubmissionProblem.difficulty || '1'),
+    });
+    setChallengeSubmissionSaving(false);
+
+    if (res?.success) {
+      setChallengeSubmissionOpen(false);
+      setChallengeSubmissionProblem(null);
+      setChallengeSubmissionLink('');
       if (activeClass) fetchProblems(activeClass.id);
+      toast.success('Submission sent for trainer review');
+    } else {
+      setChallengeSubmissionError(res?.error || 'Failed to submit solution');
     }
   };
 
@@ -3067,7 +3480,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                             />
                           </div>
 
-                          <div className="grid min-w-0 grid-cols-2 items-end gap-2 md:col-span-2">
+                          <div className="grid min-w-0 grid-cols-1 items-end gap-2 sm:grid-cols-3 md:col-span-2">
                             <Button
                               type="button"
                               variant="outline"
@@ -3082,8 +3495,98 @@ export default function ClassroomLiveClient({ classroomId }) {
                               )}
                               Preview
                             </Button>
-                            <Button type="submit" className="min-w-0 px-3 font-semibold">
-                              <span className="truncate">Assign</span>
+                            <Dialog open={problemImportOpen} onOpenChange={setProblemImportOpen}>
+                              <DialogTrigger asChild>
+                                <Button type="button" variant="outline" className="min-w-0 gap-2 px-3 font-semibold">
+                                  <FilePlus2 className="h-4 w-4" /> Bulk CSV
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[900px]">
+                                <DialogHeader>
+                                  <DialogTitle>Bulk assign problems from CSV</DialogTitle>
+                                  <DialogDescription>
+                                    Map target type, target, platform, and problem link before assignments are added.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <div className="rounded-lg border bg-muted/20 p-3">
+                                    <label className="text-xs font-semibold">CSV file</label>
+                                    <Input className="mt-1" type="file" accept=".csv,text/csv" onChange={handleProblemCsvFile} />
+                                    {problemImport.fileName && <p className="mt-1 text-xs text-muted-foreground">Loaded {problemImport.fileName}</p>}
+                                  </div>
+
+                                  {problemImport.parseError && (
+                                    <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-600">{problemImport.parseError}</p>
+                                  )}
+
+                                  {problemImport.headers.length > 0 && (
+                                    <div className="space-y-3">
+                                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        {[
+                                          ['targetType', 'Target type', true],
+                                          ['target', 'Target identifier', true],
+                                          ['platform', 'Platform', true],
+                                          ['problemLink', 'Problem link', true],
+                                          ['timerMinutes', 'Timer minutes', false],
+                                          ['difficulty', 'Difficulty', false],
+                                          ['tags', 'Tags', false],
+                                        ].map(([key, label, required]) => (
+                                          <div key={key}>
+                                            <label className="text-xs font-semibold">{label}{required ? ' *' : ''}</label>
+                                            <select
+                                              value={problemImport.mapping[key]}
+                                              onChange={(e) => updateProblemImportMapping(key, e.target.value)}
+                                              className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                            >
+                                              <option value="">{required ? 'Choose column' : 'Optional'}</option>
+                                              {problemImport.headers.map((header) => <option key={`${key}-${header}`} value={header}>{header}</option>)}
+                                            </select>
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      <div className="grid gap-3 sm:grid-cols-3">
+                                        <div className="rounded-md border bg-card p-3 text-xs">
+                                          <p className="font-semibold">Valid rows</p>
+                                          <p className="mt-1 text-lg font-bold">{problemImportPreview.rows.length}</p>
+                                        </div>
+                                        <div className="rounded-md border bg-card p-3 text-xs">
+                                          <p className="font-semibold">Rows needing attention</p>
+                                          <p className="mt-1 text-lg font-bold">{problemImportPreview.rowErrors.length}</p>
+                                        </div>
+                                        <div className="rounded-md border bg-card p-3 text-xs text-muted-foreground">
+                                          Target accepts student email, Student ID, name, user id, group name, or group id.
+                                        </div>
+                                      </div>
+
+                                      {problemImportPreview.rowErrors.length > 0 && (
+                                        <div className="max-h-32 overflow-auto rounded-md border bg-muted/20 p-2 text-xs text-red-600">
+                                          {problemImportPreview.rowErrors.slice(0, 10).map((error, index) => (
+                                            <p key={`${error.rowNumber}-${index}`}>Row {error.rowNumber}: {error.reason}</p>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {problemImport.result?.summary && (
+                                        <div className="rounded-md border bg-emerald-50 p-2 text-xs text-emerald-700">
+                                          Assigned {problemImport.result.summary.assigned}; rejected by server {problemImport.result.summary.rejected}.
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <DialogFooter>
+                                  <Button type="button" variant="outline" onClick={() => setProblemImportOpen(false)}>Close</Button>
+                                  <Button type="button" className="gap-2" disabled={problemImportLoading || problemImportPreview.rows.length === 0} onClick={handleConfirmProblemImport}>
+                                    {problemImportLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {problemImportLoading ? 'Importing...' : 'Import assignments'}
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                            <Button type="submit" className="min-w-0 gap-2 px-3 font-semibold" disabled={assignProblemLoading}>
+                              {assignProblemLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                              <span className="truncate">{assignProblemLoading ? 'Assigning...' : 'Assign'}</span>
                             </Button>
                           </div>
 
@@ -3116,63 +3619,95 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </Button>
                       </CollapsibleSectionHeader>
                       {sectionOpen.liveProgress && (
-                      <CardContent>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                          {liveProgressMetricItems.map((item) => (
+                            <div key={item.label} className={`rounded-lg border px-3 py-2.5 ${item.tone}`}>
+                              <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-70">{item.label}</p>
+                              <p className="mt-1 text-2xl font-black leading-none">{item.value}</p>
+                            </div>
+                          ))}
+                        </div>
                         {problems.length === 0 ? (
                           <p className="text-center text-sm text-muted-foreground py-8">No problems assigned in this live class yet.</p>
                         ) : (
-                          <div className="max-h-[560px] overflow-auto rounded-lg border">
-                            <table className="min-w-[920px] text-sm divide-y divide-border">
-                              <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                          <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
+                            <div className="max-h-[560px] overflow-auto">
+                              <table className="w-full min-w-[1040px] table-fixed text-sm">
+                                <colgroup>
+                                  <col className="w-[18%]" />
+                                  <col className="w-[32%]" />
+                                  <col className="w-[13%]" />
+                                  <col className="w-[9%]" />
+                                  <col className="w-[14%]" />
+                                  <col className="w-[14%]" />
+                                </colgroup>
+                                <thead className="sticky top-0 z-10 border-b bg-muted/95 text-xs uppercase tracking-[0.14em] text-muted-foreground backdrop-blur">
                                 <tr>
-                                  <th className="px-4 py-3 text-left font-semibold">Student</th>
-                                  <th className="px-4 py-3 text-left font-semibold">Problem</th>
-                                  <th className="px-4 py-3 text-left font-semibold">Platform</th>
-                                  <th className="px-4 py-3 text-center font-semibold">Timer</th>
-                                  <th className="px-4 py-3 text-center font-semibold">Status</th>
-                                  <th className="px-4 py-3 text-center font-semibold">Configure</th>
+                                  <th className="px-5 py-3 text-left font-bold">Student</th>
+                                  <th className="px-5 py-3 text-left font-bold">Problem</th>
+                                  <th className="px-5 py-3 text-left font-bold">Platform</th>
+                                  <th className="px-5 py-3 text-left font-bold">Timer</th>
+                                  <th className="px-5 py-3 text-left font-bold">Status</th>
+                                  <th className="px-5 py-3 text-right font-bold">Actions</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-border">
+                              <tbody>
                                 {visibleProblems.map((prob) => (
-                                  <tr key={prob.id} className="hover:bg-muted/10">
-                                    <td className="px-4 py-3 font-medium">{prob.student_name}</td>
-                                    <td className="px-4 py-3 max-w-xs truncate">
-                                      <a href={prob.problem_link} target="_blank" rel="noreferrer" className="text-primary hover:underline font-semibold">
-                                        {prob.title}
-                                      </a>
-                                      {prob.tags && prob.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 mt-1">
-                                          {prob.tags.map((t, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-[10px] px-1 py-0">{t}</Badge>
-                                          ))}
+                                  <tr key={prob.id} className={`border-b transition last:border-b-0 hover:bg-muted/30 ${prob.status === 'pending_approval' ? 'bg-amber-500/[0.04]' : ''}`}>
+                                    <td className="px-5 py-4 align-top">
+                                      <div className="flex min-w-0 items-center gap-3">
+                                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border bg-muted text-xs font-black">
+                                          {(prob.student_name || 'S').charAt(0).toUpperCase()}
                                         </div>
-                                      )}
+                                        <p className="min-w-0 truncate font-semibold text-foreground">{prob.student_name || 'Student'}</p>
+                                      </div>
                                     </td>
-                                    <td className="px-4 py-3 capitalize">{prob.platform}</td>
-                                    <td className="px-4 py-3 text-center text-muted-foreground">{prob.timer_minutes ? `${prob.timer_minutes}m` : 'N/A'}</td>
-                                    <td className="px-4 py-3 text-center">
+                                    <td className="px-5 py-4 align-top">
+                                      <div className="min-w-0 space-y-2">
+                                        <a href={prob.problem_link} target="_blank" rel="noreferrer" className="block truncate font-bold text-primary hover:underline">
+                                          {prob.title}
+                                        </a>
+                                        {prob.tags && prob.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {prob.tags.map((t, idx) => (
+                                              <Badge key={idx} variant="outline" className="px-1.5 py-0 text-[10px]">{t}</Badge>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-5 py-4 align-top">
+                                      <Badge variant="outline" className="text-[10px] capitalize text-muted-foreground">{prob.platform}</Badge>
+                                    </td>
+                                    <td className="px-5 py-4 align-top font-mono text-sm text-muted-foreground">{prob.timer_minutes ? `${prob.timer_minutes}m` : 'N/A'}</td>
+                                    <td className="px-5 py-4 align-top">
                                       <select
                                         value={prob.status}
                                         onChange={(e) => handleTrainerSetStatus(prob.id, e.target.value)}
-                                        className={`text-xs font-semibold rounded-full px-2.5 py-1 border outline-none ${
-                                          prob.status === 'solved' ? 'bg-green-500/10 text-green-600 border-green-500/20' :
-                                          prob.status === 'tried' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
-                                          'bg-red-500/10 text-red-600 border-red-500/20'
-                                        }`}
+                                        className={`h-8 w-full max-w-[170px] rounded-full border px-3 text-xs font-bold outline-none ${statusTone[prob.status] || statusTone.not_solved}`}
                                       >
+                                        <option value="pending_approval" disabled>Pending Approval</option>
                                         <option value="not_solved">Not Solved</option>
                                         <option value="tried">Tried</option>
                                         <option value="solved">Solved</option>
                                       </select>
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                      <Dialog>
-                                        <DialogTrigger asChild>
-                                          <Button variant="outline" size="sm" className="text-xs" onClick={() => handleOpenProblemConfig(prob.id)}>
-                                            Notes &amp; Hints
-                                          </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="sm:max-w-[480px]">
+                                    <td className="px-5 py-4 align-top">
+                                      <div className="flex flex-wrap items-center justify-end gap-2">
+                                        {prob.solution_link && (
+                                          <a href={prob.solution_link} target="_blank" rel="noreferrer" className={`inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-bold transition ${prob.status === 'pending_approval' ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15' : 'border-border text-primary hover:bg-muted'}`}>
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                            Review
+                                          </a>
+                                        )}
+                                        <Dialog>
+                                          <DialogTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={() => handleOpenProblemConfig(prob.id)}>
+                                              Notes &amp; Hints
+                                            </Button>
+                                          </DialogTrigger>
+                                          <DialogContent className="sm:max-w-[480px]">
                                           <DialogHeader>
                                             <DialogTitle>Configure Notes &amp; Hints</DialogTitle>
                                             <DialogDescription>
@@ -3236,13 +3771,15 @@ export default function ClassroomLiveClient({ classroomId }) {
                                               </div>
                                             </form>
                                           </div>
-                                        </DialogContent>
-                                      </Dialog>
+                                          </DialogContent>
+                                        </Dialog>
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
-                              </tbody>
-                            </table>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         )}
                         {problems.length > visibleProblemCount && (
@@ -4283,18 +4820,14 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </div>
                         <div className="space-y-1">
                           <label className="text-sm font-semibold">Duration (Minutes)</label>
-                          <Select value={classDurationMinutes} onValueChange={setClassDurationMinutes}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="45">45 Mins</SelectItem>
-                              <SelectItem value="60">60 Mins (1 hr)</SelectItem>
-                              <SelectItem value="90">90 Mins (1.5 hrs)</SelectItem>
-                              <SelectItem value="120">120 Mins (2 hrs)</SelectItem>
-                              <SelectItem value="180">180 Mins (3 hrs)</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={classDurationMinutes}
+                            onChange={(e) => setClassDurationMinutes(e.target.value)}
+                            required
+                          />
                         </div>
                       </div>
                       <div className="space-y-1">
@@ -4530,15 +5063,119 @@ export default function ClassroomLiveClient({ classroomId }) {
                   />
                   {sectionOpen.students && (
                   <CardContent className="space-y-4">
-                    <form onSubmit={handleAddStudent} className="flex gap-2">
+                    <form onSubmit={handleAddStudent} className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)_auto_auto]">
+                      <select
+                        value={studentLookupMethod}
+                        onChange={(e) => {
+                          const nextMethod = e.target.value;
+                          setStudentLookupMethod(nextMethod);
+                          setStudentImport((current) => current.headers.length
+                            ? { ...current, mapping: guessStudentImportMapping(current.headers, nextMethod), result: null }
+                            : current);
+                        }}
+                        className="rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                      >
+                        <option value="email">Email</option>
+                        <option value="mist_id">Student ID</option>
+                      </select>
                       <Input
-                        type="email"
-                        placeholder="Student email..."
+                        type={studentLookupMethod === 'email' ? 'email' : 'text'}
+                        placeholder={studentLookupMethod === 'email' ? 'Student email...' : 'Student ID...'}
                         value={studentEmail}
                         onChange={(e) => setStudentEmail(e.target.value)}
                         required
                       />
-                      <Button type="submit" className="font-semibold">Add</Button>
+                      <Button type="submit" className="gap-2 font-semibold" disabled={studentAddLoading}>
+                        {studentAddLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {studentAddLoading ? 'Adding' : 'Add'}
+                      </Button>
+                      <Dialog open={studentImportOpen} onOpenChange={setStudentImportOpen}>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="outline" className="gap-2 font-semibold">
+                            <FilePlus2 className="h-4 w-4" /> CSV
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[760px]">
+                          <DialogHeader>
+                            <DialogTitle>Bulk add students from CSV</DialogTitle>
+                            <DialogDescription>
+                              Choose a local CSV, map the identifier column, preview, then import.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                              <div>
+                                <label className="text-xs font-semibold">Lookup method</label>
+                                <select
+                                  value={studentLookupMethod}
+                                  onChange={(e) => {
+                                    const nextMethod = e.target.value;
+                                    setStudentLookupMethod(nextMethod);
+                                    setStudentImport((current) => current.headers.length
+                                      ? { ...current, mapping: guessStudentImportMapping(current.headers, nextMethod), result: null }
+                                      : current);
+                                  }}
+                                  className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                >
+                                  <option value="email">Email</option>
+                                  <option value="mist_id">Student ID</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold">CSV file</label>
+                                <Input className="mt-1" type="file" accept=".csv,text/csv" onChange={handleStudentCsvFile} />
+                                {studentImport.fileName && <p className="mt-1 text-xs text-muted-foreground">Loaded {studentImport.fileName}</p>}
+                              </div>
+                            </div>
+
+                            {studentImport.parseError && (
+                              <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-600">{studentImport.parseError}</p>
+                            )}
+
+                            {studentImport.headers.length > 0 && (
+                              <div className="space-y-3">
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <div>
+                                    <label className="text-xs font-semibold">Student identifier column</label>
+                                    <select
+                                      value={studentImport.mapping.identifier}
+                                      onChange={(e) => updateStudentImportMapping('identifier', e.target.value)}
+                                      className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                    >
+                                      <option value="">Choose column</option>
+                                      {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="rounded-md border bg-card p-3 text-xs">
+                                    <p className="font-semibold">Preview</p>
+                                    <p className="mt-1 text-muted-foreground">{studentImportPreview.identifiers.length} unique identifiers ready.</p>
+                                    <p className="text-muted-foreground">{studentImportPreview.rowErrors.length} rows need attention.</p>
+                                  </div>
+                                </div>
+                                {studentImportPreview.rowErrors.length > 0 && (
+                                  <div className="max-h-28 overflow-auto rounded-md border bg-muted/20 p-2 text-xs text-red-600">
+                                    {studentImportPreview.rowErrors.slice(0, 8).map((error, index) => (
+                                      <p key={`${error.rowNumber}-${index}`}>Row {error.rowNumber}: {error.reason}</p>
+                                    ))}
+                                  </div>
+                                )}
+                                {studentImport.result?.summary && (
+                                  <div className="rounded-md border bg-emerald-50 p-2 text-xs text-emerald-700">
+                                    Added {studentImport.result.summary.added}; already enrolled {studentImport.result.summary.alreadyEnrolled}; not found {studentImport.result.summary.notFound}; invalid role {studentImport.result.summary.invalidRole}.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setStudentImportOpen(false)}>Close</Button>
+                            <Button type="button" className="gap-2" disabled={studentImportLoading || studentImportPreview.identifiers.length === 0} onClick={handleConfirmStudentImport}>
+                              {studentImportLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                              {studentImportLoading ? 'Importing...' : 'Import students'}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
                     </form>
                     
                     <div className="overflow-hidden rounded-lg border">
@@ -4832,25 +5469,28 @@ export default function ClassroomLiveClient({ classroomId }) {
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                           {visibleProblems.map((prob) => (
                             <Card key={prob.id} className={`rounded-lg border-l-4 bg-card transition hover:border-foreground/20 hover:shadow-sm ${
-                              prob.status === 'solved' ? 'border-l-green-600' : prob.status === 'tried' ? 'border-l-amber-500' : 'border-l-foreground'
+                              prob.status === 'solved' ? 'border-l-green-600' : prob.status === 'pending_approval' ? 'border-l-amber-500' : prob.status === 'tried' ? 'border-l-blue-500' : 'border-l-foreground'
                             }`}>
                               <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start gap-2">
                                   <Badge variant="outline" className="text-[10px] text-muted-foreground">
                                     {platformName(prob.platform)}
                                   </Badge>
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => handleToggleStatus(prob.id, prob.status, prob.student_difficulty || prob.difficulty)}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openChallengeSubmissionDialog(prob)}
+                                    disabled={prob.status === 'solved'}
                                     className={`h-7 gap-1.5 px-2.5 text-xs font-semibold ${
                                       prob.status === 'solved' ? 'bg-green-600 hover:bg-green-700 text-white hover:text-white border-transparent' :
-                                      prob.status === 'tried' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                                      prob.status === 'pending_approval' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                                      prob.status === 'tried' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' :
                                       'bg-muted text-muted-foreground'
                                     }`}
                                   >
                                     {prob.status === 'solved' && <CheckCircle2 className="h-3.5 w-3.5" />}
-                                    {prob.status === 'solved' ? 'Solved' : prob.status === 'tried' ? 'Tried' : 'Mark solved'}
+                                    {prob.status === 'pending_approval' && <AlertCircle className="h-3.5 w-3.5" />}
+                                    {prob.status === 'solved' ? 'Solved' : prob.status === 'pending_approval' ? 'Pending review' : 'Submit solution'}
                                   </Button>
                                 </div>
                                 <CardTitle className="text-lg font-bold mt-2 leading-tight">
@@ -4867,6 +5507,12 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       <Badge key={idx} variant="outline" className="text-[10px] px-1 py-0">{t}</Badge>
                                     ))}
                                   </div>
+                                )}
+                                {prob.solution_link && (
+                                  <a href={prob.solution_link} target="_blank" rel="noreferrer" className="mt-2 inline-flex max-w-full items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">Submitted proof</span>
+                                  </a>
                                 )}
                               </CardHeader>
                               <CardContent className="pb-3 text-xs text-muted-foreground space-y-2">
@@ -5607,8 +6253,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <label className="text-sm font-semibold">Duration minutes</label>
                 <Input
                   type="number"
-                  min="15"
-                  max="1440"
+                  min="1"
+                  step="1"
                   value={sessionEditForm.durationMinutes}
                   onChange={(e) => setSessionEditForm((current) => ({ ...current, durationMinutes: e.target.value }))}
                   required
@@ -5638,6 +6284,47 @@ export default function ClassroomLiveClient({ classroomId }) {
               <Button type="submit" disabled={sessionEditSaving} className="gap-1.5">
                 {sessionEditSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save session
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={challengeSubmissionOpen} onOpenChange={setChallengeSubmissionOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <Award className="h-5 w-5 text-primary" />
+              Submit challenge proof
+            </DialogTitle>
+            <DialogDescription>
+              {challengeSubmissionProblem?.title || 'Paste your accepted submission link for trainer review.'}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmitChallengeSolution} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Submission link</label>
+              <Input
+                type="url"
+                placeholder="https://vjudge.net/solution/..."
+                value={challengeSubmissionLink}
+                onChange={(e) => setChallengeSubmissionLink(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">Trainer will review this link before marking the problem solved.</p>
+            </div>
+            {challengeSubmissionError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {challengeSubmissionError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setChallengeSubmissionOpen(false)} disabled={challengeSubmissionSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={challengeSubmissionSaving} className="gap-1.5">
+                {challengeSubmissionSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                Submit for review
               </Button>
             </DialogFooter>
           </form>

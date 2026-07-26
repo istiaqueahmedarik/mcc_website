@@ -412,41 +412,6 @@ export default function ClassroomIdePanel({ classroomId, activeClass, userId }) 
     });
   }, [language]);
 
-  useEffect(() => {
-    const handleWindowFocus = () => {
-      syncFocusedState(true);
-      sendActivity("tab_focus", { visibilityState: document.visibilityState });
-    };
-    const handleWindowBlur = () => {
-      syncFocusedState(false);
-      sendActivity("tab_blur", { visibilityState: document.visibilityState });
-    };
-    const handleVisibility = () => {
-      const visible = document.visibilityState === "visible";
-      syncFocusedState(visible && document.hasFocus());
-      sendActivity(visible ? "visibility_visible" : "visibility_hidden", {
-        visibilityState: document.visibilityState,
-      });
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-    window.addEventListener("blur", handleWindowBlur);
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      window.removeEventListener("focus", handleWindowFocus);
-      window.removeEventListener("blur", handleWindowBlur);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [sendActivity, syncFocusedState]);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      sendActivity("heartbeat", { codeLength: codeRef.current.length });
-    }, 15000);
-    return () => window.clearInterval(interval);
-  }, [sendActivity]);
-
   const handleLanguageChange = (value) => {
     setLanguage(value);
     languageRef.current = value;
