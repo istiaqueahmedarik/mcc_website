@@ -1,5 +1,33 @@
 # Project Index
 
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-feature-futureproof-crud-schedule-submission-20260727-rsd.md`
+
+Fact:
+Trainer classroom work is approved to futureproof People/Groups member displays, add end-time based duration calculation in session edit while keeping start+duration scheduling and existing DB fields, complete Topics CRUD where safe, and let student live challenge submissions use either a public link or pasted private code with trainer syntax-highlighted review.
+
+Applies when:
+Changing `ClassroomLiveClient.js` group cards, session edit dialog, Topics tab operations, live challenge submission dialog, `classroomController.ts` topic endpoints, or `class_problems` proof handling.
+
+Do not overgeneralize:
+This does not approve database migrations, code execution, external judge verification, public/private URL checking, dependency additions, route renames, or broad unrelated trainer UI redesign.
+
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-feature-futureproof-crud-schedule-submission-20260727-implementation-review.md`
+
+Fact:
+`ClassroomLiveClient.js` now bounds group member previews in People/Groups surfaces, derives session edit duration from a displayed end time, provides topic edit/archive/resource edit/delete/problem edit/delete/unassign controls, and lets live Challenge submissions use link or code with language selection. `classroomController.ts`/`classroomRoute.ts` now expose focused topic resource/problem update/delete and topic assignment unassign endpoints, and `updateProblemStatus` accepts code-only proof while preserving pending-approval behavior.
+
+Applies when:
+Maintaining trainer group cards, session edit, Topics CRUD, topic assignment management, live challenge proof submission, or trainer proof review.
+
+Do not overgeneralize:
+No database schema, dependency, route rename, code execution, external judge verification, or public/private URL checking was added.
+
 ## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Implemented Entry Points
 
 Source:

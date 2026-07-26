@@ -2014,6 +2014,9 @@ export const updateProblemStatus = async (c: Context) => {
     const targetDifficulty = studentDifficulty || difficulty || null;
     const normalizedStatus = normalizeProgressStatus(status);
     const normalizedSolutionLink = normalizeNullableText(solutionLink, 1200);
+    const rawSolutionCode = boundRawText(solutionCode, 20000);
+    const normalizedSolutionCode = rawSolutionCode.trim() ? rawSolutionCode : null;
+    const normalizedSubmissionNotes = normalizeNullableText(submissionNotes, 1000);
     if (!normalizedStatus) {
       return c.json({ error: 'Invalid status' }, 400);
     }
@@ -2048,8 +2051,8 @@ export const updateProblemStatus = async (c: Context) => {
       } else {
         const wantsReview = normalizedStatus === 'solved' || (normalizedStatus === 'pending_approval' && currentStatus !== 'pending_approval');
         if (wantsReview) {
-          if (!normalizedSolutionLink) {
-            return c.json({ error: 'Valid submission link is required' }, 400);
+          if (!normalizedSolutionLink && !normalizedSolutionCode) {
+            return c.json({ error: 'Submission link or code is required' }, 400);
           }
           effectiveStatus = 'pending_approval';
         } else {
@@ -2066,8 +2069,8 @@ export const updateProblemStatus = async (c: Context) => {
           solved_at = ${solvedAt},
           student_difficulty = COALESCE(${targetDifficulty}, student_difficulty),
           solution_link = COALESCE(${normalizedSolutionLink}, solution_link),
-          solution_code = COALESCE(${solutionCode || null}, solution_code),
-          submission_notes = COALESCE(${submissionNotes || null}, submission_notes)
+          solution_code = COALESCE(${normalizedSolutionCode}, solution_code),
+          submission_notes = COALESCE(${normalizedSubmissionNotes}, submission_notes)
       WHERE id = ${problemId} 
       RETURNING *
     `;
@@ -2421,6 +2424,168 @@ export const addClassroomTopicProblem = async (c: Context) => {
   }
 };
 
+export const updateClassroomTopicResource = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const resourceId = c.req.param('resourceId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const resourceRows = await sql`
+      SELECT r.*
+      FROM classroom_topic_resources r
+      JOIN classroom_topics t ON t.id = r.topic_id
+      WHERE r.id = ${resourceId} AND r.topic_id = ${topicId} AND t.classroom_id = ${classroomId}
+    `;
+    if (resourceRows.length === 0) return c.json({ error: 'Resource not found' }, 404);
+
+    const { title, url, content, position } = await c.req.json();
+    const normalizedTitle = normalizeText(title, 160);
+    const normalizedUrl = normalizeNullableText(url, 1000);
+    const normalizedContent = normalizeNullableText(content, 10000);
+    if (!normalizedTitle) return c.json({ error: 'Resource title is required' }, 400);
+    if (!normalizedUrl && !normalizedContent) return c.json({ error: 'Add a URL or markdown content' }, 400);
+
+    const nextPosition = position === undefined || position === null || position === ''
+      ? resourceRows[0].position || 0
+      : normalizePositiveInteger(position) || 0;
+
+    const resource = await sql`
+      UPDATE classroom_topic_resources
+      SET title = ${normalizedTitle},
+          url = ${normalizedUrl},
+          content = ${normalizedContent},
+          position = ${nextPosition}
+      WHERE id = ${resourceId} AND topic_id = ${topicId}
+      RETURNING *
+    `;
+    return c.json({ success: true, resource: resource[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const deleteClassroomTopicResource = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const resourceId = c.req.param('resourceId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const resourceRows = await sql`
+      SELECT r.id
+      FROM classroom_topic_resources r
+      JOIN classroom_topics t ON t.id = r.topic_id
+      WHERE r.id = ${resourceId} AND r.topic_id = ${topicId} AND t.classroom_id = ${classroomId}
+    `;
+    if (resourceRows.length === 0) return c.json({ error: 'Resource not found' }, 404);
+
+    const rows = await sql`
+      DELETE FROM classroom_topic_resources
+      WHERE id = ${resourceId} AND topic_id = ${topicId}
+      RETURNING *
+    `;
+    return c.json({ success: true, resource: rows[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassroomTopicProblem = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const problemId = c.req.param('problemId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const problemRows = await sql`
+      SELECT p.*
+      FROM classroom_topic_problems p
+      JOIN classroom_topics t ON t.id = p.topic_id
+      WHERE p.id = ${problemId} AND p.topic_id = ${topicId} AND t.classroom_id = ${classroomId}
+    `;
+    if (problemRows.length === 0) return c.json({ error: 'Problem not found' }, 404);
+
+    const current = problemRows[0];
+    const body = await c.req.json();
+    const normalizedPlatform = normalizeProblemPlatform(body.platform ?? current.platform);
+    const normalizedLink = normalizeText(body.problemLink ?? current.problem_link, 1200);
+    if (!normalizedPlatform || !normalizedLink) return c.json({ error: 'Platform and problem link are required' }, 400);
+
+    const normalizedTags = body.tags === undefined ? (Array.isArray(current.tags) ? current.tags : []) : normalizeProblemTags(body.tags);
+    await ensureProblemTags(normalizedTags, userId);
+
+    const nextTitle = normalizeText(body.title, 200) || current.title || 'CP Problem';
+    const nextDifficulty = normalizeText(body.difficulty, 80) || current.difficulty || 'Trainer selected';
+    const nextTimer = body.timerMinutes === undefined || body.timerMinutes === null || body.timerMinutes === ''
+      ? null
+      : normalizePositiveInteger(body.timerMinutes);
+    const nextPosition = body.position === undefined || body.position === null || body.position === ''
+      ? current.position || 0
+      : normalizePositiveInteger(body.position) || 0;
+
+    const problem = await sql`
+      UPDATE classroom_topic_problems
+      SET platform = ${normalizedPlatform},
+          problem_link = ${normalizedLink},
+          title = ${nextTitle},
+          difficulty = ${nextDifficulty},
+          timer_minutes = ${nextTimer},
+          tags = ${normalizedTags},
+          position = ${nextPosition}
+      WHERE id = ${problemId} AND topic_id = ${topicId}
+      RETURNING *
+    `;
+    return c.json({ success: true, problem: problem[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const deleteClassroomTopicProblem = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const topicId = c.req.param('topicId');
+  const problemId = c.req.param('problemId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const problemRows = await sql`
+      SELECT p.id
+      FROM classroom_topic_problems p
+      JOIN classroom_topics t ON t.id = p.topic_id
+      WHERE p.id = ${problemId} AND p.topic_id = ${topicId} AND t.classroom_id = ${classroomId}
+    `;
+    if (problemRows.length === 0) return c.json({ error: 'Problem not found' }, 404);
+
+    const progressRows = await sql`
+      SELECT id
+      FROM classroom_topic_problem_progress
+      WHERE topic_problem_id = ${problemId}
+      LIMIT 1
+    `;
+    if (progressRows.length > 0) {
+      return c.json({ error: 'Cannot delete a topic problem after student progress exists' }, 400);
+    }
+
+    const rows = await sql`
+      DELETE FROM classroom_topic_problems
+      WHERE id = ${problemId} AND topic_id = ${topicId}
+      RETURNING *
+    `;
+    return c.json({ success: true, problem: rows[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 export const assignClassroomTopicToTeam = async (c: Context) => {
   const classroomId = c.req.param('id');
   const topicId = c.req.param('topicId');
@@ -2450,6 +2615,27 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
     `;
 
     return c.json({ success: true, assignment: { ...assignment[0], team_name: teamRows[0].name, topic_title: topicRows[0].title } });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const unassignClassroomTopic = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const assignmentId = c.req.param('assignmentId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const rows = await sql`
+      UPDATE classroom_team_topic_assignments
+      SET status = 'archived'
+      WHERE id = ${assignmentId} AND classroom_id = ${classroomId}
+      RETURNING *
+    `;
+    if (rows.length === 0) return c.json({ error: 'Topic assignment not found' }, 404);
+    return c.json({ success: true, assignment: rows[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { get_with_token, post_with_token } from '@/lib/action';
+import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -51,7 +51,7 @@ import {
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
   Check, ChevronsUpDown, X, ThumbsUp, Heart, PartyPopper,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
-  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info
+  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive
 } from 'lucide-react';
 import {
   Dialog,
@@ -354,6 +354,21 @@ function datetimeLocalToIso(value) {
   return date.toISOString();
 }
 
+function datetimeLocalToDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getSessionEndDatetimeLocal(classItem) {
+  if (!classItem?.scheduled_time) return '';
+  const start = new Date(classItem.scheduled_time);
+  if (Number.isNaN(start.getTime())) return '';
+  const duration = Number(classItem.duration_minutes || 90);
+  const end = new Date(start.getTime() + Math.max(1, duration) * 60000);
+  return toDatetimeLocalValue(end.toISOString());
+}
+
 function isValidSubmissionUrl(value) {
   try {
     const url = new URL(value);
@@ -361,6 +376,42 @@ function isValidSubmissionUrl(value) {
   } catch {
     return false;
   }
+}
+
+const SUBMISSION_LANGUAGE_OPTIONS = [
+  { value: 'cpp', label: 'C++' },
+  { value: 'python', label: 'Python' },
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'java', label: 'Java' },
+  { value: 'text', label: 'Plain text' },
+];
+
+function normalizeSubmissionLanguage(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return SUBMISSION_LANGUAGE_OPTIONS.some((option) => option.value === text) ? text : 'cpp';
+}
+
+function parseSubmissionCode(value) {
+  const text = String(value || '');
+  const match = text.match(/^```([\w+#-]*)\s*\n([\s\S]*?)\n?```\s*$/);
+  if (!match) return { language: 'cpp', code: text };
+  return {
+    language: normalizeSubmissionLanguage(match[1]),
+    code: match[2],
+  };
+}
+
+function buildSubmissionCode(value, language) {
+  const code = String(value || '').replace(/\s+$/g, '');
+  if (!code.trim()) return '';
+  return `\`\`\`${normalizeSubmissionLanguage(language)}\n${code}\n\`\`\``;
+}
+
+function submissionCodeToMarkdown(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^```[\s\S]*```$/.test(text)) return text;
+  return `\`\`\`text\n${text}\n\`\`\``;
 }
 
 const statusCopy = {
@@ -709,6 +760,81 @@ function byPositionThenTime(a, b) {
   return (a.position || 0) - (b.position || 0) || sortTimeOf(a) - sortTimeOf(b);
 }
 
+function MemberPreview({ members = [], limit = 4, compact = false }) {
+  const [expanded, setExpanded] = useState(false);
+  const safeMembers = Array.isArray(members) ? members : [];
+  const visibleMembers = expanded ? safeMembers : safeMembers.slice(0, limit);
+  const hiddenCount = Math.max(safeMembers.length - visibleMembers.length, 0);
+
+  if (safeMembers.length === 0) {
+    return <p className="text-xs text-muted-foreground">No members assigned.</p>;
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/20 p-2.5">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-semibold text-muted-foreground">Members ({safeMembers.length})</span>
+        {safeMembers.length > limit && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px] font-semibold"
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? 'Show less' : `Show all ${safeMembers.length}`}
+          </Button>
+        )}
+      </div>
+      <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto pr-1">
+        {visibleMembers.map((member) => (
+          <Badge key={member.id} variant="outline" className={`${compact ? 'max-w-[180px]' : 'max-w-[240px]'} bg-background px-2 py-0.5 text-[11px] font-medium`}>
+            <span className="truncate">{getStudentLabelWithId(member)}</span>
+          </Badge>
+        ))}
+        {!expanded && hiddenCount > 0 && (
+          <Badge variant="secondary" className="px-2 py-0.5 text-[11px] font-semibold">
+            +{hiddenCount} more
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubmissionReviewContent({ solutionLink, solutionCode, submissionNotes }) {
+  const codeMarkdown = submissionCodeToMarkdown(solutionCode);
+
+  return (
+    <div className="space-y-4 py-2 text-sm">
+      {solutionLink ? (
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Solution link</p>
+          <a href={solutionLink} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 break-all font-semibold text-primary hover:underline">
+            {solutionLink} <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+          </a>
+        </div>
+      ) : (
+        <p className="text-xs italic text-muted-foreground">No external solution link provided.</p>
+      )}
+      {codeMarkdown && (
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Submitted code</p>
+          <div className="max-h-[420px] overflow-auto rounded-lg border bg-muted/20 p-3">
+            <MarkdownRender allowRawHtml={false} className="prose-pre:m-0 prose-pre:max-w-full prose-pre:overflow-x-auto" content={codeMarkdown} useDefaultWidth={false} />
+          </div>
+        </div>
+      )}
+      {submissionNotes ? (
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase text-muted-foreground">Notes</p>
+          <p className="rounded border bg-muted/20 p-2.5 text-xs">{submissionNotes}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ResourceCard({ resource, classroomId, label = 'Resource' }) {
   const href = resourceReaderHref(classroomId, resource.id);
   const excerpt = resourceExcerpt(resource);
@@ -1020,20 +1146,28 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
   const solutionLink = progress?.solution_link || problem.solution_link || '';
   const solutionCode = progress?.solution_code || problem.solution_code || '';
   const submissionNotes = progress?.submission_notes || problem.submission_notes || '';
+  const parsedSolutionCode = parseSubmissionCode(solutionCode);
 
   const [solutionDialogOpen, setSolutionDialogOpen] = useState(false);
   const [viewSolutionDialogOpen, setViewSolutionDialogOpen] = useState(false);
   const [formLink, setFormLink] = useState(solutionLink);
-  const [formCode, setFormCode] = useState(solutionCode);
+  const [formLanguage, setFormLanguage] = useState(parsedSolutionCode.language);
+  const [formCode, setFormCode] = useState(parsedSolutionCode.code);
   const [formNotes, setFormNotes] = useState(submissionNotes);
   const [formDiff, setFormDiff] = useState(currentDiff);
 
+  const resetSolutionForm = () => {
+    const parsed = parseSubmissionCode(solutionCode);
+    setFormLink(solutionLink);
+    setFormLanguage(parsed.language);
+    setFormCode(parsed.code);
+    setFormNotes(submissionNotes);
+    setFormDiff(currentDiff);
+  };
+
   const handleSelectStatusChange = (nextStatus) => {
     if (nextStatus === 'pending_approval' || nextStatus === 'solved') {
-      setFormLink(solutionLink);
-      setFormCode(solutionCode);
-      setFormNotes(submissionNotes);
-      setFormDiff(currentDiff);
+      resetSolutionForm();
       setSolutionDialogOpen(true);
     } else {
       onStatusChange?.(problem, nextStatus, currentDiff, solutionLink, solutionCode, submissionNotes);
@@ -1041,8 +1175,18 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
   };
 
   const handleFormSubmit = () => {
+    const nextLink = formLink.trim();
+    const nextCode = buildSubmissionCode(formCode, formLanguage);
+    if (nextLink && !isValidSubmissionUrl(nextLink)) {
+      alert('Enter a valid http or https submission link');
+      return;
+    }
+    if (!nextLink && !nextCode) {
+      alert('Add a submission link or paste code');
+      return;
+    }
     setSolutionDialogOpen(false);
-    onStatusChange?.(problem, 'pending_approval', formDiff, formLink, formCode, formNotes);
+    onStatusChange?.(problem, 'pending_approval', formDiff, nextLink, nextCode, formNotes);
   };
 
   return (
@@ -1110,10 +1254,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
               size="sm"
               className="h-8 text-xs gap-1"
               onClick={() => {
-                setFormLink(solutionLink);
-                setFormCode(solutionCode);
-                setFormNotes(submissionNotes);
-                setFormDiff(currentDiff);
+                resetSolutionForm();
                 setSolutionDialogOpen(true);
               }}
             >
@@ -1167,9 +1308,22 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
               <p className="text-[11px] text-muted-foreground">Paste submission link from VJudge, Codeforces, LeetCode, or GitHub.</p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-foreground">Solution Code Snippet (C++ / Python / JS)</label>
+              <label className="text-xs font-bold text-foreground">Language</label>
+              <Select value={formLanguage} onValueChange={setFormLanguage}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUBMISSION_LANGUAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-foreground">Solution Code</label>
               <Textarea
-                rows={6}
+                rows={9}
                 placeholder="#include <bits/stdc++.h>&#10;using namespace std;&#10;..."
                 className="font-mono text-xs"
                 value={formCode}
@@ -1201,32 +1355,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
             <DialogTitle className="text-lg font-bold">Submitted Solution Details</DialogTitle>
             <DialogDescription>{problem.title}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2 text-sm">
-            {solutionLink ? (
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-muted-foreground uppercase">Solution Link</p>
-                <a href={solutionLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary font-semibold hover:underline break-all">
-                  {solutionLink} <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground italic">No solution link provided.</p>
-            )}
-            {solutionCode ? (
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-muted-foreground uppercase">Submitted Code</p>
-                <pre className="p-3 rounded-lg border bg-muted/30 font-mono text-xs max-h-[300px] overflow-auto whitespace-pre-wrap">
-                  {solutionCode}
-                </pre>
-              </div>
-            ) : null}
-            {submissionNotes ? (
-              <div className="space-y-1">
-                <p className="text-xs font-bold text-muted-foreground uppercase">Notes</p>
-                <p className="text-xs bg-muted/20 p-2.5 rounded border">{submissionNotes}</p>
-              </div>
-            ) : null}
-          </div>
+          <SubmissionReviewContent solutionLink={solutionLink} solutionCode={solutionCode} submissionNotes={submissionNotes} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setViewSolutionDialogOpen(false)}>Close</Button>
           </DialogFooter>
@@ -1627,15 +1756,7 @@ function TeamDashboardPanel({
                 </div>
 
                 {/* MEMBERS LIST */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 text-xs">
-                  <span className="font-semibold text-muted-foreground mr-1">Members ({team.members.length}):</span>
-                  {team.members.map((member) => (
-                    <Badge key={member.id} variant="outline" className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-muted/30">
-                      <Users className="h-3 w-3 text-muted-foreground" />
-                      <span>{getStudentLabelWithId(member)}</span>
-                    </Badge>
-                  ))}
-                </div>
+                <MemberPreview members={team.members} limit={6} />
               </CardContent>
             </Card>
           );
@@ -1993,8 +2114,12 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [topicProblemTags, setTopicProblemTags] = useState([]);
   const [topicAssignmentForm, setTopicAssignmentForm] = useState({ topicId: '', teamId: '' });
   const [createTopicModalOpen, setCreateTopicModalOpen] = useState(false);
+  const [editTopicModalOpen, setEditTopicModalOpen] = useState(false);
+  const [topicEditForm, setTopicEditForm] = useState({ id: '', title: '', module: '', description: '', status: 'active' });
   const [addResourceModalOpen, setAddResourceModalOpen] = useState(false);
+  const [editingTopicResource, setEditingTopicResource] = useState(null);
   const [addProblemModalOpen, setAddProblemModalOpen] = useState(false);
+  const [editingTopicProblem, setEditingTopicProblem] = useState(null);
   const [assignTeamModalOpen, setAssignTeamModalOpen] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
@@ -2029,6 +2154,9 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [challengeSubmissionOpen, setChallengeSubmissionOpen] = useState(false);
   const [challengeSubmissionProblem, setChallengeSubmissionProblem] = useState(null);
   const [challengeSubmissionLink, setChallengeSubmissionLink] = useState('');
+  const [challengeSubmissionLanguage, setChallengeSubmissionLanguage] = useState('cpp');
+  const [challengeSubmissionCode, setChallengeSubmissionCode] = useState('');
+  const [challengeSubmissionNotes, setChallengeSubmissionNotes] = useState('');
   const [challengeSubmissionError, setChallengeSubmissionError] = useState('');
   const [challengeSubmissionSaving, setChallengeSubmissionSaving] = useState(false);
 
@@ -2762,6 +2890,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [sessionEditForm, setSessionEditForm] = useState({
     name: '',
     scheduledTime: '',
+    endTime: '',
     sessionType: 'onsite',
     durationMinutes: '90',
   });
@@ -2881,6 +3010,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     setSessionEditForm({
       name: classItem?.name || '',
       scheduledTime: toDatetimeLocalValue(classItem?.scheduled_time),
+      endTime: getSessionEndDatetimeLocal(classItem),
       sessionType: classItem?.session_type === 'online' ? 'online' : 'onsite',
       durationMinutes: String(classItem?.duration_minutes || 90),
     });
@@ -2892,13 +3022,20 @@ export default function ClassroomLiveClient({ classroomId }) {
     e.preventDefault();
     if (!sessionEditClass) return;
     const name = sessionEditForm.name.trim();
-    if (!name || !sessionEditForm.scheduledTime) {
-      setSessionEditError('Session name and time are required');
+    if (!name || !sessionEditForm.scheduledTime || !sessionEditForm.endTime) {
+      setSessionEditError('Session name, start time, and end time are required');
       return;
     }
     const scheduledTime = datetimeLocalToIso(sessionEditForm.scheduledTime);
-    if (!scheduledTime) {
-      setSessionEditError('A valid scheduled date and time is required');
+    const startDate = datetimeLocalToDate(sessionEditForm.scheduledTime);
+    const endDate = datetimeLocalToDate(sessionEditForm.endTime);
+    if (!scheduledTime || !startDate || !endDate) {
+      setSessionEditError('Valid start and end times are required');
+      return;
+    }
+    const durationMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      setSessionEditError('End time must be after start time');
       return;
     }
 
@@ -2908,7 +3045,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       name,
       scheduledTime,
       sessionType: sessionEditForm.sessionType,
-      durationMinutes: Number(sessionEditForm.durationMinutes) || 90,
+      durationMinutes,
     });
     setSessionEditSaving(false);
     if (res?.success) {
@@ -3026,6 +3163,42 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
+  const openTopicEditDialog = (topic) => {
+    setTopicEditForm({
+      id: topic.id,
+      title: topic.title || '',
+      module: topic.module || '',
+      description: topic.description || '',
+      status: topic.status === 'archived' ? 'archived' : 'active',
+    });
+    setEditTopicModalOpen(true);
+  };
+
+  const openTopicResourceDialog = (topic, resource = null) => {
+    setEditingTopicResource(resource);
+    setTopicResourceForm({
+      topicId: topic.id,
+      title: resource?.title || '',
+      url: resource?.url || '',
+      content: resource?.content || '',
+    });
+    setAddResourceModalOpen(true);
+  };
+
+  const openTopicProblemDialog = (topic, problem = null) => {
+    setEditingTopicProblem(problem);
+    setTopicProblemForm({
+      topicId: topic.id,
+      platform: problem?.platform || 'codeforces',
+      problemLink: problem?.problem_link || '',
+      title: problem?.title || '',
+      difficulty: problem?.difficulty || 'Medium',
+      timerMinutes: problem ? (problem.timer_minutes ? String(problem.timer_minutes) : '') : '60',
+    });
+    setTopicProblemTags(Array.isArray(problem?.tags) ? problem.tags : []);
+    setAddProblemModalOpen(true);
+  };
+
   const handleCreateTopic = async (e) => {
     e.preventDefault();
     const title = topicForm.title.trim();
@@ -3038,33 +3211,90 @@ export default function ClassroomLiveClient({ classroomId }) {
     if (res?.success) {
       setTopicForm({ title: '', module: '', description: '' });
       setCreateTopicModalOpen(false);
+      if (res.topic?.id) setSelectedTopicId(res.topic.id);
       fetchTopicData();
     } else {
       alert(res?.error || 'Failed to create topic');
     }
   };
 
+  const handleUpdateTopic = async (e) => {
+    e.preventDefault();
+    const title = topicEditForm.title.trim();
+    if (!topicEditForm.id || !title) return;
+    const res = await post_with_token(`classroom/${classroomId}/topics/${topicEditForm.id}/update`, {
+      title,
+      module: topicEditForm.module,
+      description: topicEditForm.description,
+      status: topicEditForm.status,
+    });
+    if (res?.success) {
+      setEditTopicModalOpen(false);
+      fetchTopicData();
+      toast.success('Topic updated');
+    } else {
+      toast.error(res?.error || 'Failed to update topic');
+    }
+  };
+
+  const handleArchiveTopic = async (topic) => {
+    if (!topic) return;
+    const nextStatus = topic.status === 'archived' ? 'active' : 'archived';
+    const res = await post_with_token(`classroom/${classroomId}/topics/${topic.id}/update`, {
+      title: topic.title,
+      module: topic.module || '',
+      description: topic.description || '',
+      status: nextStatus,
+    });
+    if (res?.success) {
+      fetchTopicData();
+      toast.success(nextStatus === 'archived' ? 'Topic archived' : 'Topic restored');
+    } else {
+      toast.error(res?.error || 'Failed to update topic status');
+    }
+  };
+
   const handleAddTopicResource = async (e) => {
     e.preventDefault();
     if (!topicResourceForm.topicId || !topicResourceForm.title.trim()) return;
-    const res = await post_with_token(`classroom/${classroomId}/topics/${topicResourceForm.topicId}/resources`, {
+    const endpoint = editingTopicResource
+      ? `classroom/${classroomId}/topics/${topicResourceForm.topicId}/resources/${editingTopicResource.id}/update`
+      : `classroom/${classroomId}/topics/${topicResourceForm.topicId}/resources`;
+    const res = await post_with_token(endpoint, {
       title: topicResourceForm.title,
       url: topicResourceForm.url,
       content: topicResourceForm.content,
     });
     if (res?.success) {
       setTopicResourceForm({ topicId: '', title: '', url: '', content: '' });
+      setEditingTopicResource(null);
       setAddResourceModalOpen(false);
       fetchTopicData();
+      toast.success(editingTopicResource ? 'Topic resource updated' : 'Topic resource added');
     } else {
-      alert(res?.error || 'Failed to add topic resource');
+      toast.error(res?.error || 'Failed to save topic resource');
+    }
+  };
+
+  const handleDeleteTopicResource = async (topicId, resource) => {
+    if (!topicId || !resource?.id) return;
+    if (!window.confirm(`Remove resource "${resource.title}" from this topic?`)) return;
+    const res = await delete_with_token(`classroom/${classroomId}/topics/${topicId}/resources/${resource.id}`);
+    if (res?.success) {
+      fetchTopicData();
+      toast.success('Topic resource removed');
+    } else {
+      toast.error(res?.error || 'Failed to remove topic resource');
     }
   };
 
   const handleAddTopicProblem = async (e) => {
     e.preventDefault();
     if (!topicProblemForm.topicId || !topicProblemForm.problemLink.trim()) return;
-    const res = await post_with_token(`classroom/${classroomId}/topics/${topicProblemForm.topicId}/problems`, {
+    const endpoint = editingTopicProblem
+      ? `classroom/${classroomId}/topics/${topicProblemForm.topicId}/problems/${editingTopicProblem.id}/update`
+      : `classroom/${classroomId}/topics/${topicProblemForm.topicId}/problems`;
+    const res = await post_with_token(endpoint, {
       platform: topicProblemForm.platform,
       problemLink: topicProblemForm.problemLink,
       title: topicProblemForm.title,
@@ -3082,11 +3312,25 @@ export default function ClassroomLiveClient({ classroomId }) {
         timerMinutes: '60',
       });
       setTopicProblemTags([]);
+      setEditingTopicProblem(null);
       setAddProblemModalOpen(false);
       fetchProblemTags();
       fetchTopicData();
+      toast.success(editingTopicProblem ? 'Topic problem updated' : 'Topic problem added');
     } else {
-      alert(res?.error || 'Failed to add topic problem');
+      toast.error(res?.error || 'Failed to save topic problem');
+    }
+  };
+
+  const handleDeleteTopicProblem = async (topicId, problem) => {
+    if (!topicId || !problem?.id) return;
+    if (!window.confirm(`Remove problem "${problem.title}" from this topic?`)) return;
+    const res = await delete_with_token(`classroom/${classroomId}/topics/${topicId}/problems/${problem.id}`);
+    if (res?.success) {
+      fetchTopicData();
+      toast.success('Topic problem removed');
+    } else {
+      toast.error(res?.error || 'Failed to remove topic problem');
     }
   };
 
@@ -3102,6 +3346,17 @@ export default function ClassroomLiveClient({ classroomId }) {
       fetchTopicData();
     } else {
       alert(res?.error || 'Failed to assign topic');
+    }
+  };
+
+  const handleUnassignTopicTeam = async (assignment) => {
+    if (!assignment?.id) return;
+    const res = await post_with_token(`classroom/${classroomId}/topic-assignments/${assignment.id}/unassign`, {});
+    if (res?.success) {
+      fetchTopicData();
+      toast.success('Group unassigned from topic');
+    } else {
+      toast.error(res?.error || 'Failed to unassign group');
     }
   };
 
@@ -3238,8 +3493,12 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const openChallengeSubmissionDialog = (problem) => {
     if (!problem || problem.status === 'solved') return;
+    const parsedCode = parseSubmissionCode(problem.solution_code || '');
     setChallengeSubmissionProblem(problem);
     setChallengeSubmissionLink(problem.solution_link || '');
+    setChallengeSubmissionLanguage(parsedCode.language);
+    setChallengeSubmissionCode(parsedCode.code);
+    setChallengeSubmissionNotes(problem.submission_notes || '');
     setChallengeSubmissionError('');
     setChallengeSubmissionOpen(true);
   };
@@ -3249,8 +3508,13 @@ export default function ClassroomLiveClient({ classroomId }) {
     if (!challengeSubmissionProblem || challengeSubmissionSaving) return;
 
     const link = challengeSubmissionLink.trim();
-    if (!isValidSubmissionUrl(link)) {
+    const solutionCode = buildSubmissionCode(challengeSubmissionCode, challengeSubmissionLanguage);
+    if (link && !isValidSubmissionUrl(link)) {
       setChallengeSubmissionError('Enter a valid http or https submission link');
+      return;
+    }
+    if (!link && !solutionCode) {
+      setChallengeSubmissionError('Add a submission link or paste your code');
       return;
     }
 
@@ -3259,6 +3523,8 @@ export default function ClassroomLiveClient({ classroomId }) {
     const res = await post_with_token(`classroom/problem/${challengeSubmissionProblem.id}/status`, {
       status: 'pending_approval',
       solutionLink: link,
+      solutionCode,
+      submissionNotes: challengeSubmissionNotes.trim(),
       studentDifficulty: String(challengeSubmissionProblem.student_difficulty || challengeSubmissionProblem.difficulty || '1'),
     });
     setChallengeSubmissionSaving(false);
@@ -3267,6 +3533,9 @@ export default function ClassroomLiveClient({ classroomId }) {
       setChallengeSubmissionOpen(false);
       setChallengeSubmissionProblem(null);
       setChallengeSubmissionLink('');
+      setChallengeSubmissionLanguage('cpp');
+      setChallengeSubmissionCode('');
+      setChallengeSubmissionNotes('');
       if (activeClass) fetchProblems(activeClass.id);
       toast.success('Submission sent for trainer review');
     } else {
@@ -3897,11 +4166,22 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     </td>
                                     <td className="px-5 py-4 align-top">
                                       <div className="flex flex-wrap items-center justify-end gap-2">
-                                        {prob.solution_link && (
-                                          <a href={prob.solution_link} target="_blank" rel="noreferrer" className={`inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-bold transition ${prob.status === 'pending_approval' ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15' : 'border-border text-primary hover:bg-muted'}`}>
-                                            <ExternalLink className="h-3.5 w-3.5" />
-                                            Review
-                                          </a>
+                                        {(prob.solution_link || prob.solution_code || prob.submission_notes) && (
+                                          <Dialog>
+                                            <DialogTrigger asChild>
+                                              <Button type="button" variant="outline" size="sm" className={`h-8 gap-1 text-xs font-bold ${prob.status === 'pending_approval' ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15' : ''}`}>
+                                                <Eye className="h-3.5 w-3.5" />
+                                                Review
+                                              </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[760px]">
+                                              <DialogHeader>
+                                                <DialogTitle>Submitted proof</DialogTitle>
+                                                <DialogDescription>{prob.title} - {prob.student_name || 'Student'}</DialogDescription>
+                                              </DialogHeader>
+                                              <SubmissionReviewContent solutionLink={prob.solution_link} solutionCode={prob.solution_code} submissionNotes={prob.submission_notes} />
+                                            </DialogContent>
+                                          </Dialog>
                                         )}
                                         <Dialog>
                                           <DialogTrigger asChild>
@@ -4171,9 +4451,28 @@ export default function ClassroomLiveClient({ classroomId }) {
                               variant="outline"
                               size="sm"
                               className="h-8 gap-1.5 text-xs font-medium"
+                              onClick={() => openTopicEditDialog(selectedTopic)}
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-primary" />
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-800"
+                              onClick={() => handleArchiveTopic(selectedTopic)}
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                              {selectedTopic.status === 'archived' ? 'Restore' : 'Archive'}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs font-medium"
                               onClick={() => {
-                                setTopicResourceForm({ topicId: selectedTopic.id, title: '', url: '', content: '' });
-                                setAddResourceModalOpen(true);
+                                openTopicResourceDialog(selectedTopic);
                               }}
                             >
                               <BookOpen className="h-3.5 w-3.5 text-primary" />
@@ -4185,16 +4484,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               size="sm"
                               className="h-8 gap-1.5 text-xs font-medium"
                               onClick={() => {
-                                setTopicProblemForm({
-                                  topicId: selectedTopic.id,
-                                  platform: 'codeforces',
-                                  problemLink: '',
-                                  title: '',
-                                  difficulty: 'Medium',
-                                  timerMinutes: '60',
-                                });
-                                setTopicProblemTags([]);
-                                setAddProblemModalOpen(true);
+                                openTopicProblemDialog(selectedTopic);
                               }}
                             >
                               <Award className="h-3.5 w-3.5 text-primary" />
@@ -4408,8 +4698,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     size="sm"
                                     className="h-8 gap-1.5 text-xs font-semibold"
                                     onClick={() => {
-                                      setTopicResourceForm({ topicId: selectedTopic.id, title: '', url: '', content: '' });
-                                      setAddResourceModalOpen(true);
+                                      openTopicResourceDialog(selectedTopic);
                                     }}
                                   >
                                     <Plus className="h-3.5 w-3.5" />
@@ -4436,12 +4725,22 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             </a>
                                           )}
                                         </div>
-                                        <ProgressLink href={`/classroom/live/${classroomId}/resources/${resource.id}`} className="shrink-0">
-                                          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
-                                            <BookOpen className="h-3.5 w-3.5" />
-                                            Read
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openTopicResourceDialog(selectedTopic, resource)}>
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            Edit
                                           </Button>
-                                        </ProgressLink>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-600 hover:text-red-700" onClick={() => handleDeleteTopicResource(selectedTopic.id, resource)}>
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Remove
+                                          </Button>
+                                          <ProgressLink href={`/classroom/live/${classroomId}/resources/${resource.id}`}>
+                                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                                              <BookOpen className="h-3.5 w-3.5" />
+                                              Read
+                                            </Button>
+                                          </ProgressLink>
+                                        </div>
                                       </div>
                                       {resource.content && (
                                         <div className="mt-3 max-h-36 overflow-y-auto rounded-lg bg-muted/30 p-3 text-xs border">
@@ -4491,16 +4790,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     size="sm"
                                     className="h-8 gap-1.5 text-xs font-semibold"
                                     onClick={() => {
-                                      setTopicProblemForm({
-                                        topicId: selectedTopic.id,
-                                        platform: 'codeforces',
-                                        problemLink: '',
-                                        title: '',
-                                        difficulty: 'Medium',
-                                        timerMinutes: '60',
-                                      });
-                                      setTopicProblemTags([]);
-                                      setAddProblemModalOpen(true);
+                                      openTopicProblemDialog(selectedTopic);
                                     }}
                                   >
                                     <Plus className="h-3.5 w-3.5" />
@@ -4549,6 +4839,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                                               ))}
                                             </div>
                                           )}
+                                        </div>
+                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openTopicProblemDialog(selectedTopic, problem)}>
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            Edit
+                                          </Button>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-600 hover:text-red-700" onClick={() => handleDeleteTopicProblem(selectedTopic.id, problem)}>
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            Remove
+                                          </Button>
                                         </div>
                                       </div>
                                     </div>
@@ -4612,7 +4912,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             <p className="text-[11px] text-muted-foreground font-normal">Active Topic Assignment</p>
                                           </div>
                                         </div>
-                                        <Badge variant="secondary" className="text-[10px]">Active</Badge>
+                                        <div className="flex shrink-0 items-center gap-1.5">
+                                          <Badge variant="secondary" className="text-[10px]">Active</Badge>
+                                          <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700" onClick={() => handleUnassignTopicTeam(a)}>
+                                            <X className="h-3 w-3" />
+                                            Unassign
+                                          </Button>
+                                        </div>
                                       </div>
                                     );
                                   })}
@@ -4682,13 +4988,82 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </DialogContent>
                 </Dialog>
 
+                {/* MODAL DIALOG: EDIT TOPIC */}
+                <Dialog open={editTopicModalOpen} onOpenChange={setEditTopicModalOpen}>
+                  <DialogContent className="sm:max-w-[520px]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-lg">
+                        <Pencil className="h-5 w-5 text-primary" />
+                        Edit topic unit
+                      </DialogTitle>
+                      <DialogDescription>
+                        Update title, module, description, or archive status.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleUpdateTopic} className="space-y-4 pt-2">
+                      <div className="space-y-1">
+                        <label className="text-sm font-semibold">Topic Title</label>
+                        <Input
+                          placeholder="e.g. Dynamic Programming Basics"
+                          value={topicEditForm.title}
+                          onChange={(e) => setTopicEditForm((current) => ({ ...current, title: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold">Module / Focus</label>
+                          <Input
+                            placeholder="e.g. Module 3: Algorithms"
+                            value={topicEditForm.module}
+                            onChange={(e) => setTopicEditForm((current) => ({ ...current, module: e.target.value }))}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold">Status</label>
+                          <Select value={topicEditForm.status} onValueChange={(value) => setTopicEditForm((current) => ({ ...current, status: value }))}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="archived">Archived</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-sm font-semibold">Description</label>
+                        <Textarea
+                          placeholder="Brief overview of what students will learn in this topic unit..."
+                          value={topicEditForm.description}
+                          onChange={(e) => setTopicEditForm((current) => ({ ...current, description: e.target.value }))}
+                          className="min-h-[90px]"
+                        />
+                      </div>
+                      <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setEditTopicModalOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" className="gap-2 font-semibold">
+                          <Save className="h-4 w-4" />
+                          Save topic
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+
                 {/* MODAL DIALOG 2: ADD RESOURCE */}
-                <Dialog open={addResourceModalOpen} onOpenChange={setAddResourceModalOpen}>
+                <Dialog open={addResourceModalOpen} onOpenChange={(open) => {
+                  setAddResourceModalOpen(open);
+                  if (!open) setEditingTopicResource(null);
+                }}>
                   <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-lg">
                         <BookOpen className="h-5 w-5 text-primary" />
-                        Add topic resource
+                        {editingTopicResource ? 'Edit topic resource' : 'Add topic resource'}
                       </DialogTitle>
                       <DialogDescription>
                         Attach reading material, links, or markdown documentation to a topic.
@@ -4734,7 +5109,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       <div className="space-y-1">
                         <label className="text-sm font-semibold">Markdown Content (Optional)</label>
                         <EditorWrapper
-                          key={topicResourceForm.topicId || 'topic-resource-editor-modal'}
+                          key={editingTopicResource ? `topic-resource-${editingTopicResource.id}` : (topicResourceForm.topicId || 'topic-resource-editor-modal')}
                           editorClassName="max-h-[260px] overflow-y-auto rounded-lg border bg-background"
                           handleChange={(value) => setTopicResourceForm((current) => ({ ...current, content: value }))}
                           minHeightClassName="min-h-[160px]"
@@ -4747,8 +5122,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                           Cancel
                         </Button>
                         <Button type="submit" className="gap-2 font-semibold">
-                          <FilePlus2 className="h-4 w-4" />
-                          Add resource
+                          {editingTopicResource ? <Save className="h-4 w-4" /> : <FilePlus2 className="h-4 w-4" />}
+                          {editingTopicResource ? 'Save resource' : 'Add resource'}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -4756,12 +5131,15 @@ export default function ClassroomLiveClient({ classroomId }) {
                 </Dialog>
 
                 {/* MODAL DIALOG 3: ADD PROBLEM */}
-                <Dialog open={addProblemModalOpen} onOpenChange={setAddProblemModalOpen}>
+                <Dialog open={addProblemModalOpen} onOpenChange={(open) => {
+                  setAddProblemModalOpen(open);
+                  if (!open) setEditingTopicProblem(null);
+                }}>
                   <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-lg">
                         <Award className="h-5 w-5 text-primary" />
-                        Add topic problem
+                        {editingTopicProblem ? 'Edit topic problem' : 'Add topic problem'}
                       </DialogTitle>
                       <DialogDescription>
                         Attach a practice problem from competitive programming platforms or custom link.
@@ -4869,8 +5247,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                           Cancel
                         </Button>
                         <Button type="submit" className="gap-2 font-semibold">
-                          <Plus className="h-4 w-4" />
-                          Add problem
+                          {editingTopicProblem ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                          {editingTopicProblem ? 'Save problem' : 'Add problem'}
                         </Button>
                       </DialogFooter>
                     </form>
@@ -5588,8 +5966,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <p className="truncate font-bold">{t.name}</p>
-                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                      Members: {t.members?.map(m => getStudentLabelWithId(m)).join(', ') || 'None'}
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                      {t.members?.length || 0} member{(t.members?.length || 0) === 1 ? '' : 's'} assigned
                                     </p>
                                   </div>
                                   {editingTeamId === t.id ? (
@@ -5629,6 +6007,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     </Button>
                                   )}
                                 </div>
+                                {editingTeamId !== t.id && (
+                                  <div className="mt-3">
+                                    <MemberPreview members={t.members || []} limit={4} compact />
+                                  </div>
+                                )}
                                 {editingTeamId === t.id && (
                                   <div className="mt-3 space-y-2 rounded-md border bg-muted/10 p-2">
                                     <div className="flex items-center justify-between gap-2 text-xs">
@@ -5812,11 +6195,20 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     ))}
                                   </div>
                                 )}
-                                {prob.solution_link && (
-                                  <a href={prob.solution_link} target="_blank" rel="noreferrer" className="mt-2 inline-flex max-w-full items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                                    <ExternalLink className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">Submitted proof</span>
-                                  </a>
+                                {(prob.solution_link || prob.solution_code) && (
+                                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-primary">
+                                    {prob.solution_link ? (
+                                      <a href={prob.solution_link} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 hover:underline">
+                                        <ExternalLink className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">Submitted proof</span>
+                                      </a>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1">
+                                        <Code2 className="h-3 w-3 shrink-0" />
+                                        Code submitted
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </CardHeader>
                               <CardContent className="pb-3 text-xs text-muted-foreground space-y-2">
@@ -5951,11 +6343,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <span className="font-bold text-sm">{t.name}</span>
                                 <Badge variant="outline" className="text-[10px]">{t.members?.length || 0} members</Badge>
                               </div>
-                              <div className="flex flex-wrap gap-1">
-                                {(t.members || []).map((m) => (
-                                  <Badge key={m.id} variant="secondary" className="text-[11px]">{getStudentLabelWithId(m)}</Badge>
-                                ))}
-                              </div>
+                              <MemberPreview members={t.members || []} limit={4} compact />
                             </div>
                           ))}
                         </div>
@@ -6545,7 +6933,7 @@ export default function ClassroomLiveClient({ classroomId }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold">Scheduled time</label>
+                <label className="text-sm font-semibold">Start time</label>
                 <Input
                   type="datetime-local"
                   value={sessionEditForm.scheduledTime}
@@ -6554,13 +6942,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold">Duration minutes</label>
+                <label className="text-sm font-semibold">End time</label>
                 <Input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={sessionEditForm.durationMinutes}
-                  onChange={(e) => setSessionEditForm((current) => ({ ...current, durationMinutes: e.target.value }))}
+                  type="datetime-local"
+                  value={sessionEditForm.endTime}
+                  onChange={(e) => setSessionEditForm((current) => ({ ...current, endTime: e.target.value }))}
                   required
                 />
               </div>
@@ -6595,7 +6981,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       </Dialog>
 
       <Dialog open={challengeSubmissionOpen} onOpenChange={setChallengeSubmissionOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[760px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
               <Award className="h-5 w-5 text-primary" />
@@ -6613,9 +6999,42 @@ export default function ClassroomLiveClient({ classroomId }) {
                 placeholder="https://vjudge.net/solution/..."
                 value={challengeSubmissionLink}
                 onChange={(e) => setChallengeSubmissionLink(e.target.value)}
-                required
               />
-              <p className="text-xs text-muted-foreground">Trainer will review this link before marking the problem solved.</p>
+              <p className="text-xs text-muted-foreground">Use this when your submission is public. Otherwise paste code below.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Language</label>
+                <Select value={challengeSubmissionLanguage} onValueChange={setChallengeSubmissionLanguage}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBMISSION_LANGUAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Notes</label>
+                <Input
+                  placeholder="Approach, complexity, or context"
+                  value={challengeSubmissionNotes}
+                  onChange={(e) => setChallengeSubmissionNotes(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Code</label>
+              <Textarea
+                rows={10}
+                placeholder="#include <bits/stdc++.h>&#10;using namespace std;&#10;..."
+                className="font-mono text-xs"
+                value={challengeSubmissionCode}
+                onChange={(e) => setChallengeSubmissionCode(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Submit either a link or code. Trainer sees code with syntax highlighting.</p>
             </div>
             {challengeSubmissionError && (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -1,5 +1,19 @@
 # Doc Usage
 
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Docs Used
+
+Source:
+- `docs/reviews/trainer-feature-futureproof-crud-schedule-submission-20260727-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the project knowledge base, prior schedule/submission/topic RSDs, `ClassroomLiveClient.js`, `classroomController.ts`, `classroomRoute.ts`, and existing `MarkdownRenderer`/CodeMirror dependency context to keep the change DB-stable, dependency-free, and aligned with trainer-owned verdict rules.
+
+Applies when:
+Auditing future trainer group, schedule, topic CRUD, or submission proof work.
+
+Do not overgeneralize:
+This doc pass did not validate production-scale data volume or introduce a full topic lifecycle policy beyond archive/unassign and focused resource/problem CRUD.
+
 ## 2026-07-25 - swiss-minimal-learning-ui-refresh-20260725 - Documentation Learning
 
 Source:

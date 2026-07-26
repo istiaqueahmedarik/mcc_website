@@ -1,5 +1,19 @@
 # Patterns
 
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Approved Work Plan
+
+Source:
+- `docs/tasks/trainer-feature-futureproof-crud-schedule-submission-20260727-task-plan.md`
+
+Fact:
+Implementation should proceed serially through server topic CRUD gap endpoints, client topic CRUD UI, bounded People/Groups member display, session edit end-time duration calculation, code-or-link submissions with highlighted trainer review, then verification/review docs.
+
+Applies when:
+Coordinating or reviewing this trainer classroom change set.
+
+Do not overgeneralize:
+This plan does not approve migrations, dependencies, code execution, external judge verification, or unrelated trainer UI redesign.
+
 ## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Datetime-Local Submit Pattern
 
 Source:

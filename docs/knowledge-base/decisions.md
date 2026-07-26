@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Group, Topic, Schedule, and Submission Decisions
+
+Source:
+- `docs/decisions/trainer-feature-futureproof-crud-schedule-submission-20260727-decisions.md`
+
+Decision:
+Use bounded member previews instead of virtualization for People/Groups cards; derive session edit end time client-side and persist only existing `durationMinutes`; complete Topics CRUD with existing topic update plus focused resource/problem/unassign endpoints while using archive for topic removal; store submission code language in existing `solution_code` as fenced Markdown; accept code-or-link proof while keeping trainer-owned final verdicts.
+
+Applies when:
+Changing `ClassroomLiveClient.js` group member display, session edit dialog, Topics CRUD, `classroomController.ts` topic/progress APIs, `classroomRoute.ts` topic routes, or live challenge proof submission/review.
+
+Do not overgeneralize:
+Do not add DB columns, code execution, external judge verification, public/private URL checks, new dependencies, or destructive topic deletion beyond focused safe endpoints without a new RSD.
+
 ## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Student Tabs And Schedule Time
 
 Source:

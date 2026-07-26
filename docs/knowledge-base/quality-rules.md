@@ -1,5 +1,33 @@
 # Quality Rules
 
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Bound Dense Member Lists
+
+Source:
+- `docs/reviews/trainer-feature-futureproof-crud-schedule-submission-20260727-implementation-review.md`
+
+Rule:
+Classroom group cards must not render unbounded member names inline beside action controls. Show member count, a small preview, and an explicit overflow affordance so edit/save/matrix actions remain reachable with large groups.
+
+Applies when:
+Changing People tab Groups lists, trainer Groups dashboard cards, student group/roster cards, or future group assignment summaries.
+
+Do not overgeneralize:
+Dense comparison matrices may still need scroll containers or virtualization; this rule is for card/list member previews.
+
+## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Code Proof Still Requires Trainer Verdict
+
+Source:
+- `docs/reviews/trainer-feature-futureproof-crud-schedule-submission-20260727-implementation-review.md`
+
+Rule:
+Allowing pasted code as proof must not give students final live problem verdict control. Server status handlers must keep student submissions as `pending_approval` and reserve `solved`, `tried`, and `not_solved` finalization for trainers/managers.
+
+Applies when:
+Changing `class_problems` proof fields, live Challenge submission dialogs, or trainer proof review surfaces.
+
+Do not overgeneralize:
+This rule does not add code execution or external judge verification.
+
 ## 2026-07-27 - trainer-student-tabs-schedule-time-20260727 - Normalize Schedule Times At Boundaries
 
 Source:

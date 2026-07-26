@@ -3,6 +3,8 @@ import { jwt } from 'hono/jwt';
 import {
   addClassroomTopicProblem,
   addClassroomTopicResource,
+  deleteClassroomTopicProblem,
+  deleteClassroomTopicResource,
   toggleTrainerRole,
   toggleAdminRole,
   listAllUsers,
@@ -50,10 +52,13 @@ import {
   startClassroomBoardSession,
   stopClassroomBoardSession,
   assignClassroomTopicToTeam,
+  unassignClassroomTopic,
   listClassroomIdeActivity,
   recordClassroomIdeActivity,
   resetClassroomIdeSession,
   updateClassroomTopic,
+  updateClassroomTopicProblem,
+  updateClassroomTopicResource,
   updateClassroomTopicProblemProgress,
   verifyClassroomTopicProblemProgress,
   getClassroomSessionAttendance,
@@ -181,9 +186,15 @@ route.get('/problem/:id/notes-hints', getProblemNotesAndHints);
 route.get('/:id/topics', listClassroomTopics);
 route.post('/:id/topics', createClassroomTopic);
 route.patch('/:id/topics/:topicId', updateClassroomTopic);
+route.post('/:id/topics/:topicId/update', updateClassroomTopic);
 route.post('/:id/topics/:topicId/resources', addClassroomTopicResource);
+route.post('/:id/topics/:topicId/resources/:resourceId/update', updateClassroomTopicResource);
+route.delete('/:id/topics/:topicId/resources/:resourceId', deleteClassroomTopicResource);
 route.post('/:id/topics/:topicId/problems', addClassroomTopicProblem);
+route.post('/:id/topics/:topicId/problems/:problemId/update', updateClassroomTopicProblem);
+route.delete('/:id/topics/:topicId/problems/:problemId', deleteClassroomTopicProblem);
 route.post('/:id/topics/:topicId/assign-team', assignClassroomTopicToTeam);
+route.post('/:id/topic-assignments/:assignmentId/unassign', unassignClassroomTopic);
 route.get('/:id/topic-assignments', getClassroomTopicAssignments);
 route.post('/:id/topic-progress/status', updateClassroomTopicProblemProgress);
 route.post('/:id/topic-progress/verify', verifyClassroomTopicProblemProgress);
