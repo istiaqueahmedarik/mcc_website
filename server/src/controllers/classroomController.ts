@@ -1296,11 +1296,12 @@ export const updateClassSession = async (c: Context) => {
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
     const sessionRows = await sql`
-      SELECT id, classroom_id
+      SELECT *
       FROM classes
       WHERE id = ${classId} AND classroom_id = ${classroomId}
     `;
     if (sessionRows.length === 0) return c.json({ error: 'Class session not found' }, 404);
+    const session = sessionRows[0];
 
     const body = await c.req.json();
     const name = normalizeText(body.name, 160);
@@ -1316,13 +1317,23 @@ export const updateClassSession = async (c: Context) => {
       return c.json({ error: 'A valid scheduled date and time is required' }, 400);
     }
 
+    const normDuration = Math.floor(durationMinutes);
+    let overflowMinutes = session.overflow_minutes || 0;
+    if (session.status === 'completed' && session.started_at) {
+      const ended = session.ended_at ? new Date(session.ended_at).getTime() : Date.now();
+      const started = new Date(session.started_at).getTime();
+      const elapsedMins = Math.max(0, Math.floor((ended - started) / 60000));
+      overflowMinutes = Math.max(0, elapsedMins - normDuration);
+    }
+
     const result = await sql`
       UPDATE classes
       SET
         name = ${name},
         scheduled_time = ${scheduledTimeText},
         session_type = ${sessionType},
-        duration_minutes = ${Math.floor(durationMinutes)}
+        duration_minutes = ${normDuration},
+        overflow_minutes = ${overflowMinutes}
       WHERE id = ${classId} AND classroom_id = ${classroomId}
       RETURNING *
     `;
@@ -2594,27 +2605,119 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
     const isAuthorized = await canManageClassroom(userId, classroomId);
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
-    const { teamId } = await c.req.json();
-    if (!teamId) return c.json({ error: 'Team is required' }, 400);
+    // Ensure table structure and relax old constraints for individual student assignments
+    await sql`ALTER TABLE classroom_team_topic_assignments DROP CONSTRAINT IF EXISTS classroom_team_topic_assignments_unique;`;
+    await sql`ALTER TABLE classroom_team_topic_assignments ALTER COLUMN team_id DROP NOT NULL;`;
+    await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
 
-    const [topicRows, teamRows, problemRows] = await Promise.all([
+    const body = await c.req.json();
+    const targetType = body.targetType === 'student' ? 'student' : 'group';
+
+    const [topicRows, problemRows] = await Promise.all([
       sql`SELECT id, title FROM classroom_topics WHERE id = ${topicId} AND classroom_id = ${classroomId}`,
-      sql`SELECT id, name FROM trainer_teams WHERE id = ${teamId} AND classroom_id = ${classroomId}`,
       sql`SELECT id FROM classroom_topic_problems WHERE topic_id = ${topicId}`,
     ]);
     if (topicRows.length === 0) return c.json({ error: 'Topic not found' }, 404);
-    if (teamRows.length === 0) return c.json({ error: 'Team not found' }, 404);
     if (problemRows.length === 0) return c.json({ error: 'Add at least one problem before assigning a topic' }, 400);
 
-    const assignment = await sql`
-      INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, assigned_by, status)
-      VALUES (${classroomId}, ${topicId}, ${teamId}, ${userId}, 'active')
-      ON CONFLICT (topic_id, team_id)
-      DO UPDATE SET assigned_by = EXCLUDED.assigned_by, assigned_at = now(), status = 'active'
-      RETURNING *
-    `;
+    const createdAssignments = [];
 
-    return c.json({ success: true, assignment: { ...assignment[0], team_name: teamRows[0].name, topic_title: topicRows[0].title } });
+    if (targetType === 'student') {
+      const rawStudentIds = body.studentIds || (body.studentId ? [body.studentId] : []);
+      const targetStudentIds = Array.isArray(rawStudentIds)
+        ? [...new Set(rawStudentIds.map((id: any) => String(id)).filter(Boolean))]
+        : [];
+
+      if (targetStudentIds.length === 0) return c.json({ error: 'At least one student is required' }, 400);
+
+      const studentRows = await sql`
+        SELECT id, full_name, email, mist_id FROM users
+        WHERE id = ANY(${targetStudentIds})
+      `;
+      if (studentRows.length === 0) return c.json({ error: 'No valid students found' }, 404);
+
+      for (const student of studentRows) {
+        // Existing active student assignment check
+        const existing = await sql`
+          SELECT * FROM classroom_team_topic_assignments
+          WHERE classroom_id = ${classroomId} AND topic_id = ${topicId} AND student_id = ${student.id}
+        `;
+        let assignmentRow;
+        if (existing.length > 0) {
+          const updated = await sql`
+            UPDATE classroom_team_topic_assignments
+            SET assigned_by = ${userId}, assigned_at = now(), status = 'active'
+            WHERE id = ${existing[0].id}
+            RETURNING *
+          `;
+          assignmentRow = updated[0];
+        } else {
+          const inserted = await sql`
+            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status)
+            VALUES (${classroomId}, ${topicId}, NULL, ${student.id}, ${userId}, 'active')
+            RETURNING *
+          `;
+          assignmentRow = inserted[0];
+        }
+
+        createdAssignments.push({
+          ...assignmentRow,
+          student_name: student.full_name,
+          student_email: student.email,
+          student_mist_id: student.mist_id,
+          topic_title: topicRows[0].title,
+        });
+      }
+    } else {
+      const rawTeamIds = body.teamIds || (body.teamId ? [body.teamId] : []);
+      const targetTeamIds = Array.isArray(rawTeamIds)
+        ? [...new Set(rawTeamIds.map((id: any) => String(id)).filter(Boolean))]
+        : [];
+
+      if (targetTeamIds.length === 0) return c.json({ error: 'At least one group/team is required' }, 400);
+
+      const teamRows = await sql`
+        SELECT id, name FROM trainer_teams
+        WHERE id = ANY(${targetTeamIds}) AND classroom_id = ${classroomId}
+      `;
+      if (teamRows.length === 0) return c.json({ error: 'No valid groups found in this classroom' }, 404);
+
+      for (const team of teamRows) {
+        const existingGroup = await sql`
+          SELECT * FROM classroom_team_topic_assignments
+          WHERE classroom_id = ${classroomId} AND topic_id = ${topicId} AND team_id = ${team.id} AND student_id IS NULL
+        `;
+        let assignmentRow;
+        if (existingGroup.length > 0) {
+          const updatedGroup = await sql`
+            UPDATE classroom_team_topic_assignments
+            SET assigned_by = ${userId}, assigned_at = now(), status = 'active'
+            WHERE id = ${existingGroup[0].id}
+            RETURNING *
+          `;
+          assignmentRow = updatedGroup[0];
+        } else {
+          const insertedGroup = await sql`
+            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status)
+            VALUES (${classroomId}, ${topicId}, ${team.id}, NULL, ${userId}, 'active')
+            RETURNING *
+          `;
+          assignmentRow = insertedGroup[0];
+        }
+
+        createdAssignments.push({
+          ...assignmentRow,
+          team_name: team.name,
+          topic_title: topicRows[0].title,
+        });
+      }
+    }
+
+    return c.json({
+      success: true,
+      assignments: createdAssignments,
+      assignment: createdAssignments[0],
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -2645,26 +2748,36 @@ export const getClassroomTopicAssignments = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
+    await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
     const canAccess = await canAccessClassroom(userId, classroomId);
     if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
     const isManager = await canManageClassroom(userId, classroomId);
 
     const assignments = isManager
       ? await sql`
-          SELECT a.*, t.title AS topic_title, t.module AS topic_module, t.description AS topic_description, tm.name AS team_name
+          SELECT a.*,
+                 t.title AS topic_title, t.module AS topic_module, t.description AS topic_description,
+                 tm.name AS team_name,
+                 u.full_name AS student_name, u.email AS student_email, u.mist_id AS student_mist_id
           FROM classroom_team_topic_assignments a
           JOIN classroom_topics t ON t.id = a.topic_id
-          JOIN trainer_teams tm ON tm.id = a.team_id
+          LEFT JOIN trainer_teams tm ON tm.id = a.team_id
+          LEFT JOIN users u ON u.id = a.student_id
           WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
           ORDER BY a.assigned_at DESC
         `
       : await sql`
-          SELECT a.*, t.title AS topic_title, t.module AS topic_module, t.description AS topic_description, tm.name AS team_name
+          SELECT DISTINCT a.*,
+                 t.title AS topic_title, t.module AS topic_module, t.description AS topic_description,
+                 tm.name AS team_name,
+                 u.full_name AS student_name, u.email AS student_email, u.mist_id AS student_mist_id
           FROM classroom_team_topic_assignments a
           JOIN classroom_topics t ON t.id = a.topic_id
-          JOIN trainer_teams tm ON tm.id = a.team_id
-          JOIN trainer_team_members member ON member.team_id = a.team_id AND member.student_id = ${userId}
+          LEFT JOIN trainer_teams tm ON tm.id = a.team_id
+          LEFT JOIN trainer_team_members member ON member.team_id = a.team_id AND member.student_id = ${userId}
+          LEFT JOIN users u ON u.id = a.student_id
           WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
+            AND (a.student_id = ${userId} OR member.student_id = ${userId})
           ORDER BY a.assigned_at DESC
         `;
 
@@ -2687,14 +2800,16 @@ export const getClassroomTopicAssignments = async (c: Context) => {
       `,
       isManager
         ? sql`
-            SELECT *
-            FROM classroom_topic_problem_progress
-            WHERE assignment_id = ANY(${assignmentIds})
+            SELECT p.*, u.full_name AS student_name, u.email AS student_email, u.mist_id AS student_mist_id
+            FROM classroom_topic_problem_progress p
+            LEFT JOIN users u ON u.id = p.student_id
+            WHERE p.assignment_id = ANY(${assignmentIds})
           `
         : sql`
-            SELECT *
-            FROM classroom_topic_problem_progress
-            WHERE assignment_id = ANY(${assignmentIds}) AND student_id = ${userId}
+            SELECT p.*, u.full_name AS student_name, u.email AS student_email, u.mist_id AS student_mist_id
+            FROM classroom_topic_problem_progress p
+            LEFT JOIN users u ON u.id = p.student_id
+            WHERE p.assignment_id = ANY(${assignmentIds}) AND p.student_id = ${userId}
           `,
     ]);
 
@@ -2726,6 +2841,35 @@ export const getClassroomTopicAssignments = async (c: Context) => {
         };
       }),
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomPendingSubmissions = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const pending = await sql`
+      SELECT p.*,
+             prob.title AS problem_title, prob.platform,
+             top.title AS topic_title, top.module AS topic_module,
+             tm.name AS team_name,
+             u.full_name AS student_name, u.email AS student_email, u.mist_id AS student_mist_id
+      FROM classroom_topic_problem_progress p
+      JOIN classroom_team_topic_assignments a ON a.id = p.assignment_id
+      JOIN classroom_topics top ON top.id = a.topic_id
+      JOIN classroom_topic_problems prob ON prob.id = p.topic_problem_id
+      LEFT JOIN trainer_teams tm ON tm.id = a.team_id
+      LEFT JOIN users u ON u.id = p.student_id
+      WHERE a.classroom_id = ${classroomId} AND p.status = 'pending_approval'
+      ORDER BY p.updated_at DESC
+    `;
+
+    return c.json({ pendingSubmissions: pending });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -2808,28 +2952,46 @@ export const verifyClassroomTopicProblemProgress = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: trainerId } = c.get('jwtPayload');
   try {
-    const { progressId, problemId, action } = await c.req.json();
+    const { progressId, problemId, action, notes, trainerNotes } = await c.req.json();
     const isManager = await canManageClassroom(trainerId, classroomId);
     if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
 
+    const feedbackText = normalizeNullableText(trainerNotes || notes, 1000);
     const isApproved = action === 'approve';
-    const nextStatus = isApproved ? 'solved' : 'in_progress';
-    const solvedAt = isApproved ? new Date() : null;
+    const nextStatus = isApproved ? 'solved' : 'tried';
+    const solvedAt = isApproved ? new Date().toISOString() : null;
 
     if (progressId) {
-      const rows = await sql`
-        UPDATE classroom_topic_problem_progress
-        SET status = ${nextStatus}, solved_at = ${solvedAt}, updated_at = now()
-        WHERE id = ${progressId}
-        RETURNING *
-      `;
+      let rows;
+      if (feedbackText) {
+        rows = await sql`
+          UPDATE classroom_topic_problem_progress
+          SET
+            status = ${nextStatus}::text,
+            solved_at = ${solvedAt}::timestamptz,
+            submission_notes = COALESCE(submission_notes || E'\n[Trainer Notes]: ', '') || ${feedbackText}::text,
+            updated_at = now()
+          WHERE id = ${progressId}
+          RETURNING *
+        `;
+      } else {
+        rows = await sql`
+          UPDATE classroom_topic_problem_progress
+          SET
+            status = ${nextStatus}::text,
+            solved_at = ${solvedAt}::timestamptz,
+            updated_at = now()
+          WHERE id = ${progressId}
+          RETURNING *
+        `;
+      }
       if (rows.length > 0) {
         return c.json({ success: true, progress: rows[0] });
       }
     } else if (problemId) {
       const rows = await sql`
         UPDATE class_problems
-        SET status = ${nextStatus}, solved_at = ${solvedAt}
+        SET status = ${nextStatus}::text, solved_at = ${solvedAt}::timestamptz
         WHERE id = ${problemId}
         RETURNING *
       `;

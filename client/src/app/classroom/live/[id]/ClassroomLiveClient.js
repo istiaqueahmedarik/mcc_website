@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
@@ -1155,6 +1155,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
   const [formCode, setFormCode] = useState(parsedSolutionCode.code);
   const [formNotes, setFormNotes] = useState(submissionNotes);
   const [formDiff, setFormDiff] = useState(currentDiff);
+  const [trainerNotesInput, setTrainerNotesInput] = useState('');
 
   const resetSolutionForm = () => {
     const parsed = parseSubmissionCode(solutionCode);
@@ -1252,13 +1253,13 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 text-xs gap-1"
+              className="h-8 text-xs gap-1 font-semibold"
               onClick={() => {
                 resetSolutionForm();
                 setSolutionDialogOpen(true);
               }}
             >
-              Attach Solution
+              {(solutionLink || solutionCode) ? 'Edit Submission' : 'Attach Solution'}
             </Button>
           </div>
         ) : (
@@ -1270,16 +1271,17 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
               )}
             </div>
             {(solutionLink || solutionCode) && (
-              <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1" onClick={() => setViewSolutionDialogOpen(true)}>
-                View Submission
+              <Button type="button" variant="outline" size="sm" className="h-7 text-[11px] gap-1 font-semibold" onClick={() => setViewSolutionDialogOpen(true)}>
+                <Eye className="h-3 w-3" />
+                Review Submission
               </Button>
             )}
-            {isTrainer && status === 'pending_approval' && onVerify && (
+            {isTrainer && onVerify && (
               <div className="flex items-center gap-1 mt-1">
-                <Button type="button" size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => onVerify(progress?.id, problem?.id, 'approve')}>
+                <Button type="button" size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold" onClick={() => onVerify(progress?.id, problem?.id, 'approve')}>
                   <Check className="h-3 w-3" /> Approve
                 </Button>
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1" onClick={() => onVerify(progress?.id, problem?.id, 'reject')}>
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold" onClick={() => onVerify(progress?.id, problem?.id, 'reject')}>
                   <X className="h-3 w-3" /> Reject
                 </Button>
               </div>
@@ -1341,21 +1343,59 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setSolutionDialogOpen(false)}>Cancel</Button>
-            <Button type="button" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleFormSubmit}>
+            <Button type="button" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" onClick={handleFormSubmit}>
               Submit Solution for Review
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* View Submitted Solution Dialog */}
+      {/* View & Trainer Verification Dialog */}
       <Dialog open={viewSolutionDialogOpen} onOpenChange={setViewSolutionDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[620px]">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold">Submitted Solution Details</DialogTitle>
             <DialogDescription>{problem.title}</DialogDescription>
           </DialogHeader>
           <SubmissionReviewContent solutionLink={solutionLink} solutionCode={solutionCode} submissionNotes={submissionNotes} />
+          
+          {isTrainer && onVerify && (
+            <div className="space-y-2 border-t pt-3 mt-2">
+              <label className="text-xs font-bold text-foreground">Trainer Feedback / Notes (Optional)</label>
+              <Input
+                placeholder="Add feedback for student e.g. Great logic! or Check edge cases..."
+                value={trainerNotesInput}
+                onChange={(e) => setTrainerNotesInput(e.target.value)}
+                className="text-xs"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
+                  onClick={() => {
+                    onVerify(progress?.id, problem?.id, 'reject', trainerNotesInput);
+                    setViewSolutionDialogOpen(false);
+                  }}
+                >
+                  <X className="h-3.5 w-3.5" /> Reject / Revision Required
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                  onClick={() => {
+                    onVerify(progress?.id, problem?.id, 'approve', trainerNotesInput);
+                    setViewSolutionDialogOpen(false);
+                  }}
+                >
+                  <Check className="h-3.5 w-3.5" /> Approve Solution
+                </Button>
+              </div>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setViewSolutionDialogOpen(false)}>Close</Button>
           </DialogFooter>
@@ -1366,71 +1406,335 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
 }
 
 function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerify }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [expandedAssignments, setExpandedAssignments] = useState(() => {
+    return assignments.length > 0 ? new Set([assignments[0].id]) : new Set();
+  });
+
   if (assignments.length === 0) {
     return (
       <Card className="rounded-lg border border-dashed">
         <CardContent className="grid min-h-[180px] place-items-center p-6 text-center text-sm text-muted-foreground">
-          No group topic assignments yet.
+          No topic assignments yet.
         </CardContent>
       </Card>
     );
   }
 
+  const toggleAccordion = (id) => {
+    setExpandedAssignments((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const filteredAssignments = assignments.filter((assignment) => {
+    const topicTitle = (assignment.topic?.title || assignment.topic_title || '').toLowerCase();
+    const topicModule = (assignment.topic?.module || assignment.topic_module || '').toLowerCase();
+    const targetName = (assignment.student_name || assignment.team_name || '').toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+
+    const matchesQuery = !q || topicTitle.includes(q) || topicModule.includes(q) || targetName.includes(q) || (assignment.topic?.problems || []).some(p => (p.title || '').toLowerCase().includes(q));
+    if (!matchesQuery) return false;
+
+    if (statusFilter === 'all') return true;
+    const problems = assignment.topic?.problems || [];
+    if (statusFilter === 'solved') return problems.some(p => p.progress?.status === 'solved');
+    if (statusFilter === 'pending_approval') return problems.some(p => p.progress?.status === 'pending_approval');
+    if (statusFilter === 'in_progress') return problems.some(p => p.progress?.status === 'tried' || p.progress?.status === 'in_progress');
+    return true;
+  });
+
+  // Trainer Grouped Visualization by Target (Person or Group)
+  if (isTrainer) {
+    const targetMap = new Map();
+    for (const a of filteredAssignments) {
+      const isIndiv = Boolean(a.student_id);
+      const key = isIndiv ? `student_${a.student_id}` : `team_${a.team_id}`;
+      const title = isIndiv ? (a.student_name || 'Individual Student') : (a.team_name || 'Classroom Group');
+      const subtitle = isIndiv
+        ? (a.student_mist_id ? `MIST ID: ${a.student_mist_id}` : a.student_email || 'Direct Student Assignment')
+        : 'Group Assignment';
+
+      if (!targetMap.has(key)) {
+        targetMap.set(key, {
+          key,
+          isIndiv,
+          title,
+          subtitle,
+          assignments: [],
+        });
+      }
+      targetMap.get(key).assignments.push(a);
+    }
+
+    const groupedTargets = [...targetMap.values()];
+
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border bg-card/60 p-4 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs font-semibold">
+              {groupedTargets.length} Target{groupedTargets.length > 1 ? 's' : ''} ({filteredAssignments.length} Topic Assignment{filteredAssignments.length > 1 ? 's' : ''})
+            </Badge>
+          </div>
+          <div className="relative min-w-[220px]">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search target or topic..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 pl-8 text-xs"
+            />
+          </div>
+        </div>
+
+        {groupedTargets.length === 0 ? (
+          <Card className="rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground">
+            No topic assignments match filters.
+          </Card>
+        ) : (
+          groupedTargets.map((targetGroup) => (
+            <Card key={targetGroup.key} className="rounded-xl border shadow-xs overflow-hidden">
+              <CardHeader className="bg-muted/30 pb-3 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`rounded-lg p-2 ${targetGroup.isIndiv ? 'bg-blue-500/10 text-blue-600' : 'bg-primary/10 text-primary'}`}>
+                      {targetGroup.isIndiv ? <UserCheck className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-bold leading-tight">{targetGroup.title}</CardTitle>
+                      <CardDescription className="text-xs font-medium text-muted-foreground">{targetGroup.subtitle}</CardDescription>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs font-semibold">
+                    {targetGroup.assignments.length} Topic Unit{targetGroup.assignments.length > 1 ? 's' : ''}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                {targetGroup.assignments.map((assignment) => {
+                  const problems = assignment.topic?.problems || [];
+                  const resources = assignment.topic?.resources || [];
+                  return (
+                    <div key={assignment.id} className="rounded-lg border bg-background p-4 space-y-3">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-sm text-foreground">{assignment.topic?.title || assignment.topic_title}</h4>
+                            <Badge variant="outline" className="text-[10px]">{assignment.topic?.module || assignment.topic_module || 'Topic'}</Badge>
+                          </div>
+                          {(assignment.topic?.description || assignment.topic_description) && (
+                            <p className="text-xs text-muted-foreground mt-1">{assignment.topic?.description || assignment.topic_description}</p>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="w-fit text-[10px]">{assignment.status}</Badge>
+                      </div>
+
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] pt-3 border-t">
+                        <section className="space-y-2">
+                          <h5 className="text-[10px] font-bold uppercase text-muted-foreground">Resources ({resources.length})</h5>
+                          {resources.length === 0 ? (
+                            <p className="rounded-lg border border-dashed p-2 text-xs text-muted-foreground">No resources.</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {[...resources].sort(byPositionThenTime).map((r) => (
+                                <TopicResourceMini key={r.id} resource={r} />
+                              ))}
+                            </div>
+                          )}
+                        </section>
+                        <section className="space-y-2">
+                          <h5 className="text-[10px] font-bold uppercase text-muted-foreground">Problems ({problems.length})</h5>
+                          <div className="space-y-1.5">
+                            {[...problems].sort(byPositionThenTime).map((p) => (
+                              <TopicProblemMini
+                                key={p.id}
+                                problem={p}
+                                progress={p.progress}
+                                disabled={false}
+                                isTrainer={true}
+                                onVerify={onVerify}
+                                onStatusChange={onStatusChange ? (row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) => onStatusChange(assignment, row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) : null}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  // Student Accordion View
+  const totalProblemsCount = assignments.reduce((acc, a) => acc + (a.topic?.problems?.length || 0), 0);
+  const totalSolvedCount = assignments.reduce((acc, a) => acc + (a.topic?.problems || []).filter(p => p.progress?.status === 'solved').length, 0);
+  const totalPendingCount = assignments.reduce((acc, a) => acc + (a.topic?.problems || []).filter(p => p.progress?.status === 'pending_approval').length, 0);
+  const overallPct = totalProblemsCount > 0 ? Math.round((totalSolvedCount / totalProblemsCount) * 100) : 0;
+
   return (
     <div className="space-y-4">
-      {assignments.map((assignment) => (
-        <Card key={assignment.id} className="rounded-lg border">
-          <CardHeader className="pb-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <CardTitle className="truncate text-lg">{assignment.topic?.title || assignment.topic_title}</CardTitle>
-                <CardDescription>
-                  {assignment.topic?.module || assignment.topic_module || 'Topic'} - Assigned topic
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="w-fit">{assignment.status}</Badge>
+      <Card className="rounded-xl border bg-card/60 p-4 shadow-xs">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs font-semibold">
+                {totalSolvedCount} / {totalProblemsCount} Solved ({overallPct}%)
+              </Badge>
+              {totalPendingCount > 0 && (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs font-semibold animate-pulse">
+                  {totalPendingCount} Pending Verification
+                </Badge>
+              )}
             </div>
-            {(assignment.topic?.description || assignment.topic_description) && (
-              <p className="pt-2 text-sm text-muted-foreground">{assignment.topic?.description || assignment.topic_description}</p>
-            )}
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)]">
-            <section className="space-y-2">
-              <h4 className="text-xs font-bold uppercase text-muted-foreground">Resources</h4>
-              {(assignment.topic?.resources || []).length === 0 ? (
-                <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">No resources.</p>
-              ) : (
-                <div className="space-y-2">
-                  {[...(assignment.topic?.resources || [])].sort(byPositionThenTime).map((resource) => (
-                    <TopicResourceMini key={resource.id} resource={resource} />
-                  ))}
-                </div>
-              )}
-            </section>
-            <section className="space-y-2">
-              <h4 className="text-xs font-bold uppercase text-muted-foreground">Problems</h4>
-              <div className="space-y-2">
-                {[...(assignment.topic?.problems || [])].sort(byPositionThenTime).map((problem) => (
-                  <TopicProblemMini
-                    key={problem.id}
-                    problem={problem}
-                    progress={problem.progress}
-                    disabled={false}
-                    isTrainer={isTrainer}
-                    onVerify={onVerify}
-                    onStatusChange={onStatusChange ? (row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) => onStatusChange(assignment, row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) : null}
-                  />
-                ))}
-              </div>
-              {isTrainer && (
-                <p className="text-xs text-muted-foreground">
-                  Trainer updates here apply to the selected student when reviewing progress rows in analytics.
-                </p>
-              )}
-            </section>
-          </CardContent>
+            <div className="w-full bg-muted h-2 rounded-full overflow-hidden max-w-md mt-1">
+              <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${overallPct}%` }} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[180px]">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Search topics & problems..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1 text-xs">
+              {['all', 'in_progress', 'pending_approval', 'solved'].map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setStatusFilter(f)}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    statusFilter === f ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {f === 'all' ? 'All' : f === 'in_progress' ? 'In Progress' : f === 'pending_approval' ? 'Pending' : 'Solved'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {filteredAssignments.length === 0 ? (
+        <Card className="rounded-lg border border-dashed p-8 text-center text-xs text-muted-foreground">
+          No topic assignments matching filters.
         </Card>
-      ))}
+      ) : (
+        filteredAssignments.map((assignment) => {
+          const isExpanded = expandedAssignments.has(assignment.id);
+          const problems = assignment.topic?.problems || [];
+          const resources = assignment.topic?.resources || [];
+          const solvedCount = problems.filter((p) => p.progress?.status === 'solved').length;
+          const pendingCount = problems.filter((p) => p.progress?.status === 'pending_approval').length;
+
+          return (
+            <Card key={assignment.id} className="rounded-xl border transition-all hover:border-foreground/20 shadow-xs">
+              <CardHeader
+                className="cursor-pointer select-none pb-3 pt-4"
+                onClick={() => toggleAccordion(assignment.id)}
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-md bg-muted/60 p-1 text-muted-foreground">
+                        {isExpanded ? <ChevronsUpDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </div>
+                      <CardTitle className="truncate text-base font-bold">
+                        {assignment.topic?.title || assignment.topic_title}
+                      </CardTitle>
+                      <Badge variant="outline" className="text-[10px]">
+                        {assignment.topic?.module || assignment.topic_module || 'Topic Unit'}
+                      </Badge>
+                    </div>
+                    {(assignment.topic?.description || assignment.topic_description) && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 pl-7">
+                        {assignment.topic?.description || assignment.topic_description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0 pl-7 sm:pl-0">
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <BookOpen className="h-3 w-3" /> {resources.length} Resources
+                    </Badge>
+                    <Badge variant={solvedCount === problems.length && problems.length > 0 ? "default" : "outline"} className="text-[10px] gap-1">
+                      <Award className="h-3 w-3" /> {solvedCount}/{problems.length} Solved
+                    </Badge>
+                    {pendingCount > 0 && (
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px]">
+                        {pendingCount} Pending
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+
+              {isExpanded && (
+                <CardContent className="border-t pt-4">
+                  <Tabs defaultValue="problems" className="w-full">
+                    <TabsList className="h-9 w-full justify-start rounded-lg bg-muted/40 p-1 mb-3">
+                      <TabsTrigger value="problems" className="gap-1.5 text-xs font-semibold">
+                        <Award className="h-3.5 w-3.5" /> Practice Problems ({problems.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="resources" className="gap-1.5 text-xs font-semibold">
+                        <BookOpen className="h-3.5 w-3.5" /> Resources ({resources.length})
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="problems" className="space-y-2.5">
+                      {problems.length === 0 ? (
+                        <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+                          No problems assigned in this topic yet.
+                        </p>
+                      ) : (
+                        [...problems].sort(byPositionThenTime).map((problem) => (
+                          <TopicProblemMini
+                            key={problem.id}
+                            problem={problem}
+                            progress={problem.progress}
+                            disabled={false}
+                            isTrainer={false}
+                            onVerify={onVerify}
+                            onStatusChange={onStatusChange ? (row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) => onStatusChange(assignment, row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) : null}
+                          />
+                        ))
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="resources" className="space-y-2">
+                      {resources.length === 0 ? (
+                        <p className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+                          No resources attached to this topic yet.
+                        </p>
+                      ) : (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {[...resources].sort(byPositionThenTime).map((resource) => (
+                            <TopicResourceMini key={resource.id} resource={resource} />
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              )}
+            </Card>
+          );
+        })
+      )}
     </div>
   );
 }
@@ -1540,23 +1844,84 @@ function TeamDashboardPanel({
   onSaveTeamMembers,
 }) {
   const [teamSearchQuery, setTeamSearchQuery] = useState('');
+  const [targetCategoryTab, setTargetCategoryTab] = useState('all');
   const [visibleTeamCount, setVisibleTeamCount] = useState(5);
+  const [visibleStudentCount, setVisibleStudentCount] = useState(5);
 
   const analyticsByTeam = new Map(analytics.map((team) => [team.id, team]));
-  const assignmentCounts = assignments.reduce((counts, assignment) => {
-    counts.set(assignment.team_id, (counts.get(assignment.team_id) || 0) + 1);
+  const assignmentCounts = (assignments || []).reduce((counts, assignment) => {
+    if (assignment.team_id) {
+      counts.set(assignment.team_id, (counts.get(assignment.team_id) || 0) + 1);
+    }
     return counts;
   }, new Map());
 
-  if (teams.length === 0) {
-    return (
-      <Card className="rounded-lg border border-dashed">
-        <CardContent className="grid min-h-[220px] place-items-center p-6 text-center text-sm text-muted-foreground">
-          No groups created yet.
-        </CardContent>
-      </Card>
-    );
-  }
+  const studentAssignmentsMap = useMemo(() => {
+    const map = new Map();
+    (assignments || []).forEach((a) => {
+      if (a.student_id) {
+        if (!map.has(a.student_id)) map.set(a.student_id, []);
+        map.get(a.student_id).push(a);
+      }
+    });
+    return map;
+  }, [assignments]);
+
+  const studentRows = useMemo(() => {
+    return (students || []).map((s) => {
+      const sAssignments = studentAssignmentsMap.get(s.id) || [];
+      const topicsList = sAssignments.map((a) => a.topic_title || a.topic?.title).filter(Boolean);
+      const problemsList = sAssignments.flatMap((a) => a.topic?.problems || []);
+      
+      let solved = 0;
+      let tried = 0;
+      let open = 0;
+
+      problemsList.forEach((p) => {
+        const progStatus = p.progress?.status || p.status;
+        if (progStatus === 'solved') solved++;
+        else if (progStatus === 'tried' || progStatus === 'pending_approval') tried++;
+        else open++;
+      });
+
+      const total = problemsList.length;
+      const rate = total > 0 ? Math.round((solved / total) * 100) : 0;
+
+      return {
+        ...s,
+        displayName: s.name || s.full_name || 'Student',
+        email: s.email || '',
+        mistId: s.mist_id || '',
+        assignmentCount: sAssignments.length,
+        topicsList,
+        problemsList,
+        totalProblems: total,
+        solvedCount: solved,
+        triedCount: tried,
+        openCount: open,
+        solveRate: rate,
+      };
+    });
+  }, [students, studentAssignmentsMap]);
+
+  const assignedStudentRows = useMemo(() => {
+    return studentRows.filter((s) => s.assignmentCount > 0);
+  }, [studentRows]);
+
+  const filteredStudentRows = useMemo(() => {
+    return assignedStudentRows.filter((s) => {
+      if (!teamSearchQuery.trim()) return true;
+      const q = teamSearchQuery.toLowerCase();
+      return (
+        s.displayName?.toLowerCase().includes(q) ||
+        s.mistId?.toLowerCase().includes(q) ||
+        s.email?.toLowerCase().includes(q) ||
+        s.topicsList.some((t) => t.toLowerCase().includes(q))
+      );
+    });
+  }, [assignedStudentRows, teamSearchQuery]);
+
+  const visibleStudentRows = filteredStudentRows.slice(0, visibleStudentCount);
 
   const teamRows = teams.map((team) => {
     const stats = analyticsByTeam.get(team.id) || {
@@ -1604,180 +1969,356 @@ function TeamDashboardPanel({
   const visibleTeamRows = filteredTeamRows.slice(0, visibleTeamCount);
 
   return (
-    <div className="space-y-4">
-      {/* HEADER & GROUP SEARCH TOOLBAR (NO TOP STAT CARDS) */}
+    <div className="space-y-5">
+      {/* HEADER & SEARCH TOOLBAR */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary shrink-0" />
-          <h3 className="text-lg font-bold tracking-tight">Classroom Groups ({filteredTeamRows.length})</h3>
+        <div className="flex items-center gap-3">
+          <BarChart3 className="h-5 w-5 text-primary shrink-0" />
+          <div>
+            <h3 className="text-lg font-bold tracking-tight">Classroom Target Progress Matrix</h3>
+            <p className="text-xs text-muted-foreground">Track topic performance across groups and individual students.</p>
+          </div>
         </div>
 
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search groups or members..."
-            value={teamSearchQuery}
-            onChange={(e) => setTeamSearchQuery(e.target.value)}
-            className="h-8 w-full sm:w-[240px] pl-8 text-xs"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* CATEGORY SELECTOR BUTTONS */}
+          <div className="flex items-center rounded-lg bg-muted/40 p-1 gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setTargetCategoryTab('all')}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
+                targetCategoryTab === 'all' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              All Targets
+            </button>
+            <button
+              type="button"
+              onClick={() => setTargetCategoryTab('groups')}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-all flex items-center gap-1 ${
+                targetCategoryTab === 'groups' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Groups ({teams.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTargetCategoryTab('students')}
+              className={`px-2.5 py-1 font-semibold rounded-md transition-all flex items-center gap-1 ${
+                targetCategoryTab === 'students' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Persons ({assignedStudentRows.length})
+            </button>
+          </div>
+
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search targets or members..."
+              value={teamSearchQuery}
+              onChange={(e) => setTeamSearchQuery(e.target.value)}
+              className="h-8 w-full sm:w-[220px] pl-8 text-xs"
+            />
+          </div>
         </div>
       </div>
 
-      {filteredTeamRows.length === 0 ? (
-        <Card className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
-          {teamSearchQuery ? 'No groups match your search query.' : 'No groups created yet.'}
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid gap-4">
-            {visibleTeamRows.map((team) => {
-              const memberCount = team.members?.length || 1;
-              const uniqueProblemsCount = team.problemRows?.length || 0;
-              const totalTargetTasks = uniqueProblemsCount > 0 ? (uniqueProblemsCount * memberCount) : (team.assigned || 0);
-              const totalSolvedTasks = uniqueProblemsCount > 0
-                ? team.problemRows.reduce((sum, r) => sum + (r.solvedCount || 0), 0)
-                : (team.solved || 0);
-              const computedSolveRate = totalTargetTasks > 0 ? Math.round((totalSolvedTasks / totalTargetTasks) * 100) : 0;
+      {/* SECTION 1: CLASSROOM GROUPS MATRIX */}
+      {(targetCategoryTab === 'all' || targetCategoryTab === 'groups') && (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <Users className="h-4 w-4 text-primary" />
+              Classroom Groups ({filteredTeamRows.length})
+            </h4>
+          </div>
 
-              return (
-            <Card key={team.id} className="rounded-lg border">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="truncate text-lg">{team.name}</CardTitle>
-                    <CardDescription>
-                      {team.members.length} members - {team.topicAssignmentCount} topic assignment{team.topicAssignmentCount === 1 ? '' : 's'}
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <Badge variant="outline" className="gap-1 text-sm">
-                      <BarChart3 className="h-3.5 w-3.5" />
-                      {computedSolveRate}%
-                    </Badge>
-                    {editingTeamId === team.id ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="gap-1"
-                          onClick={onCancelEditTeamMembers}
-                          disabled={teamUpdateLoading}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Cancel
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => onSaveTeamMembers(team.id)}
-                          disabled={teamUpdateLoading}
-                        >
-                          {teamUpdateLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                          Save
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1"
-                        onClick={() => onStartEditTeamMembers(team)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                    )}
-
-                    <ProgressLink href={`/classroom/live/${classroomId}/teams/${team.id}`}>
-                      <Button size="sm" className="gap-1.5 font-semibold">
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        View Group Matrix
-                      </Button>
-                    </ProgressLink>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {editingTeamId === team.id && (
-                  <div className="space-y-2 rounded-lg border bg-muted/10 p-3">
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold">Group members</span>
-                      <Badge variant="outline" className="text-[10px]">
-                        {editingTeamStudentIds.length} selected
-                      </Badge>
-                    </div>
-                    <div className="grid max-h-[220px] gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
-                      {students.map((student) => {
-                        const inputId = `group-${team.id}-${student.id}-analytics-edit`;
-                        return (
-                        <label key={`${team.id}-${student.id}-analytics-edit`} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
-                          <input
-                            id={inputId}
-                            type="checkbox"
-                            checked={editingTeamStudentIds.includes(student.id)}
-                            onChange={() => onToggleEditTeamStudent(student.id)}
-                          />
-                          <span className="min-w-0 truncate">{getStudentLabelWithId(student)}</span>
-                        </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* SOLUTION RATIO & PROGRESS BAR (REPLACED 4 STAT BOXES) */}
-                <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2.5 text-primary shrink-0">
-                      <BarChart3 className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground">Solution Ratio</p>
-                      <p className="text-sm font-bold text-foreground">
-                        {totalSolvedTasks} / {totalTargetTasks} Solved
-                        <span className="ml-2 text-xs font-medium text-muted-foreground">({computedSolveRate}% solve rate)</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="flex items-center gap-3 w-full sm:w-52">
-                    <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(0, computedSolveRate))}%` }}
-                      />
-                    </div>
-                    <Badge variant="secondary" className="text-xs font-bold shrink-0">{computedSolveRate}%</Badge>
-                  </div>
-                </div>
-
-                {/* MEMBERS LIST */}
-                <MemberPreview members={team.members} limit={6} />
-              </CardContent>
+          {filteredTeamRows.length === 0 ? (
+            <Card className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+              {teamSearchQuery ? 'No groups match your search query.' : 'No groups created yet.'}
             </Card>
-          );
-        })}
-      </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                {visibleTeamRows.map((team) => {
+                  const memberCount = team.members?.length || 1;
+                  const uniqueProblemsCount = team.problemRows?.length || 0;
+                  const totalTargetTasks = uniqueProblemsCount > 0 ? (uniqueProblemsCount * memberCount) : (team.assigned || 0);
+                  const totalSolvedTasks = uniqueProblemsCount > 0
+                    ? team.problemRows.reduce((sum, r) => sum + (r.solvedCount || 0), 0)
+                    : (team.solved || 0);
+                  const computedSolveRate = totalTargetTasks > 0 ? Math.round((totalSolvedTasks / totalTargetTasks) * 100) : 0;
 
-      {filteredTeamRows.length > visibleTeamCount && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full gap-2 text-xs font-semibold py-2"
-          onClick={() => setVisibleTeamCount((c) => c + 5)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Show more groups ({filteredTeamRows.length - visibleTeamCount} remaining)
-        </Button>
+                  return (
+                    <Card key={team.id} className="rounded-lg border">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <CardTitle className="truncate text-lg">{team.name}</CardTitle>
+                            <CardDescription>
+                              {team.members.length} members • {team.topicAssignmentCount} topic assignment{team.topicAssignmentCount === 1 ? '' : 's'}
+                            </CardDescription>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Badge variant="outline" className="gap-1 text-sm">
+                              <BarChart3 className="h-3.5 w-3.5" />
+                              {computedSolveRate}%
+                            </Badge>
+                            {editingTeamId === team.id ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={onCancelEditTeamMembers}
+                                  disabled={teamUpdateLoading}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => onSaveTeamMembers(team.id)}
+                                  disabled={teamUpdateLoading}
+                                >
+                                  {teamUpdateLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                  Save
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => onStartEditTeamMembers(team)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+                            )}
+
+                            <ProgressLink href={`/classroom/live/${classroomId}/teams/${team.id}`}>
+                              <Button size="sm" className="gap-1.5 font-semibold">
+                                <BarChart3 className="h-3.5 w-3.5" />
+                                View Group Matrix
+                              </Button>
+                            </ProgressLink>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {editingTeamId === team.id && (
+                          <div className="space-y-2 rounded-lg border bg-muted/10 p-3">
+                            <div className="flex items-center justify-between gap-2 text-xs">
+                              <span className="font-semibold">Group members</span>
+                              <Badge variant="outline" className="text-[10px]">
+                                {editingTeamStudentIds.length} selected
+                              </Badge>
+                            </div>
+                            <div className="grid max-h-[220px] gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                              {students.map((student) => {
+                                const inputId = `group-${team.id}-${student.id}-analytics-edit`;
+                                return (
+                                  <label key={`${team.id}-${student.id}-analytics-edit`} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
+                                    <input
+                                      id={inputId}
+                                      type="checkbox"
+                                      checked={editingTeamStudentIds.includes(student.id)}
+                                      onChange={() => onToggleEditTeamStudent(student.id)}
+                                    />
+                                    <span className="min-w-0 truncate">{getStudentLabelWithId(student)}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-lg bg-primary/10 p-2.5 text-primary shrink-0">
+                              <BarChart3 className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground">Solution Ratio</p>
+                              <p className="text-sm font-bold text-foreground">
+                                {totalSolvedTasks} / {totalTargetTasks} Solved
+                                <span className="ml-2 text-xs font-medium text-muted-foreground">({computedSolveRate}% solve rate)</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted sm:w-48">
+                            <div
+                              className="h-full bg-emerald-500 transition-all duration-300"
+                              style={{ width: `${Math.min(100, Math.max(0, computedSolveRate))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {team.members.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No students assigned to this group yet.</p>
+                        ) : (
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {team.members.map((member) => (
+                              <div key={member.id} className="flex items-center justify-between rounded-lg border bg-card p-2.5 text-xs">
+                                <span className="font-semibold text-foreground truncate">{member.name || member.full_name || member.email}</span>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {member.solved || 0} / {member.assigned || 0} Solved
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {filteredTeamRows.length > visibleTeamCount && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 text-xs font-semibold py-2"
+                  onClick={() => setVisibleTeamCount((c) => c + 5)}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Show more groups ({filteredTeamRows.length - visibleTeamCount} remaining)
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* SECTION 2: INDIVIDUAL PERSONS MATRIX */}
+      {(targetCategoryTab === 'all' || targetCategoryTab === 'students') && (
+        <section className="space-y-4 pt-2">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <UserCheck className="h-4 w-4 text-blue-600" />
+              Individual Persons ({filteredStudentRows.length})
+            </h4>
+          </div>
+
+          {filteredStudentRows.length === 0 ? (
+            <Card className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+              {teamSearchQuery ? 'No persons match your search query.' : 'No individual persons assigned to topics yet.'}
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                {visibleStudentRows.map((student) => (
+                  <Card key={student.id} className="rounded-lg border">
+                    <CardHeader className="pb-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-base font-bold text-foreground">{student.displayName}</CardTitle>
+                            {student.mistId && <Badge variant="outline" className="text-[10px]">ID: {student.mistId}</Badge>}
+                            <Badge variant="secondary" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/20 font-semibold">
+                              Individual Target
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-xs mt-0.5">
+                            {student.email || 'Direct Person Assignment'} • {student.assignmentCount} topic assignment{student.assignmentCount === 1 ? '' : 's'}
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="gap-1 text-sm self-start sm:self-auto">
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          {student.solveRate}%
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {student.topicsList.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs font-semibold text-muted-foreground mr-1">Assigned Topics:</span>
+                          {student.topicsList.map((title, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-[11px] font-medium bg-muted">
+                              {title}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-lg bg-blue-500/10 p-2.5 text-blue-600 shrink-0">
+                            <UserCheck className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground">Solution Ratio</p>
+                            <p className="text-sm font-bold text-foreground">
+                              {student.solvedCount} / {student.totalProblems} Solved
+                              <span className="ml-2 text-xs font-medium text-muted-foreground">({student.solveRate}% solve rate)</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted sm:w-48">
+                          <div
+                            className="h-full bg-emerald-500 transition-all duration-300"
+                            style={{ width: `${Math.min(100, Math.max(0, student.solveRate))}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {student.problemsList.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Practice Problems Progress</p>
+                          <div className="grid gap-1.5 sm:grid-cols-2">
+                            {student.problemsList.map((p) => {
+                              const progStatus = p.progress?.status || p.status || 'not_solved';
+                              return (
+                                <div key={p.id} className="flex items-center justify-between rounded-lg border bg-card p-2.5 text-xs">
+                                  <span className="font-semibold text-foreground truncate">{p.title}</span>
+                                  {progStatus === 'solved' ? (
+                                    <Badge className="bg-emerald-600 text-white text-[10px]">Solved</Badge>
+                                  ) : progStatus === 'pending_approval' ? (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]">Pending</Badge>
+                                  ) : progStatus === 'tried' ? (
+                                    <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-[10px]">Tried</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground">Not Solved</Badge>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {filteredStudentRows.length > visibleStudentCount && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 text-xs font-semibold py-2"
+                  onClick={() => setVisibleStudentCount((c) => c + 5)}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Show more persons ({filteredStudentRows.length - visibleStudentCount} remaining)
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
       )}
     </div>
-  )}
-</div>
   );
 }
 
@@ -2061,6 +2602,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [teamFormError, setTeamFormError] = useState('');
   const [className, setClassName] = useState('');
   const [classSchedule, setClassSchedule] = useState('');
+  const [classScheduleEndTime, setClassScheduleEndTime] = useState('');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceUrl, setResourceUrl] = useState('');
   const [resourceContent, setResourceContent] = useState('');
@@ -2112,7 +2654,10 @@ export default function ClassroomLiveClient({ classroomId }) {
     timerMinutes: '60',
   });
   const [topicProblemTags, setTopicProblemTags] = useState([]);
-  const [topicAssignmentForm, setTopicAssignmentForm] = useState({ topicId: '', teamId: '' });
+  const [topicAssignmentForm, setTopicAssignmentForm] = useState({ topicId: '', targetType: 'group', teamIds: [], studentIds: [] });
+  const [studentTargetSearchQuery, setStudentTargetSearchQuery] = useState('');
+  const [submissionReviewHubOpen, setSubmissionReviewHubOpen] = useState(false);
+  const [pendingSubmissionsApi, setPendingSubmissionsApi] = useState([]);
   const [createTopicModalOpen, setCreateTopicModalOpen] = useState(false);
   const [editTopicModalOpen, setEditTopicModalOpen] = useState(false);
   const [topicEditForm, setTopicEditForm] = useState({ id: '', title: '', module: '', description: '', status: 'active' });
@@ -2128,6 +2673,8 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [inTopicProblemSearch, setInTopicProblemSearch] = useState('');
   const [visibleTopicResourcesCount, setVisibleTopicResourcesCount] = useState(10);
   const [visibleTopicProblemsCount, setVisibleTopicProblemsCount] = useState(10);
+  const [submissionSearchQuery, setSubmissionSearchQuery] = useState('');
+  const [visibleSubmissionsCount, setVisibleSubmissionsCount] = useState(10);
   const [boardSession, setBoardSession] = useState(null);
   const [boardLoading, setBoardLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -2188,6 +2735,66 @@ export default function ClassroomLiveClient({ classroomId }) {
     : { rows: [], rowErrors: [] };
   const completedClasses = getCompletedClasses(classes);
   const selectedPastClass = completedClasses.find((classItem) => classItem.id === selectedPastClassId) || null;
+
+  const pendingSubmissionsList = useMemo(() => {
+    if (pendingSubmissionsApi && pendingSubmissionsApi.length > 0) {
+      return pendingSubmissionsApi.map((p) => ({
+        progressId: p.id,
+        problemId: p.topic_problem_id,
+        problemTitle: p.problem_title,
+        platform: p.platform,
+        topicTitle: p.topic_title,
+        teamName: p.team_name,
+        studentName: p.student_name || 'Student',
+        studentEmail: p.student_email || '',
+        studentMistId: p.student_mist_id || '',
+        solutionLink: p.solution_link || '',
+        solutionCode: p.solution_code || '',
+        submissionNotes: p.submission_notes || '',
+        submittedAt: p.updated_at || p.created_at,
+      }));
+    }
+
+    if (!topicAssignments) return [];
+    return topicAssignments.flatMap((assignment) => {
+      const problems = assignment.topic?.problems || [];
+      return problems.flatMap((problem) => {
+        const rows = problem.progressRows || (problem.progress ? [problem.progress] : []);
+        return rows.filter((r) => r.status === 'pending_approval').map((r) => ({
+          progressId: r.id,
+          problemId: problem.id,
+          problemTitle: problem.title,
+          platform: problem.platform,
+          topicTitle: assignment.topic?.title || assignment.topic_title,
+          teamName: assignment.team_name,
+          studentName: assignment.student_name || r.student_name || 'Student',
+          studentEmail: assignment.student_email || r.student_email || '',
+          studentMistId: assignment.student_mist_id || r.student_mist_id || '',
+          solutionLink: r.solution_link || problem.solution_link || '',
+          solutionCode: r.solution_code || problem.solution_code || '',
+          submissionNotes: r.submission_notes || problem.submission_notes || '',
+          submittedAt: r.updated_at || r.solved_at || assignment.assigned_at,
+        }));
+      });
+    });
+  }, [pendingSubmissionsApi, topicAssignments]);
+
+  const filteredPendingSubmissions = useMemo(() => {
+    if (!submissionSearchQuery.trim()) return pendingSubmissionsList;
+    const q = submissionSearchQuery.toLowerCase();
+    return pendingSubmissionsList.filter((item) => (
+      item.studentName?.toLowerCase().includes(q) ||
+      item.studentMistId?.toLowerCase().includes(q) ||
+      item.studentEmail?.toLowerCase().includes(q) ||
+      item.topicTitle?.toLowerCase().includes(q) ||
+      item.problemTitle?.toLowerCase().includes(q) ||
+      item.teamName?.toLowerCase().includes(q)
+    ));
+  }, [pendingSubmissionsList, submissionSearchQuery]);
+
+  const visiblePendingSubmissions = useMemo(() => {
+    return filteredPendingSubmissions.slice(0, visibleSubmissionsCount);
+  }, [filteredPendingSubmissions, visibleSubmissionsCount]);
 
   const storageKey = isTrainer ? "mcc_trainer_classroom_toured" : "mcc_student_classroom_toured";
   const tourSteps = isTrainer ? trainerClassroomSteps : studentClassroomSteps;
@@ -2267,7 +2874,9 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const topicResourcesList = selectedTopic?.resources || [];
   const topicProblemsList = selectedTopic?.problems || [];
-  const topicAssignmentsList = (selectedTopic?.assignments || []).filter((a) => a.status === 'active');
+  const topicAssignmentsList = (topicAssignments || []).filter(
+    (a) => (a.topic_id === selectedTopic?.id || !selectedTopic) && (a.status || 'active') === 'active'
+  );
 
   const filteredTopicResources = topicResourcesList.filter((r) => {
     if (!inTopicResourceSearch.trim()) return true;
@@ -2369,9 +2978,10 @@ export default function ClassroomLiveClient({ classroomId }) {
       }
 
       if (data?.isTrainer) {
-        const [topicsRes, analyticsRes] = await Promise.all([
+        const [topicsRes, analyticsRes, pendingRes] = await Promise.all([
           get_with_token(`classroom/${classroomId}/topics`),
           get_with_token(`classroom/${classroomId}/topic-analytics`),
+          get_with_token(`classroom/${classroomId}/topic-pending-submissions`),
         ]);
         if (!topicsRes?.error) {
           const list = topicsRes?.topics || [];
@@ -2381,6 +2991,7 @@ export default function ClassroomLiveClient({ classroomId }) {
           }
         }
         if (!analyticsRes?.error) setTopicAnalytics(analyticsRes?.teams || []);
+        if (!pendingRes?.error) setPendingSubmissionsApi(pendingRes?.pendingSubmissions || []);
       }
     } catch (err) {
     } finally {
@@ -3058,6 +3669,42 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
+  const handleScheduleStartChange = (val) => {
+    setClassSchedule(val);
+    if (val && classDurationMinutes) {
+      const dur = Number(classDurationMinutes) || 90;
+      const start = new Date(val);
+      if (!Number.isNaN(start.getTime())) {
+        const end = new Date(start.getTime() + dur * 60000);
+        setClassScheduleEndTime(toDatetimeLocalValue(end.toISOString()));
+      }
+    }
+  };
+
+  const handleScheduleEndChange = (val) => {
+    setClassScheduleEndTime(val);
+    if (classSchedule && val) {
+      const start = new Date(classSchedule);
+      const end = new Date(val);
+      if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        const mins = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
+        setClassDurationMinutes(String(mins));
+      }
+    }
+  };
+
+  const handleScheduleDurationChange = (val) => {
+    setClassDurationMinutes(val);
+    if (classSchedule && val) {
+      const dur = Number(val) || 90;
+      const start = new Date(classSchedule);
+      if (!Number.isNaN(start.getTime())) {
+        const end = new Date(start.getTime() + dur * 60000);
+        setClassScheduleEndTime(toDatetimeLocalValue(end.toISOString()));
+      }
+    }
+  };
+
   // Schedule & Start Classes
   const handleScheduleClass = async (e) => {
     e.preventDefault();
@@ -3072,6 +3719,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     if (res && res.success) {
       setClassName('');
       setClassSchedule('');
+      setClassScheduleEndTime('');
       setClassSessionType('onsite');
       setClassDurationMinutes('90');
       fetchClassroomDetails();
@@ -3336,14 +3984,35 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const handleAssignTopicToTeam = async (e) => {
     e.preventDefault();
-    if (!topicAssignmentForm.topicId || !topicAssignmentForm.teamId) return;
+    const targetType = topicAssignmentForm.targetType || 'group';
+    const teamIds = topicAssignmentForm.teamIds || [];
+    const studentIds = topicAssignmentForm.studentIds || [];
+    if (!topicAssignmentForm.topicId) {
+      alert('Select a topic unit');
+      return;
+    }
+    if (targetType === 'group' && teamIds.length === 0) {
+      alert('Select at least one target group');
+      return;
+    }
+    if (targetType === 'student' && studentIds.length === 0) {
+      alert('Select at least one target student');
+      return;
+    }
     const res = await post_with_token(`classroom/${classroomId}/topics/${topicAssignmentForm.topicId}/assign-team`, {
-      teamId: topicAssignmentForm.teamId,
+      targetType,
+      teamIds,
+      studentIds,
     });
     if (res?.success) {
-      setTopicAssignmentForm({ topicId: '', teamId: '' });
+      setTopicAssignmentForm({ topicId: '', targetType: 'group', teamIds: [], studentIds: [] });
       setAssignTeamModalOpen(false);
       fetchTopicData();
+      toast.success(
+        targetType === 'student'
+          ? `Assigned topic unit to ${studentIds.length} student${studentIds.length > 1 ? 's' : ''}`
+          : `Assigned topic unit to ${teamIds.length} group${teamIds.length > 1 ? 's' : ''}`
+      );
     } else {
       alert(res?.error || 'Failed to assign topic');
     }
@@ -3378,15 +4047,17 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
-  const handleVerifyProblemProgress = async (progressId, problemId, action) => {
+  const handleVerifyProblemProgress = async (progressId, problemId, action, trainerNotes = '') => {
     const res = await post_with_token(`classroom/${classroomId}/topic-progress/verify`, {
       progressId,
       problemId,
       action,
+      trainerNotes,
     });
     if (res?.success) {
       fetchTopicData();
-      fetchClassroomData();
+      fetchClassroomDetails();
+      toast.success(action === 'approve' ? 'Solution approved successfully!' : 'Solution marked as needs revision');
     } else {
       alert(res?.error || 'Failed to process verification action');
     }
@@ -3778,7 +4449,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                   <PenTool className="h-4 w-4" /> Board
                 </TabsTrigger>
                 <TabsTrigger id="classroom-tour-tab-analytics" value="analytics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <BarChart3 className="h-4 w-4" /> Groups
+                  <BarChart3 className="h-4 w-4" /> Progress Matrix
                 </TabsTrigger>
                 {/* TODO: Classroom IDE Feature (Beta Mode) - Hidden from active navigation for now. To re-enable, uncomment the TabsTrigger below: */}
                 {/* <TabsTrigger value="ide" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
@@ -3793,6 +4464,18 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <TabsTrigger id="classroom-tour-tab-students" value="students" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
                   <Users className="h-4 w-4" /> People
                 </TabsTrigger>
+                {pendingSubmissionsList.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="ml-auto h-8 gap-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 font-bold animate-pulse text-xs"
+                    onClick={() => setSubmissionReviewHubOpen(true)}
+                  >
+                    <ShieldCheck className="h-4 w-4 text-amber-500" />
+                    {pendingSubmissionsList.length} Pending Submissions
+                  </Button>
+                )}
               </TabsList>
 
               {/* LIVE PRACTICE PANEL */}
@@ -4496,12 +5179,12 @@ export default function ClassroomLiveClient({ classroomId }) {
                               size="sm"
                               className="h-8 gap-1.5 text-xs font-semibold shadow-xs"
                               onClick={() => {
-                                setTopicAssignmentForm({ topicId: selectedTopic.id, teamId: '' });
+                                setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'group', teamIds: [], studentIds: [] });
                                 setAssignTeamModalOpen(true);
                               }}
                             >
                               <Target className="h-3.5 w-3.5" />
-                              Assign Group
+                              Assign Topic
                             </Button>
                           </div>
                         </div>
@@ -4548,16 +5231,50 @@ export default function ClassroomLiveClient({ classroomId }) {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setActiveStudioTab('teams')}
+                              onClick={() => setActiveStudioTab('peoples')}
                               className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                activeStudioTab === 'teams'
+                                activeStudioTab === 'peoples'
+                                  ? 'bg-background text-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" />
+                              People
+                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">
+                                {topicAssignmentsList.filter(a => Boolean(a.student_id)).length}
+                              </Badge>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveStudioTab('groups')}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                                (activeStudioTab === 'groups' || activeStudioTab === 'teams')
                                   ? 'bg-background text-foreground shadow-xs'
                                   : 'text-muted-foreground hover:text-foreground'
                               }`}
                             >
                               <Users className="h-3.5 w-3.5" />
                               Groups
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">{topicAssignmentsList.length}</Badge>
+                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">
+                                {topicAssignmentsList.filter(a => !a.student_id).length}
+                              </Badge>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setActiveStudioTab('submissions')}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
+                                activeStudioTab === 'submissions'
+                                  ? 'bg-background text-foreground shadow-xs'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+                              Pending Submissions
+                              {pendingSubmissionsList.length > 0 && (
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 px-1.5 py-0 text-[10px] font-bold animate-pulse">
+                                  {pendingSubmissionsList.length}
+                                </Badge>
+                              )}
                             </button>
                           </div>
                         </div>
@@ -4569,17 +5286,17 @@ export default function ClassroomLiveClient({ classroomId }) {
                             <div className="space-y-6">
                               {/* Quick Stats Banner */}
                               <div className="grid grid-cols-3 gap-3 rounded-xl border bg-muted/20 p-3 text-center">
-                                <div className="space-y-0.5">
+                                <div>
                                   <p className="text-base font-bold text-foreground">{topicResourcesList.length}</p>
                                   <p className="text-[11px] text-muted-foreground font-medium">Resources</p>
                                 </div>
-                                <div className="space-y-0.5 border-x">
+                                <div className="border-x">
                                   <p className="text-base font-bold text-foreground">{topicProblemsList.length}</p>
                                   <p className="text-[11px] text-muted-foreground font-medium">Problems</p>
                                 </div>
-                                <div className="space-y-0.5">
+                                <div>
                                   <p className="text-base font-bold text-foreground">{topicAssignmentsList.length}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium">Assigned Groups</p>
+                                  <p className="text-[11px] text-muted-foreground font-medium">Assigned Targets</p>
                                 </div>
                               </div>
 
@@ -4871,20 +5588,75 @@ export default function ClassroomLiveClient({ classroomId }) {
                             </section>
                           )}
 
-                          {/* 4. GROUPS SUB-TAB */}
-                          {activeStudioTab === 'teams' && (
+                          {/* 4. PEOPLE (INDIVIDUAL STUDENTS) SUB-TAB */}
+                          {activeStudioTab === 'peoples' && (
                             <section className="space-y-4">
                               <div className="flex items-center justify-between border-b pb-3">
                                 <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                                  <Users className="h-4 w-4 text-primary" />
-                                  Assigned Groups ({topicAssignmentsList.length})
+                                  <UserCheck className="h-4 w-4 text-blue-600" />
+                                  Assigned Individual Students ({topicAssignmentsList.filter(a => Boolean(a.student_id)).length})
                                 </h4>
                                 <Button
                                   type="button"
                                   size="sm"
                                   className="h-8 gap-1.5 text-xs font-semibold"
                                   onClick={() => {
-                                    setTopicAssignmentForm({ topicId: selectedTopic.id, teamId: '' });
+                                    setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'student', teamIds: [], studentIds: [] });
+                                    setAssignTeamModalOpen(true);
+                                  }}
+                                >
+                                  <UserCheck className="h-3.5 w-3.5" />
+                                  Assign Student
+                                </Button>
+                              </div>
+
+                              {topicAssignmentsList.filter(a => Boolean(a.student_id)).length === 0 ? (
+                                <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                                  No individual students assigned to this topic unit yet. Click <strong>Assign Student</strong> to assign directly to students.
+                                </div>
+                              ) : (
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  {topicAssignmentsList.filter(a => Boolean(a.student_id)).map((a) => (
+                                    <div key={a.id} className="flex items-center justify-between rounded-xl border bg-card p-4 text-xs font-semibold shadow-xs">
+                                      <div className="flex items-center gap-2.5">
+                                        <div className="rounded-lg bg-blue-500/10 p-2 text-blue-600">
+                                          <UserCheck className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                          <p className="text-sm font-bold text-foreground">{a.student_name || 'Individual Student'}</p>
+                                          <p className="text-[11px] text-muted-foreground font-normal">
+                                            {a.student_mist_id ? `ID: ${a.student_mist_id}` : a.student_email || 'Direct Assignment'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="flex shrink-0 items-center gap-1.5">
+                                        <Badge variant="secondary" className="text-[10px]">Student</Badge>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700" onClick={() => handleUnassignTopicTeam(a)}>
+                                          <X className="h-3 w-3" />
+                                          Unassign
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </section>
+                          )}
+
+                          {/* 5. GROUPS SUB-TAB */}
+                          {(activeStudioTab === 'groups' || activeStudioTab === 'teams') && (
+                            <section className="space-y-4">
+                              <div className="flex items-center justify-between border-b pb-3">
+                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                  <Users className="h-4 w-4 text-primary" />
+                                  Assigned Groups ({topicAssignmentsList.filter(a => !a.student_id).length})
+                                </h4>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs font-semibold"
+                                  onClick={() => {
+                                    setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'group', teamIds: [], studentIds: [] });
                                     setAssignTeamModalOpen(true);
                                   }}
                                 >
@@ -4893,13 +5665,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 </Button>
                               </div>
 
-                              {topicAssignmentsList.length === 0 ? (
+                              {topicAssignmentsList.filter(a => !a.student_id).length === 0 ? (
                                 <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
                                   No groups currently assigned to this topic unit. Click <strong>Assign Group</strong> to assign classroom groups.
                                 </div>
                               ) : (
                                 <div className="grid gap-3 sm:grid-cols-2">
-                                  {topicAssignmentsList.map((a) => {
+                                  {topicAssignmentsList.filter(a => !a.student_id).map((a) => {
                                     const teamObj = teams.find((t) => t.id === a.team_id);
                                     return (
                                       <div key={a.id} className="flex items-center justify-between rounded-xl border bg-card p-4 text-xs font-semibold shadow-xs">
@@ -4909,11 +5681,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                                           </div>
                                           <div>
                                             <p className="text-sm font-bold text-foreground">{teamObj ? teamObj.name : (a.team_name || 'Group')}</p>
-                                            <p className="text-[11px] text-muted-foreground font-normal">Active Topic Assignment</p>
+                                            <p className="text-[11px] text-muted-foreground font-normal">Group Assignment</p>
                                           </div>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">
-                                          <Badge variant="secondary" className="text-[10px]">Active</Badge>
+                                          <Badge variant="secondary" className="text-[10px]">Group</Badge>
                                           <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700" onClick={() => handleUnassignTopicTeam(a)}>
                                             <X className="h-3 w-3" />
                                             Unassign
@@ -4922,6 +5694,114 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       </div>
                                     );
                                   })}
+                                </div>
+                              )}
+                            </section>
+                          )}
+
+                          {/* 6. PENDING SUBMISSIONS SUB-TAB */}
+                          {activeStudioTab === 'submissions' && (
+                            <section className="space-y-4">
+                              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                                  <ShieldCheck className="h-4 w-4 text-amber-500" />
+                                  Student Topic Submissions Pending Review ({pendingSubmissionsList.length})
+                                </h4>
+                                {pendingSubmissionsList.length > 0 && (
+                                  <div className="relative min-w-[220px]">
+                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Search student, topic, problem..."
+                                      value={submissionSearchQuery}
+                                      onChange={(e) => setSubmissionSearchQuery(e.target.value)}
+                                      className="h-8 pl-8 text-xs"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {filteredPendingSubmissions.length === 0 ? (
+                                <div className="rounded-xl border border-dashed p-10 text-center text-xs text-muted-foreground">
+                                  {submissionSearchQuery ? 'No pending submissions match your search query.' : '🎉 No student submissions pending trainer review right now!'}
+                                </div>
+                              ) : (
+                                <div className="space-y-4">
+                                  <ScrollArea className="max-h-[560px] pr-3">
+                                    <div className="space-y-4">
+                                      {visiblePendingSubmissions.map((item) => (
+                                        <Card key={item.progressId} className="rounded-xl border shadow-xs p-4 space-y-3">
+                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b pb-3">
+                                            <div>
+                                              <div className="flex items-center gap-2">
+                                                <h4 className="font-bold text-sm text-foreground">{item.studentName}</h4>
+                                                {item.studentMistId && <Badge variant="outline" className="text-[10px]">ID: {item.studentMistId}</Badge>}
+                                                {item.teamName && <Badge variant="secondary" className="text-[10px]">{item.teamName}</Badge>}
+                                              </div>
+                                              <p className="text-xs text-muted-foreground mt-0.5">
+                                                Topic: <span className="font-semibold text-foreground">{item.topicTitle}</span> • Problem: <span className="font-semibold text-foreground">{item.problemTitle}</span>
+                                              </p>
+                                            </div>
+                                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold animate-pulse">
+                                              Pending Verification
+                                            </Badge>
+                                          </div>
+
+                                          <SubmissionReviewContent
+                                            solutionLink={item.solutionLink}
+                                            solutionCode={item.solutionCode}
+                                            submissionNotes={item.submissionNotes}
+                                          />
+
+                                          <div className="pt-2 flex flex-col gap-2 border-t">
+                                            <Input
+                                              id={`studio-notes-${item.progressId}`}
+                                              placeholder="Add optional trainer review feedback e.g. Great solution! or Fix complexity..."
+                                              className="text-xs"
+                                            />
+                                            <div className="flex items-center justify-end gap-2 pt-1">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
+                                                onClick={() => {
+                                                  const input = document.getElementById(`studio-notes-${item.progressId}`);
+                                                  const notes = input?.value || '';
+                                                  handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
+                                                }}
+                                              >
+                                                <X className="h-3.5 w-3.5" /> Reject / Needs Revision
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                                                onClick={() => {
+                                                  const input = document.getElementById(`studio-notes-${item.progressId}`);
+                                                  const notes = input?.value || '';
+                                                  handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
+                                                }}
+                                              >
+                                                <Check className="h-3.5 w-3.5" /> Approve Solution
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </Card>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                  {filteredPendingSubmissions.length > visibleSubmissionsCount && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full gap-2 text-xs font-semibold py-2"
+                                      onClick={() => setVisibleSubmissionsCount((c) => c + 10)}
+                                    >
+                                      <RefreshCw className="h-3.5 w-3.5" />
+                                      Show more pending submissions ({filteredPendingSubmissions.length - visibleSubmissionsCount} remaining)
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </section>
@@ -5255,16 +6135,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </DialogContent>
                 </Dialog>
 
-                {/* MODAL DIALOG 4: ASSIGN GROUP */}
+                {/* MODAL DIALOG 4: ASSIGN GROUP / STUDENT */}
                 <Dialog open={assignTeamModalOpen} onOpenChange={setAssignTeamModalOpen}>
-                  <DialogContent className="sm:max-w-[500px]">
+                  <DialogContent className="sm:max-w-[560px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-lg">
                         <Target className="h-5 w-5 text-primary" />
-                        Assign topic to group
+                        Assign Topic Unit
                       </DialogTitle>
                       <DialogDescription>
-                        Select a group to receive this topic unit&apos;s resources and problems.
+                        Select target groups or individual students to receive this topic unit&apos;s resources and practice problems.
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleAssignTopicToTeam} className="space-y-4 pt-2">
@@ -5275,7 +6155,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           onValueChange={(value) => setTopicAssignmentForm((current) => ({ ...current, topicId: value }))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose topic" />
+                            <SelectValue placeholder="Choose topic unit" />
                           </SelectTrigger>
                           <SelectContent>
                             {topics.map((topic) => (
@@ -5285,22 +6165,198 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </Select>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-sm font-semibold">Group</label>
-                        <Select
-                          value={topicAssignmentForm.teamId}
-                          onValueChange={(value) => setTopicAssignmentForm((current) => ({ ...current, teamId: value }))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose group" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {teams.map((team) => (
-                              <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      {/* Target Type Toggle */}
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-semibold">Assignment Target Type</label>
+                        <div className="flex rounded-lg border bg-muted/40 p-1 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setTopicAssignmentForm((curr) => ({ ...curr, targetType: 'group' }))}
+                            className={`flex-1 rounded-md py-1.5 font-semibold transition-all ${
+                              (topicAssignmentForm.targetType || 'group') === 'group'
+                                ? 'bg-background text-foreground shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            👥 Target Groups ({teams.length})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTopicAssignmentForm((curr) => ({ ...curr, targetType: 'student' }))}
+                            className={`flex-1 rounded-md py-1.5 font-semibold transition-all ${
+                              topicAssignmentForm.targetType === 'student'
+                                ? 'bg-background text-foreground shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            👤 Target Individual Students ({students.length})
+                          </button>
+                        </div>
                       </div>
+
+                      {(topicAssignmentForm.targetType || 'group') === 'group' ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-foreground uppercase">Target Groups</label>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px]">
+                                {topicAssignmentForm.teamIds?.length || 0} of {teams.length} Selected
+                              </Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[11px] font-semibold"
+                                onClick={() => {
+                                  const allSelected = (topicAssignmentForm.teamIds?.length || 0) === teams.length;
+                                  setTopicAssignmentForm((curr) => ({
+                                    ...curr,
+                                    teamIds: allSelected ? [] : teams.map((t) => t.id),
+                                  }));
+                                }}
+                              >
+                                {(topicAssignmentForm.teamIds?.length || 0) === teams.length ? 'Deselect All' : 'Select All'}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <ScrollArea className="h-[210px] rounded-lg border bg-muted/20 p-3">
+                            <div className="space-y-2 pr-2">
+                              {teams.length === 0 ? (
+                                <p className="p-4 text-center text-xs text-muted-foreground">No groups created in this classroom yet.</p>
+                              ) : (
+                                teams.map((team) => {
+                                  const isChecked = (topicAssignmentForm.teamIds || []).includes(team.id);
+                                  return (
+                                    <label
+                                      key={team.id}
+                                      className={`flex items-center justify-between rounded-lg border p-3 text-xs cursor-pointer transition-all ${
+                                        isChecked ? 'bg-primary/10 border-primary/40 text-foreground font-semibold shadow-2xs' : 'bg-card border-border hover:bg-muted/40 text-muted-foreground'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={(e) => {
+                                            const checked = e.target.checked;
+                                            setTopicAssignmentForm((curr) => ({
+                                              ...curr,
+                                              teamIds: checked
+                                                ? [...(curr.teamIds || []), team.id]
+                                                : (curr.teamIds || []).filter((id) => id !== team.id),
+                                            }));
+                                          }}
+                                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                                        />
+                                        <div>
+                                          <p className="text-sm font-bold text-foreground">{team.name}</p>
+                                          <p className="text-[10px] text-muted-foreground font-normal">Classroom Group</p>
+                                        </div>
+                                      </div>
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {team.members?.length || 0} Members
+                                      </Badge>
+                                    </label>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-foreground uppercase">Target Students</label>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px]">
+                                {topicAssignmentForm.studentIds?.length || 0} of {students.length} Selected
+                              </Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[11px] font-semibold"
+                                onClick={() => {
+                                  const allSelected = (topicAssignmentForm.studentIds?.length || 0) === students.length;
+                                  setTopicAssignmentForm((curr) => ({
+                                    ...curr,
+                                    studentIds: allSelected ? [] : students.map((s) => s.id),
+                                  }));
+                                }}
+                              >
+                                {(topicAssignmentForm.studentIds?.length || 0) === students.length ? 'Deselect All' : 'Select All'}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              placeholder="Search student name, MIST ID, email..."
+                              value={studentTargetSearchQuery}
+                              onChange={(e) => setStudentTargetSearchQuery(e.target.value)}
+                              className="h-8 pl-8 text-xs mb-2"
+                            />
+                          </div>
+
+                          <ScrollArea className="h-[210px] rounded-lg border bg-muted/20 p-3">
+                            <div className="space-y-2 pr-2">
+                              {students.length === 0 ? (
+                                <p className="p-4 text-center text-xs text-muted-foreground">No students enrolled in this classroom yet.</p>
+                              ) : (
+                                students
+                                  .filter((s) => {
+                                    const q = studentTargetSearchQuery.toLowerCase().trim();
+                                    if (!q) return true;
+                                    return (
+                                      (s.full_name || '').toLowerCase().includes(q) ||
+                                      (s.email || '').toLowerCase().includes(q) ||
+                                      (s.mist_id || '').toLowerCase().includes(q)
+                                    );
+                                  })
+                                  .map((student) => {
+                                    const isChecked = (topicAssignmentForm.studentIds || []).includes(student.id);
+                                    return (
+                                      <label
+                                        key={student.id}
+                                        className={`flex items-center justify-between rounded-lg border p-3 text-xs cursor-pointer transition-all ${
+                                          isChecked ? 'bg-primary/10 border-primary/40 text-foreground font-semibold shadow-2xs' : 'bg-card border-border hover:bg-muted/40 text-muted-foreground'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              setTopicAssignmentForm((curr) => ({
+                                                ...curr,
+                                                studentIds: checked
+                                                  ? [...(curr.studentIds || []), student.id]
+                                                  : (curr.studentIds || []).filter((id) => id !== student.id),
+                                              }));
+                                            }}
+                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                                          />
+                                          <div>
+                                            <p className="text-sm font-bold text-foreground">{student.full_name || student.email || 'Student'}</p>
+                                            <p className="text-[10px] text-muted-foreground font-normal">
+                                              {student.mist_id ? `ID: ${student.mist_id}` : student.email || 'Individual'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Badge variant="outline" className="text-[10px]">
+                                          Student
+                                        </Badge>
+                                      </label>
+                                    );
+                                  })
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
 
                       <DialogFooter className="pt-2">
                         <Button type="button" variant="outline" onClick={() => setAssignTeamModalOpen(false)}>
@@ -5308,10 +6364,130 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </Button>
                         <Button type="submit" className="gap-2 font-semibold">
                           <Users className="h-4 w-4" />
-                          Assign Topic
+                          Assign Topic Unit
                         </Button>
                       </DialogFooter>
                     </form>
+                  </DialogContent>
+                </Dialog>
+
+                {/* MODAL DIALOG 5: TRAINER TOPIC SUBMISSION REVIEW HUB */}
+                <Dialog open={submissionReviewHubOpen} onOpenChange={setSubmissionReviewHubOpen}>
+                  <DialogContent className="sm:max-w-[780px] max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                      <div className="flex flex-wrap items-center justify-between gap-3 pr-6 border-b pb-3">
+                        <div>
+                          <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                            <ShieldCheck className="h-5 w-5 text-amber-500" />
+                            Pending Topic Submissions ({pendingSubmissionsList.length})
+                          </DialogTitle>
+                          <DialogDescription className="mt-0.5">
+                            Review student proof links and code snippets, provide feedback, and approve or reject submissions.
+                          </DialogDescription>
+                        </div>
+                        {pendingSubmissionsList.length > 0 && (
+                          <div className="relative min-w-[220px]">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                              placeholder="Search student, topic, problem..."
+                              value={submissionSearchQuery}
+                              onChange={(e) => setSubmissionSearchQuery(e.target.value)}
+                              className="h-8 pl-8 text-xs"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </DialogHeader>
+
+                    {filteredPendingSubmissions.length === 0 ? (
+                      <div className="p-8 text-center border border-dashed rounded-lg text-xs text-muted-foreground my-4">
+                        {submissionSearchQuery ? 'No pending submissions match your search query.' : 'No pending topic submissions requiring verification right now!'}
+                      </div>
+                    ) : (
+                      <div className="space-y-4 py-2 flex-1 overflow-hidden flex flex-col">
+                        <ScrollArea className="max-h-[500px] pr-3">
+                          <div className="space-y-4">
+                            {visiblePendingSubmissions.map((item) => (
+                              <Card key={item.progressId} className="rounded-xl border shadow-xs p-4 space-y-3">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between border-b pb-3">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-bold text-sm text-foreground">{item.studentName}</h4>
+                                      {item.studentMistId && <Badge variant="outline" className="text-[10px]">ID: {item.studentMistId}</Badge>}
+                                      {item.teamName && <Badge variant="secondary" className="text-[10px]">{item.teamName}</Badge>}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Topic: <span className="font-semibold text-foreground">{item.topicTitle}</span> • Problem: <span className="font-semibold text-foreground">{item.problemTitle}</span>
+                                    </p>
+                                  </div>
+                                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold animate-pulse">
+                                    Pending Verification
+                                  </Badge>
+                                </div>
+
+                                <SubmissionReviewContent
+                                  solutionLink={item.solutionLink}
+                                  solutionCode={item.solutionCode}
+                                  submissionNotes={item.submissionNotes}
+                                />
+
+                                <div className="pt-2 flex flex-col gap-2 border-t">
+                                  <Input
+                                    id={`trainer-notes-${item.progressId}`}
+                                    placeholder="Add optional trainer review feedback e.g. Great solution! or Fix complexity..."
+                                    className="text-xs"
+                                  />
+                                  <div className="flex items-center justify-end gap-2 pt-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
+                                      onClick={() => {
+                                        const input = document.getElementById(`trainer-notes-${item.progressId}`);
+                                        const notes = input?.value || '';
+                                        handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
+                                      }}
+                                    >
+                                      <X className="h-3.5 w-3.5" /> Reject / Needs Revision
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                                      onClick={() => {
+                                        const input = document.getElementById(`trainer-notes-${item.progressId}`);
+                                        const notes = input?.value || '';
+                                        handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
+                                      }}
+                                    >
+                                      <Check className="h-3.5 w-3.5" /> Approve Solution
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </ScrollArea>
+
+                        {filteredPendingSubmissions.length > visibleSubmissionsCount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 text-xs font-semibold py-2 shrink-0"
+                            onClick={() => setVisibleSubmissionsCount((c) => c + 10)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Show more pending submissions ({filteredPendingSubmissions.length - visibleSubmissionsCount} remaining)
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setSubmissionReviewHubOpen(false)}>Close</Button>
+                    </DialogFooter>
                   </DialogContent>
                 </Dialog>
               </TabsContent>
@@ -5387,6 +6563,26 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
+                          <label className="text-sm font-semibold">Scheduled Start Time</label>
+                          <Input 
+                            type="datetime-local" 
+                            value={classSchedule}
+                            onChange={(e) => handleScheduleStartChange(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold">Scheduled End Time</label>
+                          <Input 
+                            type="datetime-local" 
+                            value={classScheduleEndTime}
+                            onChange={(e) => handleScheduleEndChange(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
                           <label className="text-sm font-semibold">Session Type</label>
                           <Select value={classSessionType} onValueChange={setClassSessionType}>
                             <SelectTrigger>
@@ -5405,19 +6601,10 @@ export default function ClassroomLiveClient({ classroomId }) {
                             min="1"
                             step="1"
                             value={classDurationMinutes}
-                            onChange={(e) => setClassDurationMinutes(e.target.value)}
+                            onChange={(e) => handleScheduleDurationChange(e.target.value)}
                             required
                           />
                         </div>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-sm font-semibold">Scheduled Date &amp; Time</label>
-                        <Input 
-                          type="datetime-local" 
-                          value={classSchedule}
-                          onChange={(e) => setClassSchedule(e.target.value)}
-                          required
-                        />
                       </div>
                       <Button type="submit" className="w-full font-semibold">Schedule class</Button>
                     </form>
@@ -6933,35 +8120,117 @@ export default function ClassroomLiveClient({ classroomId }) {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold">Start time</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start time</label>
                 <Input
                   type="datetime-local"
                   value={sessionEditForm.scheduledTime}
-                  onChange={(e) => setSessionEditForm((current) => ({ ...current, scheduledTime: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSessionEditForm((curr) => {
+                      const sDate = datetimeLocalToDate(val);
+                      const dur = Number(curr.durationMinutes) || 90;
+                      let nextEnd = curr.endTime;
+                      if (sDate) {
+                        nextEnd = toDatetimeLocalValue(new Date(sDate.getTime() + dur * 60000).toISOString());
+                      }
+                      return { ...curr, scheduledTime: val, endTime: nextEnd };
+                    });
+                  }}
                   required
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold">End time</label>
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End time</label>
                 <Input
                   type="datetime-local"
                   value={sessionEditForm.endTime}
-                  onChange={(e) => setSessionEditForm((current) => ({ ...current, endTime: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSessionEditForm((curr) => {
+                      const sDate = datetimeLocalToDate(curr.scheduledTime);
+                      const eDate = datetimeLocalToDate(val);
+                      let nextDur = curr.durationMinutes;
+                      if (sDate && eDate && eDate > sDate) {
+                        nextDur = String(Math.round((eDate.getTime() - sDate.getTime()) / 60000));
+                      }
+                      return { ...curr, endTime: val, durationMinutes: nextDur };
+                    });
+                  }}
                   required
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-semibold">Session type</label>
-              <select
-                value={sessionEditForm.sessionType}
-                onChange={(e) => setSessionEditForm((current) => ({ ...current, sessionType: e.target.value }))}
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-              >
-                <option value="onsite">Onsite</option>
-                <option value="online">Online</option>
-              </select>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Planned Duration (Mins)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={sessionEditForm.durationMinutes}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSessionEditForm((curr) => {
+                      const sDate = datetimeLocalToDate(curr.scheduledTime);
+                      const dur = Number(val) || 90;
+                      let nextEnd = curr.endTime;
+                      if (sDate) {
+                        nextEnd = toDatetimeLocalValue(new Date(sDate.getTime() + dur * 60000).toISOString());
+                      }
+                      return { ...curr, durationMinutes: val, endTime: nextEnd };
+                    });
+                  }}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Session type</label>
+                <select
+                  value={sessionEditForm.sessionType}
+                  onChange={(e) => setSessionEditForm((current) => ({ ...current, sessionType: e.target.value }))}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="onsite">Onsite</option>
+                  <option value="online">Online</option>
+                </select>
+              </div>
             </div>
+
+            {(() => {
+              const editStart = datetimeLocalToDate(sessionEditForm.scheduledTime);
+              const editEnd = datetimeLocalToDate(sessionEditForm.endTime);
+              const editDur = editStart && editEnd && editEnd > editStart
+                ? Math.round((editEnd.getTime() - editStart.getTime()) / 60000)
+                : Number(sessionEditForm.durationMinutes) || 90;
+
+              const sessionStartedAt = sessionEditClass?.started_at ? new Date(sessionEditClass.started_at).getTime() : null;
+              const sessionEndedAt = sessionEditClass?.ended_at ? new Date(sessionEditClass.ended_at).getTime() : null;
+              const totalElapsedMins = sessionEndedAt && sessionStartedAt
+                ? Math.max(0, Math.floor((sessionEndedAt - sessionStartedAt) / 60000))
+                : sessionStartedAt
+                ? Math.max(0, Math.floor((Date.now() - sessionStartedAt) / 60000))
+                : 0;
+
+              const previewOverflow = (sessionEditClass?.status === 'completed' || sessionEditClass?.status === 'started') && totalElapsedMins > editDur
+                ? totalElapsedMins - editDur
+                : 0;
+
+              return (
+                <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3 text-xs">
+                  <span className="font-medium text-foreground">Planned Duration: <span className="font-bold">{editDur} min</span></span>
+                  {previewOverflow > 0 ? (
+                    <Badge className="bg-amber-600 text-white text-[10px] font-bold gap-1 animate-pulse">
+                      <Timer className="h-3 w-3" /> Overflow: +{previewOverflow}m
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                      No Overflow
+                    </Badge>
+                  )}
+                </div>
+              );
+            })()}
             {sessionEditError && (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {sessionEditError}

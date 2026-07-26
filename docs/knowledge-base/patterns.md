@@ -1,5 +1,19 @@
 # Patterns
 
+## 2026-07-27 - Explicit SQL Parameter Type Casting & Null Handling Pattern
+
+Source:
+- `docs/rsd/trainer-feature-schedule-topics-verification-studentui-20260727-rsd.md`
+
+Fact:
+When executing SQL updates in Hono / Bun PostgreSQL controllers where parameters can evaluate to `null` or `undefined` (such as `solved_at` on submission rejection or optional trainer review notes), parameters MUST be explicitly cast in SQL statements (e.g. `${nextStatus}::text`, `${solvedAt}::timestamptz`, `${feedbackText}::text`) or branched into clean query paths to prevent PostgreSQL parameter type inference errors (`could not determine data type of parameter $N`).
+
+Applies when:
+Updating submission progress, approval/rejection endpoints, or optional metadata fields in PostgreSQL controllers.
+
+Do not overgeneralize:
+Does not alter contest problem evaluation or third-party online judge auto-grading.
+
 ## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Approved Work Plan
 
 Source:

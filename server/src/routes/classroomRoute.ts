@@ -18,6 +18,7 @@ import {
   getClassroomBoardSession,
   getClassroomTopicAnalytics,
   getClassroomTopicAssignments,
+  getClassroomPendingSubmissions,
   addStudentToClassroom,
   addStudentsToClassroom,
   preEnrollStudents,
@@ -196,6 +197,7 @@ route.delete('/:id/topics/:topicId/problems/:problemId', deleteClassroomTopicPro
 route.post('/:id/topics/:topicId/assign-team', assignClassroomTopicToTeam);
 route.post('/:id/topic-assignments/:assignmentId/unassign', unassignClassroomTopic);
 route.get('/:id/topic-assignments', getClassroomTopicAssignments);
+route.get('/:id/topic-pending-submissions', getClassroomPendingSubmissions);
 route.post('/:id/topic-progress/status', updateClassroomTopicProblemProgress);
 route.post('/:id/topic-progress/verify', verifyClassroomTopicProblemProgress);
 route.get('/:id/topic-analytics', getClassroomTopicAnalytics);
