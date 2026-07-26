@@ -1,5 +1,19 @@
 # Patterns
 
+## 2026-07-26 - trainer-qa-fixes-20260726 - QA Fix Work Slicing
+
+Source:
+- `docs/tasks/trainer-qa-fixes-20260726-task-plan.md`
+
+Fact:
+When trainer QA findings span server policy, form analytics, and classroom client UI, split work by disjoint write scopes: classroom server/resource policy, trainer form detail analytics, and classroom UI copy/validation/board.
+
+Applies when:
+Coordinating parallel agents for broad trainer/classroom defect repair.
+
+Do not overgeneralize:
+If `ClassroomLiveClient.js` changes overlap heavily with server behavior, integrate serially instead of giving overlapping write scopes.
+
 ## 2026-07-25 - Navigation Uses Profile-Derived Role Flags
 
 Source:
@@ -268,4 +282,3 @@ Adding or modifying role-specific profile pages or navigation components.
 
 Do not overgeneralize:
 Do not duplicate token deletion logic in individual page handlers; always reuse `@/lib/action.js#logout`.
-

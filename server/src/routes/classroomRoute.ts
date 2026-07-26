@@ -8,6 +8,7 @@ import {
   listAllUsers,
   listTrainers,
   createClassroom,
+  updateClassroom,
   createClassroomBoardJoinTokenHandler,
   createClassroomTopic,
   getClassrooms,
@@ -20,6 +21,7 @@ import {
   createTeam,
   updateTeamMembers,
   scheduleClass,
+  updateClassSession,
   startClass,
   completeClass,
   assignProblem,
@@ -143,6 +145,7 @@ route.post('/problem-tags/dictionary', createProblemTag);
 route.get('/:id/resources/:resourceId', getClassResourceDetail);
 route.post('/:id/add-student', addStudentToClassroom);
 route.post('/:id/remove-student', removeStudentFromClassroom);
+route.post('/:id/update', updateClassroom);
 
 // Team management
 route.post('/:id/create-team', createTeam);
@@ -150,6 +153,7 @@ route.post('/:id/teams/:teamId/members', updateTeamMembers);
 
 // Class sessions & scheduling
 route.post('/:id/schedule-class', scheduleClass);
+route.post('/:id/class/:classId/update', updateClassSession);
 route.post('/class/:id/start', startClass);
 route.post('/class/:id/complete', completeClass);
 route.get('/:id/class/:classId/attendance', getClassroomSessionAttendance);

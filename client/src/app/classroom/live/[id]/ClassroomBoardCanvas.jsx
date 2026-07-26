@@ -20,7 +20,7 @@ function fileToDataUrl(file) {
   });
 }
 
-export default function ClassroomBoardCanvas({ classroomId, role, sessionId }) {
+export default function ClassroomBoardCanvas({ classroomId, sessionId }) {
   const assets = useMemo(() => ({
     upload: async (_asset, file) => ({ src: await fileToDataUrl(file) }),
     resolve: (asset) => asset?.props?.src || asset?.src || '',
@@ -34,17 +34,10 @@ export default function ClassroomBoardCanvas({ classroomId, role, sessionId }) {
     return `${serverWsBase()}${res.websocketPath}`;
   }, [classroomId]);
 
-  const handleMount = useCallback((editor) => {
-    if (role !== 'trainer') {
-      editor.updateInstanceState({ isReadonly: true });
-    }
-  }, [role]);
-
   const store = useSync({
     uri,
     assets,
     roomId: sessionId || classroomId,
-    onMount: handleMount,
   });
 
   if (store.status === 'loading') {
@@ -64,10 +57,20 @@ export default function ClassroomBoardCanvas({ classroomId, role, sessionId }) {
   }
 
   return (
-    <Tldraw
-      store={store.store}
-      autoFocus={false}
-      onMount={handleMount}
-    />
+    <div className="classroom-board-canvas h-full w-full">
+      <Tldraw
+        store={store.store}
+        autoFocus={false}
+      />
+      <style jsx global>{`
+        .classroom-board-canvas .tl-watermark,
+        .classroom-board-canvas .tlui-watermark,
+        .classroom-board-canvas .tlui-license,
+        .classroom-board-canvas [data-testid*="watermark"],
+        .classroom-board-canvas [data-testid*="license"] {
+          display: none !important;
+        }
+      `}</style>
+    </div>
   );
 }

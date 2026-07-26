@@ -1,5 +1,19 @@
 # Project Index
 
+## 2026-07-26 - trainer-qa-fixes-20260726 - Trainer QA Fix Scope
+
+Source:
+- `docs/rsd/trainer-qa-fixes-20260726-rsd.md`
+
+Fact:
+Trainer QA fixes cover classroom roster role pollution, topic resource reader links, trainer form detail analytics/JSON visibility, Group/Groups terminology, validation feedback, board duplicate controls/license CTA, and honest problem preview fallback.
+
+Applies when:
+Maintaining trainer classroom People/Groups/Topics/Board/Live tabs, topic resources, trainer form detail analytics, and problem preview display.
+
+Do not overgeneralize:
+This does not approve destructive cleanup of existing `classroom_students` rows, schema migrations, public route renames, or tldraw architecture changes.
+
 ## 2026-07-25 - student-perceived-difficulty-dashboard-tabs-20260725 - Student Perceived Difficulty & Tabbed Student Dashboard
 
 Source:
@@ -426,4 +440,3 @@ Refactoring trainer dashboard, form responses/analytics, classroom live room per
 
 Do not overgeneralize:
 This audit highlights scalability risks across trainer and live classroom modules; implementation requires user review and task plan approval before applying code changes.
-

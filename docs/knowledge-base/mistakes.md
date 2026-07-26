@@ -177,3 +177,17 @@ User reported the logic was broken and too server-heavy.
 
 Prevention:
 For live trainer telemetry, require explicit target selection before short-interval polling and keep unrelated dashboard tabs decoupled.
+
+## 2026-07-26 - trainer-qa-fixes-20260726 - Role Pollution Near Miss
+
+Source:
+- `docs/reviews/trainer-qa-fixes-20260726-implementation-review.md`
+
+What happened:
+Trainer/admin accounts could be inserted into `classroom_students`, which made them appear in student-only People, Groups, Attendance, Assign Problem, and IDE-monitor workflows.
+
+Detection:
+Trainer QA with `temp@mcc.trainer.com` showed the trainer account appearing as an enrolled student and valid assignment target.
+
+Prevention:
+Treat classroom student membership as a role-clean domain relation: reject trainer/admin users on writes and filter existing polluted rows from every student-only read path.

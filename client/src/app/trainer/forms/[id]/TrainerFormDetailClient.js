@@ -25,12 +25,66 @@ const FORM_LABELS = {
 };
 
 function fieldValue(response, label) {
-  const flat = response?.response_json?.flat || {};
+  const flat = objectRecord(parseResponseJson(response).flat);
   const value = flat[label];
   if (value === undefined || value === null || value === "") return "-";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+function parseResponseJson(response) {
+  const payload = response?.response_json;
+  if (!payload) return {};
+  if (typeof payload === "string") {
+    try {
+      const parsed = JSON.parse(payload);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return { raw: payload };
+    }
+  }
+  return typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+}
+
+function objectRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function countResponseValues(responses, key) {
+  return responses.reduce((count, response) => {
+    const values = objectRecord(parseResponseJson(response)[key]);
+    return count + Object.keys(values).length;
+  }, 0);
+}
+
+function buildFieldSummaryFromResponses(responses) {
+  const summary = {};
+  for (const response of responses) {
+    const flat = objectRecord(parseResponseJson(response).flat);
+    for (const [label, value] of Object.entries(flat)) {
+      const normalized = value === null || value === undefined || value === "" ? "(blank)" : String(value);
+      summary[label] ||= {};
+      summary[label][normalized] = (summary[label][normalized] || 0) + 1;
+    }
+  }
+  return summary;
+}
+
+function savedPayloadForResponse(response) {
+  const payload = parseResponseJson(response);
+  return {
+    response_id: response.id,
+    submitted_at: response.submitted_at,
+    primary_key_value: response.primary_key_value,
+    user: {
+      name: response.user_name || null,
+      email: response.user_email || null,
+      mist_id: response.user_mist_id || null,
+      batch_name: response.user_batch_name || null,
+    },
+    saved_response_json: payload,
+  };
 }
 
 function compactDate(value) {
@@ -130,8 +184,11 @@ export default function TrainerFormDetailClient({ formId }) {
   }
 
   const dynamic = analytics?.dynamic || {};
-  const mappedCount = fields.filter((field) => field.mapUserField).length;
-  const customCount = fields.length - mappedCount;
+  const mappedCount = countResponseValues(responses, "mapped");
+  const customCount = countResponseValues(responses, "custom");
+  const fieldSummary = Object.entries(analytics?.field_summary || {}).length
+    ? analytics.field_summary
+    : buildFieldSummaryFromResponses(responses);
 
   const handleToggleAcceptingResponses = async () => {
     try {
@@ -262,10 +319,10 @@ export default function TrainerFormDetailClient({ formId }) {
               <div className="mt-8">
                 <h3 className="text-sm font-bold">Field summary</h3>
                 <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  {Object.entries(analytics?.field_summary || {}).length === 0 ? (
+                  {Object.entries(fieldSummary).length === 0 ? (
                     <p className="text-sm text-muted-foreground">Summary appears after first response.</p>
                   ) : (
-                    Object.entries(analytics.field_summary).map(([label, summary]) => (
+                    Object.entries(fieldSummary).map(([label, summary]) => (
                       <div key={label} className="rounded-lg border bg-background p-4">
                         <p className="truncate text-sm font-semibold">{label}</p>
                         <div className="mt-3 space-y-2">
@@ -402,7 +459,7 @@ export default function TrainerFormDetailClient({ formId }) {
                       {response.primary_key_value} - {compactDate(response.submitted_at)}
                     </summary>
                     <pre className="mt-3 max-h-96 overflow-auto rounded-md bg-muted p-3 text-xs">
-                      {JSON.stringify(response.response_json, null, 2)}
+                      {JSON.stringify(savedPayloadForResponse(response), null, 2)}
                     </pre>
                   </details>
                 ))

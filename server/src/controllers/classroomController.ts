@@ -103,7 +103,7 @@ async function fetchCodeforcesProblemFromApi(problemLink: string) {
 
     return {
       title: problem.name || `Codeforces ${parsed.contestId}${parsed.index}`,
-      details: `${problem.timeLimit || 'Standard'} sec | ${problem.memoryLimit || 'Standard'} MB`,
+      details: problem.timeLimit && problem.memoryLimit ? `${problem.timeLimit} sec | ${problem.memoryLimit} MB` : '',
       difficulty: problem.rating ? `${problem.rating}` : 'Unrated',
     };
   } catch (err) {
@@ -125,12 +125,12 @@ async function fetchProblemMetadata(platform: string, problemLink: string) {
       const html = await res.text();
       const $ = cheerio.load(html);
       const title = $('.problem-statement .header .title').first().text().trim() || 'Codeforces Problem';
-      const timeLimit = $('.problem-statement .header .time-limit').first().text().trim() || 'Standard Time Limit';
-      const memoryLimit = $('.problem-statement .header .memory-limit').first().text().trim() || 'Standard Memory Limit';
+      const timeLimit = $('.problem-statement .header .time-limit').first().text().trim();
+      const memoryLimit = $('.problem-statement .header .memory-limit').first().text().trim();
       const ratingTag = $('.tag-box[title="Difficulty"]').first().text().trim() || 'Medium';
       return {
         title: cleanProblemTitle(title, 'Codeforces Problem'),
-        details: `${timeLimit} | ${memoryLimit}`,
+        details: [timeLimit, memoryLimit].filter(Boolean).join(' | '),
         difficulty: ratingTag || 'Medium'
       };
     } else if (platform === 'atcoder') {
@@ -412,6 +412,10 @@ const IDE_EVENT_TYPES = new Set([
 ]);
 const IDE_LANGUAGES = new Set(['javascript', 'python', 'cpp', 'text']);
 
+function isStudentRole(row: any): boolean {
+  return !Boolean(row?.admin || row?.trainer);
+}
+
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
 }
@@ -564,13 +568,6 @@ export const createClassroom = async (c: Context) => {
       RETURNING *
     `;
 
-    // Automatically add creator to student list as trainer
-    await sql`
-      INSERT INTO classroom_students (classroom_id, student_id)
-      VALUES (${result[0].id}, ${id})
-      ON CONFLICT DO NOTHING
-    `;
-
     return c.json({ success: true, classroom: result[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -643,6 +640,8 @@ export const getClassroomDetails = async (c: Context) => {
         FROM classroom_students cs
         JOIN users u ON cs.student_id = u.id
         WHERE cs.classroom_id = ${classroomId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY u.full_name ASC
       `,
       sql`
@@ -656,7 +655,7 @@ export const getClassroomDetails = async (c: Context) => {
                COALESCE(json_agg(json_build_object('id', u.id, 'name', u.full_name, 'email', u.email)) FILTER (WHERE u.id IS NOT NULL), '[]') as members
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON t.id = tm.team_id
-        LEFT JOIN users u ON tm.student_id = u.id
+        LEFT JOIN users u ON tm.student_id = u.id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
         WHERE t.classroom_id = ${classroomId}
         GROUP BY t.id, t.name
         ORDER BY t.name ASC
@@ -677,6 +676,9 @@ export const getClassroomDetails = async (c: Context) => {
     const isSubstitute = substitutes.some((s: any) => s.id === currentUserId);
     const isAdmin = Boolean(userCheck[0]?.admin);
     const isTrainer = isOwner || isSubstitute || isAdmin;
+    const isStudent = students.some((student: any) => student.id === currentUserId);
+
+    if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized' }, 403);
 
     return c.json({
       classroom: classroom[0],
@@ -691,6 +693,33 @@ export const getClassroomDetails = async (c: Context) => {
       isSubstitute,
       isAdmin
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassroom = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(userId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const body = await c.req.json();
+    const name = normalizeText(body.name, 120);
+    const description = normalizeNullableText(body.description, 1000);
+
+    if (!name) return c.json({ error: 'Classroom name is required' }, 400);
+
+    const result = await sql`
+      UPDATE classrooms
+      SET name = ${name}, description = ${description}
+      WHERE id = ${classroomId}
+      RETURNING *
+    `;
+
+    if (result.length === 0) return c.json({ error: 'Classroom not found' }, 404);
+    return c.json({ success: true, classroom: result[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -816,8 +845,11 @@ export const addStudentToClassroom = async (c: Context) => {
     }
 
     const { studentEmail } = await c.req.json();
-    const student = await sql`SELECT id, full_name FROM users WHERE email = ${studentEmail}`;
+    const student = await sql`SELECT id, full_name, admin, trainer FROM users WHERE email = ${studentEmail}`;
     if (student.length === 0) return c.json({ error: 'Student email not registered on MCC' }, 404);
+    if (!isStudentRole(student[0])) {
+      return c.json({ error: 'This user is a trainer/admin and cannot be enrolled as a classroom student.' }, 400);
+    }
 
     await sql`
       INSERT INTO classroom_students (classroom_id, student_id)
@@ -868,6 +900,28 @@ export const createTeam = async (c: Context) => {
 
     const { name, studentIds } = await c.req.json();
     if (!name) return c.json({ error: 'Team name is required' }, 400);
+    const uniqueStudentIds = Array.isArray(studentIds)
+      ? [...new Set(studentIds.map((studentId: unknown) => normalizeUuid(studentId)).filter((studentId): studentId is string => Boolean(studentId)))]
+      : [];
+
+    if (Array.isArray(studentIds) && studentIds.some((studentId: unknown) => !normalizeUuid(studentId))) {
+      return c.json({ error: 'Student list contains an invalid student' }, 400);
+    }
+
+    if (uniqueStudentIds.length > 0) {
+      const eligibleRows = await sql`
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ANY(${uniqueStudentIds})
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
+      if (eligibleRows.length !== uniqueStudentIds.length) {
+        return c.json({ error: 'All team members must be enrolled students in this classroom' }, 400);
+      }
+    }
 
     const team = await sql`
       INSERT INTO trainer_teams (classroom_id, name)
@@ -875,15 +929,15 @@ export const createTeam = async (c: Context) => {
       RETURNING *
     `;
 
-    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
+    if (uniqueStudentIds.length > 0) {
       await sql`
         INSERT INTO trainer_team_members ${sql(
-          studentIds.map((studentId: string) => ({ team_id: team[0].id, student_id: studentId }))
+          uniqueStudentIds.map((studentId: string) => ({ team_id: team[0].id, student_id: studentId }))
         )}
         ON CONFLICT DO NOTHING
       `;
       await createNotifications(
-        studentIds,
+        uniqueStudentIds,
         'Added to Team',
         `You have been added to team "${name}" in your classroom.`,
         `/classroom/${classroomId}`
@@ -926,12 +980,16 @@ export const updateTeamMembers = async (c: Context) => {
 
     if (uniqueStudentIds.length > 0) {
       const enrolledRows = await sql`
-        SELECT student_id
-        FROM classroom_students
-        WHERE classroom_id = ${classroomId} AND student_id = ANY(${uniqueStudentIds})
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ANY(${uniqueStudentIds})
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
       `;
       if (enrolledRows.length !== uniqueStudentIds.length) {
-        return c.json({ error: 'All team members must be enrolled in this classroom' }, 400);
+        return c.json({ error: 'All team members must be enrolled students in this classroom' }, 400);
       }
     }
 
@@ -952,6 +1010,8 @@ export const updateTeamMembers = async (c: Context) => {
       FROM trainer_team_members tm
       JOIN users u ON u.id = tm.student_id
       WHERE tm.team_id = ${teamId}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
       ORDER BY u.full_name ASC
     `;
 
@@ -991,13 +1051,65 @@ export const scheduleClass = async (c: Context) => {
     `;
 
     // Notify all classroom students
-    const students = await sql`SELECT student_id FROM classroom_students WHERE classroom_id = ${classroomId}`;
+    const students = await sql`
+      SELECT cs.student_id
+      FROM classroom_students cs
+      JOIN users u ON u.id = cs.student_id
+      WHERE cs.classroom_id = ${classroomId}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
+    `;
     await createNotifications(
       students.map(student => student.student_id),
       'Class Scheduled',
       `New class "${name}" scheduled for ${new Date(scheduledTime).toLocaleString()}`,
       `/classroom/${classroomId}`
     );
+
+    return c.json({ success: true, class: result[0] });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const updateClassSession = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const classId = c.req.param('classId');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const sessionRows = await sql`
+      SELECT id, classroom_id
+      FROM classes
+      WHERE id = ${classId} AND classroom_id = ${classroomId}
+    `;
+    if (sessionRows.length === 0) return c.json({ error: 'Class session not found' }, 404);
+
+    const body = await c.req.json();
+    const name = normalizeText(body.name, 160);
+    const scheduledTimeText = normalizeText(body.scheduledTime, 80);
+    const sessionType = body.sessionType === 'online' ? 'online' : 'onsite';
+    const durationMinutes = Number(body.durationMinutes) > 0
+      ? Math.min(1440, Math.max(15, Number(body.durationMinutes)))
+      : 90;
+
+    if (!name) return c.json({ error: 'Session name is required' }, 400);
+    if (!scheduledTimeText || Number.isNaN(new Date(scheduledTimeText).getTime())) {
+      return c.json({ error: 'A valid scheduled date and time is required' }, 400);
+    }
+
+    const result = await sql`
+      UPDATE classes
+      SET
+        name = ${name},
+        scheduled_time = ${scheduledTimeText},
+        session_type = ${sessionType},
+        duration_minutes = ${Math.floor(durationMinutes)}
+      WHERE id = ${classId} AND classroom_id = ${classroomId}
+      RETURNING *
+    `;
 
     return c.json({ success: true, class: result[0] });
   } catch (error: any) {
@@ -1039,7 +1151,14 @@ export const startClass = async (c: Context) => {
     `;
 
     // Notify all classroom students
-    const students = await sql`SELECT student_id FROM classroom_students WHERE classroom_id = ${classData[0].classroom_id}`;
+    const students = await sql`
+      SELECT cs.student_id
+      FROM classroom_students cs
+      JOIN users u ON u.id = cs.student_id
+      WHERE cs.classroom_id = ${classData[0].classroom_id}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
+    `;
     await createNotifications(
       students.map(student => student.student_id),
       'Class Started LIVE!',
@@ -1123,6 +1242,8 @@ export const getClassroomSessionAttendance = async (c: Context) => {
       JOIN users u ON cs.student_id = u.id
       LEFT JOIN class_attendance ca ON ca.class_id = ${classId} AND ca.student_id = u.id
       WHERE cs.classroom_id = ${classroomId}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
       ORDER BY u.full_name ASC
     `;
 
@@ -1149,9 +1270,30 @@ export const updateClassroomSessionAttendance = async (c: Context) => {
     }
 
     const validStatuses = ['present', 'absent', 'late', 'very_late', 'excused'];
+    const submittedStudentIds = [...new Set(
+      attendance
+        .map((item: any) => normalizeUuid(item?.studentId))
+        .filter((studentId): studentId is string => Boolean(studentId))
+    )];
+
+    if (submittedStudentIds.length > 0) {
+      const eligibleRows = await sql`
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ANY(${submittedStudentIds})
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
+      if (eligibleRows.length !== submittedStudentIds.length) {
+        return c.json({ error: 'Attendance can only be recorded for enrolled students.' }, 400);
+      }
+    }
 
     for (const item of attendance) {
-      if (!item.studentId) continue;
+      const studentId = normalizeUuid(item.studentId);
+      if (!studentId) continue;
       const presenceStatus = validStatuses.includes(item.status) ? item.status : 'present';
       const remarks = item.remarks ? String(item.remarks).trim().slice(0, 500) : null;
 
@@ -1169,7 +1311,7 @@ export const updateClassroomSessionAttendance = async (c: Context) => {
         VALUES (
           ${classroomId},
           ${classId},
-          ${item.studentId},
+          ${studentId},
           ${presenceStatus},
           ${trainerId},
           ${trainerName},
@@ -1227,6 +1369,8 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
         FROM classroom_students cs
         JOIN users u ON cs.student_id = u.id
         WHERE cs.classroom_id = ${classroomId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY u.full_name ASC
       `;
       attendanceRes = await sql`
@@ -1238,7 +1382,13 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
     } else {
       // Student: check enrollment
       const enrolled = await sql`
-        SELECT 1 FROM classroom_students WHERE classroom_id = ${classroomId} AND student_id = ${userId}
+        SELECT 1
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ${userId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
       `;
       if (enrolled.length === 0) return c.json({ error: 'Not enrolled' }, 403);
 
@@ -1314,9 +1464,30 @@ export const assignProblem = async (c: Context) => {
     // Determine target students
     let targetStudentIds: string[] = [];
     if (studentId) {
+      const targetRows = await sql`
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classCheck[0].classroom_id}
+          AND cs.student_id = ${studentId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
+      if (targetRows.length === 0) {
+        return c.json({ error: 'Problem target must be an enrolled classroom student' }, 400);
+      }
       targetStudentIds.push(studentId);
     } else if (teamId) {
-      const members = await sql`SELECT student_id FROM trainer_team_members WHERE team_id = ${teamId}`;
+      const members = await sql`
+        SELECT tm.student_id
+        FROM trainer_team_members tm
+        JOIN trainer_teams t ON t.id = tm.team_id
+        JOIN users u ON u.id = tm.student_id
+        WHERE tm.team_id = ${teamId}
+          AND t.classroom_id = ${classCheck[0].classroom_id}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
+      `;
       targetStudentIds = members.map(m => m.student_id);
     }
 
@@ -1423,8 +1594,7 @@ export const getClassProblems = async (c: Context) => {
 
     if (check.length === 0) return c.json({ error: 'Class not found' }, 404);
 
-    const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
-    const isTrainer = check[0].created_by === userId || Boolean(userCheck[0]?.admin || userCheck[0]?.trainer);
+    const isTrainer = await canManageClassroom(userId, check[0].classroom_id);
     const isStudent = !!check[0].student_check;
 
     if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized access to class' }, 403);
@@ -2161,7 +2331,7 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
         SELECT t.id AS team_id, t.name AS team_name, u.id AS student_id, u.full_name, u.email
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON tm.team_id = t.id
-        LEFT JOIN users u ON u.id = tm.student_id
+        LEFT JOIN users u ON u.id = tm.student_id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
         WHERE t.classroom_id = ${classroomId}
         ORDER BY t.name ASC, u.full_name ASC
       `,
@@ -2175,12 +2345,16 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
         SELECT tm.student_id, COALESCE(progress.status, 'not_solved') AS status
         FROM classroom_team_topic_assignments a
         JOIN trainer_team_members tm ON tm.team_id = a.team_id
+        JOIN users u ON u.id = tm.student_id
         JOIN classroom_topic_problems problem ON problem.topic_id = a.topic_id
         LEFT JOIN classroom_topic_problem_progress progress
           ON progress.assignment_id = a.id
           AND progress.topic_problem_id = problem.id
           AND progress.student_id = tm.student_id
-        WHERE a.classroom_id = ${classroomId} AND a.status = 'active'
+        WHERE a.classroom_id = ${classroomId}
+          AND a.status = 'active'
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
       `,
     ]);
 
@@ -2358,9 +2532,13 @@ export const listClassroomIdeActivity = async (c: Context) => {
 
     if (requestedStudentId) {
       const studentRows = await sql`
-        SELECT student_id
-        FROM classroom_students
-        WHERE classroom_id = ${classroomId} AND student_id = ${requestedStudentId}
+        SELECT cs.student_id
+        FROM classroom_students cs
+        JOIN users u ON u.id = cs.student_id
+        WHERE cs.classroom_id = ${classroomId}
+          AND cs.student_id = ${requestedStudentId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
       `;
       if (studentRows.length === 0) {
         return c.json({ error: 'Student is not enrolled in this classroom' }, 400);
@@ -2377,7 +2555,10 @@ export const listClassroomIdeActivity = async (c: Context) => {
         FROM classroom_ide_sessions s
         JOIN users u ON u.id = s.student_id
         LEFT JOIN classes cl ON cl.id = s.class_id
-        WHERE s.classroom_id = ${classroomId} AND s.student_id = ${requestedStudentId}
+        WHERE s.classroom_id = ${classroomId}
+          AND s.student_id = ${requestedStudentId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY s.updated_at DESC
       `
       : sql`
@@ -2390,6 +2571,8 @@ export const listClassroomIdeActivity = async (c: Context) => {
         JOIN users u ON u.id = s.student_id
         LEFT JOIN classes cl ON cl.id = s.class_id
         WHERE s.classroom_id = ${classroomId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY s.updated_at DESC
       `;
     const eventsQuery = requestedStudentId
@@ -2400,7 +2583,10 @@ export const listClassroomIdeActivity = async (c: Context) => {
           u.email AS student_email
         FROM classroom_ide_events e
         JOIN users u ON u.id = e.student_id
-        WHERE e.classroom_id = ${classroomId} AND e.student_id = ${requestedStudentId}
+        WHERE e.classroom_id = ${classroomId}
+          AND e.student_id = ${requestedStudentId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY e.created_at DESC
         LIMIT ${limit}
       `
@@ -2412,6 +2598,8 @@ export const listClassroomIdeActivity = async (c: Context) => {
         FROM classroom_ide_events e
         JOIN users u ON u.id = e.student_id
         WHERE e.classroom_id = ${classroomId}
+          AND u.admin IS NOT TRUE
+          AND u.trainer IS NOT TRUE
         ORDER BY e.created_at DESC
         LIMIT ${limit}
       `;
@@ -2634,7 +2822,14 @@ export const addResource = async (c: Context) => {
     `;
 
     // Notify students
-    const students = await sql`SELECT student_id FROM classroom_students WHERE classroom_id = ${classroomId}`;
+    const students = await sql`
+      SELECT cs.student_id
+      FROM classroom_students cs
+      JOIN users u ON u.id = cs.student_id
+      WHERE cs.classroom_id = ${classroomId}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
+    `;
     const notificationLink = `/classroom/live/${classroomId}/resources/${result[0].id}`;
     await createNotifications(
       students.map(student => student.student_id),
@@ -2672,7 +2867,44 @@ export const getClassResourceDetail = async (c: Context) => {
       LIMIT 1
     `;
 
-    if (resources.length === 0) return c.json({ error: 'Resource not found' }, 404);
+    if (resources.length === 0) {
+      const topicResources = await sql`
+        SELECT
+          r.*,
+          t.classroom_id,
+          t.title AS topic_title,
+          t.module AS topic_module,
+          cr.name AS classroom_name,
+          cr.description AS classroom_description
+        FROM classroom_topic_resources r
+        JOIN classroom_topics t ON t.id = r.topic_id
+        JOIN classrooms cr ON cr.id = t.classroom_id
+        WHERE r.id = ${resourceId} AND t.classroom_id = ${classroomId}
+        LIMIT 1
+      `;
+
+      if (topicResources.length === 0) return c.json({ error: 'Resource not found' }, 404);
+
+      const row = topicResources[0];
+      return c.json({
+        resource: {
+          ...row,
+          class_id: null,
+          source_type: 'topic',
+        },
+        classroom: {
+          id: classroomId,
+          name: row.classroom_name,
+          description: row.classroom_description,
+        },
+        classItem: null,
+        topic: {
+          id: row.topic_id,
+          title: row.topic_title,
+          module: row.topic_module,
+        },
+      });
+    }
 
     const row = resources[0];
     return c.json({

@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-07-26 - trainer-qa-fixes-20260726 - Auto-Mode Trainer QA Fix Decisions
+
+Source:
+- `docs/decisions/trainer-qa-fixes-20260726-technical-decisions.md`
+
+Fact:
+Trainer QA fixes should prevent future trainer/admin student pollution and filter polluted rosters without destructive cleanup; extend existing classroom resource reader lookup for topic resources; fix trainer form analytics client-side from existing response JSON; keep DB/API `team` names while user-facing copy says Group; use honest unavailable metadata fallbacks; and keep board fixes presentation-only.
+
+Applies when:
+Fixing or reviewing trainer classroom roster, topic resource, form analytics, group terminology, problem preview, or board UI behavior.
+
+Do not overgeneralize:
+Do not delete existing enrollment rows or rename API/database contracts without a separate explicit approval.
+
 ## 2026-07-26 - trainer-logout-option - Dedicated Trainer Logout Button and Mobile Nav Support
 
 Source:

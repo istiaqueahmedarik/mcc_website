@@ -208,3 +208,31 @@ Changing classroom team create/edit flows or assignment logic that trusts team m
 
 Do not overgeneralize:
 This does not replace route-level authorization; keep both permission checks and domain validation.
+
+## 2026-07-26 - trainer-qa-fixes-20260726 - Student Workflow Lists Must Be Role Clean
+
+Source:
+- `docs/reviews/trainer-qa-fixes-20260726-implementation-review.md`
+
+Rule:
+Classroom student-only workflows must filter or reject trainer/admin users on the server before returning rosters, group candidates, attendance rows, assignment targets, IDE monitor sources, or student notifications.
+
+Applies when:
+Changing classroom enrollment, People/Groups, attendance, assignments, IDE monitor reads, or student-targeted notifications.
+
+Do not overgeneralize:
+Do not delete existing enrollment rows without an explicit cleanup RSD and rollback plan.
+
+## 2026-07-26 - trainer-qa-fixes-20260726 - Honest External Problem Metadata
+
+Source:
+- `docs/reviews/trainer-qa-fixes-20260726-implementation-review.md`
+
+Rule:
+Problem previews and saved assignment metadata must omit unavailable external judge limits or state that they are unavailable, rather than inventing placeholder limits such as `Standard sec | Standard MB`.
+
+Applies when:
+Changing `fetchProblemMetadata`, `problem-preview`, or classroom problem assignment displays.
+
+Do not overgeneralize:
+It is still valid to show real parsed time/memory limits when the source provides them.

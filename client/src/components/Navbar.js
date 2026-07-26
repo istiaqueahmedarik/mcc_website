@@ -161,20 +161,20 @@ const Navbar = async () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          {loggedIn && (
+          {isLoggedIn && (
             <NotificationBell
-              userId={user && user.result && user.result[0] && user.result[0].id}
+              userId={profile?.id}
             />
           )}
           <ThemeChanger />
           <div className="hidden md:flex items-center space-x-2">
-            <ProgressLink href="/login" className={`${loggedIn && "hidden"}`}>
+            <ProgressLink href="/login" className={`${isLoggedIn && "hidden"}`}>
               <Button variant="outline" size="sm">
                 <LogIn className="w-4 h-4 mr-2" />
                 Login
               </Button>
             </ProgressLink>
-            <ProgressLink href="/signup" className={`${loggedIn && "hidden"}`}>
+            <ProgressLink href="/signup" className={`${isLoggedIn && "hidden"}`}>
               <Button variant="default" size="sm">
                 <UserPlus className="w-4 h-4 mr-2" />
                 Sign Up
@@ -182,15 +182,15 @@ const Navbar = async () => {
             </ProgressLink>
             <ProgressLink
               href={profileHref}
-              className={`${!loggedIn && "hidden"}`}
+              className={`${!isLoggedIn && "hidden"}`}
             >
 
               <Avatar className="w-8 h-8">
                 <AvatarImage
-                  src={user && user.result && user.result[0].profile_pic}
+                  src={profile?.profile_pic}
                 />
                 <AvatarFallback>
-                  {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
+                  {profile?.full_name?.[0]}
                 </AvatarFallback>
               </Avatar>
             </ProgressLink>
@@ -276,7 +276,7 @@ const Navbar = async () => {
                   <hr className="my-4" />
                   <ProgressLink
                     href="/login"
-                    className={`${loggedIn && "hidden"}`}
+                    className={`${isLoggedIn && "hidden"}`}
                   >
                     <Button
                       variant="outline"
@@ -288,7 +288,7 @@ const Navbar = async () => {
                   </ProgressLink>
                   <ProgressLink
                     href="/signup"
-                    className={`${loggedIn && "hidden"}`}
+                    className={`${isLoggedIn && "hidden"}`}
                   >
                     <Button
                       variant="default"
@@ -300,21 +300,21 @@ const Navbar = async () => {
                   </ProgressLink>
                   <ProgressLink
                     href={profileHref}
-                    className={`${!loggedIn && "hidden"}`}
+                    className={`${!isLoggedIn && "hidden"}`}
                   >
                     <div className="flex items-center gap-3 py-1">
                       <Avatar className="w-8 h-8">
                         <AvatarImage
-                          src={user && user.result && user.result[0].profile_pic}
+                          src={profile?.profile_pic}
                         />
                         <AvatarFallback>
-                          {user && user.result && user.result[0].full_name && user.result[0].full_name[0]}
+                          {profile?.full_name?.[0]}
                         </AvatarFallback>
                       </Avatar>
                       <span className="text-base font-medium">My Profile</span>
                     </div>
                   </ProgressLink>
-                  {loggedIn && (
+                  {isLoggedIn && (
                     <form action={logout} className="pt-2">
                       <Button
                         type="submit"

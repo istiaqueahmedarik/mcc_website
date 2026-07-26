@@ -51,7 +51,7 @@ import {
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
   Check, ChevronsUpDown, X, ThumbsUp, Heart, PartyPopper,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
-  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer
+  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save
 } from 'lucide-react';
 import {
   Dialog,
@@ -125,7 +125,7 @@ const trainerClassroomSteps = [
     element: "#classroom-tour-tab-analytics",
     popover: {
       title: "👥 Groups Tab",
-      description: "View the team matrix: each column is a student, each row is a problem. See solve status, perceived difficulty ratings, and team-level statistics at a glance.",
+      description: "View the group matrix: each column is a student, each row is a problem. See solve status, perceived difficulty ratings, and group-level statistics at a glance.",
       side: "bottom",
       align: "start",
     },
@@ -152,7 +152,7 @@ const trainerClassroomSteps = [
     element: "#classroom-tour-tab-students",
     popover: {
       title: "👤 People Tab",
-      description: "Browse the student roster, view team assignments, and check who is enrolled in this classroom. Useful for managing large cohorts.",
+      description: "Browse the student roster, view group assignments, and check who is enrolled in this classroom. Useful for managing large cohorts.",
       side: "bottom",
       align: "start",
     },
@@ -180,7 +180,7 @@ const studentClassroomSteps = [
   {
     popover: {
       title: "🎓 Welcome to Your Classroom!",
-      description: "This is your learning hub for this class. Here you'll find your assigned topics, live session access, practice challenges, and your team. Let's take a quick look around!",
+      description: "This is your learning hub for this class. Here you'll find your assigned topics, live session access, practice challenges, and your group. Let's take a quick look around!",
       side: "center",
       align: "center",
     },
@@ -224,8 +224,8 @@ const studentClassroomSteps = [
   {
     element: "#student-tour-tab-people",
     popover: {
-      title: "👫 Team & Roster",
-      description: "See who is in your group and the full classroom roster. Group assignments come from your trainer — you'll collaborate and compete as a team during live sessions.",
+      title: "👫 Group & Roster",
+      description: "See who is in your group and the full classroom roster. Group assignments come from your trainer — you'll collaborate and compete as a group during live sessions.",
       side: "bottom",
       align: "start",
     },
@@ -291,6 +291,14 @@ const RESOURCE_BATCH_SIZE = 6;
 const PROBLEM_BATCH_SIZE = 8;
 const HISTORY_BATCH_SIZE = 8;
 const PEOPLE_BATCH_SIZE = 12;
+
+function toDatetimeLocalValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
 
 const statusCopy = {
   not_solved: 'Not solved',
@@ -468,6 +476,9 @@ function ProblemPreviewPanel({
   platform,
 }) {
   if (!loading && !error && !preview && !problemLink) return null;
+  const previewDetails = preview?.details && !/standard\s+sec|standard\s+mb/i.test(preview.details)
+    ? preview.details
+    : '';
 
   return (
     <div className="rounded-lg border bg-card p-4 md:col-span-2">
@@ -481,7 +492,7 @@ function ProblemPreviewPanel({
             {preview?.title || 'Review problem before assigning'}
           </h3>
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-            {preview?.details || 'Fetch metadata to show students a richer challenge card.'}
+            {preview ? (previewDetails || 'Limits unavailable from preview metadata.') : 'Fetch metadata to show students a richer challenge card.'}
           </p>
         </div>
         <Badge variant="outline" className="w-fit capitalize">
@@ -927,7 +938,7 @@ function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerif
     return (
       <Card className="rounded-lg border border-dashed">
         <CardContent className="grid min-h-[180px] place-items-center p-6 text-center text-sm text-muted-foreground">
-          No team topic assignments yet.
+          No group topic assignments yet.
         </CardContent>
       </Card>
     );
@@ -1109,7 +1120,7 @@ function TeamDashboardPanel({
     return (
       <Card className="rounded-lg border border-dashed">
         <CardContent className="grid min-h-[220px] place-items-center p-6 text-center text-sm text-muted-foreground">
-          No teams created yet.
+          No groups created yet.
         </CardContent>
       </Card>
     );
@@ -1162,17 +1173,17 @@ function TeamDashboardPanel({
 
   return (
     <div className="space-y-4">
-      {/* HEADER & TEAM SEARCH TOOLBAR (NO TOP STAT CARDS) */}
+      {/* HEADER & GROUP SEARCH TOOLBAR (NO TOP STAT CARDS) */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
         <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-primary shrink-0" />
-          <h3 className="text-lg font-bold tracking-tight">Classroom Teams ({filteredTeamRows.length})</h3>
+          <h3 className="text-lg font-bold tracking-tight">Classroom Groups ({filteredTeamRows.length})</h3>
         </div>
 
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search teams or members..."
+            placeholder="Search groups or members..."
             value={teamSearchQuery}
             onChange={(e) => setTeamSearchQuery(e.target.value)}
             className="h-8 w-full sm:w-[240px] pl-8 text-xs"
@@ -1182,7 +1193,7 @@ function TeamDashboardPanel({
 
       {filteredTeamRows.length === 0 ? (
         <Card className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
-          {teamSearchQuery ? 'No teams match your search query.' : 'No teams created yet.'}
+          {teamSearchQuery ? 'No groups match your search query.' : 'No groups created yet.'}
         </Card>
       ) : (
         <div className="space-y-4">
@@ -1251,7 +1262,7 @@ function TeamDashboardPanel({
                     <ProgressLink href={`/classroom/live/${classroomId}/teams/${team.id}`}>
                       <Button size="sm" className="gap-1.5 font-semibold">
                         <BarChart3 className="h-3.5 w-3.5" />
-                        View Team Matrix
+                        View Group Matrix
                       </Button>
                     </ProgressLink>
                   </div>
@@ -1261,22 +1272,26 @@ function TeamDashboardPanel({
                 {editingTeamId === team.id && (
                   <div className="space-y-2 rounded-lg border bg-muted/10 p-3">
                     <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold">Team members</span>
+                      <span className="font-semibold">Group members</span>
                       <Badge variant="outline" className="text-[10px]">
                         {editingTeamStudentIds.length} selected
                       </Badge>
                     </div>
                     <div className="grid max-h-[220px] gap-1.5 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
-                      {students.map((student) => (
-                        <label key={`${team.id}-${student.id}-analytics-edit`} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
+                      {students.map((student) => {
+                        const inputId = `group-${team.id}-${student.id}-analytics-edit`;
+                        return (
+                        <label key={`${team.id}-${student.id}-analytics-edit`} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
                           <input
+                            id={inputId}
                             type="checkbox"
                             checked={editingTeamStudentIds.includes(student.id)}
                             onChange={() => onToggleEditTeamStudent(student.id)}
                           />
                           <span className="min-w-0 truncate">{student.full_name}</span>
                         </label>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1333,7 +1348,7 @@ function TeamDashboardPanel({
           onClick={() => setVisibleTeamCount((c) => c + 5)}
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Show more teams ({filteredTeamRows.length - visibleTeamCount} remaining)
+          Show more groups ({filteredTeamRows.length - visibleTeamCount} remaining)
         </Button>
       )}
     </div>
@@ -1361,18 +1376,11 @@ function ClassroomBoardPanel({ classroomId, isTrainer, activeClass, boardSession
               <RefreshCw className={`h-4 w-4 ${boardLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
-            {isTrainer && (
-              boardSession ? (
+            {isTrainer && boardSession && (
                 <Button type="button" variant="outline" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" onClick={onStop}>
                   <Square className="h-4 w-4" />
                   Stop broadcast
                 </Button>
-              ) : (
-                <Button type="button" size="sm" className="gap-1.5" onClick={onStart}>
-                  <Radio className="h-4 w-4" />
-                  Start broadcast
-                </Button>
-              )
             )}
           </div>
         </div>
@@ -1617,6 +1625,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [studentEmail, setStudentEmail] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamStudentIds, setTeamStudentIds] = useState([]);
+  const [teamFormError, setTeamFormError] = useState('');
   const [className, setClassName] = useState('');
   const [classSchedule, setClassSchedule] = useState('');
   const [resourceTitle, setResourceTitle] = useState('');
@@ -1631,6 +1640,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   // CP Problem Assignment Form States
   const [assignTarget, setAssignTarget] = useState({ type: 'student', id: '' });
   const [assignTargetStr, setAssignTargetStr] = useState('');
+  const [assignProblemError, setAssignProblemError] = useState('');
   const [problemPlatform, setProblemPlatform] = useState('codeforces');
   const [problemLink, setProblemLink] = useState('');
   const [problemTimer, setProblemTimer] = useState('60');
@@ -1682,10 +1692,10 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({
     liveProgress: false,
-    scheduleClass: false,
-    schedules: false,
-    students: false,
-    teams: false,
+    scheduleClass: true,
+    schedules: true,
+    students: true,
+    teams: true,
     studentChallenges: false,
     studentTopics: false,
     history: false,
@@ -2158,12 +2168,21 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
-  // Manage Teams
+  // Manage Groups
   const handleCreateTeam = async (e) => {
     e.preventDefault();
-    if (!teamName || teamStudentIds.length === 0) return;
+    const name = teamName.trim();
+    if (!name) {
+      setTeamFormError('Enter a group name.');
+      return;
+    }
+    if (teamStudentIds.length === 0) {
+      setTeamFormError('Select at least one group member.');
+      return;
+    }
+    setTeamFormError('');
     const res = await post_with_token(`classroom/${classroomId}/create-team`, {
-      name: teamName,
+      name,
       studentIds: teamStudentIds
     });
     if (res && res.success) {
@@ -2171,7 +2190,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       setTeamStudentIds([]);
       fetchClassroomDetails();
     } else {
-      alert(res?.error || 'Failed to create team');
+      setTeamFormError(res?.error || 'Failed to create group');
     }
   };
 
@@ -2205,12 +2224,26 @@ export default function ClassroomLiveClient({ classroomId }) {
       fetchClassroomDetails();
       fetchTopicData();
     } else {
-      alert(res?.error || 'Failed to update team members');
+      alert(res?.error || 'Failed to update group members');
     }
   };
 
   const [classSessionType, setClassSessionType] = useState('onsite');
   const [classDurationMinutes, setClassDurationMinutes] = useState('90');
+  const [classroomEditOpen, setClassroomEditOpen] = useState(false);
+  const [classroomEditForm, setClassroomEditForm] = useState({ name: '', description: '' });
+  const [classroomEditError, setClassroomEditError] = useState('');
+  const [classroomEditSaving, setClassroomEditSaving] = useState(false);
+  const [sessionEditOpen, setSessionEditOpen] = useState(false);
+  const [sessionEditClass, setSessionEditClass] = useState(null);
+  const [sessionEditForm, setSessionEditForm] = useState({
+    name: '',
+    scheduledTime: '',
+    sessionType: 'onsite',
+    durationMinutes: '90',
+  });
+  const [sessionEditError, setSessionEditError] = useState('');
+  const [sessionEditSaving, setSessionEditSaving] = useState(false);
 
   // Session Attendance State
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
@@ -2285,6 +2318,78 @@ export default function ClassroomLiveClient({ classroomId }) {
       alert('Error saving attendance');
     } finally {
       setAttendanceSaving(false);
+    }
+  };
+
+  const openClassroomEditDialog = () => {
+    setClassroomEditForm({
+      name: classroom?.name || '',
+      description: classroom?.description || '',
+    });
+    setClassroomEditError('');
+    setClassroomEditOpen(true);
+  };
+
+  const handleUpdateClassroom = async (e) => {
+    e.preventDefault();
+    const name = classroomEditForm.name.trim();
+    if (!name) {
+      setClassroomEditError('Classroom name is required');
+      return;
+    }
+
+    setClassroomEditSaving(true);
+    setClassroomEditError('');
+    const res = await post_with_token(`classroom/${classroomId}/update`, {
+      name,
+      description: classroomEditForm.description.trim(),
+    });
+    setClassroomEditSaving(false);
+    if (res?.success) {
+      setClassroomEditOpen(false);
+      fetchClassroomDetails();
+    } else {
+      setClassroomEditError(res?.error || 'Failed to update classroom');
+    }
+  };
+
+  const openSessionEditDialog = (classItem) => {
+    setSessionEditClass(classItem);
+    setSessionEditForm({
+      name: classItem?.name || '',
+      scheduledTime: toDatetimeLocalValue(classItem?.scheduled_time),
+      sessionType: classItem?.session_type === 'online' ? 'online' : 'onsite',
+      durationMinutes: String(classItem?.duration_minutes || 90),
+    });
+    setSessionEditError('');
+    setSessionEditOpen(true);
+  };
+
+  const handleUpdateSession = async (e) => {
+    e.preventDefault();
+    if (!sessionEditClass) return;
+    const name = sessionEditForm.name.trim();
+    if (!name || !sessionEditForm.scheduledTime) {
+      setSessionEditError('Session name and time are required');
+      return;
+    }
+
+    setSessionEditSaving(true);
+    setSessionEditError('');
+    const res = await post_with_token(`classroom/${classroomId}/class/${sessionEditClass.id}/update`, {
+      name,
+      scheduledTime: sessionEditForm.scheduledTime,
+      sessionType: sessionEditForm.sessionType,
+      durationMinutes: Number(sessionEditForm.durationMinutes) || 90,
+    });
+    setSessionEditSaving(false);
+    if (res?.success) {
+      setSessionEditOpen(false);
+      setSessionEditClass(null);
+      fetchClassroomDetails();
+      if (attendanceSummary) fetchAttendanceSummary();
+    } else {
+      setSessionEditError(res?.error || 'Failed to update class session');
     }
   };
 
@@ -2554,11 +2659,16 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const handleAssignProblem = async (e) => {
     e.preventDefault();
-    if (!activeClass || !problemLink) return;
+    if (!activeClass || !problemLink.trim()) return;
+    if (!assignTarget.id) {
+      setAssignProblemError('Choose a student or group before assigning.');
+      return;
+    }
+    setAssignProblemError('');
     const payload = {
       classId: activeClass.id,
       platform: problemPlatform,
-      problemLink,
+      problemLink: problemLink.trim(),
       timerMinutes: problemTimer ? parseInt(problemTimer) : null,
       difficulty: problemDifficulty.trim() || 'Trainer selected',
       tags: problemTags
@@ -2581,7 +2691,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       fetchProblemTags();
       fetchProblems(activeClass.id);
     } else {
-      alert(res?.error || 'Failed to assign problem');
+      setAssignProblemError(res?.error || 'Failed to assign problem');
     }
   };
 
@@ -2714,6 +2824,18 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <GraduationCap className="h-3 w-3" /> Student view
               </Badge>
             )}
+            {isTrainer && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={openClassroomEditDialog}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit classroom
+              </Button>
+            )}
           </div>
           <h1 className="mt-2 truncate text-3xl font-bold leading-tight sm:text-4xl">{classroom.name}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -2842,6 +2964,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               onChange={(e) => {
                                 const val = e.target.value;
                                 setAssignTargetStr(val);
+                                setAssignProblemError('');
                                 if (val.startsWith('team-')) {
                                   setAssignTarget({ type: 'team', id: val.substring(5) });
                                 } else if (val.startsWith('student-')) {
@@ -2853,11 +2976,20 @@ export default function ClassroomLiveClient({ classroomId }) {
                               className="w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
                               required
                             >
-                              <option value="">-- Choose student --</option>
+                              <option value="">-- Choose student or group --</option>
                                 {students.map(s => (
                                   <option key={s.id} value={`student-${s.id}`}>{s.full_name}</option>
                                 ))}
+                                {teams.map(t => (
+                                  <option key={t.id} value={`team-${t.id}`}>Group: {t.name}</option>
+                                ))}
                             </select>
+                            {assignProblemError && (
+                              <p className="flex items-center gap-1 text-xs font-semibold text-red-600">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                {assignProblemError}
+                              </p>
+                            )}
                           </div>
 
                           <div className="min-w-0 space-y-1">
@@ -3125,7 +3257,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                 )}
               </TabsContent>
 
-              {/* TOPIC UNIT / TEAM ASSIGNMENT TAB */}
+              {/* TOPIC UNIT / GROUP ASSIGNMENT TAB */}
               <TabsContent value="topics" className="space-y-4">
                 {/* WORKSPACE HEADER & TOPIC METRICS */}
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
@@ -3133,7 +3265,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     <div className="flex flex-wrap items-center gap-2.5">
                       <div className="flex items-center gap-2">
                         <Layers3 className="h-5 w-5 text-primary shrink-0" />
-                        <h2 className="text-xl font-bold tracking-tight">Topic Studio &amp; Team Assignments</h2>
+                        <h2 className="text-xl font-bold tracking-tight">Topic Studio &amp; Group Assignments</h2>
                       </div>
                       <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-1 text-xs font-semibold">
                         <span className="text-muted-foreground">Topics:</span>
@@ -3145,7 +3277,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </div>
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Build structured learning units with resources and problems, then assign them to student teams.
+                      Build structured learning units with resources and problems, then assign them to student groups.
                     </p>
                   </div>
 
@@ -3186,7 +3318,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </div>
                       <h3 className="text-lg font-bold">No topic units built yet</h3>
                       <p className="text-sm text-muted-foreground">
-                        Create topic units containing learning resources and problem sets to assign to classroom teams.
+                        Create topic units containing learning resources and problem sets to assign to classroom groups.
                       </p>
                       <Button
                         type="button"
@@ -3257,7 +3389,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
                                   <Users className="h-3 w-3" />
-                                  {activeAssignmentsCount} teams
+                                  {activeAssignmentsCount} groups
                                 </span>
                               </div>
                             </button>
@@ -3333,7 +3465,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               }}
                             >
                               <Target className="h-3.5 w-3.5" />
-                              Assign Team
+                              Assign Group
                             </Button>
                           </div>
                         </div>
@@ -3388,7 +3520,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               }`}
                             >
                               <Users className="h-3.5 w-3.5" />
-                              Teams
+                              Groups
                               <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">{topicAssignmentsList.length}</Badge>
                             </button>
                           </div>
@@ -3411,7 +3543,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 </div>
                                 <div className="space-y-0.5">
                                   <p className="text-base font-bold text-foreground">{topicAssignmentsList.length}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium">Assigned Teams</p>
+                                  <p className="text-[11px] text-muted-foreground font-medium">Assigned Groups</p>
                                 </div>
                               </div>
 
@@ -3693,13 +3825,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                             </section>
                           )}
 
-                          {/* 4. TEAMS SUB-TAB */}
+                          {/* 4. GROUPS SUB-TAB */}
                           {activeStudioTab === 'teams' && (
                             <section className="space-y-4">
                               <div className="flex items-center justify-between border-b pb-3">
                                 <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
                                   <Users className="h-4 w-4 text-primary" />
-                                  Assigned Teams ({topicAssignmentsList.length})
+                                  Assigned Groups ({topicAssignmentsList.length})
                                 </h4>
                                 <Button
                                   type="button"
@@ -3711,13 +3843,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                                   }}
                                 >
                                   <Target className="h-3.5 w-3.5" />
-                                  Assign Team
+                                  Assign Group
                                 </Button>
                               </div>
 
                               {topicAssignmentsList.length === 0 ? (
                                 <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
-                                  No teams currently assigned to this topic unit. Click <strong>Assign Team</strong> to assign classroom teams.
+                                  No groups currently assigned to this topic unit. Click <strong>Assign Group</strong> to assign classroom groups.
                                 </div>
                               ) : (
                                 <div className="grid gap-3 sm:grid-cols-2">
@@ -3730,7 +3862,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             <Users className="h-4 w-4" />
                                           </div>
                                           <div>
-                                            <p className="text-sm font-bold text-foreground">{teamObj ? teamObj.name : (a.team_name || 'Team')}</p>
+                                            <p className="text-sm font-bold text-foreground">{teamObj ? teamObj.name : (a.team_name || 'Group')}</p>
                                             <p className="text-[11px] text-muted-foreground font-normal">Active Topic Assignment</p>
                                           </div>
                                         </div>
@@ -3761,7 +3893,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         Build topic unit
                       </DialogTitle>
                       <DialogDescription>
-                        Create a new topic unit to bundle resources and practice problems for teams.
+                        Create a new topic unit to bundle resources and practice problems for groups.
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleCreateTopic} className="space-y-4 pt-2">
@@ -3999,16 +4131,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </DialogContent>
                 </Dialog>
 
-                {/* MODAL DIALOG 4: ASSIGN TEAM */}
+                {/* MODAL DIALOG 4: ASSIGN GROUP */}
                 <Dialog open={assignTeamModalOpen} onOpenChange={setAssignTeamModalOpen}>
                   <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2 text-lg">
                         <Target className="h-5 w-5 text-primary" />
-                        Assign topic to team
+                        Assign topic to group
                       </DialogTitle>
                       <DialogDescription>
-                        Select a team to receive this topic unit&apos;s resources and problems.
+                        Select a group to receive this topic unit&apos;s resources and problems.
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleAssignTopicToTeam} className="space-y-4 pt-2">
@@ -4030,13 +4162,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-sm font-semibold">Team</label>
+                        <label className="text-sm font-semibold">Group</label>
                         <Select
                           value={topicAssignmentForm.teamId}
                           onValueChange={(value) => setTopicAssignmentForm((current) => ({ ...current, teamId: value }))}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Choose team" />
+                            <SelectValue placeholder="Choose group" />
                           </SelectTrigger>
                           <SelectContent>
                             {teams.map((team) => (
@@ -4243,6 +4375,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       variant="outline"
                                       size="sm"
                                       className="h-7 text-xs gap-1"
+                                      onClick={() => openSessionEditDialog(c)}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 text-primary" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs gap-1"
                                       onClick={() => openAttendanceModal(c)}
                                     >
                                       <UserCheck className="h-3.5 w-3.5 text-primary" />
@@ -4368,7 +4510,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                 </Card>
               </TabsContent>
 
-              {/* STUDENTS & TEAMS TAB */}
+                {/* STUDENTS & GROUPS TAB */}
               <TabsContent value="students" className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* STUDENTS MANAGEMENT */}
                 <Card className="rounded-lg border">
@@ -4430,12 +4572,12 @@ export default function ClassroomLiveClient({ classroomId }) {
                   )}
                 </Card>
 
-                {/* TEAMS SETUP */}
+                {/* GROUPS SETUP */}
                 <Card className="rounded-lg border">
                   <CollapsibleSectionHeader
                     open={sectionOpen.teams}
                     onToggle={() => toggleSection('teams')}
-                    title="Teams"
+                    title="Groups"
                     description="Group students for practice."
                     Icon={Users}
                   />
@@ -4443,39 +4585,53 @@ export default function ClassroomLiveClient({ classroomId }) {
                   <CardContent className="space-y-4">
                     <form onSubmit={handleCreateTeam} className="space-y-3">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold">Team Name</label>
+                        <label className="text-xs font-semibold">Group Name</label>
                         <Input 
                           placeholder="e.g. MCC Alpha"
                           value={teamName}
-                          onChange={(e) => setTeamName(e.target.value)}
+                          onChange={(e) => {
+                            setTeamName(e.target.value);
+                            setTeamFormError('');
+                          }}
                           required
                         />
                       </div>
                       <div className="space-y-1">
                         <label className="text-xs font-semibold">Select Members</label>
                         <div className="max-h-[140px] space-y-1.5 overflow-y-auto rounded-md border bg-background p-2">
-                          {students.map(s => (
-                            <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
+                          {students.map(s => {
+                            const inputId = `group-member-${s.id}`;
+                            return (
+                            <label key={s.id} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
                               <input 
+                                id={inputId}
                                 type="checkbox" 
                                 checked={teamStudentIds.includes(s.id)}
                                 onChange={(e) => {
+                                  setTeamFormError('');
                                   if (e.target.checked) setTeamStudentIds(prev => [...prev, s.id]);
                                   else setTeamStudentIds(prev => prev.filter(id => id !== s.id));
                                 }}
                               />
                               <span>{s.full_name}</span>
                             </label>
-                          ))}
+                            );
+                          })}
                         </div>
+                        {teamFormError && (
+                          <p className="flex items-center gap-1 text-xs font-semibold text-red-600">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {teamFormError}
+                          </p>
+                        )}
                       </div>
-                      <Button type="submit" className="w-full font-semibold">Create team</Button>
+                      <Button type="submit" className="w-full font-semibold">Create group</Button>
                     </form>
 
                     <div className="overflow-hidden rounded-lg border">
-                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Teams ({teams.length})</div>
+                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Groups ({teams.length})</div>
                       {teams.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No teams created yet.</div>
+                        <div className="p-4 text-center text-sm text-muted-foreground">No groups created yet.</div>
                       ) : (
                         <ScrollArea className="h-[420px]">
                           <div>
@@ -4528,22 +4684,26 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 {editingTeamId === t.id && (
                                   <div className="mt-3 space-y-2 rounded-md border bg-muted/10 p-2">
                                     <div className="flex items-center justify-between gap-2 text-xs">
-                                      <span className="font-semibold">Team members</span>
+                                      <span className="font-semibold">Group members</span>
                                       <Badge variant="outline" className="text-[10px]">
                                         {editingTeamStudentIds.length} selected
                                       </Badge>
                                     </div>
                                     <div className="max-h-[180px] space-y-1.5 overflow-y-auto">
-                                      {students.map(s => (
-                                        <label key={`${t.id}-${s.id}-edit`} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
+                                      {students.map(s => {
+                                        const inputId = `group-${t.id}-${s.id}-edit`;
+                                        return (
+                                        <label key={`${t.id}-${s.id}-edit`} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
                                           <input
+                                            id={inputId}
                                             type="checkbox"
                                             checked={editingTeamStudentIds.includes(s.id)}
                                             onChange={() => handleToggleEditingTeamStudent(s.id)}
                                           />
                                           <span className="min-w-0 truncate">{s.full_name}</span>
                                         </label>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
@@ -4562,7 +4722,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         onClick={() => setVisiblePeopleCount((count) => count + PEOPLE_BATCH_SIZE)}
                       >
                         <RefreshCw className="h-4 w-4" />
-                        Show more teams
+                        Show more groups
                       </Button>
                     )}
                   </CardContent>
@@ -4586,7 +4746,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                   <Award className="h-4 w-4" /> Challenges
                 </TabsTrigger>
                 <TabsTrigger id="student-tour-tab-people" value="people" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Users className="h-4 w-4" /> Team &amp; Roster
+                  <Users className="h-4 w-4" /> Group &amp; Roster
                 </TabsTrigger>
                 <TabsTrigger id="student-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
                   <UserCheck className="h-4 w-4" /> Attendance
@@ -4600,7 +4760,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     open={sectionOpen.studentTopics}
                     onToggle={() => toggleSection('studentTopics')}
                     title="Assigned topics"
-                    description="Team topic units with resources, problems, and student perceived difficulty ratings."
+                    description="Group topic units with resources, problems, and student perceived difficulty ratings."
                     Icon={Layers3}
                   >
                     <Button type="button" variant="outline" size="sm" className="gap-2" onClick={fetchTopicData} disabled={topicDataLoading}>
@@ -4812,20 +4972,20 @@ export default function ClassroomLiveClient({ classroomId }) {
                 </Card>
               </TabsContent>
 
-              {/* TAB 4: TEAM & ROSTER */}
+              {/* TAB 4: GROUP & ROSTER */}
               <TabsContent value="people">
                 <Card className="rounded-lg border">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="h-5 w-5 text-primary" /> Team &amp; Classroom Members
+                      <Users className="h-5 w-5 text-primary" /> Group &amp; Classroom Members
                     </CardTitle>
-                    <CardDescription>View your assigned team and classmates in this classroom.</CardDescription>
+                    <CardDescription>View your assigned group and classmates in this classroom.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Teams</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Groups</h4>
                       {teams.length === 0 ? (
-                        <p className="text-xs text-muted-foreground border border-dashed rounded-lg p-4">No teams created yet.</p>
+                        <p className="text-xs text-muted-foreground border border-dashed rounded-lg p-4">No groups created yet.</p>
                       ) : (
                         <div className="grid gap-3 sm:grid-cols-2">
                           {visibleTeams.map((t) => (
@@ -5357,6 +5517,126 @@ export default function ClassroomLiveClient({ classroomId }) {
           </Card>
         </div>
       </div>
+      <Dialog open={classroomEditOpen} onOpenChange={setClassroomEditOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Edit classroom
+            </DialogTitle>
+            <DialogDescription>
+              Update the trainer-facing classroom name and description.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateClassroom} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Classroom name</label>
+              <Input
+                value={classroomEditForm.name}
+                onChange={(e) => setClassroomEditForm((current) => ({ ...current, name: e.target.value }))}
+                maxLength={120}
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Description</label>
+              <Textarea
+                value={classroomEditForm.description}
+                onChange={(e) => setClassroomEditForm((current) => ({ ...current, description: e.target.value }))}
+                maxLength={1000}
+                rows={4}
+              />
+            </div>
+            {classroomEditError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {classroomEditError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setClassroomEditOpen(false)} disabled={classroomEditSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={classroomEditSaving} className="gap-1.5">
+                {classroomEditSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save classroom
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={sessionEditOpen} onOpenChange={setSessionEditOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Edit class session
+            </DialogTitle>
+            <DialogDescription>
+              Modify the session name, time, type, and planned duration.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateSession} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Session name</label>
+              <Input
+                value={sessionEditForm.name}
+                onChange={(e) => setSessionEditForm((current) => ({ ...current, name: e.target.value }))}
+                maxLength={160}
+                required
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Scheduled time</label>
+                <Input
+                  type="datetime-local"
+                  value={sessionEditForm.scheduledTime}
+                  onChange={(e) => setSessionEditForm((current) => ({ ...current, scheduledTime: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold">Duration minutes</label>
+                <Input
+                  type="number"
+                  min="15"
+                  max="1440"
+                  value={sessionEditForm.durationMinutes}
+                  onChange={(e) => setSessionEditForm((current) => ({ ...current, durationMinutes: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Session type</label>
+              <select
+                value={sessionEditForm.sessionType}
+                onChange={(e) => setSessionEditForm((current) => ({ ...current, sessionType: e.target.value }))}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="onsite">Onsite</option>
+                <option value="online">Online</option>
+              </select>
+            </div>
+            {sessionEditError && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {sessionEditError}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setSessionEditOpen(false)} disabled={sessionEditSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={sessionEditSaving} className="gap-1.5">
+                {sessionEditSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Save session
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Session Attendance Dialog */}
       <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
         <DialogContent className="sm:max-w-[700px]">

@@ -84,6 +84,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
   const [liveProblems, setLiveProblems] = useState([]);
   const [analytics, setAnalytics] = useState([]);
   const [selectedTopicTab, setSelectedTopicTab] = useState("all");
+  const [isTrainer, setIsTrainer] = useState(false);
   const [editingTeam, setEditingTeam] = useState(false);
   const [editingStudentIds, setEditingStudentIds] = useState([]);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -111,6 +112,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
 
     if (classDetails && !classDetails.error) {
       targetClassroom = classDetails.classroom || null;
+      setIsTrainer(Boolean(classDetails.isTrainer));
       setStudents(classDetails.students || []);
       targetTeam = (classDetails.teams || []).find(
         (t) => String(t.id).toLowerCase() === String(teamId).toLowerCase()
@@ -169,7 +171,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
   }, [fetchData]);
 
   const handleStartEdit = () => {
-    if (!team) return;
+    if (!team || !isTrainer) return;
     setEditingStudentIds((team.members || []).map((m) => m.id));
     setEditingTeam(true);
   };
@@ -183,7 +185,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
   };
 
   const handleSaveMembers = async () => {
-    if (!team) return;
+    if (!team || !isTrainer) return;
     setUpdateLoading(true);
     setError("");
     const res = await post_with_token(
@@ -194,7 +196,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
       setEditingTeam(false);
       await fetchData();
     } else {
-      setError(res?.error || "Failed to update team members");
+      setError(res?.error || "Failed to update group members");
     }
     setUpdateLoading(false);
   };
@@ -204,7 +206,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
       <div className="grid min-h-screen place-items-center bg-background">
         <div className="flex items-center gap-3 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-sm font-medium">Loading team matrix...</span>
+          <span className="text-sm font-medium">Loading group matrix...</span>
         </div>
       </div>
     );
@@ -222,9 +224,9 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
             Back to classroom
           </ProgressLink>
           <Card className="border-dashed p-8 text-center">
-            <h2 className="text-xl font-bold">Team not found</h2>
+            <h2 className="text-xl font-bold">Group not found</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              The requested team could not be found in this classroom.
+              The requested group could not be found in this classroom.
             </p>
           </Card>
         </div>
@@ -430,7 +432,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
               Solve Rate: {teamAnalytics.solveRate}%
             </Badge>
 
-            {editingTeam ? (
+            {isTrainer && editingTeam ? (
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -456,7 +458,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                   Save Members
                 </Button>
               </div>
-            ) : (
+            ) : isTrainer ? (
               <Button
                 type="button"
                 variant="outline"
@@ -467,16 +469,16 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                 <Pencil className="h-3.5 w-3.5" />
                 Edit Group Members
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
 
         {/* Member Editing Panel */}
-        {editingTeam && (
+        {isTrainer && editingTeam && (
           <Card className="border bg-muted/20">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-sm font-bold flex items-center justify-between">
-                <span>Select Team Members</span>
+                <span>Select Group Members</span>
                 <Badge variant="outline" className="text-[10px]">
                   {editingStudentIds.length} selected
                 </Badge>
@@ -487,12 +489,16 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                 <p className="text-xs text-red-500 mb-2 font-medium">{error}</p>
               )}
               <div className="grid max-h-[220px] gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
-                {students.map((student) => (
+                {students.map((student) => {
+                  const inputId = `matrix-group-member-${student.id}`;
+                  return (
                   <label
                     key={student.id}
+                    htmlFor={inputId}
                     className="flex cursor-pointer items-center gap-2 rounded border bg-card p-2 text-xs hover:bg-muted/50"
                   >
                     <input
+                      id={inputId}
                       type="checkbox"
                       checked={editingStudentIds.includes(student.id)}
                       onChange={() => handleToggleStudent(student.id)}
@@ -501,7 +507,8 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
                       {student.full_name || student.email}
                     </span>
                   </label>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -547,7 +554,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-bold flex items-center gap-2 mr-2">
                 <Table className="h-4 w-4 text-muted-foreground" />
-                Team Problem Matrix
+                Group Problem Matrix
               </h2>
 
               <Button
