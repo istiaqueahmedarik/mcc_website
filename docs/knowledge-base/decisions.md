@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Pre-Enrolled Identity Model
+
+Source:
+- `docs/decisions/trainer-pre-enrolled-students-20260727-technical-decisions.md`
+- `docs/adr/0006-classroom-pre-enrolled-student-identities.md`
+
+Decision:
+Represent trainer-created pre-enrolled classroom students as disabled `users` placeholder identities plus explicit `classroom_students.enrollment_status` values (`active`, `pre_enrolled`, `link_pending`). Trainer-side roster workflows can include all three states, but student-facing classroom access requires active real membership. Signup/profile MIST ID matches create pending claims for trainer approval, not immediate access.
+
+Applies when:
+Changing classroom enrollment, roster reads, group/attendance/problem target validation, student classroom access checks, signup/profile MIST ID linking, or pre-enrollment approval flows.
+
+Do not overgeneralize:
+Do not use placeholders as login-capable accounts, do not auto-grant classroom access from unverified self-entered IDs, and do not remove role-clean student checks for trainer/admin accounts.
+
 ## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Live Progress UI-Only Refresh
 
 Source:

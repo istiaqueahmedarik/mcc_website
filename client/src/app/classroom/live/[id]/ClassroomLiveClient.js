@@ -51,7 +51,7 @@ import {
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
   Check, ChevronsUpDown, X, ThumbsUp, Heart, PartyPopper,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
-  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save
+  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info
 } from 'lucide-react';
 import {
   Dialog,
@@ -297,7 +297,7 @@ const emptyStudentImportState = {
   fileName: '',
   headers: [],
   rows: [],
-  mapping: { identifier: '' },
+  mapping: { identifier: '', fullName: '', email: '' },
   parseError: '',
   result: null,
 };
@@ -324,6 +324,19 @@ const getStudentDisplayName = (student) => student?.full_name || student?.name |
 const getStudentLabelWithId = (student) => {
   const idLabel = getStudentIdLabel(student);
   return idLabel ? `${getStudentDisplayName(student)} [${idLabel}]` : getStudentDisplayName(student);
+};
+const getStudentEnrollmentStatus = (student) => student?.enrollment_status || 'active';
+const getStudentStatusLabel = (student) => {
+  const status = getStudentEnrollmentStatus(student);
+  if (status === 'pre_enrolled') return 'Pre-enrolled';
+  if (status === 'link_pending') return 'Link pending';
+  return 'Active';
+};
+const getStudentStatusClass = (student) => {
+  const status = getStudentEnrollmentStatus(student);
+  if (status === 'pre_enrolled') return 'border-amber-500/25 bg-amber-500/10 text-amber-700';
+  if (status === 'link_pending') return 'border-blue-500/25 bg-blue-500/10 text-blue-700';
+  return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700';
 };
 
 function toDatetimeLocalValue(value) {
@@ -476,6 +489,8 @@ function guessStudentImportMapping(headers, lookupMethod) {
     identifier: lookupMethod === 'mist_id'
       ? guessHeader(headers, ['mist_id', 'student_id', 'student id', 'id'])
       : guessHeader(headers, ['email', 'student_email', 'student email']),
+    fullName: guessHeader(headers, ['full_name', 'full name', 'student_name', 'student name', 'name']),
+    email: guessHeader(headers, ['email', 'student_email', 'student email']),
   };
 }
 
@@ -493,11 +508,14 @@ function guessProblemImportMapping(headers) {
 
 function buildStudentImportPreview(importState) {
   const identifierHeader = importState.mapping.identifier;
+  const fullNameHeader = importState.mapping.fullName;
+  const emailHeader = importState.mapping.email;
   const rowErrors = [];
   const identifiers = [];
+  const rows = [];
   const seen = new Set();
 
-  if (!identifierHeader) return { identifiers, rowErrors: [{ rowNumber: '-', reason: 'Map a student identifier column.' }] };
+  if (!identifierHeader) return { identifiers, rows, rowErrors: [{ rowNumber: '-', reason: 'Map a student identifier column.' }] };
 
   importState.rows.forEach((row) => {
     const identifier = String(row[identifierHeader] || '').trim();
@@ -509,9 +527,15 @@ function buildStudentImportPreview(importState) {
     if (seen.has(key)) return;
     seen.add(key);
     identifiers.push(identifier);
+    rows.push({
+      rowNumber: row.__rowNumber,
+      identifier,
+      fullName: fullNameHeader ? String(row[fullNameHeader] || '').trim() : '',
+      email: emailHeader ? String(row[emailHeader] || '').trim() : '',
+    });
   });
 
-  return { identifiers, rowErrors };
+  return { identifiers, rows, rowErrors };
 }
 
 function normalizeProblemImportTargetType(value) {
@@ -1900,6 +1924,10 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [studentImportOpen, setStudentImportOpen] = useState(false);
   const [studentImport, setStudentImport] = useState(emptyStudentImportState);
   const [studentImportLoading, setStudentImportLoading] = useState(false);
+  const [preEnrollOpen, setPreEnrollOpen] = useState(false);
+  const [preEnrollRows, setPreEnrollRows] = useState([]);
+  const [preEnrollLoading, setPreEnrollLoading] = useState(false);
+  const [preEnrollClaimLoading, setPreEnrollClaimLoading] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamStudentIds, setTeamStudentIds] = useState([]);
   const [teamFormError, setTeamFormError] = useState('');
@@ -2018,7 +2046,8 @@ export default function ClassroomLiveClient({ classroomId }) {
   const currentUserId = data?.currentUserId || '';
   const studentImportPreview = studentImport.rows.length
     ? buildStudentImportPreview(studentImport)
-    : { identifiers: [], rowErrors: [] };
+    : { identifiers: [], rows: [], rowErrors: [] };
+  const preEnrollRowsNeedingNames = preEnrollRows.filter((row) => !String(row.fullName || '').trim()).length;
   const problemImportPreview = problemImport.rows.length
     ? buildProblemImportPreview(problemImport, students, teams)
     : { rows: [], rowErrors: [] };
@@ -2070,6 +2099,16 @@ export default function ClassroomLiveClient({ classroomId }) {
   ];
   const visibleCompletedClasses = completedClasses.slice(0, visibleHistoryCount);
   const visibleStudents = students.slice(0, visiblePeopleCount);
+  const preEnrollmentRosterStudents = students
+    .filter((student) => getStudentEnrollmentStatus(student) !== 'active')
+    .sort((a, b) => {
+      const aPending = getStudentEnrollmentStatus(a) === 'link_pending' ? 0 : 1;
+      const bPending = getStudentEnrollmentStatus(b) === 'link_pending' ? 0 : 1;
+      return aPending - bPending || getStudentDisplayName(a).localeCompare(getStudentDisplayName(b));
+    });
+  const activeRosterStudents = students.filter((student) => getStudentEnrollmentStatus(student) === 'active');
+  const visiblePreEnrollmentStudents = preEnrollmentRosterStudents.slice(0, visiblePeopleCount);
+  const visibleActiveRosterStudents = activeRosterStudents.slice(0, Math.max(visiblePeopleCount - visiblePreEnrollmentStudents.length, 0));
   const visibleTeams = teams.slice(0, visiblePeopleCount);
   const resourceTargetClassId = resourceScope === 'active' && activeClass?.id ? activeClass.id : null;
   const pastStats = getProblemStats(pastClassProblems);
@@ -2399,6 +2438,91 @@ export default function ClassroomLiveClient({ classroomId }) {
   }, [chatMessages, chatOpen]);
 
   // Manage Students
+  const buildPreEnrollRows = (rows, lookupMethod = studentLookupMethod) => (
+    (Array.isArray(rows) ? rows : []).map((row, index) => {
+      const method = row.lookupMethod || row.method || lookupMethod;
+      const identifier = String(row.identifier || row.studentIdentifier || '').trim();
+      return {
+        rowKey: `${method}-${identifier || index}-${row.rowNumber || index}`,
+        rowNumber: row.rowNumber || index + 1,
+        lookupMethod: method,
+        identifier,
+        fullName: row.fullName || row.name || '',
+        email: row.email || (method === 'email' ? identifier : ''),
+      };
+    }).filter((row) => row.identifier)
+  );
+
+  const openPreEnrollmentReview = (rows, lookupMethod = studentLookupMethod) => {
+    const reviewRows = buildPreEnrollRows(rows, lookupMethod);
+    if (reviewRows.length === 0) return false;
+    setPreEnrollRows(reviewRows);
+    setPreEnrollOpen(true);
+    return true;
+  };
+
+  const updatePreEnrollRow = (rowKey, field, value) => {
+    setPreEnrollRows((current) => current.map((row) => (
+      row.rowKey === rowKey ? { ...row, [field]: value } : row
+    )));
+  };
+
+  const handleConfirmPreEnrollment = async () => {
+    if (preEnrollRows.length === 0 || preEnrollLoading) return;
+    if (preEnrollRowsNeedingNames > 0) {
+      toast.error('Add a name for every pre-enrolled student');
+      return;
+    }
+    setPreEnrollLoading(true);
+    const toastId = toast.loading('Creating pre-enrolled students...');
+    try {
+      const res = await post_with_token(`classroom/${classroomId}/pre-enroll-students`, {
+        rows: preEnrollRows.map((row) => ({
+          lookupMethod: row.lookupMethod,
+          identifier: row.identifier,
+          fullName: row.fullName.trim(),
+          email: row.email?.trim() || undefined,
+          rowNumber: row.rowNumber,
+        })),
+      });
+      if (res?.success) {
+        setPreEnrollRows([]);
+        setPreEnrollOpen(false);
+        fetchClassroomDetails();
+        toast.success(`Pre-enrolled ${res.summary?.created || 0} students`, { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to pre-enroll students', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to pre-enroll students', { id: toastId });
+    } finally {
+      setPreEnrollLoading(false);
+    }
+  };
+
+  const handlePreEnrollmentClaim = async (student, action) => {
+    if (!student?.id || preEnrollClaimLoading) return;
+    const loadingKey = `${student.id}-${action}`;
+    setPreEnrollClaimLoading(loadingKey);
+    const toastId = toast.loading(action === 'approve' ? 'Approving account link...' : 'Rejecting account link...');
+    try {
+      const res = await post_with_token(`classroom/${classroomId}/pre-enrollment/claim`, {
+        studentId: student.id,
+        action,
+      });
+      if (res?.success) {
+        fetchClassroomDetails();
+        toast.success(action === 'approve' ? 'Student account linked' : 'Student account link rejected', { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to update account link', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to update account link', { id: toastId });
+    } finally {
+      setPreEnrollClaimLoading('');
+    }
+  };
+
   const handleAddStudent = async (e) => {
     e.preventDefault();
     if (!studentEmail.trim() || studentAddLoading) return;
@@ -2412,8 +2536,14 @@ export default function ClassroomLiveClient({ classroomId }) {
       });
       if (res && res.success) {
         setStudentEmail('');
-        fetchClassroomDetails();
-        toast.success(res.message || 'Student added', { id: toastId });
+        const needsPreEnrollment = openPreEnrollmentReview(res.notFound || [], studentLookupMethod);
+        if (!needsPreEnrollment) {
+          fetchClassroomDetails();
+          toast.success(res.message || 'Student added', { id: toastId });
+        } else {
+          fetchClassroomDetails();
+          toast.warning('Student needs pre-enrollment. Add name to continue.', { id: toastId });
+        }
       } else {
         toast.error(res?.error || 'Failed to add student', { id: toastId });
       }
@@ -2472,12 +2602,17 @@ export default function ClassroomLiveClient({ classroomId }) {
     try {
       const res = await post_with_token(`classroom/${classroomId}/add-students`, {
         lookupMethod: studentLookupMethod,
-        identifiers: preview.identifiers,
+        rows: preview.rows,
       });
       if (res?.success) {
         setStudentImport((current) => ({ ...current, result: res }));
         fetchClassroomDetails();
-        toast.success(`Students imported: ${res.summary?.added || 0} added, ${res.summary?.alreadyEnrolled || 0} already enrolled`, { id: toastId });
+        const needsPreEnrollment = openPreEnrollmentReview(res.notFound || [], studentLookupMethod);
+        if (needsPreEnrollment) {
+          toast.warning(`Imported existing students. Review ${res.summary?.notFound || 0} missing students.`, { id: toastId });
+        } else {
+          toast.success(`Students imported: ${res.summary?.added || 0} added, ${res.summary?.alreadyEnrolled || 0} already enrolled`, { id: toastId });
+        }
       } else {
         toast.error(res?.error || 'Failed to import students', { id: toastId });
       }
@@ -3200,6 +3335,60 @@ export default function ClassroomLiveClient({ classroomId }) {
       reaction,
     });
     if (res && res.success) fetchChatHistory();
+  };
+
+  const renderTrainerRosterStudent = (s) => {
+    const status = getStudentEnrollmentStatus(s);
+    const approveKey = `${s.id}-approve`;
+    const rejectKey = `${s.id}-reject`;
+
+    return (
+      <div key={s.id} className="flex items-start justify-between gap-3 border-b p-3 text-sm last:border-b-0 hover:bg-muted/10">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold">{getStudentLabelWithId(s)}</p>
+            <Badge variant="outline" className={`text-[10px] ${getStudentStatusClass(s)}`}>{getStudentStatusLabel(s)}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">{s.email || (s.is_pre_enrolled ? 'No email added yet' : 'No email')}</p>
+          {status === 'link_pending' && (
+            <p className="text-xs text-blue-700">
+              Match requested by {s.claimed_full_name || s.claimed_email || 'new account'}{s.claimed_mist_id ? ` [${s.claimed_mist_id}]` : ''}.
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {status === 'link_pending' && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                onClick={() => handlePreEnrollmentClaim(s, 'approve')}
+                disabled={Boolean(preEnrollClaimLoading)}
+              >
+                {preEnrollClaimLoading === approveKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Approve
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                onClick={() => handlePreEnrollmentClaim(s, 'reject')}
+                disabled={Boolean(preEnrollClaimLoading)}
+              >
+                {preEnrollClaimLoading === rejectKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                Reject
+              </Button>
+            </>
+          )}
+          <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveStudent(s.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -5058,7 +5247,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     open={sectionOpen.students}
                     onToggle={() => toggleSection('students')}
                     title="Students"
-                    description="Enroll by registered email."
+                    description="Enroll by email, Student ID, CSV, or pre-enroll missing accounts."
                     Icon={GraduationCap}
                   />
                   {sectionOpen.students && (
@@ -5146,9 +5335,34 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
                                     </select>
                                   </div>
+                                  <div>
+                                    <label className="text-xs font-semibold">Name column for pre-enrollment</label>
+                                    <select
+                                      value={studentImport.mapping.fullName}
+                                      onChange={(e) => updateStudentImportMapping('fullName', e.target.value)}
+                                      className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                    >
+                                      <option value="">Choose column if available</option>
+                                      {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
+                                    </select>
+                                  </div>
+                                  {studentLookupMethod === 'mist_id' && (
+                                    <div>
+                                      <label className="text-xs font-semibold">Email column (optional)</label>
+                                      <select
+                                        value={studentImport.mapping.email}
+                                        onChange={(e) => updateStudentImportMapping('email', e.target.value)}
+                                        className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                      >
+                                        <option value="">Choose column if available</option>
+                                        {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
+                                      </select>
+                                    </div>
+                                  )}
                                   <div className="rounded-md border bg-card p-3 text-xs">
                                     <p className="font-semibold">Preview</p>
                                     <p className="mt-1 text-muted-foreground">{studentImportPreview.identifiers.length} unique identifiers ready.</p>
+                                    <p className="text-muted-foreground">{studentImportPreview.rows.filter((row) => row.fullName).length} rows have names ready.</p>
                                     <p className="text-muted-foreground">{studentImportPreview.rowErrors.length} rows need attention.</p>
                                   </div>
                                 </div>
@@ -5177,25 +5391,102 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </DialogContent>
                       </Dialog>
                     </form>
-                    
+
+                    <Dialog open={preEnrollOpen} onOpenChange={setPreEnrollOpen}>
+                      <DialogContent className="sm:max-w-[820px]">
+                        <DialogHeader>
+                          <DialogTitle>Pre-enroll missing students</DialogTitle>
+                          <DialogDescription>
+                            These students do not have MCC accounts yet. Add names so trainers can use them in groups, attendance, and problem assignment. Student dashboard access stays blocked until account link approval.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
+                            <p className="font-semibold">Security note</p>
+                            <p className="mt-1">Pre-enrollment creates trainer-side roster entries only. If a student later signs up with a matching ID/email, you must approve the account link before they can access this classroom.</p>
+                          </div>
+                          <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+                            {preEnrollRows.map((row) => (
+                              <div key={row.rowKey} className="grid gap-2 rounded-md border bg-card p-3 sm:grid-cols-[90px_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
+                                <div className="text-xs text-muted-foreground">
+                                  <p className="font-semibold text-foreground">Row {row.rowNumber}</p>
+                                  <p>{row.lookupMethod === 'mist_id' ? 'Student ID' : 'Email'}</p>
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold">Identifier</label>
+                                  <Input className="mt-1" value={row.identifier} disabled />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold">Student name</label>
+                                  <Input
+                                    className="mt-1"
+                                    value={row.fullName}
+                                    onChange={(e) => updatePreEnrollRow(row.rowKey, 'fullName', e.target.value)}
+                                    placeholder="Enter student name"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold">Email (optional)</label>
+                                  <Input
+                                    className="mt-1"
+                                    value={row.email}
+                                    onChange={(e) => updatePreEnrollRow(row.rowKey, 'email', e.target.value)}
+                                    placeholder="student@email.com"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {preEnrollRowsNeedingNames > 0 && (
+                            <p className="text-xs font-semibold text-red-600">{preEnrollRowsNeedingNames} students need names before confirmation.</p>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => setPreEnrollOpen(false)} disabled={preEnrollLoading}>Cancel</Button>
+                          <Button type="button" className="gap-2" onClick={handleConfirmPreEnrollment} disabled={preEnrollLoading || preEnrollRows.length === 0 || preEnrollRowsNeedingNames > 0}>
+                            {preEnrollLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {preEnrollLoading ? 'Pre-enrolling...' : 'Create pre-enrolled students'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
                     <div className="overflow-hidden rounded-lg border">
-                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Enrolled students ({students.length})</div>
+                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Classroom roster ({students.length})</div>
                       {students.length === 0 ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">No students enrolled yet.</div>
                       ) : (
                         <ScrollArea className="h-[420px]">
                           <div>
-                            {visibleStudents.map(s => (
-                              <div key={s.id} className="flex items-center justify-between p-3 text-sm hover:bg-muted/10">
-                                <div>
-                                  <p className="font-semibold">{getStudentLabelWithId(s)}</p>
-                                  <p className="text-xs text-muted-foreground">{s.email}</p>
+                            {preEnrollmentRosterStudents.length > 0 && (
+                              <div className="group/pre-enroll border-b bg-amber-500/5">
+                                <div className="border-b border-amber-500/20 px-3 py-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                                      Pre-enrolled & pending links ({preEnrollmentRosterStudents.length})
+                                    </p>
+                                    <Badge variant="outline" className="border-amber-500/25 bg-amber-500/10 text-[10px] text-amber-700">
+                                      Trainer action first
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-2 hidden gap-2 rounded-md border border-amber-500/20 bg-background/80 p-2 text-xs text-muted-foreground group-hover/pre-enroll:flex group-focus-within/pre-enroll:flex">
+                                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                                    <p>
+                                      Pre-enrolled students are usable for trainer planning, groups, attendance, and problem assignment. Link pending means a real account matched; approve it to give student classroom access.
+                                    </p>
+                                  </div>
                                 </div>
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveStudent(s.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {visiblePreEnrollmentStudents.map(renderTrainerRosterStudent)}
                               </div>
-                            ))}
+                            )}
+                            {visibleActiveRosterStudents.length > 0 && (
+                              <div>
+                                <div className="border-b bg-muted/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                                  Active students ({activeRosterStudents.length})
+                                </div>
+                                {visibleActiveRosterStudents.map(renderTrainerRosterStudent)}
+                              </div>
+                            )}
                           </div>
                         </ScrollArea>
                       )}

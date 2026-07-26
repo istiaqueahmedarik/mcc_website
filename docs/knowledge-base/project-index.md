@@ -1,5 +1,47 @@
 # Project Index
 
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-pre-enrolled-students-20260727-rsd.md`
+
+Fact:
+Trainer People workflows should allow Student ID/email/CSV enrollment to create pre-enrolled roster identities when matching accounts do not exist. Pre-enrolled students must be visible/selectable in trainer-side classroom workflows such as groups, attendance, and problem assignment, while student classroom access must remain blocked until a trusted account link is activated.
+
+Applies when:
+Changing classroom People tab enrollment, CSV student import, roster reads, group membership, attendance, problem targets, signup/profile MIST ID linking, or classroom student-access checks.
+
+Do not overgeneralize:
+This does not approve public invitation links, email/SMS invites, `.xlsx` import, destructive roster cleanup, or granting student dashboard access from unverified self-entered IDs.
+
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Approved Implementation Plan
+
+Source:
+- `docs/tasks/trainer-pre-enrolled-students-20260727-task-plan.md`
+
+Fact:
+Implementation should add a shared `classroomPreEnrollment` utility, update classroom enrollment/roster/access/claim APIs, integrate signup/profile/form/IDE access checks, add People tab missing-student modal/status UI, then verify and create implementation review.
+
+Applies when:
+Coordinating the pre-enrolled student implementation or reviewing its intended write scope.
+
+Do not overgeneralize:
+This plan is not an approval for broader auth redesign, formal migration infrastructure, notification reintroduction, or unrelated classroom UI refreshes.
+
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-pre-enrolled-students-20260727-implementation-review.md`
+
+Fact:
+Trainer pre-enrollment is implemented through `server/src/utils/classroomPreEnrollment.ts`, classroom enrollment/claim routes in `classroomController.ts`/`classroomRoute.ts`, signup/profile claim detection in `authController.ts` and `userController.ts`, placeholder filtering in `trainerFormController.ts`, active-only IDE membership in `classroomIdeStream.ts`, and People tab modal/status UI in `ClassroomLiveClient.js`. People tab roster shows pre-enrolled/link-pending rows above active students with an info panel explaining trainer-side use and account-link approval.
+
+Applies when:
+Maintaining classroom roster setup, pre-enrolled students, link-pending approvals, student access checks, or trainer selection flows.
+
+Do not overgeneralize:
+Runtime schema guard is not a general migration framework, and this implementation does not add public invites, email/SMS sending, `.xlsx` support, or auto-access from unverified IDs.
+
 ## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Approved Requirement Scope
 
 Source:

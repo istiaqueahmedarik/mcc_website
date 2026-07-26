@@ -1,5 +1,33 @@
 # Patterns
 
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Serial Roster Identity Work
+
+Source:
+- `docs/tasks/trainer-pre-enrolled-students-20260727-task-plan.md`
+
+Fact:
+Pre-enrolled classroom student work should be implemented serially because schema/status helpers, `classroomController.ts`, `ClassroomLiveClient.js`, auth/profile matching, trainer forms, and IDE/classroom access checks share the same roster identity and membership-status semantics.
+
+Applies when:
+Changing pre-enrolled students, roster membership states, classroom student access, signup/profile claim detection, or trainer-side student selection workflows.
+
+Do not overgeneralize:
+Other trainer/classroom UI-only tasks can still run in parallel when write scopes are disjoint and do not share access semantics.
+
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Missing Account Review Modal Pattern
+
+Source:
+- `docs/reviews/trainer-pre-enrolled-students-20260727-implementation-review.md`
+
+Fact:
+When trainer batch/manual enrollment detects existing accounts and missing accounts together, commit active existing accounts first, then open a review modal for missing rows with editable required names, optional emails, a security note, and one batch pre-enrollment confirmation request.
+
+Applies when:
+Extending classroom People import, adding future roster imports, or handling mixed success/missing results in trainer bulk workflows.
+
+Do not overgeneralize:
+This pattern is for roster identity creation; problem assignment and other imports should not create placeholder domain records unless approved separately.
+
 ## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Operational Table Refresh Pattern
 
 Source:

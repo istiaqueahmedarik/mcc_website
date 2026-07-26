@@ -1,6 +1,7 @@
 import { sign as JwtSign } from "hono/jwt";
 import sql from "../db";
 import { sendEmail } from "../sendEmail";
+import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 
 export const signup = async (c: any) => {
   const {
@@ -43,6 +44,9 @@ export const signup = async (c: any) => {
           mist_id,
         )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
         RETURNING *`;
+    if (result[0]?.id) {
+      await markPreEnrollmentClaimsForUser(result[0].id);
+    }
     return c.json({ result });
   } catch (error: any) {
     console.error("Database error in signup:", error.message);
@@ -81,6 +85,9 @@ export const login = async (c: any) => {
   try {
     const result = await sql`select * from users where email = ${email}`;
     if (result.length === 0) {
+      return c.json({ error: "Invalid email or password" }, 400);
+    }
+    if (result[0].is_pre_enrolled) {
       return c.json({ error: "Invalid email or password" }, 400);
     }
     const isMatch = await Bun.password.verify(password, result[0].password);

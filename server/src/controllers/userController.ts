@@ -1,4 +1,5 @@
 import sql from "../db";
+import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 
 type Ctx = any;
 
@@ -309,6 +310,7 @@ export const setMistId = async (c: any) => {
     const rows =
       await sql`update users set mist_id = ${numeric} where id = ${id} returning id, mist_id`;
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
+    await markPreEnrollmentClaimsForUser(id);
     return c.json({ result: rows[0] });
   } catch (e) {
     console.error(e);
@@ -425,4 +427,3 @@ export const setTrainerProfile = async (c: any) => {
     return c.json({ error: "Failed to update trainer profile" }, 400);
   }
 };
-

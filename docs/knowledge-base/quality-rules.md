@@ -1,5 +1,19 @@
 # Quality Rules
 
+## 2026-07-27 - trainer-pre-enrolled-students-20260727 - Separate Trainer Selectability From Student Access
+
+Source:
+- `docs/reviews/trainer-pre-enrolled-students-20260727-implementation-review.md`
+
+Rule:
+Pre-enrolled or link-pending classroom students may be selectable in trainer-side workflows, but student-facing classroom access must require active real membership (`classroom_students.enrollment_status = 'active'`) and must reject placeholder users.
+
+Applies when:
+Changing classroom roster queries, groups, attendance, problem assignment, topic access, chat/IDE/board access, signup/profile linking, or claim approval.
+
+Do not overgeneralize:
+This does not block trainers from managing placeholder roster identities; it blocks unapproved student-session access only.
+
 ## 2026-07-27 - trainer-live-progress-design-refresh-20260727 - Avoid Dead Table Space
 
 Source:

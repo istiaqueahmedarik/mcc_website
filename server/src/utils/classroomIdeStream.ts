@@ -1,4 +1,5 @@
 import sql from '../db';
+import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from './classroomPreEnrollment';
 
 interface IdeConnection {
   ws: any;
@@ -16,8 +17,9 @@ const ideSessionCache = new Map<string, Map<string, any>>();
 export async function validateClassroomIdeSocketToken(classroomId: string, token?: string) {
   if (!token || !classroomId) return null;
   try {
+    await ensurePreEnrollmentSchema();
     const userRows = await sql`
-      SELECT u.id, u.admin, u.trainer, u.full_name, u.email
+      SELECT u.id, u.admin, u.trainer, u.full_name, u.email, u.is_pre_enrolled
       FROM users u
       WHERE u.id::text = ${token}
     `;
@@ -26,14 +28,14 @@ export async function validateClassroomIdeSocketToken(classroomId: string, token
     const user = userRows[0];
     const classRows = await sql`
       SELECT c.id, c.created_by,
-        (SELECT count(*) FROM classroom_students cs WHERE cs.classroom_id = c.id AND cs.student_id = ${user.id}) > 0 AS is_student
+        (SELECT count(*) FROM classroom_students cs WHERE cs.classroom_id = c.id AND cs.student_id = ${user.id} AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}) > 0 AS is_student
       FROM classrooms c
       WHERE c.id = ${classroomId}
     `;
     if (classRows.length === 0) return null;
 
     const isTrainer = classRows[0].created_by === user.id || Boolean(user.admin || user.trainer);
-    const isStudent = Boolean(classRows[0].is_student);
+    const isStudent = Boolean(classRows[0].is_student) && !Boolean(user.is_pre_enrolled);
 
     if (!isTrainer && !isStudent) return null;
 

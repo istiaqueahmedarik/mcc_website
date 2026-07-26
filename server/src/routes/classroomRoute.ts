@@ -18,6 +18,8 @@ import {
   getClassroomTopicAssignments,
   addStudentToClassroom,
   addStudentsToClassroom,
+  preEnrollStudents,
+  handlePreEnrollmentClaim,
   removeStudentFromClassroom,
   createTeam,
   updateTeamMembers,
@@ -145,6 +147,8 @@ route.post('/problem-tags/dictionary', createProblemTag);
 route.get('/:id/resources/:resourceId', getClassResourceDetail);
 route.post('/:id/add-student', addStudentToClassroom);
 route.post('/:id/add-students', addStudentsToClassroom);
+route.post('/:id/pre-enroll-students', preEnrollStudents);
+route.post('/:id/pre-enrollment/claim', handlePreEnrollmentClaim);
 route.post('/:id/remove-student', removeStudentFromClassroom);
 route.post('/:id/update', updateClassroom);
 

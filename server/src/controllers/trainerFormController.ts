@@ -1,6 +1,7 @@
 import { Context } from "hono";
 import { verify as JwtVerify } from "hono/jwt";
 import sql from "../db";
+import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from "../utils/classroomPreEnrollment";
 
 type FormType = "classroom_invitation" | "attendance" | "general";
 
@@ -169,6 +170,7 @@ async function getOptionalAuthenticatedUser(c: Context) {
 }
 
 async function findUserByPrimaryKey(field: string, value: string) {
+  await ensurePreEnrollmentSchema();
   const needle = value.trim();
   if (!needle) return [];
 
@@ -178,6 +180,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE id::text = ${needle}
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "email":
@@ -185,6 +188,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(email) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "full_name":
@@ -192,6 +196,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(full_name) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "phone":
@@ -199,6 +204,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE phone = ${needle}
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "vjudge_id":
@@ -206,6 +212,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(vjudge_id) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "cf_id":
@@ -213,6 +220,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(cf_id) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "codechef_id":
@@ -220,6 +228,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(codechef_id) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "atcoder_id":
@@ -227,6 +236,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(atcoder_id) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "batch_name":
@@ -234,6 +244,7 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE lower(batch_name) = lower(${needle})
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
     case "mist_id":
@@ -242,13 +253,14 @@ async function findUserByPrimaryKey(field: string, value: string) {
         SELECT id, full_name, email, phone, mist_id, batch_name, vjudge_id, cf_id, codechef_id, atcoder_id, tshirt_size, admin, trainer
         FROM users
         WHERE mist_id::text = ${needle}
+          AND is_pre_enrolled IS NOT TRUE
         LIMIT 1
       `;
   }
 }
 
 function isStudentUser(user: any) {
-  return user && user.admin !== true && user.trainer !== true;
+  return user && user.admin !== true && user.trainer !== true && user.is_pre_enrolled !== true;
 }
 
 function getUserValue(user: any, field: string | null) {
@@ -902,10 +914,16 @@ export const submitPublicTrainerForm = async (c: Context) => {
     `;
 
     if (form.type === "classroom_invitation" && form.classroom_id) {
+      await ensurePreEnrollmentSchema();
       await sql`
-        INSERT INTO classroom_students (classroom_id, student_id)
-        VALUES (${form.classroom_id}, ${user.id})
+        INSERT INTO classroom_students (classroom_id, student_id, enrollment_status)
+        VALUES (${form.classroom_id}, ${user.id}, ${ENROLLMENT_ACTIVE})
         ON CONFLICT DO NOTHING
+      `;
+      await sql`
+        UPDATE classroom_students
+        SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
+        WHERE classroom_id = ${form.classroom_id} AND student_id = ${user.id}
       `;
     }
 

@@ -7,6 +7,15 @@ import {
   createClassroomBoardJoinToken,
   type BoardJoinContext,
 } from '../utils/classroomBoardSync';
+import {
+  ENROLLMENT_ACTIVE,
+  ENROLLMENT_LINK_PENDING,
+  ENROLLMENT_PRE_ENROLLED,
+  approvePreEnrollmentClaim,
+  ensurePreEnrollmentSchema,
+  preEnrollClassroomStudents,
+  rejectPreEnrollmentClaim,
+} from '../utils/classroomPreEnrollment';
 
 // Scrape helper for problem details
 function cleanProblemTitle(title: string, fallback: string) {
@@ -359,6 +368,10 @@ function isStudentRole(row: any): boolean {
   return !Boolean(row?.admin || row?.trainer);
 }
 
+function isActiveRealStudent(row: any): boolean {
+  return isStudentRole(row) && !Boolean(row?.is_pre_enrolled) && row?.enrollment_status === ENROLLMENT_ACTIVE;
+}
+
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
 }
@@ -452,15 +465,17 @@ async function findStudentsByIdentifiers(method: StudentLookupMethod, identifier
   if (identifiers.length === 0) return [];
   if (method === 'mist_id') {
     return sql`
-      SELECT id, full_name, email, mist_id, admin, trainer, mist_id::text AS lookup_value
+      SELECT id, full_name, email, mist_id, admin, trainer, is_pre_enrolled, mist_id::text AS lookup_value
       FROM users
       WHERE mist_id::text = ANY(${identifiers})
+        AND is_pre_enrolled IS NOT TRUE
     `;
   }
   return sql`
-    SELECT id, full_name, email, mist_id, admin, trainer, lower(email) AS lookup_value
+    SELECT id, full_name, email, mist_id, admin, trainer, is_pre_enrolled, lower(email) AS lookup_value
     FROM users
     WHERE lower(email) = ANY(${identifiers})
+      AND is_pre_enrolled IS NOT TRUE
   `;
 }
 
@@ -489,11 +504,12 @@ async function ensureProblemTags(tags: string[], createdBy: string) {
 }
 
 async function getClassAccess(userId: string, classroomId: string, classId: string) {
+  await ensurePreEnrollmentSchema();
   const classRows = await sql`
     SELECT c.id AS class_id, c.status, cr.id AS classroom_id, cr.created_by, cs.id AS student_check
     FROM classes c
     JOIN classrooms cr ON c.classroom_id = cr.id
-    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId}
+    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId} AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
     WHERE c.id = ${classId} AND cr.id = ${classroomId}
   `;
 
@@ -501,9 +517,9 @@ async function getClassAccess(userId: string, classroomId: string, classId: stri
     return { error: 'Class not found', status: 404 as const };
   }
 
-  const userRows = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
+  const userRows = await sql`SELECT admin, trainer, is_pre_enrolled FROM users WHERE id = ${userId}`;
   const isTrainer = classRows[0].created_by === userId || Boolean(userRows[0]?.admin || userRows[0]?.trainer);
-  const isStudent = Boolean(classRows[0].student_check);
+  const isStudent = Boolean(classRows[0].student_check) && !Boolean(userRows[0]?.is_pre_enrolled);
 
   if (!isTrainer && !isStudent) {
     return { error: 'Unauthorized access to class', status: 403 as const };
@@ -520,26 +536,33 @@ async function getClassAccess(userId: string, classroomId: string, classId: stri
 }
 
 async function isClassroomParticipant(userId: string, classroomId: string, trainerId: string) {
+  await ensurePreEnrollmentSchema();
   if (userId === trainerId) return true;
   const participant = await sql`
     SELECT cs.id
     FROM classroom_students cs
-    WHERE cs.classroom_id = ${classroomId} AND cs.student_id = ${userId}
+    JOIN users u ON u.id = cs.student_id
+    WHERE cs.classroom_id = ${classroomId}
+      AND cs.student_id = ${userId}
+      AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND u.is_pre_enrolled IS NOT TRUE
   `;
   return participant.length > 0;
 }
 
 async function canAccessClassroom(userId: string, classroomId: string): Promise<boolean> {
+  await ensurePreEnrollmentSchema();
   const rows = await sql`
-    SELECT cr.created_by, u.admin, u.trainer, cs.id AS student_check
+    SELECT cr.created_by, u.admin, u.trainer, u.is_pre_enrolled, cs.id AS student_check
     FROM classrooms cr
     JOIN users u ON u.id = ${userId}
-    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId}
+    LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId} AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
     WHERE cr.id = ${classroomId}
   `;
 
   if (rows.length === 0) return false;
-  return rows[0].created_by === userId || Boolean(rows[0].admin || rows[0].trainer || rows[0].student_check);
+  const activeRealStudent = Boolean(rows[0].student_check) && !Boolean(rows[0].is_pre_enrolled);
+  return rows[0].created_by === userId || Boolean(rows[0].admin || rows[0].trainer || activeRealStudent);
 }
 
 // -------------------------------------------------------------
@@ -572,6 +595,7 @@ export const createClassroom = async (c: Context) => {
 export const getClassrooms = async (c: Context) => {
   const { id } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${id}`;
     let result;
     if (userCheck.length > 0 && userCheck[0].admin) {
@@ -608,7 +632,7 @@ export const getClassrooms = async (c: Context) => {
         JOIN users u ON c.created_by = u.id
         WHERE c.created_by = ${id}
         OR c.id IN (
-          SELECT classroom_id FROM classroom_students WHERE student_id = ${id}
+          SELECT classroom_id FROM classroom_students WHERE student_id = ${id} AND enrollment_status = ${ENROLLMENT_ACTIVE}
         )
         ORDER BY c.created_at DESC
       `;
@@ -623,6 +647,7 @@ export const getClassroomDetails = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: currentUserId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const [classroom, students, classes, resources, teams, userCheck, substitutes] = await Promise.all([
       sql`
         SELECT c.*, u.full_name as trainer_name, u.email as trainer_email
@@ -631,9 +656,29 @@ export const getClassroomDetails = async (c: Context) => {
         WHERE c.id = ${classroomId}
       `,
       sql`
-        SELECT u.id, u.full_name, u.email, u.mist_id, u.cf_id, u.atcoder_id, u.codechef_id
+        SELECT
+          u.id,
+          cs.id AS membership_id,
+          u.full_name,
+          CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END AS email,
+          u.email AS account_email,
+          u.mist_id,
+          u.cf_id,
+          u.atcoder_id,
+          u.codechef_id,
+          u.is_pre_enrolled,
+          cs.enrollment_status,
+          cs.claimed_user_id,
+          claimed.full_name AS claimed_full_name,
+          claimed.email AS claimed_email,
+          claimed.mist_id AS claimed_mist_id,
+          cs.pre_enrollment_method,
+          cs.pre_enrollment_identifier,
+          cs.pre_enrollment_email,
+          cs.link_requested_at
         FROM classroom_students cs
         JOIN users u ON cs.student_id = u.id
+        LEFT JOIN users claimed ON claimed.id = cs.claimed_user_id
         WHERE cs.classroom_id = ${classroomId}
           AND u.admin IS NOT TRUE
           AND u.trainer IS NOT TRUE
@@ -647,10 +692,30 @@ export const getClassroomDetails = async (c: Context) => {
       `,
       sql`
         SELECT t.id, t.name, 
-               COALESCE(json_agg(json_build_object('id', u.id, 'name', u.full_name, 'full_name', u.full_name, 'email', u.email, 'mist_id', u.mist_id)) FILTER (WHERE u.id IS NOT NULL), '[]') as members
+               COALESCE(json_agg(json_build_object(
+                 'id', u.id,
+                 'membership_id', cs_member.id,
+                 'name', u.full_name,
+                 'full_name', u.full_name,
+                 'email', CASE WHEN u.is_pre_enrolled THEN cs_member.pre_enrollment_email ELSE u.email END,
+                 'account_email', u.email,
+                 'mist_id', u.mist_id,
+                 'is_pre_enrolled', u.is_pre_enrolled,
+                 'enrollment_status', cs_member.enrollment_status,
+                 'claimed_user_id', cs_member.claimed_user_id,
+                 'claimed_full_name', claimed.full_name,
+                 'claimed_email', claimed.email,
+                 'claimed_mist_id', claimed.mist_id,
+                 'pre_enrollment_method', cs_member.pre_enrollment_method,
+                 'pre_enrollment_identifier', cs_member.pre_enrollment_identifier,
+                 'pre_enrollment_email', cs_member.pre_enrollment_email,
+                 'link_requested_at', cs_member.link_requested_at
+               )) FILTER (WHERE u.id IS NOT NULL), '[]') as members
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON t.id = tm.team_id
         LEFT JOIN users u ON tm.student_id = u.id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
+        LEFT JOIN classroom_students cs_member ON cs_member.classroom_id = ${classroomId} AND cs_member.student_id = u.id
+        LEFT JOIN users claimed ON claimed.id = cs_member.claimed_user_id
         WHERE t.classroom_id = ${classroomId}
         GROUP BY t.id, t.name
         ORDER BY t.name ASC
@@ -671,7 +736,7 @@ export const getClassroomDetails = async (c: Context) => {
     const isSubstitute = substitutes.some((s: any) => s.id === currentUserId);
     const isAdmin = Boolean(userCheck[0]?.admin);
     const isTrainer = isOwner || isSubstitute || isAdmin;
-    const isStudent = students.some((student: any) => student.id === currentUserId);
+    const isStudent = students.some((student: any) => student.id === currentUserId && isActiveRealStudent(student));
 
     if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized' }, 403);
 
@@ -834,6 +899,7 @@ export const addStudentToClassroom = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: trainerId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const isAuthorized = await canManageClassroom(trainerId, classroomId);
     if (!isAuthorized) {
       return c.json({ error: 'Unauthorized: Only classroom creator or admin can add students' }, 403);
@@ -847,15 +913,29 @@ export const addStudentToClassroom = async (c: Context) => {
     }
 
     const student = await findStudentsByIdentifiers(lookupMethod, [studentIdentifier]);
-    if (student.length === 0) return c.json({ error: lookupMethod === 'mist_id' ? 'Student ID not registered on MCC' : 'Student email not registered on MCC' }, 404);
+    if (student.length === 0) {
+      return c.json({
+        success: true,
+        added: [],
+        notFound: [{ lookupMethod, identifier: studentIdentifier, rowNumber: 1 }],
+        invalidRole: [],
+        summary: { received: 1, added: 0, alreadyEnrolled: 0, notFound: 1, invalidRole: 0 },
+        message: 'Student needs pre-enrollment.',
+      });
+    }
     if (!isStudentRole(student[0])) {
       return c.json({ error: 'This user is a trainer/admin and cannot be enrolled as a classroom student.' }, 400);
     }
 
     await sql`
-      INSERT INTO classroom_students (classroom_id, student_id)
-      VALUES (${classroomId}, ${student[0].id})
+      INSERT INTO classroom_students (classroom_id, student_id, enrollment_status)
+      VALUES (${classroomId}, ${student[0].id}, ${ENROLLMENT_ACTIVE})
       ON CONFLICT DO NOTHING
+    `;
+    await sql`
+      UPDATE classroom_students
+      SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
+      WHERE classroom_id = ${classroomId} AND student_id = ${student[0].id}
     `;
 
     return c.json({ success: true, message: `${student[0].full_name} added successfully.` });
@@ -868,6 +948,7 @@ export const addStudentsToClassroom = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: trainerId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const isAuthorized = await canManageClassroom(trainerId, classroomId);
     if (!isAuthorized) {
       return c.json({ error: 'Unauthorized: Only classroom creator or admin can add students' }, 403);
@@ -875,8 +956,19 @@ export const addStudentsToClassroom = async (c: Context) => {
 
     const body = await c.req.json();
     const lookupMethod = normalizeStudentLookupMethod(body.lookupMethod);
-    const rawIdentifiers = Array.isArray(body.identifiers) ? body.identifiers : [];
-    const identifiers = uniqueNormalizedStudentIdentifiers(rawIdentifiers, lookupMethod).slice(0, 1000);
+    const rawRows = Array.isArray(body.rows)
+      ? body.rows
+      : (Array.isArray(body.identifiers) ? body.identifiers.map((identifier: unknown, index: number) => ({ identifier, rowNumber: index + 1 })) : []);
+    const normalizedInputRows = rawRows.slice(0, 1000).map((row: any, index: number) => {
+      const rawIdentifier = row?.identifier ?? row?.studentIdentifier ?? row;
+      return {
+        rowNumber: Number(row?.rowNumber) > 0 ? Number(row.rowNumber) : index + 1,
+        identifier: normalizeStudentIdentifier(rawIdentifier, lookupMethod),
+        fullName: normalizeText(row?.fullName ?? row?.name, 160),
+        email: normalizeStudentIdentifier(row?.email, 'email'),
+      };
+    });
+    const identifiers = uniqueNormalizedStudentIdentifiers(normalizedInputRows.map((row: any) => row.identifier), lookupMethod).slice(0, 1000);
     if (identifiers.length === 0) return c.json({ error: 'At least one student identifier is required' }, 400);
 
     const studentRows = await findStudentsByIdentifiers(lookupMethod, identifiers);
@@ -885,13 +977,20 @@ export const addStudentsToClassroom = async (c: Context) => {
       if (!studentByIdentifier.has(student.lookup_value)) studentByIdentifier.set(student.lookup_value, student);
     }
 
-    const notFound: string[] = [];
+    const notFound: any[] = [];
     const invalidRole: any[] = [];
     const eligibleStudents: any[] = [];
     for (const identifier of identifiers) {
+      const sourceRow = normalizedInputRows.find((row: any) => row.identifier === identifier);
       const student = studentByIdentifier.get(identifier);
       if (!student) {
-        notFound.push(identifier);
+        notFound.push({
+          lookupMethod,
+          identifier,
+          rowNumber: sourceRow?.rowNumber || '-',
+          fullName: sourceRow?.fullName || '',
+          email: sourceRow?.email || (lookupMethod === 'email' ? identifier : ''),
+        });
         continue;
       }
       if (!isStudentRole(student)) {
@@ -916,9 +1015,16 @@ export const addStudentsToClassroom = async (c: Context) => {
     if (studentsToAdd.length > 0) {
       await sql`
         INSERT INTO classroom_students ${sql(
-          studentsToAdd.map(student => ({ classroom_id: classroomId, student_id: student.id }))
+          studentsToAdd.map(student => ({ classroom_id: classroomId, student_id: student.id, enrollment_status: ENROLLMENT_ACTIVE }))
         )}
         ON CONFLICT DO NOTHING
+      `;
+    }
+    if (eligibleStudentIds.length > 0) {
+      await sql`
+        UPDATE classroom_students
+        SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
+        WHERE classroom_id = ${classroomId} AND student_id = ANY(${eligibleStudentIds})
       `;
     }
 
@@ -941,6 +1047,49 @@ export const addStudentsToClassroom = async (c: Context) => {
         invalidRole: invalidRole.length,
       },
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const preEnrollStudents = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) {
+      return c.json({ error: 'Unauthorized: Only classroom managers can pre-enroll students' }, 403);
+    }
+
+    const body = await c.req.json();
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (rows.length === 0) return c.json({ error: 'At least one student is required' }, 400);
+
+    const result = await preEnrollClassroomStudents(classroomId, rows);
+    return c.json(result);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const handlePreEnrollmentClaim = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: trainerId } = c.get('jwtPayload');
+  try {
+    const isAuthorized = await canManageClassroom(trainerId, classroomId);
+    if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
+
+    const body = await c.req.json();
+    const studentId = normalizeUuid(body.studentId);
+    const action = normalizeText(body.action, 20).toLowerCase();
+    if (!studentId) return c.json({ error: 'Student is required' }, 400);
+    if (action !== 'approve' && action !== 'reject') return c.json({ error: 'Action must be approve or reject' }, 400);
+
+    const result = action === 'approve'
+      ? await approvePreEnrollmentClaim(classroomId, studentId)
+      : await rejectPreEnrollmentClaim(classroomId, studentId);
+    if (!result.success) return c.json({ error: result.error }, result.status as any);
+    return c.json(result);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -1264,6 +1413,7 @@ export const getClassroomSessionAttendance = async (c: Context) => {
   const classId = c.req.param('classId');
   const { id: userId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const canAccess = await canAccessClassroom(userId, classroomId);
     if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
 
@@ -1271,9 +1421,15 @@ export const getClassroomSessionAttendance = async (c: Context) => {
       SELECT 
         u.id AS student_id,
         u.full_name,
-        u.email,
+        CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END AS email,
+        u.email AS account_email,
         u.mist_id,
         u.batch_name,
+        u.is_pre_enrolled,
+        cs.enrollment_status,
+        cs.claimed_user_id,
+        cs.pre_enrollment_identifier,
+        cs.pre_enrollment_email,
         ca.id AS attendance_id,
         ca.status AS presence_status,
         ca.recorded_by,
@@ -1300,6 +1456,7 @@ export const updateClassroomSessionAttendance = async (c: Context) => {
   const classId = c.req.param('classId');
   const { id: trainerId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const isManager = await canManageClassroom(trainerId, classroomId);
     if (!isManager) return c.json({ error: 'Unauthorized. Trainer permissions required.' }, 403);
 
@@ -1382,6 +1539,7 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const canAccess = await canAccessClassroom(userId, classroomId);
     if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
 
@@ -1407,7 +1565,18 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
 
     if (isManager) {
       studentsRes = await sql`
-        SELECT u.id, u.full_name, u.email, u.mist_id, u.batch_name
+        SELECT
+          u.id,
+          u.full_name,
+          CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END AS email,
+          u.email AS account_email,
+          u.mist_id,
+          u.batch_name,
+          u.is_pre_enrolled,
+          cs.enrollment_status,
+          cs.claimed_user_id,
+          cs.pre_enrollment_identifier,
+          cs.pre_enrollment_email
         FROM classroom_students cs
         JOIN users u ON cs.student_id = u.id
         WHERE cs.classroom_id = ${classroomId}
@@ -1429,8 +1598,10 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
         JOIN users u ON u.id = cs.student_id
         WHERE cs.classroom_id = ${classroomId}
           AND cs.student_id = ${userId}
+          AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
           AND u.admin IS NOT TRUE
           AND u.trainer IS NOT TRUE
+          AND u.is_pre_enrolled IS NOT TRUE
       `;
       if (enrolled.length === 0) return c.json({ error: 'Not enrolled' }, 403);
 
@@ -1782,19 +1953,21 @@ export const getClassProblems = async (c: Context) => {
   const classId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     // Verify user belongs to classroom
     const check = await sql`
-      SELECT cr.id AS classroom_id, cr.created_by, cs.id as student_check 
+      SELECT cr.id AS classroom_id, cr.created_by, cs.id as student_check, u.is_pre_enrolled
       FROM classes c
       JOIN classrooms cr ON c.classroom_id = cr.id
-      LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId}
+      JOIN users u ON u.id = ${userId}
+      LEFT JOIN classroom_students cs ON cr.id = cs.classroom_id AND cs.student_id = ${userId} AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
       WHERE c.id = ${classId}
     `;
 
     if (check.length === 0) return c.json({ error: 'Class not found' }, 404);
 
     const isTrainer = await canManageClassroom(userId, check[0].classroom_id);
-    const isStudent = !!check[0].student_check;
+    const isStudent = !!check[0].student_check && !Boolean(check[0].is_pre_enrolled);
 
     if (!isTrainer && !isStudent) return c.json({ error: 'Unauthorized access to class' }, 403);
 
@@ -1802,9 +1975,11 @@ export const getClassProblems = async (c: Context) => {
     let problems;
     if (isTrainer) {
       problems = await sql`
-        SELECT cp.*, u.full_name as student_name, u.email as student_email
+        SELECT cp.*, u.full_name as student_name, CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END as student_email
         FROM class_problems cp
         JOIN users u ON cp.student_id = u.id
+        LEFT JOIN classes cl ON cl.id = cp.class_id
+        LEFT JOIN classroom_students cs ON cs.classroom_id = cl.classroom_id AND cs.student_id = u.id
         WHERE cp.class_id = ${classId}
         ORDER BY cp.assigned_at DESC
       `;
@@ -2478,15 +2653,27 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
+    await ensurePreEnrollmentSchema();
     const isAuthorized = await canManageClassroom(userId, classroomId);
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
     const [teams, classRows, topicRows] = await Promise.all([
       sql`
-        SELECT t.id AS team_id, t.name AS team_name, u.id AS student_id, u.full_name, u.email, u.mist_id
+        SELECT
+          t.id AS team_id,
+          t.name AS team_name,
+          u.id AS student_id,
+          u.full_name,
+          CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END AS email,
+          u.email AS account_email,
+          u.mist_id,
+          u.is_pre_enrolled,
+          cs.enrollment_status,
+          cs.claimed_user_id
         FROM trainer_teams t
         LEFT JOIN trainer_team_members tm ON tm.team_id = t.id
         LEFT JOIN users u ON u.id = tm.student_id AND u.admin IS NOT TRUE AND u.trainer IS NOT TRUE
+        LEFT JOIN classroom_students cs ON cs.classroom_id = ${classroomId} AND cs.student_id = u.id
         WHERE t.classroom_id = ${classroomId}
         ORDER BY t.name ASC, u.full_name ASC
       `,
@@ -2553,7 +2740,11 @@ export const getClassroomTopicAnalytics = async (c: Context) => {
         name: row.full_name,
         full_name: row.full_name,
         email: row.email,
+        account_email: row.account_email,
         mist_id: row.mist_id,
+        is_pre_enrolled: row.is_pre_enrolled,
+        enrollment_status: row.enrollment_status,
+        claimed_user_id: row.claimed_user_id,
         ...counts,
         solveRate: counts.assigned ? Math.round((counts.solved / counts.assigned) * 100) : 0,
       });
