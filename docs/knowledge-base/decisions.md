@@ -477,3 +477,20 @@ Modifying user profile pages, account security settings, or password management 
 
 Do not overgeneralize:
 Does not alter admin-initiated password override (`POST /classroom/admin/change-password`) or OTP-based public password reset (`POST /auth/reset-password`).
+
+## 2026-07-27 - optional-problem-difficulty-trainer-feature-20260727 - Optional Problem Difficulty for Trainer Feature
+
+Source:
+- `docs/decisions/optional-problem-difficulty-trainer-feature-20260727-technical-decisions.md`
+
+Decision:
+1. Client UI Forms: Initial problem difficulty state defaults to empty string (`""`). Dropdown select menus include a `"None"` (value `""`) option for both live problem assignments and topic unit problem forms.
+2. Server Controller Fallbacks: `assignProblem`, `addClassroomTopicProblem`, `updateClassroomTopicProblem`, and `bulkAssignProblems` in `server/src/controllers/classroomController.ts` accept empty string or null difficulty values without substituting `"Medium"` or `"Trainer selected"`.
+3. Display & Badges: Problem cards and list items conditionally omit difficulty badges when difficulty is empty/unspecified instead of rendering forced default badges.
+4. Schema: No database schema migration needed; existing TEXT column stores empty string or NULL directly.
+
+Applies when:
+Modifying problem creation, topic problem forms, problem list badges, or problem assignment controllers.
+
+Do not overgeneralize:
+Does not alter student perceived difficulty rating feedback scale (1-5).

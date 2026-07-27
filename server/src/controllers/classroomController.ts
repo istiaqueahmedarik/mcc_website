@@ -1661,9 +1661,9 @@ export const assignProblem = async (c: Context) => {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
     const normalizedTags = normalizeProblemTags(tags);
-    const trainerDifficulty = typeof difficulty === 'string' && difficulty.trim()
+    const trainerDifficulty = typeof difficulty === 'string'
       ? difficulty.trim().slice(0, 60)
-      : 'Medium';
+      : '';
 
     // Verify trainer authorization
     const classCheck = await sql`
@@ -1780,7 +1780,7 @@ export const assignProblemsBulk = async (c: Context) => {
       const platform = normalizeProblemPlatform(row?.platform);
       const problemLink = normalizeText(row?.problemLink, 1200);
       const timerMinutes = normalizePositiveInteger(row?.timerMinutes);
-      const difficulty = normalizeText(row?.difficulty, 80) || 'Medium';
+      const difficulty = normalizeText(row?.difficulty, 80);
       const tags = normalizeProblemTags(row?.tags);
 
       const errors: string[] = [];
@@ -2404,6 +2404,10 @@ export const addClassroomTopicProblem = async (c: Context) => {
     const normalizedTags = normalizeProblemTags(tags);
     await ensureProblemTags(normalizedTags, userId);
 
+    const topicDifficulty = typeof difficulty === 'string'
+      ? (difficulty === 'None' ? '' : normalizeText(difficulty, 80))
+      : (metadata.difficulty || '');
+
     const problem = await sql`
       INSERT INTO classroom_topic_problems (
         topic_id,
@@ -2422,7 +2426,7 @@ export const addClassroomTopicProblem = async (c: Context) => {
         ${normalizedLink},
         ${normalizeText(title, 200) || metadata.title || 'CP Problem'},
         ${metadata.details || null},
-        ${normalizeText(difficulty, 80) || metadata.difficulty || 'Trainer selected'},
+        ${topicDifficulty},
         ${normalizePositiveInteger(timerMinutes)},
         ${normalizedTags},
         ${normalizePositiveInteger(position) || 0}
@@ -2533,7 +2537,9 @@ export const updateClassroomTopicProblem = async (c: Context) => {
     await ensureProblemTags(normalizedTags, userId);
 
     const nextTitle = normalizeText(body.title, 200) || current.title || 'CP Problem';
-    const nextDifficulty = normalizeText(body.difficulty, 80) || current.difficulty || 'Trainer selected';
+    const nextDifficulty = body.difficulty !== undefined
+      ? (body.difficulty === 'None' ? '' : normalizeText(body.difficulty, 80))
+      : (current.difficulty || '');
     const nextTimer = body.timerMinutes === undefined || body.timerMinutes === null || body.timerMinutes === ''
       ? null
       : normalizePositiveInteger(body.timerMinutes);

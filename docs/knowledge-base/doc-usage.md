@@ -156,8 +156,16 @@ Source:
 Fact:
 This task used `AGENTS.md`, project knowledge-base entries for IDE/team work, and RSD orchestrator references for auto gates, HCI, code quality, and documentation audit.
 
+## 2026-07-27 - optional-problem-difficulty-trainer-feature-20260727 - Docs Used
+
+Source:
+- `docs/reviews/optional-problem-difficulty-trainer-feature-20260727-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, project knowledge base, `ClassroomLiveClient.js`, `classroomController.ts`, and prior trainer feature RSDs to make problem difficulty optional across forms, controllers, imports, and UI badges without DB schema changes.
+
 Applies when:
-Auditing whether trainer IDE and team-edit implementation followed repository planning rules.
+Auditing future problem creation, topic problem forms, or difficulty display decisions.
 
 Do not overgeneralize:
 This entry records documentation use for this scoped task only.

@@ -443,7 +443,7 @@ const topicProgressOptions = [
   { value: 'solved', label: 'Solved (Approved)' },
 ];
 
-const topicDifficultyOptions = ['Easy', 'Medium', 'Hard', 'Advanced', 'Trainer selected'];
+const topicDifficultyOptions = ['None', 'Easy', 'Medium', 'Hard', 'Advanced', 'Trainer selected'];
 
 function normalizeTagInput(value) {
   const tag = String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -650,7 +650,7 @@ function buildProblemImportPreview(importState, students, teams) {
     const platform = normalizeProblemImportPlatform(record[mapping.platform]);
     const problemLink = String(record[mapping.problemLink] || '').trim();
     const timerMinutes = mapping.timerMinutes ? String(record[mapping.timerMinutes] || '').trim() : '';
-    const difficulty = mapping.difficulty ? String(record[mapping.difficulty] || '').trim() : 'Medium';
+    const difficulty = mapping.difficulty ? String(record[mapping.difficulty] || '').trim() : '';
     const tags = mapping.tags ? String(record[mapping.tags] || '').trim() : '';
     const errors = [];
 
@@ -682,7 +682,7 @@ function buildProblemImportPreview(importState, students, teams) {
       platform,
       problemLink,
       timerMinutes,
-      difficulty: difficulty || 'Medium',
+      difficulty,
       tags,
     });
   });
@@ -932,7 +932,7 @@ function ProblemPreviewPanel({
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         <div className="rounded-md border bg-muted/20 p-3">
           <p className="text-[10px] font-semibold uppercase text-muted-foreground">Difficulty</p>
-          <p className="mt-1 text-sm font-bold">{difficulty || 'Trainer selected'}</p>
+          <p className="mt-1 text-sm font-bold">{difficulty || 'Not specified'}</p>
         </div>
         <div className="rounded-md border bg-muted/20 p-3">
           <p className="text-[10px] font-semibold uppercase text-muted-foreground">Timer</p>
@@ -1196,7 +1196,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className="text-[10px]">{platformName(problem.platform)}</Badge>
-            <Badge variant="outline" className="text-[10px]">Trainer Diff: {problem.difficulty || '1'}</Badge>
+            {problem.difficulty && <Badge variant="outline" className="text-[10px]">Trainer Diff: {problem.difficulty}</Badge>}
             {problem.timer_minutes && <Badge variant="outline" className="text-[10px]">{problem.timer_minutes}m</Badge>}
           </div>
           <a href={problem.problem_link} target="_blank" rel="noreferrer" className="block truncate text-sm font-semibold text-primary hover:underline">
@@ -2619,7 +2619,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [problemPlatform, setProblemPlatform] = useState('codeforces');
   const [problemLink, setProblemLink] = useState('');
   const [problemTimer, setProblemTimer] = useState('60');
-  const [problemDifficulty, setProblemDifficulty] = useState('Medium');
+  const [problemDifficulty, setProblemDifficulty] = useState('');
   const [problemTags, setProblemTags] = useState([]);
   const [problemTagOptions, setProblemTagOptions] = useState([]);
   const [problemTagsLoading, setProblemTagsLoading] = useState(false);
@@ -2650,7 +2650,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     platform: 'codeforces',
     problemLink: '',
     title: '',
-    difficulty: 'Medium',
+    difficulty: '',
     timerMinutes: '60',
   });
   const [topicProblemTags, setTopicProblemTags] = useState([]);
@@ -3840,7 +3840,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       platform: problem?.platform || 'codeforces',
       problemLink: problem?.problem_link || '',
       title: problem?.title || '',
-      difficulty: problem?.difficulty || 'Medium',
+      difficulty: problem?.difficulty || '',
       timerMinutes: problem ? (problem.timer_minutes ? String(problem.timer_minutes) : '') : '60',
     });
     setTopicProblemTags(Array.isArray(problem?.tags) ? problem.tags : []);
@@ -3946,7 +3946,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       platform: topicProblemForm.platform,
       problemLink: topicProblemForm.problemLink,
       title: topicProblemForm.title,
-      difficulty: topicProblemForm.difficulty,
+      difficulty: topicProblemForm.difficulty === 'None' ? '' : topicProblemForm.difficulty,
       timerMinutes: topicProblemForm.timerMinutes ? parseInt(topicProblemForm.timerMinutes) : null,
       tags: topicProblemTags,
     });
@@ -3956,7 +3956,7 @@ export default function ClassroomLiveClient({ classroomId }) {
         platform: 'codeforces',
         problemLink: '',
         title: '',
-        difficulty: 'Medium',
+        difficulty: '',
         timerMinutes: '60',
       });
       setTopicProblemTags([]);
@@ -4128,7 +4128,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       platform: problemPlatform,
       problemLink: problemLink.trim(),
       timerMinutes: problemTimer ? parseInt(problemTimer) : null,
-      difficulty: problemDifficulty.trim() || 'Trainer selected',
+      difficulty: problemDifficulty === 'None' ? '' : problemDifficulty.trim(),
       tags: problemTags
     };
 
@@ -4614,6 +4614,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <SelectValue placeholder="Set difficulty" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="None">None (Optional)</SelectItem>
                                 <SelectItem value="Easy">Easy</SelectItem>
                                 <SelectItem value="Medium">Medium</SelectItem>
                                 <SelectItem value="Hard">Hard</SelectItem>
@@ -5377,7 +5378,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                         <div className="min-w-0 space-y-1">
                                           <div className="flex items-center gap-1.5">
                                             <Badge variant="outline" className="text-[10px]">{platformName(problem.platform)}</Badge>
-                                            <Badge variant="secondary" className="text-[10px]">{problem.difficulty || 'Medium'}</Badge>
+                                            {problem.difficulty && <Badge variant="secondary" className="text-[10px]">{problem.difficulty}</Badge>}
                                           </div>
                                           <a href={problem.problem_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
                                             <span className="truncate">{problem.title}</span>
@@ -5528,7 +5529,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                         <div className="space-y-2 min-w-0">
                                           <div className="flex flex-wrap items-center gap-2">
                                             <Badge variant="outline" className="text-xs font-semibold uppercase">{platformName(problem.platform)}</Badge>
-                                            <Badge variant="secondary" className="text-xs">Trainer Diff: {problem.difficulty || 'Medium'}</Badge>
+                                            {problem.difficulty && <Badge variant="secondary" className="text-xs">Trainer Diff: {problem.difficulty}</Badge>}
                                             {problem.timer_minutes && (
                                               <Badge variant="outline" className="text-xs">
                                                 <Clock className="h-3 w-3 mr-1 inline" />
@@ -7402,7 +7403,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 p-2.5">
                                   <div className="flex items-center gap-1">
                                     <HelpCircle className="h-3.5 w-3.5" />
-                                    <span>Trainer Diff: <span className="font-semibold text-foreground">{prob.difficulty || '1'}</span></span>
+                                    <span>Trainer Diff: <span className="font-semibold text-foreground">{prob.difficulty || 'Not set'}</span></span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-[11px] font-semibold text-foreground">My Diff:</span>
