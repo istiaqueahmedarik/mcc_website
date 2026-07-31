@@ -1,7 +1,90 @@
 import sql from "../db";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
+import {
+  CLASSROOM_UPDATE_PRIORITIES,
+  ensureClassroomUpdatesSchema,
+  normalizeClassroomUpdatePriorities,
+} from "../utils/classroomUpdatesSchema";
 
 type Ctx = any;
+
+export const getClassroomSettings = async (c: Ctx) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await ensureClassroomUpdatesSchema();
+    const user =
+      await sql`select id from users where id = ${id} and email = ${email}`;
+    if (user.length === 0) return c.json({ error: "Unauthorized" }, 401);
+
+    const rows = await sql`
+      select classroom_update_priorities, classroom_email_notifications_enabled
+      from user_settings
+      where user_id = ${id}
+    `;
+    const priorities = normalizeClassroomUpdatePriorities(rows[0]?.classroom_update_priorities || CLASSROOM_UPDATE_PRIORITIES);
+    const emailEnabled = rows.length === 0
+      ? true
+      : Boolean(rows[0].classroom_email_notifications_enabled);
+
+    return c.json({
+      classroom_update_priorities: priorities,
+      classroom_email_notifications_enabled: emailEnabled,
+      update_priorities: priorities,
+      email_notifications_enabled: emailEnabled,
+    });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to load classroom settings" }, 400);
+  }
+};
+
+export const updateClassroomSettings = async (c: Ctx) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await ensureClassroomUpdatesSchema();
+    const user =
+      await sql`select id from users where id = ${id} and email = ${email}`;
+    if (user.length === 0) return c.json({ error: "Unauthorized" }, 401);
+
+    const body = await c.req.json();
+    const priorities = normalizeClassroomUpdatePriorities(
+      body?.classroom_update_priorities || body?.update_priorities || CLASSROOM_UPDATE_PRIORITIES
+    );
+    const emailEnabled = typeof body?.classroom_email_notifications_enabled === "boolean"
+      ? body.classroom_email_notifications_enabled
+      : typeof body?.email_notifications_enabled === "boolean"
+        ? body.email_notifications_enabled
+        : true;
+
+    const rows = await sql`
+      insert into user_settings (
+        user_id,
+        classroom_update_priorities,
+        classroom_email_notifications_enabled,
+        updated_at
+      )
+      values (${id}, ${priorities}, ${emailEnabled}, now())
+      on conflict (user_id) do update set
+        classroom_update_priorities = excluded.classroom_update_priorities,
+        classroom_email_notifications_enabled = excluded.classroom_email_notifications_enabled,
+        updated_at = now()
+      returning classroom_update_priorities, classroom_email_notifications_enabled
+    `;
+
+    return c.json({
+      success: true,
+      classroom_update_priorities: normalizeClassroomUpdatePriorities(rows[0].classroom_update_priorities),
+      classroom_email_notifications_enabled: Boolean(rows[0].classroom_email_notifications_enabled),
+    });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to save classroom settings" }, 400);
+  }
+};
 
 // ---- Codeforces manual verification (mirrors VJudge flow) ----
 export const setCodeforcesId = async (c: Ctx) => {

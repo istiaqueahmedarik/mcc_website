@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { UpdatesTab } from '@/components/UpdatesTab';
+import { PrioritySettings } from '@/components/PrioritySettings';
+import { ClassroomThreadsTab } from '@/components/ClassroomThreadsTab';
+import { StudentThreadBubbleDock, getStudentThreadBubbleKey } from '@/components/StudentThreadBubbleDock';
+
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,23 +39,14 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Bubble, BubbleContent, BubbleReactions } from "@/components/ui/bubble";
 import {
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageFooter,
-  MessageGroup,
-  MessageHeader,
-} from "@/components/ui/message";
-import {
-  Play, Square, BookOpen, Clock, MessageSquare, Send, CheckCircle2,
+  Play, Square, BookOpen, Clock, MessageSquare, CheckCircle2,
   AlertCircle, Plus, Trash2, Award, FileText, HelpCircle,
   ChevronRight, Sparkles, ShieldCheck, Users,
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
-  Check, ChevronsUpDown, X, ThumbsUp, Heart, PartyPopper,
+  Check, ChevronsUpDown, X,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
-  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive
+  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive, Bell, SlidersHorizontal
 } from 'lucide-react';
 import {
   Dialog,
@@ -67,6 +62,8 @@ import MarkdownRender from "@/components/MarkdownRenderer";
 import ProgressLink from "@/components/ProgressLink";
 import { useTour } from "@/hooks/useTour";
 import { toast } from 'sonner';
+
+const LEGACY_PROBLEM_THREADS_VISIBLE = false;
 
 const trainerClassroomSteps = [
   {
@@ -159,18 +156,9 @@ const trainerClassroomSteps = [
     },
   },
   {
-    element: "#classroom-tour-chat-bubble",
-    popover: {
-      title: "💬 Class Chat Pet",
-      description: "Click the animated pet to open real-time class chat. You can message the whole class or send direct messages to individual students. Supports emoji reactions too!",
-      side: "left",
-      align: "end",
-    },
-  },
-  {
     popover: {
       title: "🎉 Ready to Teach!",
-      description: "You now know every tab in the classroom. Start with 'Schedule' to plan a session, 'Topics' to prepare content, then 'Live' when you're ready to teach. Hit 'Take Tour' anytime for a refresher!",
+      description: "You now know every tab in the classroom. Start with 'Schedule' to plan a session, 'Topics' to prepare content, then 'Live' when you're ready to teach. Hit the '?' button anytime for a refresher!",
       side: "center",
       align: "center",
     },
@@ -241,18 +229,9 @@ const studentClassroomSteps = [
     },
   },
   {
-    element: "#classroom-tour-chat-bubble",
-    popover: {
-      title: "💬 Class Chat",
-      description: "Click the pet to open the class chat. You can message your trainer or classmates during active sessions. Reactions and direct messages are also supported.",
-      side: "left",
-      align: "end",
-    },
-  },
-  {
     popover: {
       title: "🚀 You're All Set!",
-      description: "Now you know your way around! Start by checking your Topics for today's study material, then come back here when your trainer goes live. Click 'Take Tour' anytime for a refresher.",
+      description: "Now you know your way around! Start by checking your Topics for today's study material, then come back here when your trainer goes live. Click the '?' button anytime for a refresher.",
       side: "center",
       align: "center",
     },
@@ -429,12 +408,6 @@ const statusTone = {
 };
 
 const tagAllowedRegex = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
-
-const reactionOptions = [
-  { value: 'like', label: 'Like', Icon: ThumbsUp },
-  { value: 'heart', label: 'Heart', Icon: Heart },
-  { value: 'celebrate', label: 'Celebrate', Icon: PartyPopper },
-];
 
 const topicProgressOptions = [
   { value: 'not_solved', label: 'Not solved' },
@@ -701,6 +674,47 @@ function dateTimeOf(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Not recorded';
   return date.toLocaleString();
+}
+
+function submissionContextDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString();
+}
+
+function buildLiveSubmissionReference(problem, activeClass) {
+  if (!problem?.id || !problem?.student_id) return null;
+  return {
+    type: 'live_problem',
+    classProblemId: problem.id,
+    studentId: problem.student_id,
+    problemTitle: problem.title || 'Live problem',
+    classId: problem.class_id || activeClass?.id || '',
+    className: activeClass?.name || '',
+    submittedAt: submissionContextDate(problem.solved_at || problem.assigned_at),
+  };
+}
+
+function buildTopicSubmissionReference(item) {
+  if (!item?.progressId || !item?.studentId) return null;
+  return {
+    type: 'topic_problem',
+    progressId: item.progressId,
+    assignmentId: item.assignmentId || '',
+    topicProblemId: item.problemId || '',
+    studentId: item.studentId,
+    problemTitle: item.problemTitle || 'Topic problem',
+    topicTitle: item.topicTitle || '',
+    submittedAt: submissionContextDate(item.submittedAt),
+  };
+}
+
+function referenceDescription(reference) {
+  if (!reference) return 'Private classroom thread';
+  const title = reference.problemTitle || reference.problem_title || 'Pending submission';
+  const context = reference.topicTitle || reference.topic_title || reference.className || reference.class_name || '';
+  return [title, context].filter(Boolean).join(' - ');
 }
 
 function sortTimeOf(classItem) {
@@ -1140,7 +1154,224 @@ function TopicResourceMini({ resource }) {
   );
 }
 
-function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrainer, disabled }) {
+function ProblemThreadDialog({
+  classroomId,
+  problemId,
+  problemType = 'class_problem',
+  classId,
+  assignmentId,
+  currentUser,
+  title,
+  description,
+  onOpenThread,
+  buttonClassName = 'h-8 gap-1.5 text-xs font-semibold',
+  buttonVariant = 'outline',
+  buttonSize = 'sm',
+}) {
+  if (!LEGACY_PROBLEM_THREADS_VISIBLE) return null;
+  if (!classroomId || !problemId) return null;
+
+  return (
+    <Button
+      type="button"
+      variant={buttonVariant}
+      size={buttonSize}
+      className={buttonClassName}
+      onClick={() => onOpenThread?.({
+        classroomId,
+        problemId,
+        problemType,
+        classId,
+        assignmentId,
+        currentUser,
+        title: title || 'Problem thread',
+        description: description || 'Ask questions, share solution notes, and follow replies for this problem.',
+      })}
+      disabled={!onOpenThread}
+    >
+      <MessageSquare className="h-3.5 w-3.5" />
+      Thread
+    </Button>
+  );
+}
+
+function buildTopicProblemThreadTargets(problem, assignments = [], teams = []) {
+  if (!problem?.id) return [];
+  const teamById = new Map((teams || []).map((team) => [String(team.id), team]));
+  const targets = [];
+
+  for (const assignment of assignments || []) {
+    if (!assignment?.id || (assignment.status || 'active') !== 'active') continue;
+    const assignmentProblem = (assignment.topic?.problems || []).find((item) => item.id === problem.id);
+    const progressRows = assignmentProblem?.progressRows || [];
+    const topicMatches = assignment.topic_id === problem.topic_id || assignment.topic?.id === problem.topic_id || Boolean(assignmentProblem);
+    if (!topicMatches) continue;
+
+    const pushTarget = ({ student, sourceLabel }) => {
+      const studentId = student?.id || student?.student_id || assignment.student_id;
+      if (!studentId) return;
+      const progress = progressRows.find((row) => String(row.student_id) === String(studentId));
+      const name = student?.full_name || student?.name || assignment.student_name || 'Student';
+      const email = student?.email || assignment.student_email || '';
+      const mistId = student?.mist_id || assignment.student_mist_id || '';
+      targets.push({
+        key: `${assignment.id}:${studentId}`,
+        assignmentId: assignment.id,
+        studentId,
+        studentName: name,
+        studentEmail: email,
+        studentMistId: mistId,
+        teamName: assignment.team_name || teamById.get(String(assignment.team_id))?.name || '',
+        sourceLabel,
+        status: progress?.status || assignmentProblem?.status || 'not_solved',
+        updatedAt: progress?.updated_at || progress?.solved_at || assignment.assigned_at,
+      });
+    };
+
+    if (assignment.student_id) {
+      pushTarget({
+        student: {
+          id: assignment.student_id,
+          name: assignment.student_name,
+          email: assignment.student_email,
+          mist_id: assignment.student_mist_id,
+        },
+        sourceLabel: 'Student',
+      });
+      continue;
+    }
+
+    const team = teamById.get(String(assignment.team_id));
+    for (const member of team?.members || []) {
+      pushTarget({ student: member, sourceLabel: assignment.team_name || team?.name || 'Group' });
+    }
+  }
+
+  return targets.sort((a, b) => (
+    a.studentName.localeCompare(b.studentName) ||
+    (a.teamName || '').localeCompare(b.teamName || '')
+  ));
+}
+
+function TopicProblemThreadPicker({
+  classroomId,
+  problem,
+  selectedTopic,
+  topicAssignments,
+  teams,
+  currentUser,
+  onOpenThread,
+  buttonClassName = 'h-8 gap-1.5 text-xs font-semibold',
+  buttonVariant = 'outline',
+  buttonSize = 'sm',
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const targets = useMemo(
+    () => buildTopicProblemThreadTargets(problem, topicAssignments, teams),
+    [problem, topicAssignments, teams]
+  );
+  const filteredTargets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return targets;
+    return targets.filter((target) => (
+      target.studentName.toLowerCase().includes(q) ||
+      target.studentEmail.toLowerCase().includes(q) ||
+      target.studentMistId.toLowerCase().includes(q) ||
+      target.teamName.toLowerCase().includes(q) ||
+      target.sourceLabel.toLowerCase().includes(q)
+    ));
+  }, [query, targets]);
+
+  const startThread = (target) => {
+    setOpen(false);
+    setQuery('');
+    onOpenThread?.({
+      classroomId,
+      problemId: problem.id,
+      problemType: 'topic_problem',
+      assignmentId: target.assignmentId,
+      currentUser,
+      title: problem.title || 'Problem thread',
+      description: `${target.studentName}${target.teamName ? ` - ${target.teamName}` : ''} thread for ${selectedTopic?.title || 'this topic problem'}.`,
+    });
+  };
+
+  if (!LEGACY_PROBLEM_THREADS_VISIBLE) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant={buttonVariant} size={buttonSize} className={buttonClassName}>
+          <MessageSquare className="h-3.5 w-3.5" />
+          Thread
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[680px]">
+        <DialogHeader>
+          <DialogTitle>{problem?.title || 'Problem thread'}</DialogTitle>
+          <DialogDescription>{selectedTopic?.title || 'Assigned topic problem'}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search assigned students..."
+              className="h-9 pl-9 text-sm"
+            />
+          </div>
+
+          {targets.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              No assigned students found for this problem.
+            </div>
+          ) : filteredTargets.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              No assigned students match this search.
+            </div>
+          ) : (
+            <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+              {filteredTargets.map((target) => (
+                <button
+                  key={target.key}
+                  type="button"
+                  onClick={() => startThread(target)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border bg-card p-3 text-left transition hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                      <UserCheck className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{target.studentName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {target.studentMistId ? `ID: ${target.studentMistId}` : target.studentEmail || target.sourceLabel}
+                      </p>
+                      {target.teamName && (
+                        <p className="truncate text-[11px] text-muted-foreground">{target.teamName}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Badge variant="outline" className={`text-[10px] ${statusTone[target.status] || statusTone.not_solved}`}>
+                      {statusCopy[target.status] || statusCopy.not_solved}
+                    </Badge>
+                    <span className="text-xs font-semibold text-primary">Start</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrainer, disabled, currentUser, classroomId, assignmentId, onOpenThread }) {
   const status = progress?.status || problem.status || 'not_solved';
   const currentDiff = progress?.student_difficulty || problem.student_difficulty || problem.difficulty || '1';
   const solutionLink = progress?.solution_link || problem.solution_link || '';
@@ -1290,6 +1521,18 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
         )}
       </div>
 
+      <div className="mt-4 border-t pt-3">
+        <ProblemThreadDialog
+          classroomId={classroomId}
+          problemId={problem.id}
+          problemType={problem.topic_id ? 'topic_problem' : 'class_problem'}
+          assignmentId={assignmentId}
+          currentUser={currentUser}
+          onOpenThread={onOpenThread}
+          title={problem.title || 'Problem thread'}
+          description="Ask questions, submit follow-up notes, and react to replies."
+        />
+      </div>
       {/* Solution Submission Dialog */}
       <Dialog open={solutionDialogOpen} onOpenChange={setSolutionDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
@@ -1405,7 +1648,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
   );
 }
 
-function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerify }) {
+function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerify, classroomId, currentUser, onOpenThread }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [expandedAssignments, setExpandedAssignments] = useState(() => {
@@ -1557,6 +1800,10 @@ function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerif
                                 progress={p.progress}
                                 disabled={false}
                                 isTrainer={true}
+                                classroomId={classroomId}
+                                currentUser={currentUser}
+                                assignmentId={assignment.id}
+                                onOpenThread={onOpenThread}
                                 onVerify={onVerify}
                                 onStatusChange={onStatusChange ? (row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) => onStatusChange(assignment, row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) : null}
                               />
@@ -1591,8 +1838,8 @@ function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerif
                 {totalSolvedCount} / {totalProblemsCount} Solved ({overallPct}%)
               </Badge>
               {totalPendingCount > 0 && (
-                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs font-semibold animate-pulse">
-                  {totalPendingCount} Pending Verification
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs font-semibold">
+                  Pending verification
                 </Badge>
               )}
             </div>
@@ -1708,6 +1955,10 @@ function TopicAssignmentsPanel({ assignments, isTrainer, onStatusChange, onVerif
                             progress={problem.progress}
                             disabled={false}
                             isTrainer={false}
+                            classroomId={classroomId}
+                            currentUser={currentUser}
+                            assignmentId={assignment.id}
+                            onOpenThread={onOpenThread}
                             onVerify={onVerify}
                             onStatusChange={onStatusChange ? (row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) => onStatusChange(assignment, row, status, studentDifficulty, solutionLink, solutionCode, submissionNotes) : null}
                           />
@@ -1830,6 +2081,8 @@ function buildTeamProblemRows(team) {
 
 function TeamDashboardPanel({
   classroomId,
+  currentUser,
+  onOpenThread,
   teams,
   students,
   analytics,
@@ -1871,7 +2124,13 @@ function TeamDashboardPanel({
     return (students || []).map((s) => {
       const sAssignments = studentAssignmentsMap.get(s.id) || [];
       const topicsList = sAssignments.map((a) => a.topic_title || a.topic?.title).filter(Boolean);
-      const problemsList = sAssignments.flatMap((a) => a.topic?.problems || []);
+      const problemsList = sAssignments.flatMap((a) => (
+        (a.topic?.problems || []).map((problem) => ({
+          ...problem,
+          assignmentId: a.id,
+          topicTitle: a.topic?.title || a.topic_title,
+        }))
+      ));
       
       let solved = 0;
       let tried = 0;
@@ -2280,17 +2539,30 @@ function TeamDashboardPanel({
                             {student.problemsList.map((p) => {
                               const progStatus = p.progress?.status || p.status || 'not_solved';
                               return (
-                                <div key={p.id} className="flex items-center justify-between rounded-lg border bg-card p-2.5 text-xs">
-                                  <span className="font-semibold text-foreground truncate">{p.title}</span>
-                                  {progStatus === 'solved' ? (
-                                    <Badge className="bg-emerald-600 text-white text-[10px]">Solved</Badge>
-                                  ) : progStatus === 'pending_approval' ? (
-                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]">Pending</Badge>
-                                  ) : progStatus === 'tried' ? (
-                                    <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-[10px]">Tried</Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-[10px] text-muted-foreground">Not Solved</Badge>
-                                  )}
+                                <div key={`${p.assignmentId || 'topic'}-${p.id}`} className="flex items-center justify-between gap-2 rounded-lg border bg-card p-2.5 text-xs">
+                                  <span className="min-w-0 truncate font-semibold text-foreground">{p.title}</span>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    {progStatus === 'solved' ? (
+                                      <Badge className="bg-emerald-600 text-white text-[10px]">Solved</Badge>
+                                    ) : progStatus === 'pending_approval' ? (
+                                      <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]">Pending</Badge>
+                                    ) : progStatus === 'tried' ? (
+                                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/30 text-[10px]">Tried</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[10px] text-muted-foreground">Not Solved</Badge>
+                                    )}
+                                    <ProblemThreadDialog
+                                      classroomId={classroomId}
+                                      problemId={p.id}
+                                      problemType="topic_problem"
+                                      assignmentId={p.assignmentId}
+                                      currentUser={currentUser}
+                                      onOpenThread={onOpenThread}
+                                      title={p.title || 'Problem thread'}
+                                      description={`${student.displayName} thread for ${p.topicTitle || 'this topic problem'}.`}
+                                      buttonClassName="h-7 gap-1 px-2 text-[11px] font-semibold"
+                                    />
+                                  </div>
                                 </div>
                               );
                             })}
@@ -2386,193 +2658,7 @@ function ClassroomBoardPanel({ classroomId, isTrainer, activeClass, boardSession
   );
 }
 
-function FloatingClassChat({
-  open,
-  setOpen,
-  chatContainerRef,
-  chatClass,
-  chatClassOptions,
-  chatClassId,
-  setChatClassId,
-  setChatMessages,
-  isTrainer,
-  students,
-  classroom,
-  chatRecipient,
-  setChatRecipient,
-  chatMessages,
-  currentUserId,
-  canWriteChat,
-  newMessage,
-  setNewMessage,
-  handleSendMessage,
-  handleToggleReaction,
-}) {
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2">
-      {!open && (
-        <button
-          id="classroom-tour-chat-bubble"
-          type="button"
-          aria-label="Open class chat"
-          onClick={() => setOpen(true)}
-          className="h-20 w-20 overflow-hidden rounded-full border bg-card p-0 shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <DotLottieReact src="/pet.lottie" loop autoplay className="pointer-events-none h-full w-full" />
-        </button>
-      )}
-      {open && (
-        <Card id="chat" className="flex h-[min(680px,calc(100vh-6rem))] w-[min(390px,calc(100vw-2rem))] flex-col justify-between overflow-hidden rounded-lg border border-border/80 bg-card shadow-2xl">
-          <CardHeader className="border-b py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <span className="h-9 w-9 overflow-hidden rounded-full border bg-card">
-                    <DotLottieReact src="/pet.lottie" loop autoplay className="pointer-events-none h-full w-full" />
-                  </span>
-                  Class chat
-                </CardTitle>
-                <CardDescription className="mt-1 text-[10px]">
-                  {chatClass ? classLabel(chatClass) : 'Select a started or completed class.'}
-                </CardDescription>
-              </div>
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(false)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            {chatClassOptions.length > 0 && (
-              <select
-                value={chatClassId}
-                onChange={(e) => {
-                  setChatClassId(e.target.value);
-                  setChatMessages([]);
-                }}
-                className="mt-2 w-full rounded-md border border-border/80 bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
-              >
-                {chatClassOptions.map((classItem) => (
-                  <option key={classItem.id} value={classItem.id}>
-                    {classLabel(classItem)}
-                  </option>
-                ))}
-              </select>
-            )}
-            {isTrainer ? (
-              <select
-                value={chatRecipient}
-                onChange={(e) => setChatRecipient(e.target.value)}
-                className="mt-2 w-full rounded-md border border-border/80 bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
-                disabled={!canWriteChat}
-              >
-                <option value="">Broadcast to Class</option>
-                {students.map((student) => (
-                  <option key={student.id} value={student.id}>Chat: {getStudentLabelWithId(student)}</option>
-                ))}
-              </select>
-            ) : (
-              <select
-                value={chatRecipient}
-                onChange={(e) => setChatRecipient(e.target.value)}
-                className="mt-2 w-full rounded-md border border-border/80 bg-background p-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
-                disabled={!canWriteChat}
-              >
-                <option value="">Broadcast to Class</option>
-                {classroom.created_by && (
-                  <option value={classroom.created_by}>Message Trainer ({classroom.trainer_name})</option>
-                )}
-              </select>
-            )}
-          </CardHeader>
 
-          <CardContent ref={chatContainerRef} className="flex-1 overflow-y-auto p-3">
-            {!chatClass ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                <span className="grid h-11 w-11 place-items-center rounded-md border border-dashed text-muted-foreground">
-                  <MessageSquare className="h-5 w-5" />
-                </span>
-                <p className="text-xs text-muted-foreground">Start or complete a class to open its chat.</p>
-              </div>
-            ) : chatMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-                <span className="grid h-11 w-11 place-items-center rounded-md bg-muted text-muted-foreground">
-                  <MessageSquare className="h-5 w-5" />
-                </span>
-                <p className="text-xs text-muted-foreground">
-                  {canWriteChat ? 'No messages yet in this class.' : 'No archived messages for this class.'}
-                </p>
-              </div>
-            ) : (
-              <MessageGroup>
-                {chatMessages.map((msg) => {
-                  const isOwn = msg.sender_id === currentUserId;
-                  return (
-                    <Message key={msg.id} align={isOwn ? 'end' : 'start'}>
-                      {!isOwn && <MessageAvatar>{getInitials(msg.sender_name)}</MessageAvatar>}
-                      <MessageContent className={isOwn ? 'items-end' : 'items-start'}>
-                        <MessageHeader className={isOwn ? 'justify-end' : ''}>
-                          <span>{isOwn ? 'You' : msg.sender_name}</span>
-                          <span className="text-muted-foreground/60">
-                            {msg.recipient_name ? `Direct to ${msg.recipient_name}` : 'Class'}
-                          </span>
-                        </MessageHeader>
-                        <Bubble align={isOwn ? 'end' : 'start'}>
-                          <BubbleContent variant={isOwn ? 'default' : msg.recipient_id ? 'tinted' : 'secondary'}>
-                            {msg.message}
-                          </BubbleContent>
-                        </Bubble>
-                        <MessageFooter className={isOwn ? 'justify-end' : 'justify-start'}>
-                          <BubbleReactions align={isOwn ? 'end' : 'start'} aria-label="Message reactions">
-                            {reactionOptions.map(({ value, label, Icon }) => {
-                              const reaction = (msg.reactions || []).find((item) => item.reaction === value);
-                              const active = Boolean(reaction?.reactedByMe);
-                              return (
-                                <Button
-                                  key={value}
-                                  type="button"
-                                  variant="ghost"
-                                  onClick={() => handleToggleReaction(msg.id, value)}
-                                  className={`h-6 rounded-md px-1.5 text-[11px] ${
-                                    active
-                                      ? 'border border-primary/20 bg-primary/10 text-primary hover:bg-primary/15'
-                                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                  }`}
-                                  aria-label={`${label} reaction`}
-                                >
-                                  <Icon className="h-3.5 w-3.5" />
-                                  {reaction?.count > 0 && <span>{reaction.count}</span>}
-                                </Button>
-                              );
-                            })}
-                          </BubbleReactions>
-                        </MessageFooter>
-                      </MessageContent>
-                      {isOwn && <MessageAvatar>ME</MessageAvatar>}
-                    </Message>
-                  );
-                })}
-              </MessageGroup>
-            )}
-          </CardContent>
-
-          <CardFooter className="border-t bg-muted/20 p-3">
-            <form onSubmit={handleSendMessage} className="flex w-full gap-1.5">
-              <Input
-                placeholder={canWriteChat ? 'Message this class...' : 'Completed class chat is read-only'}
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                className="h-9 text-xs"
-                disabled={!canWriteChat}
-                required
-              />
-              <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={!canWriteChat}>
-                <Send className="h-3.5 w-3.5" />
-              </Button>
-            </form>
-          </CardFooter>
-        </Card>
-      )}
-    </div>
-  );
-}
 
 export default function ClassroomLiveClient({ classroomId }) {
   // Common states
@@ -2638,8 +2724,8 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [ideActivity, setIdeActivity] = useState({ sessions: [], events: [] });
   const [ideActivityLoading, setIdeActivityLoading] = useState(false);
   const [trackedIdeStudentId, setTrackedIdeStudentId] = useState('');
-  const [trainerTab, setTrainerTab] = useState('live');
-  const [studentTab, setStudentTab] = useState('topics');
+  const [trainerTab, setTrainerTab] = useState('updates');
+  const [studentTab, setStudentTab] = useState('updates');
   const [editingTeamId, setEditingTeamId] = useState('');
   const [editingTeamStudentIds, setEditingTeamStudentIds] = useState([]);
   const [teamUpdateLoading, setTeamUpdateLoading] = useState(false);
@@ -2677,7 +2763,6 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [visibleSubmissionsCount, setVisibleSubmissionsCount] = useState(10);
   const [boardSession, setBoardSession] = useState(null);
   const [boardLoading, setBoardLoading] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({
     liveProgress: false,
     scheduleClass: true,
@@ -2707,15 +2792,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [challengeSubmissionError, setChallengeSubmissionError] = useState('');
   const [challengeSubmissionSaving, setChallengeSubmissionSaving] = useState(false);
 
-  // Chat states
-  const [chatMessages, setChatMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [chatRecipient, setChatRecipient] = useState(''); // Empty for classroom channel
-  const [chatClassId, setChatClassId] = useState('');
-  const chatContainerRef = useRef(null);
-
   // --- Deduplication: prevent overlapping concurrent fetches ---
-  const fetchingChat = useRef(false);
   const fetchingDetails = useRef(false);
   const trackedIdeStudentIdRef = useRef('');
 
@@ -2726,6 +2803,10 @@ export default function ClassroomLiveClient({ classroomId }) {
   const teams = data?.teams || EMPTY_LIST;
   const isTrainer = data?.isTrainer || false;
   const currentUserId = data?.currentUserId || '';
+  const currentUser = useMemo(() => ({ id: currentUserId }), [currentUserId]);
+  const [threadBubbles, setThreadBubbles] = useState([]);
+  const [activeThreadBubbleKey, setActiveThreadBubbleKey] = useState('');
+  const token = null;
   const studentImportPreview = studentImport.rows.length
     ? buildStudentImportPreview(studentImport)
     : { identifiers: [], rows: [], rowErrors: [] };
@@ -2741,6 +2822,9 @@ export default function ClassroomLiveClient({ classroomId }) {
       return pendingSubmissionsApi.map((p) => ({
         progressId: p.id,
         problemId: p.topic_problem_id,
+        assignmentId: p.assignment_id,
+        studentId: p.student_id || '',
+        threadKey: p.assignment_id && p.topic_problem_id ? `topic:${p.assignment_id}:${p.topic_problem_id}` : '',
         problemTitle: p.problem_title,
         platform: p.platform,
         topicTitle: p.topic_title,
@@ -2763,6 +2847,9 @@ export default function ClassroomLiveClient({ classroomId }) {
         return rows.filter((r) => r.status === 'pending_approval').map((r) => ({
           progressId: r.id,
           problemId: problem.id,
+          assignmentId: assignment.id,
+          studentId: r.student_id || assignment.student_id || '',
+          threadKey: assignment.id && problem.id ? `topic:${assignment.id}:${problem.id}` : '',
           problemTitle: problem.title,
           platform: problem.platform,
           topicTitle: assignment.topic?.title || assignment.topic_title,
@@ -2805,15 +2892,43 @@ export default function ClassroomLiveClient({ classroomId }) {
     autoStart: !loading,
   });
 
-  const chatClassOptions = classes
-    .filter((classItem) => ['started', 'completed'].includes(classItem.status))
-    .sort((a, b) => {
-      if (a.status === 'started' && b.status !== 'started') return -1;
-      if (b.status === 'started' && a.status !== 'started') return 1;
-      return sortTimeOf(b) - sortTimeOf(a);
+  const openThreadBubble = useCallback((thread) => {
+    const studentId = thread?.studentId || thread?.student_id || thread?.student?.id || thread?.submissionReference?.studentId;
+    if (!studentId) {
+      toast.error('Student thread is unavailable for this submission');
+      return;
+    }
+    const normalized = {
+      ...thread,
+      classroomId: thread.classroomId || classroomId,
+      studentId,
+      student: thread.student || {
+        id: studentId,
+        full_name: thread.studentName || thread.title || 'Student',
+        mist_id: thread.studentMistId || '',
+        email: thread.studentEmail || '',
+      },
+      title: thread.title || thread.studentName || thread.student?.full_name || thread.student?.name || 'Student thread',
+      description: thread.description || referenceDescription(thread.submissionReference),
+    };
+    const key = getStudentThreadBubbleKey(normalized);
+    const nextThread = { ...normalized, key };
+    setThreadBubbles((items) => {
+      const withoutDuplicate = items.filter((item) => item.key !== key);
+      return [...withoutDuplicate, nextThread].slice(-6);
     });
-  const chatClass = chatClassOptions.find((classItem) => classItem.id === chatClassId) || null;
-  const canWriteChat = Boolean(activeClass?.id && chatClassId === activeClass.id);
+    setActiveThreadBubbleKey(key);
+  }, [classroomId]);
+
+  const closeThreadBubble = useCallback((key) => {
+    setThreadBubbles((items) => items.filter((item) => item.key !== key));
+    setActiveThreadBubbleKey((current) => (current === key ? '' : current));
+  }, []);
+
+  const activateThreadBubble = useCallback((key) => {
+    setActiveThreadBubbleKey((current) => (current === key ? '' : key));
+  }, []);
+
   const classroomResources = resources.filter((resource) => !resource.class_id);
   const activeClassResources = activeClass
     ? resources.filter((resource) => resource.class_id === activeClass.id)
@@ -3033,23 +3148,6 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   }, [classroomId]);
 
-  // Fetch chat history
-  const fetchChatHistory = useCallback(async () => {
-    if (!chatClassId) {
-      setChatMessages([]);
-      return;
-    }
-    if (fetchingChat.current) return;
-    fetchingChat.current = true;
-    try {
-      const response = await fetch(`/api/classroom/${classroomId}/chat?classId=${encodeURIComponent(chatClassId)}`, { cache: 'no-store' });
-      const res = await response.json();
-      if (res && res.messages) {
-        setChatMessages(res.messages);
-      }
-    } catch (err) {}
-    fetchingChat.current = false;
-  }, [chatClassId, classroomId]);
 
   useEffect(() => {
     fetchProblemTags();
@@ -3091,33 +3189,8 @@ export default function ClassroomLiveClient({ classroomId }) {
   }, [completedClasses.length]);
 
   useEffect(() => {
-    const availableIds = classes
-      .filter((classItem) => ['started', 'completed'].includes(classItem.status))
-      .sort((a, b) => {
-        if (a.status === 'started' && b.status !== 'started') return -1;
-        if (b.status === 'started' && a.status !== 'started') return 1;
-        return sortTimeOf(b) - sortTimeOf(a);
-      })
-      .map((classItem) => classItem.id);
-    const preferredId = activeClass?.id || selectedPastClassId || availableIds[0] || '';
-
-    if (!preferredId) {
-      if (chatClassId) setChatClassId('');
-      return;
-    }
-
-    if (!availableIds.includes(chatClassId)) {
-      setChatClassId(preferredId);
-    }
-  }, [activeClass?.id, selectedPastClassId, classes, chatClassId]);
-
-  useEffect(() => {
     fetchClassroomDetails();
   }, [fetchClassroomDetails]);
-
-  useEffect(() => {
-    fetchChatHistory();
-  }, [fetchChatHistory]);
 
   useEffect(() => {
     if (!ideLiveTracking) return;
@@ -3176,12 +3249,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     };
   }, [selectedPastClassId]);
 
-  // Scroll chat window to bottom locally without scrolling the viewport
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
-  }, [chatMessages, chatOpen]);
+
 
   // Manage Students
   const buildPreEnrollRows = (rows, lookupMethod = studentLookupMethod) => (
@@ -4063,6 +4131,83 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
+  const renderSubmissionThreadButton = (item) => {
+    const submissionReference = buildTopicSubmissionReference(item);
+    if (!submissionReference) return null;
+    const bubbleKey = getStudentThreadBubbleKey({
+      classroomId,
+      studentId: item.studentId,
+      submissionReference,
+    });
+    const isOpen = activeThreadBubbleKey === bubbleKey;
+    return (
+      <Button
+        type="button"
+        variant={isOpen ? "secondary" : "outline"}
+        size="sm"
+        className="h-8 text-xs gap-1 font-semibold"
+        aria-expanded={isOpen}
+        onClick={() => openThreadBubble({
+          classroomId,
+          studentId: item.studentId,
+          student: {
+            id: item.studentId,
+            full_name: item.studentName || 'Student',
+            email: item.studentEmail || '',
+            mist_id: item.studentMistId || '',
+          },
+          submissionReference,
+          title: item.studentName || 'Student thread',
+          description: referenceDescription(submissionReference),
+        })}
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+        Thread
+      </Button>
+    );
+  };
+
+  const renderLiveSubmissionThreadButton = (problem) => {
+    if (problem?.status !== 'pending_approval') return null;
+    const submissionReference = buildLiveSubmissionReference(problem, activeClass);
+    if (!submissionReference) return null;
+    const bubbleKey = getStudentThreadBubbleKey({
+      classroomId,
+      studentId: problem.student_id,
+      submissionReference,
+    });
+    const isOpen = activeThreadBubbleKey === bubbleKey;
+    return (
+      <Button
+        type="button"
+        variant={isOpen ? "secondary" : "outline"}
+        size="sm"
+        className="h-8 gap-1 text-xs font-bold"
+        aria-expanded={isOpen}
+        onClick={() => openThreadBubble({
+          classroomId,
+          studentId: problem.student_id,
+          student: {
+            id: problem.student_id,
+            full_name: problem.student_name || 'Student',
+            email: problem.student_email || '',
+            mist_id: problem.student_mist_id || '',
+          },
+          submissionReference,
+          title: problem.student_name || 'Student thread',
+          description: referenceDescription(submissionReference),
+        })}
+      >
+        <MessageSquare className="h-3.5 w-3.5" />
+        Thread
+      </Button>
+    );
+  };
+
+  const renderSubmissionThreadPanel = () => {
+    return null;
+  };
+
   const handleStartBoard = async () => {
     const res = await post_with_token(`classroom/${classroomId}/board/start`, {
       classId: activeClass?.id || null,
@@ -4266,29 +4411,6 @@ export default function ClassroomLiveClient({ classroomId }) {
     }
   };
 
-  // Chat message sending
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !canWriteChat) return;
-    const res = await post_with_token(`classroom/${classroomId}/chat/send`, {
-      message: newMessage,
-      recipientId: chatRecipient || null,
-      classId: chatClassId
-    });
-    if (res && res.success) {
-      setNewMessage('');
-      fetchChatHistory();
-    }
-  };
-
-  const handleToggleReaction = async (messageId, reaction) => {
-    if (!messageId || !chatClassId) return;
-    const res = await post_with_token(`classroom/${classroomId}/chat/reaction`, {
-      messageId,
-      reaction,
-    });
-    if (res && res.success) fetchChatHistory();
-  };
 
   const renderTrainerRosterStudent = (s) => {
     const status = getStudentEnrollmentStatus(s);
@@ -4438,45 +4560,56 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* TRAINER BOARD PANELS                                      */
             /* ========================================================= */
             <Tabs value={trainerTab} onValueChange={setTrainerTab} className="space-y-5">
-              <TabsList id="classroom-tour-tabs" className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border bg-background p-1">
-                <TabsTrigger id="classroom-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Target className="h-4 w-4" /> Live
-                </TabsTrigger>
-                <TabsTrigger id="classroom-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Layers3 className="h-4 w-4" /> Topics
-                </TabsTrigger>
-                <TabsTrigger id="classroom-tour-tab-board" value="board" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <PenTool className="h-4 w-4" /> Board
-                </TabsTrigger>
-                <TabsTrigger id="classroom-tour-tab-analytics" value="analytics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <BarChart3 className="h-4 w-4" /> Progress Matrix
-                </TabsTrigger>
-                {/* TODO: Classroom IDE Feature (Beta Mode) - Hidden from active navigation for now. To re-enable, uncomment the TabsTrigger below: */}
-                {/* <TabsTrigger value="ide" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Code2 className="h-4 w-4" /> IDE
-                </TabsTrigger> */}
-                <TabsTrigger id="classroom-tour-tab-schedule" value="schedule" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Calendar className="h-4 w-4" /> Schedule
-                </TabsTrigger>
-                <TabsTrigger id="classroom-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
-                  <UserCheck className="h-4 w-4" /> Attendance
-                </TabsTrigger>
-                <TabsTrigger id="classroom-tour-tab-students" value="students" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Users className="h-4 w-4" /> People
-                </TabsTrigger>
-                {pendingSubmissionsList.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="ml-auto h-8 gap-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30 hover:bg-amber-500/20 font-bold animate-pulse text-xs"
-                    onClick={() => setSubmissionReviewHubOpen(true)}
-                  >
-                    <ShieldCheck className="h-4 w-4 text-amber-500" />
-                    {pendingSubmissionsList.length} Pending Submissions
-                  </Button>
-                )}
-              </TabsList>
+              <div className="flex flex-col gap-2 xl:flex-row xl:items-start">
+                <TabsList id="classroom-tour-tabs" className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border bg-background p-1 xl:flex-1">
+                  <TabsTrigger value="updates" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Bell className="h-4 w-4" /> Updates
+                  </TabsTrigger>
+                  <TabsTrigger value="threads" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <MessageSquare className="h-4 w-4" /> Threads
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Target className="h-4 w-4" /> Live
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Layers3 className="h-4 w-4" /> Topics
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-board" value="board" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <PenTool className="h-4 w-4" /> Board
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-analytics" value="analytics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <BarChart3 className="h-4 w-4" /> Progress Matrix
+                  </TabsTrigger>
+                  {/* TODO: Classroom IDE Feature (Beta Mode) - Hidden from active navigation for now. To re-enable, uncomment the TabsTrigger below: */}
+                  {/* <TabsTrigger value="ide" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Code2 className="h-4 w-4" /> IDE
+                  </TabsTrigger> */}
+                  <TabsTrigger id="classroom-tour-tab-schedule" value="schedule" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Calendar className="h-4 w-4" /> Schedule
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
+                    <UserCheck className="h-4 w-4" /> Attendance
+                  </TabsTrigger>
+                  <TabsTrigger id="classroom-tour-tab-students" value="students" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <Users className="h-4 w-4" /> People
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                    <SlidersHorizontal className="h-4 w-4" /> Settings
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+            <TabsContent value="updates" className="mt-4 space-y-4">
+              <UpdatesTab classroomId={classroomId} isTrainer={true} token={token} currentUser={currentUser} active={trainerTab === 'updates'} />
+            </TabsContent>
+
+              <TabsContent value="threads" className="mt-4">
+                <ClassroomThreadsTab classroomId={classroomId} isTrainer={true} currentUser={currentUser} onOpenBubble={openThreadBubble} />
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-4">
+                <PrioritySettings token={token} />
+              </TabsContent>
 
               {/* LIVE PRACTICE PANEL */}
               <TabsContent value="live" className="space-y-6">
@@ -4851,22 +4984,37 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     <td className="px-5 py-4 align-top">
                                       <div className="flex flex-wrap items-center justify-end gap-2">
                                         {(prob.solution_link || prob.solution_code || prob.submission_notes) && (
-                                          <Dialog>
-                                            <DialogTrigger asChild>
-                                              <Button type="button" variant="outline" size="sm" className={`h-8 gap-1 text-xs font-bold ${prob.status === 'pending_approval' ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15' : ''}`}>
-                                                <Eye className="h-3.5 w-3.5" />
-                                                Review
-                                              </Button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[760px]">
-                                              <DialogHeader>
-                                                <DialogTitle>Submitted proof</DialogTitle>
-                                                <DialogDescription>{prob.title} - {prob.student_name || 'Student'}</DialogDescription>
-                                              </DialogHeader>
-                                              <SubmissionReviewContent solutionLink={prob.solution_link} solutionCode={prob.solution_code} submissionNotes={prob.submission_notes} />
-                                            </DialogContent>
-                                          </Dialog>
+                                          <>
+                                            <Dialog>
+                                              <DialogTrigger asChild>
+                                                <Button type="button" variant="outline" size="sm" className={`h-8 gap-1 text-xs font-bold ${prob.status === 'pending_approval' ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15' : ''}`}>
+                                                  <Eye className="h-3.5 w-3.5" />
+                                                  Review
+                                                </Button>
+                                              </DialogTrigger>
+                                              <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-[760px]">
+                                                <DialogHeader>
+                                                  <DialogTitle>Submitted proof</DialogTitle>
+                                                  <DialogDescription>{prob.title} - {prob.student_name || 'Student'}</DialogDescription>
+                                                </DialogHeader>
+                                                <SubmissionReviewContent solutionLink={prob.solution_link} solutionCode={prob.solution_code} submissionNotes={prob.submission_notes} />
+                                              </DialogContent>
+                                            </Dialog>
+
+                                          </>
                                         )}
+                                        {renderLiveSubmissionThreadButton(prob)}
+                                        <ProblemThreadDialog
+                                          classroomId={classroomId}
+                                          problemId={prob.id}
+                                          problemType="class_problem"
+                                          classId={prob.class_id || activeClass?.id}
+                                          currentUser={currentUser}
+                                          onOpenThread={openThreadBubble}
+                                          title={prob.title || 'Problem thread'}
+                                          description={`${prob.student_name || 'Student'} problem discussion.`}
+                                          buttonClassName="h-8 gap-1 text-xs font-bold"
+                                        />
                                         <Dialog>
                                           <DialogTrigger asChild>
                                             <Button variant="outline" size="sm" className="h-8 text-xs font-bold" onClick={() => handleOpenProblemConfig(prob.id)}>
@@ -5271,11 +5419,6 @@ export default function ClassroomLiveClient({ classroomId }) {
                             >
                               <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
                               Pending Submissions
-                              {pendingSubmissionsList.length > 0 && (
-                                <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 px-1.5 py-0 text-[10px] font-bold animate-pulse">
-                                  {pendingSubmissionsList.length}
-                                </Badge>
-                              )}
                             </button>
                           </div>
                         </div>
@@ -5385,6 +5528,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             <ExternalLink className="h-3 w-3 shrink-0" />
                                           </a>
                                         </div>
+                                        <TopicProblemThreadPicker
+                                          classroomId={classroomId}
+                                          problem={problem}
+                                          selectedTopic={selectedTopic}
+                                          topicAssignments={topicAssignmentsList}
+                                          teams={teams}
+                                          currentUser={currentUser}
+                                          onOpenThread={openThreadBubble}
+                                          buttonClassName="h-7 gap-1 text-[11px] font-semibold"
+                                        />
                                       </div>
                                     ))}
                                   </div>
@@ -5559,6 +5712,15 @@ export default function ClassroomLiveClient({ classroomId }) {
                                           )}
                                         </div>
                                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                          <TopicProblemThreadPicker
+                                            classroomId={classroomId}
+                                            problem={problem}
+                                            selectedTopic={selectedTopic}
+                                            topicAssignments={topicAssignmentsList}
+                                            teams={teams}
+                                            currentUser={currentUser}
+                                            onOpenThread={openThreadBubble}
+                                          />
                                           <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openTopicProblemDialog(selectedTopic, problem)}>
                                             <Pencil className="h-3.5 w-3.5" />
                                             Edit
@@ -5702,11 +5864,11 @@ export default function ClassroomLiveClient({ classroomId }) {
 
                           {/* 6. PENDING SUBMISSIONS SUB-TAB */}
                           {activeStudioTab === 'submissions' && (
-                            <section className="space-y-4">
+                            <section id="topic-studio-submissions" className="space-y-4">
                               <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
                                 <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
                                   <ShieldCheck className="h-4 w-4 text-amber-500" />
-                                  Student Topic Submissions Pending Review ({pendingSubmissionsList.length})
+                                  Student Topic Submissions Pending Review
                                 </h4>
                                 {pendingSubmissionsList.length > 0 && (
                                   <div className="relative min-w-[220px]">
@@ -5742,7 +5904,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                                 Topic: <span className="font-semibold text-foreground">{item.topicTitle}</span> • Problem: <span className="font-semibold text-foreground">{item.problemTitle}</span>
                                               </p>
                                             </div>
-                                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold animate-pulse">
+                                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold">
                                               Pending Verification
                                             </Badge>
                                           </div>
@@ -5759,33 +5921,39 @@ export default function ClassroomLiveClient({ classroomId }) {
                                               placeholder="Add optional trainer review feedback e.g. Great solution! or Fix complexity..."
                                               className="text-xs"
                                             />
-                                            <div className="flex items-center justify-end gap-2 pt-1">
-                                              <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
-                                                onClick={() => {
-                                                  const input = document.getElementById(`studio-notes-${item.progressId}`);
-                                                  const notes = input?.value || '';
-                                                  handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
-                                                }}
-                                              >
-                                                <X className="h-3.5 w-3.5" /> Reject / Needs Revision
-                                              </Button>
-                                              <Button
-                                                type="button"
-                                                size="sm"
-                                                className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
-                                                onClick={() => {
-                                                  const input = document.getElementById(`studio-notes-${item.progressId}`);
-                                                  const notes = input?.value || '';
-                                                  handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
-                                                }}
-                                              >
-                                                <Check className="h-3.5 w-3.5" /> Approve Solution
-                                              </Button>
+                                            <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                              <div className="flex items-center gap-2">
+                                                {renderSubmissionThreadButton(item)}
+                                              </div>
+                                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
+                                                  onClick={() => {
+                                                    const input = document.getElementById(`studio-notes-${item.progressId}`);
+                                                    const notes = input?.value || '';
+                                                    handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
+                                                  }}
+                                                >
+                                                  <X className="h-3.5 w-3.5" /> Reject / Needs Revision
+                                                </Button>
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                                                  onClick={() => {
+                                                    const input = document.getElementById(`studio-notes-${item.progressId}`);
+                                                    const notes = input?.value || '';
+                                                    handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
+                                                  }}
+                                                >
+                                                  <Check className="h-3.5 w-3.5" /> Approve Solution
+                                                </Button>
+                                              </div>
                                             </div>
+                                            {renderSubmissionThreadPanel(item)}
                                           </div>
                                         </Card>
                                       ))}
@@ -6380,7 +6548,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         <div>
                           <DialogTitle className="flex items-center gap-2 text-lg font-bold">
                             <ShieldCheck className="h-5 w-5 text-amber-500" />
-                            Pending Topic Submissions ({pendingSubmissionsList.length})
+                            Pending Topic Submissions
                           </DialogTitle>
                           <DialogDescription className="mt-0.5">
                             Review student proof links and code snippets, provide feedback, and approve or reject submissions.
@@ -6421,7 +6589,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       Topic: <span className="font-semibold text-foreground">{item.topicTitle}</span> • Problem: <span className="font-semibold text-foreground">{item.problemTitle}</span>
                                     </p>
                                   </div>
-                                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold animate-pulse">
+                                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] shrink-0 font-semibold">
                                     Pending Verification
                                   </Badge>
                                 </div>
@@ -6438,33 +6606,39 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     placeholder="Add optional trainer review feedback e.g. Great solution! or Fix complexity..."
                                     className="text-xs"
                                   />
-                                  <div className="flex items-center justify-end gap-2 pt-1">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
-                                      onClick={() => {
-                                        const input = document.getElementById(`trainer-notes-${item.progressId}`);
-                                        const notes = input?.value || '';
-                                        handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
-                                      }}
-                                    >
-                                      <X className="h-3.5 w-3.5" /> Reject / Needs Revision
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
-                                      onClick={() => {
-                                        const input = document.getElementById(`trainer-notes-${item.progressId}`);
-                                        const notes = input?.value || '';
-                                        handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
-                                      }}
-                                    >
-                                      <Check className="h-3.5 w-3.5" /> Approve Solution
-                                    </Button>
+                                  <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-center gap-2">
+                                      {renderSubmissionThreadButton(item)}
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold"
+                                        onClick={() => {
+                                          const input = document.getElementById(`trainer-notes-${item.progressId}`);
+                                          const notes = input?.value || '';
+                                          handleVerifyProblemProgress(item.progressId, item.problemId, 'reject', notes);
+                                        }}
+                                      >
+                                        <X className="h-3.5 w-3.5" /> Reject / Needs Revision
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                                        onClick={() => {
+                                          const input = document.getElementById(`trainer-notes-${item.progressId}`);
+                                          const notes = input?.value || '';
+                                          handleVerifyProblemProgress(item.progressId, item.problemId, 'approve', notes);
+                                        }}
+                                      >
+                                        <Check className="h-3.5 w-3.5" /> Approve Solution
+                                      </Button>
+                                    </div>
                                   </div>
+                                  {renderSubmissionThreadPanel(item)}
                                 </div>
                               </Card>
                             ))}
@@ -6509,6 +6683,8 @@ export default function ClassroomLiveClient({ classroomId }) {
               <TabsContent value="analytics" className="space-y-5">
                 <TeamDashboardPanel
                   classroomId={classroomId}
+                  currentUser={currentUser}
+                  onOpenThread={openThreadBubble}
                   teams={teams}
                   students={students}
                   analytics={topicAnalytics}
@@ -6667,7 +6843,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-dashed">
                                   <div className="flex items-center gap-1.5">
                                     {liveOverflow > 0 && (
-                                      <Badge className="bg-rose-600 text-white text-[10px] font-bold animate-pulse gap-1">
+                                      <Badge className="bg-rose-600 text-white text-[10px] font-bold gap-1">
                                         <Timer className="h-3 w-3" /> Overflow: +{liveOverflow}m
                                       </Badge>
                                     )}
@@ -7255,6 +7431,12 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* ========================================================= */
             <Tabs value={studentTab} onValueChange={setStudentTab} className="space-y-5">
               <TabsList id="student-tour-tabs" className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border bg-background p-1">
+                <TabsTrigger value="updates" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                  <Bell className="h-4 w-4" /> Updates
+                </TabsTrigger>
+                <TabsTrigger value="threads" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                  <MessageSquare className="h-4 w-4" /> Threads
+                </TabsTrigger>
                 <TabsTrigger id="student-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
                   <Layers3 className="h-4 w-4" /> Topics
                 </TabsTrigger>
@@ -7270,7 +7452,22 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <TabsTrigger id="student-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
                   <UserCheck className="h-4 w-4" /> Attendance
                 </TabsTrigger>
+                <TabsTrigger value="settings" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
+                  <SlidersHorizontal className="h-4 w-4" /> Settings
+                </TabsTrigger>
               </TabsList>
+
+            <TabsContent value="updates" className="mt-4 space-y-4">
+              <UpdatesTab classroomId={classroomId} isTrainer={false} token={token} currentUser={currentUser} active={studentTab === 'updates'} />
+            </TabsContent>
+
+              <TabsContent value="threads" className="mt-4">
+                <ClassroomThreadsTab classroomId={classroomId} isTrainer={false} currentUser={currentUser} onOpenBubble={openThreadBubble} />
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-4">
+                <PrioritySettings token={token} />
+              </TabsContent>
 
               {/* TAB 1: TOPICS */}
               <TabsContent value="topics">
@@ -7294,6 +7491,9 @@ export default function ClassroomLiveClient({ classroomId }) {
                         isTrainer={false}
                         onStatusChange={handleTopicProblemStatus}
                         onVerify={handleVerifyProblemProgress}
+                        classroomId={classroomId}
+                        currentUser={currentUser}
+                        onOpenThread={openThreadBubble}
                       />
                     </CardContent>
                   )}
@@ -7431,13 +7631,24 @@ export default function ClassroomLiveClient({ classroomId }) {
                                   </div>
                                 )}
                               </CardContent>
-                              <CardFooter className="pt-2 border-t flex justify-between gap-2">
+                              <CardFooter className="pt-2 border-t flex flex-wrap justify-between gap-2">
                                 <a href={prob.problem_link} target="_blank" rel="noreferrer">
                                   <Button size="sm" className="gap-1.5 text-xs font-semibold">
                                     <ExternalLink className="h-3.5 w-3.5" />
                                     Start challenge
                                   </Button>
                                 </a>
+                                <ProblemThreadDialog
+                                  classroomId={classroomId}
+                                  problemId={prob.id}
+                                  problemType="class_problem"
+                                  classId={prob.class_id || activeClass?.id}
+                                  currentUser={currentUser}
+                                  onOpenThread={openThreadBubble}
+                                  title={prob.title || 'Problem thread'}
+                                  description="Ask questions and follow trainer replies for this challenge."
+                                  buttonClassName="gap-1.5 text-xs font-semibold"
+                                />
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button variant="outline" size="sm" className="gap-1.5 text-xs font-semibold" onClick={() => handleOpenProblemConfig(prob.id)}>
@@ -7488,7 +7699,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                                   </DialogContent>
                                 </Dialog>
                               </CardFooter>
-                            </Card>
+
+                              </Card>
                           ))}
                         </div>
                       )}
@@ -7787,7 +7999,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
                             ) : (
                               <div className="max-h-[520px] overflow-auto rounded-lg border">
-                                <table className="min-w-[720px] divide-y divide-border text-sm">
+                                <table className="min-w-[820px] divide-y divide-border text-sm">
                                   <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
                                     <tr>
                                       {isTrainer && <th className="px-4 py-3 text-left font-semibold">Student</th>}
@@ -7795,6 +8007,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       <th className="px-4 py-3 text-left font-semibold">Platform</th>
                                       <th className="px-4 py-3 text-center font-semibold">Timer</th>
                                       <th className="px-4 py-3 text-center font-semibold">Status</th>
+                                      <th className="px-4 py-3 text-right font-semibold">Actions</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-border">
@@ -7825,6 +8038,20 @@ export default function ClassroomLiveClient({ classroomId }) {
                                           <Badge variant="outline" className={`text-[10px] ${statusTone[prob.status] || statusTone.not_solved}`}>
                                             {statusCopy[prob.status] || statusCopy.not_solved}
                                           </Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                          <div className="flex justify-end">
+                                            <ProblemThreadDialog
+                                              classroomId={classroomId}
+                                              problemId={prob.id}
+                                              problemType="class_problem"
+                                              classId={prob.class_id || selectedPastClass?.id}
+                                              currentUser={currentUser}
+                                              onOpenThread={openThreadBubble}
+                                              title={prob.title || 'Problem thread'}
+                                              description={isTrainer ? `${prob.student_name || 'Student'} problem discussion.` : 'Ask questions and follow trainer replies for this problem.'}
+                                            />
+                                          </div>
                                         </td>
                                       </tr>
                                     ))}
@@ -8221,7 +8448,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3 text-xs">
                   <span className="font-medium text-foreground">Planned Duration: <span className="font-bold">{editDur} min</span></span>
                   {previewOverflow > 0 ? (
-                    <Badge className="bg-amber-600 text-white text-[10px] font-bold gap-1 animate-pulse">
+                    <Badge className="bg-amber-600 text-white text-[10px] font-bold gap-1">
                       <Timer className="h-3 w-3" /> Overflow: +{previewOverflow}m
                     </Badge>
                   ) : (
@@ -8426,36 +8653,24 @@ export default function ClassroomLiveClient({ classroomId }) {
         </DialogContent>
       </Dialog>
 
-      <FloatingClassChat
-        open={chatOpen}
-        setOpen={setChatOpen}
-        chatContainerRef={chatContainerRef}
-        chatClass={chatClass}
-        chatClassOptions={chatClassOptions}
-        chatClassId={chatClassId}
-        setChatClassId={setChatClassId}
-        setChatMessages={setChatMessages}
+
+      <StudentThreadBubbleDock
+        threads={threadBubbles}
+        activeKey={activeThreadBubbleKey}
+        onActivate={activateThreadBubble}
+        onClose={closeThreadBubble}
+        onMinimize={() => setActiveThreadBubbleKey('')}
+        currentUser={currentUser}
         isTrainer={isTrainer}
-        students={students}
-        classroom={classroom}
-        chatRecipient={chatRecipient}
-        setChatRecipient={setChatRecipient}
-        chatMessages={chatMessages}
-        currentUserId={currentUserId}
-        canWriteChat={canWriteChat}
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        handleSendMessage={handleSendMessage}
-        handleToggleReaction={handleToggleReaction}
       />
 
       <button
         onClick={startTour}
-        className="fixed bottom-28 right-4 z-40 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-lg hover:bg-muted transition-all active:scale-95"
+        className="fixed bottom-4 right-4 z-[70] grid h-12 w-12 place-items-center rounded-full border border-white/20 bg-background/80 text-xl font-black text-primary shadow-2xl backdrop-blur-xl transition-all hover:-translate-y-0.5 hover:scale-105 hover:bg-muted active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         title="Re-launch onboarding tour"
+        aria-label="Re-launch onboarding tour"
       >
-        <HelpCircle className="h-4 w-4 text-primary" />
-        <span>Take Tour</span>
+        ?
       </button>
       </main>
     </div>

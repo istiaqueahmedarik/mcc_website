@@ -1,5 +1,47 @@
 # Project Index
 
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Fact:
+Submission-context thread bubbles are implemented through `client/src/components/StudentThreadBubbleDock.js`, bubble-mode props on `client/src/components/ClassroomThreadsTab.js`, pending-submission entry points in `client/src/app/classroom/live/[id]/ClassroomLiveClient.js`, and server-side reference validation in `server/src/controllers/classroomController.ts`. Text and attachment sends may include optional `submissionReference`; the server resolves live/topic pending rows and persists canonical `metadata.submission_reference`.
+
+Applies when:
+Maintaining trainer live pending submissions, topic pending submission cards, normal `Threads` open-as-bubble behavior, student-thread message rendering, or student-thread message/attachment APIs.
+
+Do not overgeneralize:
+This does not make chat messages update verdicts, trust client-provided reference labels, expose solution code in chat metadata, enable student-to-student chat, or revive legacy `ProblemThread` as the active bubble UI.
+
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-submission-thread-bubbles-20260801-rsd.md`
+
+Fact:
+Trainer pending-submission workflows are approved to open the submitted student's existing student-scoped classroom thread as a floating bubble for both live class and topic submissions. Messages and attachments sent from a submission-context bubble must store server-validated submission-reference metadata visible to both trainer and student, while normal `Threads` conversations can also open as bubbles without requiring a submission reference.
+
+Applies when:
+Changing classroom pending-submission review actions, student-thread message metadata, floating thread bubbles, `ClassroomThreadsTab.js`, `FloatingThreadDock.js`, or student-thread message/attachment endpoints.
+
+Do not overgeneralize:
+This does not revive legacy problem threads, change final verdict ownership, expose cross-student submissions, add hidden polling, loosen attachment validation, or move `Updates` away from first/default notification behavior.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-student-classroom-threads-realtime-20260731-rsd.md`
+
+Fact:
+Classroom communication is approved to add a dedicated `Threads` tab with one classroom-level trainer-student chat per active student, Supabase Realtime delivery, safe file sharing, and system event bubbles for affected classroom actions. `Updates` remains the first/default tab as a notification/read-state surface, and `Settings` owns update priority ordering and classroom email preferences.
+
+Applies when:
+Changing classroom live tabs, Updates notification behavior, student/trainer thread UI, classroom event surfacing, attachment upload/access, Supabase Realtime subscriptions, or priority settings placement.
+
+Do not overgeneralize:
+This does not approve hidden polling, student-to-student chat, public file buckets, arbitrary file uploads, automatic judge execution, student-owned final verdicts, route/auth weakening, or destructive deletion of old problem-thread/chat data.
+
 ## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Approved Requirement Scope
 
 Source:
@@ -622,3 +664,46 @@ Refactoring trainer dashboard, form responses/analytics, classroom live room per
 
 Do not overgeneralize:
 This audit highlights scalability risks across trainer and live classroom modules; implementation requires user review and task plan approval before applying code changes.
+
+## 2026-07-28 - trainer-updates-problem-threads-20260728 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-updates-problem-threads-20260728-rsd.md`
+
+Fact:
+Trainer and student classroom UI should replace the generic classroom messaging option with per-problem threads for both live class problems and topic problems. Threads support questions, visualized existing-system solution submissions, trainer feedback/status events, and reactions. `Updates` is the first/default tab for both roles and uses a fixed, priority-sorted update list. Trainer update types include `time_exceeded`, `student_solution_submitted`, `student_needs_review`, `problem_progress_changed`, and `thread_reply`. Student update types include `new_problem`, `teacher_feedback`, `thread_reply`, `solution_status_changed`, and `topic_or_resource_updated`. Classroom update email is toggleable from settings and must stay separate from auth or non-classroom emails. The 2026-07-29 amendment adds per-user `Mark as read`, `Mark all as read`, and explicit thread access through problem cards/lists and authenticated problem-surface deep links. The 2026-07-31 correction keeps Updates notification/read-state only, with no thread launch action.
+
+Applies when:
+Changing classroom problem details, classroom chat surfaces, Updates tab, email triggers, or problem thread routes.
+
+Do not overgeneralize:
+This does not approve polling, global notification bells, visibility refetches, destructive chat table drops, or time-exceeded email without a deduplicated event decision. The "time exceeded" update is derived on load or explicit refresh.
+
+## 2026-07-29 - trainer-updates-problem-threads-20260728 - Implementation Entry Points
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+Fact:
+Implemented classroom Updates and problem threads across `server/src/controllers/classroomController.ts`, `server/src/routes/classroomRoute.ts`, `server/src/controllers/userController.ts`, `server/src/routes/userRoute.ts`, `server/src/utils/classroomUpdatesSchema.ts`, `client/src/components/UpdatesTab.js`, `client/src/components/ProblemThread.js`, `client/src/components/PrioritySettings.js`, and `client/src/app/classroom/live/[id]/ClassroomLiveClient.js`.
+
+Applies when:
+Changing classroom Updates, problem-card thread access, topic problem assignment threads, read receipts, or classroom update email settings.
+
+Do not overgeneralize:
+Thread APIs are authenticated classroom APIs, not public links. Updates still load only on first tab mount, refresh, or read actions, and Updates must not open thread dialogs.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Student Threads Entry Points
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+- `docs/adr/0008-classroom-student-thread-realtime-model.md`
+
+Fact:
+Classroom visible conversation is now student-scoped in the `Threads` tab. Server entry points are `GET /classroom/:id/student-threads`, `GET /classroom/:id/student-threads/:studentId`, `POST /classroom/:id/student-threads/:studentId/messages`, `POST /classroom/:id/student-threads/:studentId/attachments`, and `GET /classroom/:id/student-threads/:studentId/attachments/:attachmentId`. Runtime schema/storage/realtime helpers live in `server/src/utils/classroomStudentThreadsSchema.ts`. Client entry points are `client/src/components/ClassroomThreadsTab.js`, `client/src/hooks/useClassroomThreadRealtime.js`, `client/src/lib/action.js#post_form_with_token`, and tab wiring in `ClassroomLiveClient.js`.
+
+Applies when:
+Changing classroom communication, student-thread chat, system event bubbles, safe classroom attachments, or Supabase Realtime invalidation.
+
+Do not overgeneralize:
+Legacy problem-thread routes and tables still exist for compatibility, but active classroom UI should guide users to `Threads`.

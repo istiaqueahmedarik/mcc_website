@@ -1,5 +1,19 @@
 # Doc Usage
 
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Docs Used
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the approved RSD, technical decisions, ADR-0009, the student-thread realtime implementation review, classroom knowledge-base entries, `ClassroomThreadsTab.js`, `StudentThreadBubbleDock.js`, `ClassroomLiveClient.js`, and `classroomController.ts` to keep bubble behavior on the active student-thread model with server-owned submission-reference validation.
+
+Applies when:
+Auditing future trainer pending-submission discussion, floating thread bubbles, or student-thread message metadata changes.
+
+Do not overgeneralize:
+The docs pass did not include authenticated live browser QA or live database negative-case execution.
+
 ## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Docs Used
 
 Source:
@@ -169,3 +183,46 @@ Auditing future problem creation, topic problem forms, or difficulty display dec
 
 Do not overgeneralize:
 This entry records documentation use for this scoped task only.
+
+## 2026-07-28 - trainer-updates-problem-threads-20260728 - Technical Decision Docs Used
+
+Source:
+- `docs/decisions/trainer-updates-problem-threads-20260728-technical-decisions.md`
+- `docs/adr/0007-classroom-problem-thread-update-model.md`
+
+Fact:
+The approved technical decision package used `AGENTS.md`, the approved RSD, classroom no-polling and notification-removal decisions, `userRoute.ts`, `sendEmail.ts`, `classroomController.ts`, `ClassroomLiveClient.js`, and RSD orchestrator HCI/code-quality/worktree references to choose load/action-only Updates, namespaced classroom user settings, explicit problem-thread references, event-backed email only, no destructive old-chat table drops, and serial implementation due overlapping dirty source files.
+
+Applies when:
+Auditing future classroom Updates/problem-thread implementation, notification behavior, or why the task avoided parallel worktrees.
+
+## 2026-07-29 - trainer-updates-problem-threads-20260728 - Implementation Review Docs Used
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+Fact:
+Implementation review verified the approved RSD, technical decisions, ADR, task plan, classroom controller/routes, user settings routes, email helper, and classroom live UI against requirement satisfaction, security, HCI, code-quality, and verification checks.
+
+Applies when:
+Auditing the shipped Updates/problem-thread implementation, read receipt behavior, or why topic thread access requires assignment scope.
+
+Do not overgeneralize:
+This review did not prove live SMTP delivery; it verified code paths, build/lint, and safety constraints.
+
+Do not overgeneralize:
+This documents planning inputs for this feature; future tasks still need their own source review and gate-satisfied decisions.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Implementation Review Docs Used
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Fact:
+This implementation used AGENTS, the approved RSD, technical decisions, ADR-0008, approved task plan, classroom knowledge-base entries, RSD orchestrator HCI/code-quality/doc-audit references, Supabase Broadcast docs, Supabase Storage docs, and current source entry points in `ClassroomLiveClient.js`, `TeamMatrixClient.js`, `classroomController.ts`, `classroomRoute.ts`, `UpdatesTab.js`, `PrioritySettings.js`, and legacy problem-thread components.
+
+Applies when:
+Auditing student-thread realtime, private classroom attachments, Updates/Threads/Settings tab behavior, or legacy problem-thread UI treatment.
+
+Do not overgeneralize:
+The implementation review did not prove live Supabase upload/download or two-browser realtime delivery; it verified code paths, build/lint, route shape, and safety constraints.

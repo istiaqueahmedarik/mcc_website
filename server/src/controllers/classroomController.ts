@@ -16,6 +16,25 @@ import {
   preEnrollClassroomStudents,
   rejectPreEnrollmentClaim,
 } from '../utils/classroomPreEnrollment';
+import { sendEmail } from '../sendEmail';
+import {
+  CLASSROOM_UPDATE_PRIORITIES,
+  ensureClassroomUpdatesSchema,
+  isClassroomThreadReaction,
+  normalizeClassroomUpdatePriorities,
+} from '../utils/classroomUpdatesSchema';
+import {
+  CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
+  CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH,
+  broadcastStudentThreadChange,
+  buildStudentThreadStoragePath,
+  createStudentThreadAttachmentSignedUrl,
+  ensureClassroomStudentThreadsSchema,
+  getClassroomStudentThreadAttachmentAccept,
+  sanitizeAttachmentFilename,
+  uploadStudentThreadAttachmentToStorage,
+  validateStudentThreadAttachment,
+} from '../utils/classroomStudentThreadsSchema';
 
 // Scrape helper for problem details
 function cleanProblemTitle(title: string, fallback: string) {
@@ -345,7 +364,6 @@ async function canManageClassroom(userId: string, classroomId: string): Promise<
 }
 
 const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
-const CHAT_REACTIONS = new Set(['like', 'heart', 'celebrate']);
 const PROBLEM_STATUS_VALUES = new Set(['not_solved', 'tried', 'pending_approval', 'solved']);
 const PROBLEM_PLATFORMS = new Set(['codeforces', 'codechef', 'atcoder', 'custom']);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -571,6 +589,1585 @@ async function canAccessClassroom(userId: string, classroomId: string): Promise<
   if (rows.length === 0) return false;
   const activeRealStudent = Boolean(rows[0].student_check) && !Boolean(rows[0].is_pre_enrolled);
   return rows[0].created_by === userId || Boolean(rows[0].admin || rows[0].trainer || activeRealStudent);
+}
+
+type ThreadScope = {
+  kind: 'class_problem' | 'topic_problem';
+  classroomId: string;
+  classId?: string | null;
+  classProblemId?: string | null;
+  topicAssignmentId?: string | null;
+  topicProblemId?: string | null;
+  title: string;
+  problemLink?: string | null;
+  isManager: boolean;
+  targetStudentIds: string[];
+};
+
+function cleanEmailSnippet(value: unknown, maxLength = 240): string {
+  return normalizeText(value, maxLength).replace(/\s+/g, ' ');
+}
+
+function updateTimestampOf(update: any): number {
+  const value = update.created_at || update.updated_at || update.assigned_at || update.timestamp;
+  const time = new Date(value || 0).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function visibleKeySet(updates: any[]): Set<string> {
+  return new Set(updates.map((item) => item.update_key).filter(Boolean));
+}
+
+function addStableUpdate(target: any[], seen: Set<string>, update: any) {
+  if (!update?.update_key || seen.has(update.update_key)) return;
+  seen.add(update.update_key);
+  target.push(update);
+}
+
+async function filterRecipientsByClassroomSettings(recipients: any[]) {
+  await ensureClassroomUpdatesSchema();
+  const unique = new Map<string, any>();
+  for (const recipient of recipients) {
+    if (!recipient?.id || !recipient?.email) continue;
+    unique.set(recipient.id, recipient);
+  }
+  const rows = [...unique.values()];
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((row) => row.id);
+  const settings = await sql`
+    SELECT user_id, classroom_email_notifications_enabled
+    FROM user_settings
+    WHERE user_id = ANY(${ids})
+  `;
+  const disabled = new Set(
+    settings
+      .filter((row: any) => row.classroom_email_notifications_enabled === false)
+      .map((row: any) => row.user_id)
+  );
+
+  return rows.filter((row) => !disabled.has(row.id));
+}
+
+function queueClassroomEmails(recipients: any[], subject: string, text: string) {
+  void (async () => {
+    try {
+      const enabledRecipients = await filterRecipientsByClassroomSettings(recipients);
+      await Promise.all(enabledRecipients.map((recipient: any) => (
+        sendEmail(recipient.email, subject, text)
+      )));
+    } catch (error) {
+      console.error('Classroom update email failed:', error);
+    }
+  })();
+}
+
+async function getClassroomManagerRecipients(classroomId: string, excludeUserIds: string[] = []) {
+  const rows = await sql`
+    SELECT DISTINCT u.id, u.email, u.full_name
+    FROM classrooms cr
+    JOIN users u ON u.id = cr.created_by
+    WHERE cr.id = ${classroomId}
+    UNION
+    SELECT DISTINCT u.id, u.email, u.full_name
+    FROM classroom_substitutes sub
+    JOIN users u ON u.id = sub.trainer_id
+    WHERE sub.classroom_id = ${classroomId}
+  `;
+  const excluded = new Set(excludeUserIds);
+  return rows.filter((row: any) => !excluded.has(row.id));
+}
+
+async function getUserEmailRecipients(userIds: string[], excludeUserIds: string[] = []) {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const rows = await sql`
+    SELECT id, email, full_name
+    FROM users
+    WHERE id = ANY(${ids})
+  `;
+  const excluded = new Set(excludeUserIds);
+  return rows.filter((row: any) => !excluded.has(row.id));
+}
+
+function queueProblemAssignedEmails(classroomId: string, assignedProblems: any[]) {
+  void (async () => {
+    try {
+      const byStudent = new Map<string, any[]>();
+      for (const problem of assignedProblems || []) {
+        if (!problem?.student_id) continue;
+        const current = byStudent.get(problem.student_id) || [];
+        current.push(problem);
+        byStudent.set(problem.student_id, current);
+      }
+      const recipients = await getUserEmailRecipients([...byStudent.keys()]);
+      for (const recipient of recipients) {
+        const items = byStudent.get(recipient.id) || [];
+        const firstTitle = cleanEmailSnippet(items[0]?.title || 'New problem');
+        const subject = items.length === 1 ? `New classroom problem: ${firstTitle}` : `${items.length} new classroom problems`;
+        const text = items.length === 1
+          ? `A new problem was assigned to you in the classroom.\n\nProblem: ${firstTitle}\nOpen Updates for notifications or Threads to discuss it with your trainer.`
+          : `${items.length} new problems were assigned to you in the classroom.\n\nOpen Updates for notifications or Threads to discuss them with your trainer.`;
+        queueClassroomEmails([recipient], subject, text);
+      }
+    } catch (error) {
+      console.error('Problem assignment email queue failed:', error);
+    }
+  })();
+}
+
+function queueTopicAssignmentEmails(classroomId: string, assignments: any[]) {
+  void (async () => {
+    try {
+      const recipientIds = new Set<string>();
+      for (const assignment of assignments || []) {
+        if (assignment?.student_id) recipientIds.add(assignment.student_id);
+        if (assignment?.team_id) {
+          const members = await sql`
+            SELECT tm.student_id
+            FROM trainer_team_members tm
+            JOIN users u ON u.id = tm.student_id
+            WHERE tm.team_id = ${assignment.team_id}
+              AND u.admin IS NOT TRUE
+              AND u.trainer IS NOT TRUE
+          `;
+          members.forEach((row: any) => recipientIds.add(row.student_id));
+        }
+      }
+      const recipients = await getUserEmailRecipients([...recipientIds]);
+      const firstTopic = cleanEmailSnippet(assignments[0]?.topic_title || 'Topic unit');
+      queueClassroomEmails(
+        recipients,
+        `New classroom topic: ${firstTopic}`,
+        `A new topic unit was assigned in your classroom.\n\nTopic: ${firstTopic}\nOpen Updates for notifications or Threads to discuss it with your trainer.`
+      );
+    } catch (error) {
+      console.error('Topic assignment email queue failed:', error);
+    }
+  })();
+}
+
+function queueStudentSubmissionEmail(classroomId: string, title: string, studentName: string) {
+  void (async () => {
+    try {
+      const recipients = await getClassroomManagerRecipients(classroomId);
+      queueClassroomEmails(
+        recipients,
+        `Solution submitted: ${cleanEmailSnippet(title, 120)}`,
+        `${cleanEmailSnippet(studentName || 'A student', 80)} submitted a solution for review.\n\nProblem: ${cleanEmailSnippet(title)}\nOpen Updates for notifications or Threads for the student conversation.`
+      );
+    } catch (error) {
+      console.error('Submission email queue failed:', error);
+    }
+  })();
+}
+
+function queueTeacherFeedbackEmail(studentId: string, title: string, status: string) {
+  void (async () => {
+    try {
+      const recipients = await getUserEmailRecipients([studentId]);
+      queueClassroomEmails(
+        recipients,
+        `Teacher feedback: ${cleanEmailSnippet(title, 120)}`,
+        `Your trainer updated your problem status to ${cleanEmailSnippet(status, 40)}.\n\nProblem: ${cleanEmailSnippet(title)}\nOpen Updates for notifications or Threads to continue the conversation.`
+      );
+    } catch (error) {
+      console.error('Feedback email queue failed:', error);
+    }
+  })();
+}
+
+async function getClassProblemThreadAccess(userId: string, classroomId: string, classProblemId: string) {
+  await ensurePreEnrollmentSchema();
+  const rows = await sql`
+    SELECT cp.id AS class_problem_id,
+           cp.class_id,
+           cp.student_id,
+           cp.title,
+           cp.problem_link,
+           cr.id AS classroom_id,
+           cs.enrollment_status,
+           u.is_pre_enrolled
+    FROM class_problems cp
+    JOIN classes cl ON cl.id = cp.class_id
+    JOIN classrooms cr ON cr.id = cl.classroom_id
+    LEFT JOIN classroom_students cs ON cs.classroom_id = cr.id AND cs.student_id = cp.student_id
+    LEFT JOIN users u ON u.id = cp.student_id
+    WHERE cp.id = ${classProblemId}
+      AND cr.id = ${classroomId}
+  `;
+  if (rows.length === 0) return { error: 'Problem assignment not found', status: 404 as const };
+
+  const isManager = await canManageClassroom(userId, classroomId);
+  const isTargetStudent = rows[0].student_id === userId
+    && rows[0].enrollment_status === ENROLLMENT_ACTIVE
+    && !Boolean(rows[0].is_pre_enrolled);
+  if (!isManager && !isTargetStudent) return { error: 'Unauthorized', status: 403 as const };
+
+  return {
+    kind: 'class_problem' as const,
+    classroomId,
+    classId: rows[0].class_id,
+    classProblemId: rows[0].class_problem_id,
+    title: rows[0].title || 'Assigned problem',
+    problemLink: rows[0].problem_link,
+    isManager,
+    targetStudentIds: [rows[0].student_id].filter(Boolean),
+  };
+}
+
+async function getTopicProblemThreadAccess(userId: string, classroomId: string, topicProblemId: string, assignmentId: string | null) {
+  await ensurePreEnrollmentSchema();
+  if (!assignmentId) {
+    const rows = await sql`
+      SELECT p.id AS topic_problem_id,
+             p.title,
+             p.problem_link,
+             p.platform,
+             t.title AS topic_title
+      FROM classroom_topic_problems p
+      JOIN classroom_topics t ON t.id = p.topic_id
+      WHERE p.id = ${topicProblemId}
+        AND t.classroom_id = ${classroomId}
+    `;
+    if (rows.length === 0) return { error: 'Topic problem not found', status: 404 as const };
+
+    const isManager = await canManageClassroom(userId, classroomId);
+    if (!isManager) return { error: 'Unauthorized', status: 403 as const };
+
+    return {
+      kind: 'topic_problem' as const,
+      classroomId,
+      topicAssignmentId: null,
+      topicProblemId: rows[0].topic_problem_id,
+      title: rows[0].title || rows[0].topic_title || 'Topic problem',
+      problemLink: rows[0].problem_link,
+      isManager,
+      targetStudentIds: [],
+    };
+  }
+
+  const rows = await sql`
+    SELECT a.id AS topic_assignment_id,
+           a.team_id,
+           a.student_id AS assignment_student_id,
+           p.id AS topic_problem_id,
+           p.title,
+           p.problem_link,
+           p.platform,
+           t.title AS topic_title
+    FROM classroom_team_topic_assignments a
+    JOIN classroom_topics t ON t.id = a.topic_id
+    JOIN classroom_topic_problems p ON p.topic_id = a.topic_id AND p.id = ${topicProblemId}
+    WHERE a.id = ${assignmentId}
+      AND a.classroom_id = ${classroomId}
+      AND a.status = 'active'
+  `;
+  if (rows.length === 0) return { error: 'Topic problem assignment not found', status: 404 as const };
+
+  const isManager = await canManageClassroom(userId, classroomId);
+  let targetStudentIds: string[] = [];
+  if (rows[0].assignment_student_id) {
+    targetStudentIds = [rows[0].assignment_student_id];
+  } else if (rows[0].team_id) {
+    const members = await sql`
+      SELECT tm.student_id
+      FROM trainer_team_members tm
+      JOIN users u ON u.id = tm.student_id
+      WHERE tm.team_id = ${rows[0].team_id}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
+    `;
+    targetStudentIds = members.map((row: any) => row.student_id);
+  }
+
+  if (!isManager && !targetStudentIds.includes(userId)) {
+    return { error: 'Unauthorized', status: 403 as const };
+  }
+
+  return {
+    kind: 'topic_problem' as const,
+    classroomId,
+    topicAssignmentId: rows[0].topic_assignment_id,
+    topicProblemId: rows[0].topic_problem_id,
+    title: rows[0].title || rows[0].topic_title || 'Topic problem',
+    problemLink: rows[0].problem_link,
+    isManager,
+    targetStudentIds,
+  };
+}
+
+async function getThreadAccessForProblem(
+  userId: string,
+  classroomId: string,
+  problemId: string,
+  problemType: unknown,
+  assignmentId: unknown
+) {
+  const type = normalizeText(problemType || 'class_problem', 40);
+  if (type === 'topic_problem') {
+    return getTopicProblemThreadAccess(userId, classroomId, problemId, normalizeUuid(assignmentId));
+  }
+  return getClassProblemThreadAccess(userId, classroomId, problemId);
+}
+
+async function getOrCreateProblemThread(scope: ThreadScope) {
+  await ensureClassroomUpdatesSchema();
+  if (scope.kind === 'topic_problem') {
+    if (!scope.topicAssignmentId) {
+      const existing = await sql`
+        SELECT *
+        FROM classroom_problem_threads
+        WHERE classroom_id = ${scope.classroomId}
+          AND topic_assignment_id IS NULL
+          AND topic_problem_id = ${scope.topicProblemId}
+        LIMIT 1
+      `;
+      if (existing.length > 0) return existing[0];
+
+      const created = await sql`
+        INSERT INTO classroom_problem_threads (
+          classroom_id,
+          topic_problem_id
+        )
+        VALUES (${scope.classroomId}, ${scope.topicProblemId})
+        RETURNING *
+      `;
+      return created[0];
+    }
+
+    const existing = await sql`
+      SELECT *
+      FROM classroom_problem_threads
+      WHERE topic_assignment_id = ${scope.topicAssignmentId}
+        AND topic_problem_id = ${scope.topicProblemId}
+      LIMIT 1
+    `;
+    if (existing.length > 0) return existing[0];
+
+    const created = await sql`
+      INSERT INTO classroom_problem_threads (
+        classroom_id,
+        topic_assignment_id,
+        topic_problem_id
+      )
+      VALUES (${scope.classroomId}, ${scope.topicAssignmentId}, ${scope.topicProblemId})
+      RETURNING *
+    `;
+    return created[0];
+  }
+
+  const existing = await sql`
+    SELECT *
+    FROM classroom_problem_threads
+    WHERE class_problem_id = ${scope.classProblemId}
+    LIMIT 1
+  `;
+  if (existing.length > 0) return existing[0];
+
+  const created = await sql`
+    INSERT INTO classroom_problem_threads (
+      classroom_id,
+      class_id,
+      class_problem_id
+    )
+    VALUES (${scope.classroomId}, ${scope.classId}, ${scope.classProblemId})
+    RETURNING *
+  `;
+  return created[0];
+}
+
+async function listProblemThreadMessages(threadId: string, currentUserId: string) {
+  return sql`
+    SELECT m.id,
+           m.thread_id,
+           m.user_id,
+           m.kind,
+           m.message,
+           m.metadata,
+           m.is_solution,
+           m.created_at,
+           u.full_name AS sender_name,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'reaction', r.reaction,
+                 'user_id', r.user_id,
+                 'user_name', ru.full_name,
+                 'reacted_by_me', r.user_id = ${currentUserId}
+               )
+             ) FILTER (WHERE r.reaction IS NOT NULL),
+             '[]'::json
+           ) AS reactions
+    FROM classroom_problem_thread_messages m
+    JOIN users u ON u.id = m.user_id
+    LEFT JOIN classroom_problem_thread_reactions r ON r.message_id = m.id
+    LEFT JOIN users ru ON ru.id = r.user_id
+    WHERE m.thread_id = ${threadId}
+    GROUP BY m.id, u.full_name
+    ORDER BY m.created_at ASC
+  `;
+}
+
+function queueThreadReplyEmail(scope: ThreadScope, senderId: string, senderName: string, message: string) {
+  void (async () => {
+    try {
+      const recipients = scope.isManager
+        ? await getUserEmailRecipients(scope.targetStudentIds, [senderId])
+        : await getClassroomManagerRecipients(scope.classroomId, [senderId]);
+      queueClassroomEmails(
+        recipients,
+        `Thread reply: ${cleanEmailSnippet(scope.title, 120)}`,
+        `${cleanEmailSnippet(senderName, 80)} replied in a legacy problem thread.\n\nProblem: ${cleanEmailSnippet(scope.title)}\nMessage: ${cleanEmailSnippet(message)}\nOpen the classroom Threads tab for current student conversations.`
+      );
+    } catch (error) {
+      console.error('Thread reply email queue failed:', error);
+    }
+  })();
+}
+
+async function appendProblemThreadEntry(
+  scope: ThreadScope,
+  userId: string,
+  message: string,
+  options: { isSolution?: boolean; kind?: string } = {}
+) {
+  const trimmedMessage = normalizeText(message, 5000);
+  if (!trimmedMessage) return null;
+  const thread = await getOrCreateProblemThread(scope);
+  const rows = await sql`
+    INSERT INTO classroom_problem_thread_messages (
+      thread_id,
+      user_id,
+      kind,
+      message,
+      is_solution
+    )
+    VALUES (
+      ${thread.id},
+      ${userId},
+      ${options.kind || 'message'},
+      ${trimmedMessage},
+      ${Boolean(options.isSolution)}
+    )
+    RETURNING *
+  `;
+  await sql`
+    UPDATE classroom_problem_threads
+    SET updated_at = now()
+    WHERE id = ${thread.id}
+  `;
+  return rows[0] || null;
+}
+
+function buildSubmissionThreadMessage(solutionLink: string | null, solutionCode: string | null, notes: string | null) {
+  const lines = ['Submitted a solution for review.'];
+  if (solutionLink) lines.push(`Submission link: ${solutionLink}`);
+  if (solutionCode) lines.push('Solution code was attached in the submission panel.');
+  if (notes) lines.push(`Notes: ${notes}`);
+  return lines.join('\n\n');
+}
+
+type StudentThreadEventOptions = {
+  eventType: string;
+  body: string;
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+type StudentThreadSubmissionReference = {
+  type: 'live_problem' | 'topic_problem';
+  student_id: string;
+  problem_title: string;
+  status: 'pending_approval';
+  submitted_at: string | null;
+  class_problem_id?: string;
+  progress_id?: string;
+  assignment_id?: string;
+  topic_problem_id?: string;
+  topic_title?: string;
+  class_id?: string;
+  class_name?: string;
+};
+
+function getStudentThreadChannel(thread: any): string {
+  return `classroom-student-thread:${thread?.realtime_token || thread?.id || 'unknown'}`;
+}
+
+function normalizeThreadMetadataRecord(value: unknown, depth = 0): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const metadata: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>).slice(0, 20)) {
+    const normalizedKey = normalizeText(key, 80);
+    if (!normalizedKey) continue;
+    if (typeof raw === 'string') metadata[normalizedKey] = raw.slice(0, 1000);
+    else if (typeof raw === 'number' && Number.isFinite(raw)) metadata[normalizedKey] = raw;
+    else if (typeof raw === 'boolean') metadata[normalizedKey] = raw;
+    else if (raw === null) metadata[normalizedKey] = null;
+    else if (Array.isArray(raw)) {
+      metadata[normalizedKey] = raw
+        .slice(0, 20)
+        .map((item) => (typeof item === 'string' ? item.slice(0, 500) : item))
+        .filter((item) => ['string', 'number', 'boolean'].includes(typeof item) || item === null);
+    } else if (raw && typeof raw === 'object' && !Array.isArray(raw) && depth < 2) {
+      const nested = normalizeThreadMetadataRecord(raw, depth + 1);
+      if (Object.keys(nested).length > 0) metadata[normalizedKey] = nested;
+    }
+  }
+  return metadata;
+}
+
+function normalizeThreadMetadata(value: unknown): Record<string, unknown> {
+  return normalizeThreadMetadataRecord(value);
+}
+
+function parseStudentThreadSubmissionReferencePayload(value: unknown): {
+  reference: Record<string, unknown> | null;
+  error?: string;
+} {
+  if (!value) return { reference: null };
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) return { reference: null };
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { reference: parsed as Record<string, unknown> };
+      }
+    } catch {
+      return { reference: null, error: 'Submission reference is invalid.' };
+    }
+    return { reference: null, error: 'Submission reference is invalid.' };
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return { reference: value as Record<string, unknown> };
+  }
+  return { reference: null, error: 'Submission reference is invalid.' };
+}
+
+function toIsoStringOrNull(value: unknown): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function boundedPageLimit(value: unknown, fallback: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, Math.min(max, Math.floor(parsed)));
+}
+
+async function resolveStudentThreadSubmissionReference(
+  classroomId: string,
+  studentId: string,
+  rawReference: unknown
+): Promise<
+  | { reference: StudentThreadSubmissionReference | null }
+  | { error: string; status: 400 | 403 | 404 }
+> {
+  const parsed = parseStudentThreadSubmissionReferencePayload(rawReference);
+  if (parsed.error) return { error: parsed.error, status: 400 };
+  if (!parsed.reference) return { reference: null };
+
+  const raw = parsed.reference;
+  const type = normalizeText(raw.type || raw.source, 40);
+
+  if (type === 'live_problem') {
+    const classProblemId = normalizeUuid(
+      raw.classProblemId ||
+      raw.class_problem_id ||
+      raw.problemId ||
+      raw.problem_id
+    );
+    if (!classProblemId) return { error: 'Live submission reference is invalid.', status: 400 };
+
+    const rows = await sql`
+      SELECT cp.id,
+             cp.student_id,
+             cp.status,
+             cp.title AS problem_title,
+             cp.class_id,
+             cp.assigned_at,
+             cp.solved_at,
+             cl.name AS class_name
+      FROM class_problems cp
+      JOIN classes cl ON cl.id = cp.class_id
+      WHERE cp.id = ${classProblemId}
+        AND cl.classroom_id = ${classroomId}
+      LIMIT 1
+    `;
+    if (rows.length === 0) return { error: 'Submission reference was not found.', status: 404 };
+    const row = rows[0];
+    if (row.student_id !== studentId) {
+      return { error: 'Submission reference does not belong to this student thread.', status: 403 };
+    }
+    if (row.status !== 'pending_approval') {
+      return { error: 'This submission is no longer pending. Send as a normal thread message instead.', status: 400 };
+    }
+
+    return {
+      reference: {
+        type: 'live_problem',
+        class_problem_id: row.id,
+        student_id: row.student_id,
+        problem_title: normalizeText(row.problem_title || 'Live problem', 180),
+        class_id: row.class_id,
+        class_name: normalizeText(row.class_name || '', 120),
+        submitted_at: toIsoStringOrNull(row.solved_at || row.assigned_at),
+        status: 'pending_approval',
+      },
+    };
+  }
+
+  if (type === 'topic_problem') {
+    const progressId = normalizeUuid(raw.progressId || raw.progress_id);
+    if (!progressId) return { error: 'Topic submission reference is invalid.', status: 400 };
+
+    const rows = await sql`
+      SELECT p.id AS progress_id,
+             p.student_id,
+             p.status,
+             p.updated_at,
+             p.assignment_id,
+             p.topic_problem_id,
+             prob.title AS problem_title,
+             topic.title AS topic_title
+      FROM classroom_topic_problem_progress p
+      JOIN classroom_team_topic_assignments a ON a.id = p.assignment_id
+      JOIN classroom_topic_problems prob ON prob.id = p.topic_problem_id AND prob.topic_id = a.topic_id
+      JOIN classroom_topics topic ON topic.id = a.topic_id
+      WHERE p.id = ${progressId}
+        AND a.classroom_id = ${classroomId}
+        AND a.status = 'active'
+      LIMIT 1
+    `;
+    if (rows.length === 0) return { error: 'Submission reference was not found.', status: 404 };
+    const row = rows[0];
+    if (row.student_id !== studentId) {
+      return { error: 'Submission reference does not belong to this student thread.', status: 403 };
+    }
+    if (row.status !== 'pending_approval') {
+      return { error: 'This submission is no longer pending. Send as a normal thread message instead.', status: 400 };
+    }
+
+    return {
+      reference: {
+        type: 'topic_problem',
+        progress_id: row.progress_id,
+        assignment_id: row.assignment_id,
+        topic_problem_id: row.topic_problem_id,
+        student_id: row.student_id,
+        problem_title: normalizeText(row.problem_title || 'Topic problem', 180),
+        topic_title: normalizeText(row.topic_title || '', 120),
+        submitted_at: toIsoStringOrNull(row.updated_at),
+        status: 'pending_approval',
+      },
+    };
+  }
+
+  return { error: 'Submission reference type is invalid.', status: 400 };
+}
+
+function mapStudentThreadMessage(row: any, currentUserId: string) {
+  return {
+    id: row.id,
+    thread_id: row.thread_id,
+    sender_id: row.sender_id,
+    sender_name: row.sender_name || (row.kind === 'system' ? 'Classroom event' : 'Unknown user'),
+    sender_email: row.sender_email || '',
+    sender_mist_id: row.sender_mist_id || '',
+    kind: row.kind || 'message',
+    event_type: row.event_type,
+    body: row.body || '',
+    metadata: row.metadata || {},
+    created_at: row.created_at,
+    is_own: Boolean(row.sender_id && row.sender_id === currentUserId),
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+  };
+}
+
+function mapStudentThreadSummary(row: any) {
+  return {
+    id: row.thread_id,
+    classroom_id: row.classroom_id,
+    student_id: row.student_id,
+    student: {
+      id: row.student_id,
+      full_name: row.student_name || 'Student',
+      email: row.student_email || '',
+      mist_id: row.student_mist_id || '',
+    },
+    updated_at: row.thread_updated_at,
+    last_message: row.last_message_id ? {
+      id: row.last_message_id,
+      kind: row.last_message_kind,
+      event_type: row.last_message_event_type,
+      body: row.last_message_body,
+      created_at: row.last_message_created_at,
+      sender_name: row.last_message_sender_name || '',
+    } : null,
+  };
+}
+
+async function getActiveStudentRowsForClassroom(classroomId: string, studentIds: string[] = []) {
+  await ensurePreEnrollmentSchema();
+  const uniqueStudentIds = [...new Set(studentIds.map((id) => normalizeUuid(id)).filter((id): id is string => Boolean(id)))];
+  if (studentIds.length > 0 && uniqueStudentIds.length === 0) return [];
+
+  if (uniqueStudentIds.length > 0) {
+    return sql`
+      SELECT cs.student_id,
+             u.full_name,
+             u.email,
+             u.mist_id,
+             u.admin,
+             u.trainer,
+             u.is_pre_enrolled,
+             cs.enrollment_status
+      FROM classroom_students cs
+      JOIN users u ON u.id = cs.student_id
+      WHERE cs.classroom_id = ${classroomId}
+        AND cs.student_id = ANY(${uniqueStudentIds})
+        AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
+        AND u.admin IS NOT TRUE
+        AND u.trainer IS NOT TRUE
+        AND u.is_pre_enrolled IS NOT TRUE
+    `;
+  }
+
+  return sql`
+    SELECT cs.student_id,
+           u.full_name,
+           u.email,
+           u.mist_id,
+           u.admin,
+           u.trainer,
+           u.is_pre_enrolled,
+           cs.enrollment_status
+    FROM classroom_students cs
+    JOIN users u ON u.id = cs.student_id
+    WHERE cs.classroom_id = ${classroomId}
+      AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND u.admin IS NOT TRUE
+      AND u.trainer IS NOT TRUE
+      AND u.is_pre_enrolled IS NOT TRUE
+  `;
+}
+
+async function ensureStudentThreadsForActiveStudents(classroomId: string, studentIds: string[] = []) {
+  await ensureClassroomStudentThreadsSchema();
+  const activeStudents = await getActiveStudentRowsForClassroom(classroomId, studentIds);
+  if (activeStudents.length === 0) return [];
+
+  await sql`
+    INSERT INTO classroom_student_threads ${sql(
+      activeStudents.map((student: any) => ({
+        classroom_id: classroomId,
+        student_id: student.student_id,
+      }))
+    )}
+    ON CONFLICT (classroom_id, student_id) DO NOTHING
+  `;
+
+  const activeStudentIds = activeStudents.map((student: any) => student.student_id);
+  return sql`
+    SELECT t.*,
+           u.full_name AS student_name,
+           u.email AS student_email,
+           u.mist_id AS student_mist_id
+    FROM classroom_student_threads t
+    JOIN users u ON u.id = t.student_id
+    WHERE t.classroom_id = ${classroomId}
+      AND t.student_id = ANY(${activeStudentIds})
+      AND t.status = 'active'
+  `;
+}
+
+async function getOrCreateStudentThread(classroomId: string, studentId: string) {
+  const threads = await ensureStudentThreadsForActiveStudents(classroomId, [studentId]);
+  return threads[0] || null;
+}
+
+async function getStudentThreadAccess(userId: string, classroomId: string, rawStudentId: string) {
+  const studentId = normalizeUuid(rawStudentId);
+  if (!studentId) return { error: 'Student is required', status: 400 as const };
+
+  const studentRows = await getActiveStudentRowsForClassroom(classroomId, [studentId]);
+  if (studentRows.length === 0) {
+    return { error: 'This student cannot chat until they are an active classroom student.', status: 404 as const };
+  }
+
+  const isManager = await canManageClassroom(userId, classroomId);
+  const isOwnStudent = studentId === userId;
+  if (!isManager && !isOwnStudent) {
+    return { error: 'Unauthorized', status: 403 as const };
+  }
+
+  const thread = await getOrCreateStudentThread(classroomId, studentId);
+  if (!thread) return { error: 'Thread is unavailable for this student.', status: 404 as const };
+
+  const student = studentRows[0];
+  return {
+    isManager,
+    thread,
+    student: {
+      id: student.student_id,
+      full_name: student.full_name || 'Student',
+      email: student.email || '',
+      mist_id: student.mist_id || '',
+    },
+  };
+}
+
+async function listStudentThreadSummaries(classroomId: string, studentIds: string[] = []) {
+  const threads = await ensureStudentThreadsForActiveStudents(classroomId, studentIds);
+  if (threads.length === 0) return [];
+  const threadIds = threads.map((thread: any) => thread.id);
+
+  const rows = await sql`
+    SELECT t.id AS thread_id,
+           t.classroom_id,
+           t.student_id,
+           t.updated_at AS thread_updated_at,
+           u.full_name AS student_name,
+           u.email AS student_email,
+           u.mist_id AS student_mist_id,
+           last_message.id AS last_message_id,
+           last_message.kind AS last_message_kind,
+           last_message.event_type AS last_message_event_type,
+           last_message.body AS last_message_body,
+           last_message.created_at AS last_message_created_at,
+           last_sender.full_name AS last_message_sender_name
+    FROM classroom_student_threads t
+    JOIN users u ON u.id = t.student_id
+    LEFT JOIN LATERAL (
+      SELECT m.*
+      FROM classroom_student_thread_messages m
+      WHERE m.thread_id = t.id
+      ORDER BY m.created_at DESC
+      LIMIT 1
+    ) last_message ON true
+    LEFT JOIN users last_sender ON last_sender.id = last_message.sender_id
+    WHERE t.id = ANY(${threadIds})
+    ORDER BY COALESCE(last_message.created_at, t.updated_at) DESC, u.full_name ASC
+  `;
+  return rows.map(mapStudentThreadSummary);
+}
+
+async function listStudentThreadMessages(
+  threadId: string,
+  currentUserId: string,
+  options: { before?: string | null; limit?: number } = {}
+) {
+  const limit = boundedPageLimit(options.limit, 40, 80);
+  const before = toIsoStringOrNull(options.before);
+  const rows = before
+    ? await sql`
+        SELECT m.id,
+               m.thread_id,
+               m.sender_id,
+               m.kind,
+               m.event_type,
+               m.body,
+               m.metadata,
+               m.created_at,
+               u.full_name AS sender_name,
+               u.email AS sender_email,
+               u.mist_id AS sender_mist_id,
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'id', a.id,
+                     'original_filename', a.original_filename,
+                     'content_type', a.content_type,
+                     'size_bytes', a.size_bytes,
+                     'created_at', a.created_at
+                   )
+                   ORDER BY a.created_at ASC
+                 ) FILTER (WHERE a.id IS NOT NULL),
+                 '[]'::json
+               ) AS attachments
+        FROM classroom_student_thread_messages m
+        LEFT JOIN users u ON u.id = m.sender_id
+        LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
+        WHERE m.thread_id = ${threadId}
+          AND m.created_at < ${before}::timestamptz
+        GROUP BY m.id, u.full_name, u.email, u.mist_id
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ${limit + 1}
+      `
+    : await sql`
+        SELECT m.id,
+               m.thread_id,
+               m.sender_id,
+               m.kind,
+               m.event_type,
+               m.body,
+               m.metadata,
+               m.created_at,
+               u.full_name AS sender_name,
+               u.email AS sender_email,
+               u.mist_id AS sender_mist_id,
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'id', a.id,
+                     'original_filename', a.original_filename,
+                     'content_type', a.content_type,
+                     'size_bytes', a.size_bytes,
+                     'created_at', a.created_at
+                   )
+                   ORDER BY a.created_at ASC
+                 ) FILTER (WHERE a.id IS NOT NULL),
+                 '[]'::json
+               ) AS attachments
+        FROM classroom_student_thread_messages m
+        LEFT JOIN users u ON u.id = m.sender_id
+        LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
+        WHERE m.thread_id = ${threadId}
+        GROUP BY m.id, u.full_name, u.email, u.mist_id
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ${limit + 1}
+      `;
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit).reverse();
+  const messages = pageRows.map((row: any) => mapStudentThreadMessage(row, currentUserId));
+  return {
+    messages,
+    hasMore,
+    before: messages[0]?.created_at || null,
+  };
+}
+
+async function listStudentThreadEvents(
+  threadId: string,
+  currentUserId: string,
+  options: { before?: string | null; limit?: number } = {}
+) {
+  const limit = boundedPageLimit(options.limit, 20, 80);
+  const before = toIsoStringOrNull(options.before);
+  const rows = before
+    ? await sql`
+        SELECT m.id,
+               m.thread_id,
+               m.sender_id,
+               m.kind,
+               m.event_type,
+               m.body,
+               m.metadata,
+               m.created_at,
+               u.full_name AS sender_name,
+               u.email AS sender_email,
+               u.mist_id AS sender_mist_id,
+               '[]'::json AS attachments
+        FROM classroom_student_thread_messages m
+        LEFT JOIN users u ON u.id = m.sender_id
+        WHERE m.thread_id = ${threadId}
+          AND m.kind = 'system'
+          AND m.created_at < ${before}::timestamptz
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ${limit + 1}
+      `
+    : await sql`
+        SELECT m.id,
+               m.thread_id,
+               m.sender_id,
+               m.kind,
+               m.event_type,
+               m.body,
+               m.metadata,
+               m.created_at,
+               u.full_name AS sender_name,
+               u.email AS sender_email,
+               u.mist_id AS sender_mist_id,
+               '[]'::json AS attachments
+        FROM classroom_student_thread_messages m
+        LEFT JOIN users u ON u.id = m.sender_id
+        WHERE m.thread_id = ${threadId}
+          AND m.kind = 'system'
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT ${limit + 1}
+      `;
+  const hasMore = rows.length > limit;
+  const events = rows.slice(0, limit).map((row: any) => mapStudentThreadMessage(row, currentUserId));
+  return {
+    events,
+    hasMore,
+    before: events[events.length - 1]?.created_at || null,
+  };
+}
+
+async function getStudentThreadMessageById(messageId: string, currentUserId: string) {
+  const rows = await sql`
+    SELECT m.id,
+           m.thread_id,
+           m.sender_id,
+           m.kind,
+           m.event_type,
+           m.body,
+           m.metadata,
+           m.created_at,
+           u.full_name AS sender_name,
+           u.email AS sender_email,
+           u.mist_id AS sender_mist_id,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'id', a.id,
+                 'original_filename', a.original_filename,
+                 'content_type', a.content_type,
+                 'size_bytes', a.size_bytes,
+                 'created_at', a.created_at
+               )
+               ORDER BY a.created_at ASC
+             ) FILTER (WHERE a.id IS NOT NULL),
+             '[]'::json
+           ) AS attachments
+    FROM classroom_student_thread_messages m
+    LEFT JOIN users u ON u.id = m.sender_id
+    LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
+    WHERE m.id = ${messageId}
+    GROUP BY m.id, u.full_name, u.email, u.mist_id
+  `;
+  return rows[0] ? mapStudentThreadMessage(rows[0], currentUserId) : null;
+}
+
+async function insertStudentThreadMessage(input: {
+  thread: any;
+  senderId: string | null;
+  kind: 'message' | 'system';
+  eventType?: string | null;
+  body: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const body = normalizeText(input.body, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
+  if (!body) return null;
+  const metadata = normalizeThreadMetadata(input.metadata);
+
+  const rows = await sql`
+    INSERT INTO classroom_student_thread_messages (
+      thread_id,
+      sender_id,
+      kind,
+      event_type,
+      body,
+      metadata
+    )
+    VALUES (
+      ${input.thread.id},
+      ${input.senderId},
+      ${input.kind},
+      ${input.eventType || null},
+      ${body},
+      ${sql.json(metadata)}
+    )
+    RETURNING *
+  `;
+  const message = rows[0] || null;
+  await sql`
+    UPDATE classroom_student_threads
+    SET updated_at = now()
+    WHERE id = ${input.thread.id}
+  `;
+
+  if (message) {
+    void broadcastStudentThreadChange(getStudentThreadChannel(input.thread), {
+      thread_id: input.thread.id,
+      message_id: message.id,
+      kind: input.kind,
+      event_type: input.eventType || null,
+      created_at: message.created_at,
+    });
+  }
+
+  return message;
+}
+
+async function appendStudentThreadEvent(classroomId: string, studentIds: string[], event: StudentThreadEventOptions) {
+  const uniqueStudentIds = [...new Set(studentIds.map((id) => normalizeUuid(id)).filter((id): id is string => Boolean(id)))];
+  if (uniqueStudentIds.length === 0) return [];
+  const threads = await ensureStudentThreadsForActiveStudents(classroomId, uniqueStudentIds);
+  const messages = [];
+  for (const thread of threads) {
+    const message = await insertStudentThreadMessage({
+      thread,
+      senderId: event.actorId || null,
+      kind: 'system',
+      eventType: normalizeText(event.eventType, 80),
+      body: event.body,
+      metadata: event.metadata,
+    });
+    if (message) messages.push(message);
+  }
+  return messages;
+}
+
+async function getStudentIdsForTopicAssignments(classroomId: string, assignments: any[]) {
+  const directStudentIds = assignments
+    .map((assignment) => normalizeUuid(assignment?.student_id))
+    .filter((id): id is string => Boolean(id));
+  const teamIds = [...new Set(assignments
+    .map((assignment) => normalizeUuid(assignment?.team_id))
+    .filter((id): id is string => Boolean(id)))];
+  if (teamIds.length === 0) return [...new Set(directStudentIds)];
+
+  const teamMembers = await sql`
+    SELECT tm.student_id
+    FROM trainer_team_members tm
+    JOIN trainer_teams t ON t.id = tm.team_id
+    JOIN classroom_students cs ON cs.classroom_id = t.classroom_id AND cs.student_id = tm.student_id
+    JOIN users u ON u.id = tm.student_id
+    WHERE t.classroom_id = ${classroomId}
+      AND t.id = ANY(${teamIds})
+      AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND u.admin IS NOT TRUE
+      AND u.trainer IS NOT TRUE
+      AND u.is_pre_enrolled IS NOT TRUE
+  `;
+
+  return [...new Set([...directStudentIds, ...teamMembers.map((row: any) => row.student_id)])];
+}
+
+async function getStudentIdsForAssignedTopic(classroomId: string, topicId: string) {
+  await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
+  const assignments = await sql`
+    SELECT id, team_id, student_id
+    FROM classroom_team_topic_assignments
+    WHERE classroom_id = ${classroomId}
+      AND topic_id = ${topicId}
+      AND status = 'active'
+  `;
+  return getStudentIdsForTopicAssignments(classroomId, assignments);
+}
+
+async function mirrorProblemAssignedToStudentThreads(classroomId: string, actorId: string, assignedProblems: any[]) {
+  for (const problem of assignedProblems || []) {
+    const studentId = normalizeUuid(problem?.student_id);
+    if (!studentId) continue;
+    await appendStudentThreadEvent(classroomId, [studentId], {
+      actorId,
+      eventType: 'trainer_problem_added',
+      body: `Trainer assigned a new problem: ${cleanEmailSnippet(problem.title || 'Practice problem', 160)}.`,
+      metadata: {
+        source: 'live_problem',
+        class_problem_id: problem.id,
+        problem_title: problem.title || '',
+        platform: problem.platform || '',
+        difficulty: problem.difficulty || '',
+      },
+    });
+  }
+}
+
+async function mirrorTopicUpdateToStudentThreads(input: {
+  classroomId: string;
+  topicId: string;
+  actorId: string;
+  title: string;
+  action: string;
+  resourceId?: string | null;
+  problemId?: string | null;
+  assignmentRows?: any[];
+}) {
+  const studentIds = input.assignmentRows
+    ? await getStudentIdsForTopicAssignments(input.classroomId, input.assignmentRows)
+    : await getStudentIdsForAssignedTopic(input.classroomId, input.topicId);
+  if (studentIds.length === 0) return [];
+  return appendStudentThreadEvent(input.classroomId, studentIds, {
+    actorId: input.actorId,
+    eventType: 'topic_or_resource_updated',
+    body: input.title,
+    metadata: {
+      source: 'topic',
+      topic_id: input.topicId,
+      action: input.action,
+      resource_id: input.resourceId || null,
+      topic_problem_id: input.problemId || null,
+    },
+  });
+}
+
+async function applyReadReceipts(classroomId: string, userId: string, updates: any[]) {
+  const keys = [...visibleKeySet(updates)];
+  if (keys.length === 0) return updates;
+  const receipts = await sql`
+    SELECT update_key, read_at
+    FROM classroom_update_read_receipts
+    WHERE classroom_id = ${classroomId}
+      AND user_id = ${userId}
+      AND update_key = ANY(${keys})
+  `;
+  const readMap = new Map(receipts.map((row: any) => [row.update_key, row.read_at]));
+  return updates.map((update) => ({
+    ...update,
+    is_read: readMap.has(update.update_key),
+    read_at: readMap.get(update.update_key) || null,
+  }));
+}
+
+async function buildClassroomUpdatesForUser(userId: string, classroomId: string, includeReadState = true) {
+  await ensureClassroomUpdatesSchema();
+  await ensurePreEnrollmentSchema();
+  const isTrainer = await canManageClassroom(userId, classroomId);
+  if (!isTrainer) {
+    const membership = await sql`
+      SELECT cs.id
+      FROM classroom_students cs
+      JOIN users u ON u.id = cs.student_id
+      WHERE cs.classroom_id = ${classroomId}
+        AND cs.student_id = ${userId}
+        AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
+        AND u.is_pre_enrolled IS NOT TRUE
+    `;
+    if (membership.length === 0) return { error: 'Unauthorized access to classroom', status: 403 as const };
+  }
+
+  const settings = await sql`
+    SELECT classroom_update_priorities
+    FROM user_settings
+    WHERE user_id = ${userId}
+  `;
+  const priorities = normalizeClassroomUpdatePriorities(settings[0]?.classroom_update_priorities || CLASSROOM_UPDATE_PRIORITIES);
+  const updates: any[] = [];
+  const seen = new Set<string>();
+
+  if (isTrainer) {
+    const timeExceeded = await sql`
+      SELECT cp.id AS problem_id,
+             cp.class_id,
+             cp.title,
+             cp.problem_link,
+             u.full_name AS student_name,
+             'class_problem' AS problem_type,
+             cp.assigned_at,
+             cp.timer_minutes
+      FROM class_problems cp
+      JOIN classes cl ON cp.class_id = cl.id
+      JOIN users u ON cp.student_id = u.id
+      WHERE cl.classroom_id = ${classroomId}
+        AND cp.status <> 'solved'
+        AND cp.timer_minutes IS NOT NULL
+        AND cp.assigned_at + (cp.timer_minutes * interval '1 minute') < now()
+      ORDER BY cp.assigned_at DESC
+      LIMIT 40
+    `;
+    for (const row of timeExceeded) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'time_exceeded',
+        update_key: `time_exceeded:class_problem:${row.problem_id}`,
+        title: row.title || 'Problem time exceeded',
+        message: `${row.student_name || 'Student'} exceeded the problem time limit.`,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'class_problem',
+          classId: row.class_id,
+        },
+      });
+    }
+
+    const liveSubmissions = await sql`
+      SELECT cp.id AS problem_id,
+             cp.class_id,
+             cp.title,
+             cp.problem_link,
+             cp.solved_at,
+             cp.assigned_at,
+             cp.status,
+             u.full_name AS student_name
+      FROM class_problems cp
+      JOIN classes cl ON cp.class_id = cl.id
+      JOIN users u ON cp.student_id = u.id
+      WHERE cl.classroom_id = ${classroomId}
+        AND cp.status = 'pending_approval'
+        AND (cp.solution_link IS NOT NULL OR cp.solution_code IS NOT NULL)
+      ORDER BY COALESCE(cp.solved_at, cp.assigned_at) DESC
+      LIMIT 40
+    `;
+    for (const row of liveSubmissions) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'student_solution_submitted',
+        update_key: `student_solution_submitted:class_problem:${row.problem_id}`,
+        title: row.title || 'Solution submitted',
+        message: `${row.student_name || 'Student'} submitted a solution for review.`,
+        created_at: row.solved_at || row.assigned_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'class_problem',
+          classId: row.class_id,
+        },
+      });
+    }
+
+    const topicSubmissions = await sql`
+      SELECT p.id AS progress_id,
+             p.assignment_id,
+             p.topic_problem_id AS problem_id,
+             p.updated_at,
+             prob.title,
+             prob.problem_link,
+             topic.title AS topic_title,
+             u.full_name AS student_name
+      FROM classroom_topic_problem_progress p
+      JOIN classroom_team_topic_assignments a ON a.id = p.assignment_id
+      JOIN classroom_topic_problems prob ON prob.id = p.topic_problem_id
+      JOIN classroom_topics topic ON topic.id = a.topic_id
+      JOIN users u ON u.id = p.student_id
+      WHERE a.classroom_id = ${classroomId}
+        AND p.status = 'pending_approval'
+      ORDER BY p.updated_at DESC
+      LIMIT 40
+    `;
+    for (const row of topicSubmissions) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'student_needs_review',
+        update_key: `student_needs_review:topic_problem:${row.progress_id}`,
+        title: row.title || row.topic_title || 'Topic solution submitted',
+        message: `${row.student_name || 'Student'} submitted a topic problem for review.`,
+        created_at: row.updated_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'topic_problem',
+          assignmentId: row.assignment_id,
+        },
+      });
+    }
+
+    const threadReplies = await sql`
+      SELECT m.id AS message_id,
+             m.message,
+             m.created_at,
+             u.full_name AS sender_name,
+             t.class_id,
+             t.class_problem_id,
+             t.topic_assignment_id,
+             t.topic_problem_id,
+             COALESCE(cp.title, tp.title) AS title
+      FROM classroom_problem_thread_messages m
+      JOIN classroom_problem_threads t ON t.id = m.thread_id
+      JOIN users u ON u.id = m.user_id
+      LEFT JOIN class_problems cp ON cp.id = t.class_problem_id
+      LEFT JOIN classroom_topic_problems tp ON tp.id = t.topic_problem_id
+      WHERE t.classroom_id = ${classroomId}
+        AND m.user_id <> ${userId}
+      ORDER BY m.created_at DESC
+      LIMIT 50
+    `;
+    for (const row of threadReplies) {
+      const problemType = row.class_problem_id ? 'class_problem' : 'topic_problem';
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'thread_reply',
+        update_key: `thread_reply:${row.message_id}`,
+        title: row.title || 'Problem thread reply',
+        message: cleanEmailSnippet(row.message),
+        thread: {
+          problemId: row.class_problem_id || row.topic_problem_id,
+          problemType,
+          classId: row.class_id,
+          assignmentId: row.topic_assignment_id,
+        },
+      });
+    }
+  } else {
+    const newProblems = await sql`
+      SELECT cp.id AS problem_id,
+             cp.class_id,
+             cp.title,
+             cp.problem_link,
+             cp.assigned_at
+      FROM class_problems cp
+      JOIN classes cl ON cp.class_id = cl.id
+      WHERE cl.classroom_id = ${classroomId}
+        AND cp.student_id = ${userId}
+        AND cp.assigned_at > now() - interval '14 days'
+      ORDER BY cp.assigned_at DESC
+      LIMIT 40
+    `;
+    for (const row of newProblems) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'new_problem',
+        update_key: `new_problem:class_problem:${row.problem_id}`,
+        title: row.title || 'New classroom problem',
+        message: 'A new problem was assigned to you.',
+        created_at: row.assigned_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'class_problem',
+          classId: row.class_id,
+        },
+      });
+    }
+
+    const topicProblems = await sql`
+      SELECT a.id AS assignment_id,
+             a.assigned_at,
+             p.id AS problem_id,
+             p.title,
+             p.problem_link,
+             topic.title AS topic_title
+      FROM classroom_team_topic_assignments a
+      JOIN classroom_topics topic ON topic.id = a.topic_id
+      JOIN classroom_topic_problems p ON p.topic_id = a.topic_id
+      LEFT JOIN trainer_team_members member ON member.team_id = a.team_id AND member.student_id = ${userId}
+      WHERE a.classroom_id = ${classroomId}
+        AND a.status = 'active'
+        AND (a.student_id = ${userId} OR member.student_id = ${userId})
+        AND a.assigned_at > now() - interval '14 days'
+      ORDER BY a.assigned_at DESC, p.position ASC, p.created_at ASC
+      LIMIT 40
+    `;
+    for (const row of topicProblems) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'new_problem',
+        update_key: `new_problem:topic_problem:${row.assignment_id}:${row.problem_id}`,
+        title: row.title || row.topic_title || 'New topic problem',
+        message: `New problem in ${row.topic_title || 'your assigned topic'}.`,
+        created_at: row.assigned_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'topic_problem',
+          assignmentId: row.assignment_id,
+        },
+      });
+    }
+
+    const feedback = await sql`
+      SELECT cp.id AS problem_id,
+             cp.class_id,
+             cp.title,
+             cp.problem_link,
+             cp.status,
+             cp.solved_at,
+             cp.assigned_at,
+             cp.submission_notes
+      FROM class_problems cp
+      JOIN classes cl ON cp.class_id = cl.id
+      WHERE cl.classroom_id = ${classroomId}
+        AND cp.student_id = ${userId}
+        AND (
+          cp.status IN ('solved', 'tried')
+          OR cp.submission_notes IS NOT NULL
+        )
+      ORDER BY COALESCE(cp.solved_at, cp.assigned_at) DESC
+      LIMIT 40
+    `;
+    for (const row of feedback) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'teacher_feedback',
+        update_key: `teacher_feedback:class_problem:${row.problem_id}`,
+        title: row.title || 'Teacher feedback',
+        message: row.status ? `Status updated to ${row.status}.` : 'Teacher feedback was added.',
+        created_at: row.solved_at || row.assigned_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'class_problem',
+          classId: row.class_id,
+        },
+      });
+    }
+
+    const topicFeedback = await sql`
+      SELECT p.id AS progress_id,
+             p.assignment_id,
+             p.topic_problem_id AS problem_id,
+             p.status,
+             p.updated_at,
+             prob.title,
+             topic.title AS topic_title
+      FROM classroom_topic_problem_progress p
+      JOIN classroom_team_topic_assignments a ON a.id = p.assignment_id
+      JOIN classroom_topic_problems prob ON prob.id = p.topic_problem_id
+      JOIN classroom_topics topic ON topic.id = a.topic_id
+      WHERE a.classroom_id = ${classroomId}
+        AND p.student_id = ${userId}
+        AND p.status IN ('solved', 'tried')
+      ORDER BY p.updated_at DESC
+      LIMIT 40
+    `;
+    for (const row of topicFeedback) {
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'teacher_feedback',
+        update_key: `teacher_feedback:topic_problem:${row.progress_id}`,
+        title: row.title || row.topic_title || 'Teacher feedback',
+        message: `Topic problem status updated to ${row.status}.`,
+        created_at: row.updated_at,
+        thread: {
+          problemId: row.problem_id,
+          problemType: 'topic_problem',
+          assignmentId: row.assignment_id,
+        },
+      });
+    }
+
+    const threadReplies = await sql`
+      SELECT m.id AS message_id,
+             m.message,
+             m.created_at,
+             u.full_name AS sender_name,
+             t.class_id,
+             t.class_problem_id,
+             t.topic_assignment_id,
+             t.topic_problem_id,
+             COALESCE(cp.title, tp.title) AS title
+      FROM classroom_problem_thread_messages m
+      JOIN classroom_problem_threads t ON t.id = m.thread_id
+      JOIN users u ON u.id = m.user_id
+      LEFT JOIN class_problems cp ON cp.id = t.class_problem_id
+      LEFT JOIN classroom_topic_problems tp ON tp.id = t.topic_problem_id
+      LEFT JOIN trainer_team_members member ON member.team_id IN (
+        SELECT team_id FROM classroom_team_topic_assignments WHERE id = t.topic_assignment_id
+      ) AND member.student_id = ${userId}
+      LEFT JOIN classroom_team_topic_assignments a ON a.id = t.topic_assignment_id
+      WHERE t.classroom_id = ${classroomId}
+        AND m.user_id <> ${userId}
+        AND (
+          cp.student_id = ${userId}
+          OR a.student_id = ${userId}
+          OR member.student_id = ${userId}
+        )
+      ORDER BY m.created_at DESC
+      LIMIT 50
+    `;
+    for (const row of threadReplies) {
+      const problemType = row.class_problem_id ? 'class_problem' : 'topic_problem';
+      addStableUpdate(updates, seen, {
+        ...row,
+        type: 'thread_reply',
+        update_key: `thread_reply:${row.message_id}`,
+        title: row.title || 'Problem thread reply',
+        message: cleanEmailSnippet(row.message),
+        thread: {
+          problemId: row.class_problem_id || row.topic_problem_id,
+          problemType,
+          classId: row.class_id,
+          assignmentId: row.topic_assignment_id,
+        },
+      });
+    }
+  }
+
+  const priorityIndex = new Map(priorities.map((type, index) => [type, index]));
+  const withReadState = includeReadState
+    ? await applyReadReceipts(classroomId, userId, updates)
+    : updates;
+
+  withReadState.sort((a: any, b: any) => {
+    const readDelta = Number(Boolean(a.is_read)) - Number(Boolean(b.is_read));
+    if (readDelta !== 0) return readDelta;
+    const priorityDelta = (priorityIndex.get(a.type) ?? 99) - (priorityIndex.get(b.type) ?? 99);
+    if (priorityDelta !== 0) return priorityDelta;
+    return updateTimestampOf(b) - updateTimestampOf(a);
+  });
+
+  return { updates: withReadState, priorities, isTrainer };
 }
 
 // -------------------------------------------------------------
@@ -1745,6 +3342,12 @@ export const assignProblem = async (c: Context) => {
       `;
 
     }
+    queueProblemAssignedEmails(classCheck[0].classroom_id, assignedProblems);
+    try {
+      await mirrorProblemAssignedToStudentThreads(classCheck[0].classroom_id, trainerId, assignedProblems);
+    } catch (threadError) {
+      console.error('Failed to mirror live problem assignment to student threads:', threadError);
+    }
 
     return c.json({ success: true, result: assignedProblems });
   } catch (error: any) {
@@ -1899,6 +3502,12 @@ export const assignProblemsBulk = async (c: Context) => {
     const assignedProblems = insertRows.length > 0
       ? await sql`INSERT INTO class_problems ${sql(insertRows)} RETURNING *`
       : [];
+    queueProblemAssignedEmails(classroomId, assignedProblems);
+    try {
+      await mirrorProblemAssignedToStudentThreads(classroomId, trainerId, assignedProblems);
+    } catch (threadError) {
+      console.error('Failed to mirror bulk problem assignments to student threads:', threadError);
+    }
 
     return c.json({
       success: true,
@@ -1995,7 +3604,7 @@ export const getClassProblems = async (c: Context) => {
     let problems;
     if (isTrainer) {
       problems = await sql`
-        SELECT cp.*, u.full_name as student_name, CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END as student_email
+        SELECT cp.*, u.full_name as student_name, u.mist_id as student_mist_id, CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END as student_email
         FROM class_problems cp
         JOIN users u ON cp.student_id = u.id
         LEFT JOIN classes cl ON cl.id = cp.class_id
@@ -2085,6 +3694,47 @@ export const updateProblemStatus = async (c: Context) => {
       WHERE id = ${problemId} 
       RETURNING *
     `;
+
+    if (isStudent && !isTrainer && effectiveStatus === 'pending_approval' && currentStatus !== 'pending_approval') {
+      queueStudentSubmissionEmail(check[0].classroom_id, check[0].title, check[0].student_name);
+      try {
+        await appendStudentThreadEvent(check[0].classroom_id, [check[0].student_id], {
+          actorId: userId,
+          eventType: 'student_solution_submitted',
+          body: `Solution submitted for trainer review: ${cleanEmailSnippet(check[0].title || 'Assigned problem', 160)}.`,
+          metadata: {
+            source: 'live_problem',
+            class_problem_id: problemId,
+            problem_title: check[0].title || '',
+            has_solution_link: Boolean(normalizedSolutionLink),
+            has_solution_code: Boolean(normalizedSolutionCode),
+          },
+        });
+      } catch (threadError) {
+        console.error('Failed to mirror live solution submission to student thread:', threadError);
+      }
+    }
+    if (isTrainer && check[0].student_id !== userId && (effectiveStatus !== currentStatus || normalizedSubmissionNotes)) {
+      queueTeacherFeedbackEmail(check[0].student_id, check[0].title, effectiveStatus);
+      try {
+        const feedbackLines = [`Trainer updated ${cleanEmailSnippet(check[0].title || 'assigned problem', 160)} to ${effectiveStatus}.`];
+        if (normalizedSubmissionNotes) feedbackLines.push(`Feedback: ${normalizedSubmissionNotes}`);
+        await appendStudentThreadEvent(check[0].classroom_id, [check[0].student_id], {
+          actorId: userId,
+          eventType: normalizedSubmissionNotes ? 'trainer_feedback' : 'solution_status_changed',
+          body: feedbackLines.join('\n\n'),
+          metadata: {
+            source: 'live_problem',
+            class_problem_id: problemId,
+            problem_title: check[0].title || '',
+            status: effectiveStatus,
+            previous_status: currentStatus,
+          },
+        });
+      } catch (threadError) {
+        console.error('Failed to mirror live trainer feedback to student thread:', threadError);
+      }
+    }
 
     return c.json({ success: true, problem: result[0] });
   } catch (error: any) {
@@ -2338,6 +3988,17 @@ export const updateClassroomTopic = async (c: Context) => {
       RETURNING *
     `;
     if (topic.length === 0) return c.json({ error: 'Topic not found' }, 404);
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'topic_updated',
+        title: `Topic updated: ${cleanEmailSnippet(topic[0].title || 'Classroom topic', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic update to student threads:', threadError);
+    }
     return c.json({ success: true, topic: topic[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2367,6 +4028,18 @@ export const addClassroomTopicResource = async (c: Context) => {
       VALUES (${topicId}, ${normalizedTitle}, ${normalizedUrl}, ${normalizedContent}, ${normalizePositiveInteger(position) || 0})
       RETURNING *
     `;
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'resource_added',
+        resourceId: resource[0].id,
+        title: `Topic resource added: ${cleanEmailSnippet(resource[0].title || 'Resource', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic resource addition to student threads:', threadError);
+    }
     return c.json({ success: true, resource: resource[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2433,6 +4106,18 @@ export const addClassroomTopicProblem = async (c: Context) => {
       )
       RETURNING *
     `;
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'topic_problem_added',
+        problemId: problem[0].id,
+        title: `Topic problem added: ${cleanEmailSnippet(problem[0].title || 'Topic problem', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic problem addition to student threads:', threadError);
+    }
     return c.json({ success: true, problem: problem[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2476,6 +4161,18 @@ export const updateClassroomTopicResource = async (c: Context) => {
       WHERE id = ${resourceId} AND topic_id = ${topicId}
       RETURNING *
     `;
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'resource_updated',
+        resourceId,
+        title: `Topic resource updated: ${cleanEmailSnippet(resource[0].title || 'Resource', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic resource update to student threads:', threadError);
+    }
     return c.json({ success: true, resource: resource[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2559,6 +4256,18 @@ export const updateClassroomTopicProblem = async (c: Context) => {
       WHERE id = ${problemId} AND topic_id = ${topicId}
       RETURNING *
     `;
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'topic_problem_updated',
+        problemId,
+        title: `Topic problem updated: ${cleanEmailSnippet(problem[0].title || 'Topic problem', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic problem update to student threads:', threadError);
+    }
     return c.json({ success: true, problem: problem[0] });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -2717,6 +4426,20 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
           topic_title: topicRows[0].title,
         });
       }
+    }
+
+    queueTopicAssignmentEmails(classroomId, createdAssignments);
+    try {
+      await mirrorTopicUpdateToStudentThreads({
+        classroomId,
+        topicId,
+        actorId: userId,
+        action: 'topic_assigned',
+        assignmentRows: createdAssignments,
+        title: `Topic assigned: ${cleanEmailSnippet(topicRows[0].title || 'Classroom topic', 160)}.`,
+      });
+    } catch (threadError) {
+      console.error('Failed to mirror topic assignment to student threads:', threadError);
     }
 
     return c.json({
@@ -2903,12 +4626,17 @@ export const updateClassroomTopicProblemProgress = async (c: Context) => {
     const isManager = await canManageClassroom(userId, classroomId);
     const targetStudentId = isManager && studentId ? String(studentId) : userId;
 
-    const memberRows = await sql`
-      SELECT id
-      FROM trainer_team_members
-      WHERE team_id = ${assignmentRows[0].team_id} AND student_id = ${targetStudentId}
-    `;
-    if (memberRows.length === 0) return c.json({ error: 'Student is not a member of this assigned team' }, 403);
+    const isIndividualAssignment = assignmentRows[0].student_id === targetStudentId;
+    const memberRows = assignmentRows[0].team_id
+      ? await sql`
+          SELECT id
+          FROM trainer_team_members
+          WHERE team_id = ${assignmentRows[0].team_id} AND student_id = ${targetStudentId}
+        `
+      : [];
+    if (!isIndividualAssignment && memberRows.length === 0) {
+      return c.json({ error: 'Student is not assigned to this topic problem' }, 403);
+    }
     if (!isManager && targetStudentId !== userId) return c.json({ error: 'Unauthorized' }, 403);
 
     // If student submits solve status, enforce pending_approval status unless trainer approves
@@ -2947,6 +4675,29 @@ export const updateClassroomTopicProblemProgress = async (c: Context) => {
         updated_at = now()
       RETURNING *
     `;
+
+    if (!isManager && effectiveStatus === 'pending_approval') {
+      const studentRows = await sql`SELECT full_name FROM users WHERE id = ${targetStudentId}`;
+      queueStudentSubmissionEmail(classroomId, assignmentRows[0].problem_title, studentRows[0]?.full_name || 'Student');
+      try {
+        await appendStudentThreadEvent(classroomId, [targetStudentId], {
+          actorId: userId,
+          eventType: 'student_solution_submitted',
+          body: `Topic solution submitted for trainer review: ${cleanEmailSnippet(assignmentRows[0].problem_title || 'Topic problem', 160)}.`,
+          metadata: {
+            source: 'topic_problem',
+            assignment_id: assignmentId,
+            topic_problem_id: topicProblemId,
+            topic_title: assignmentRows[0].topic_title || '',
+            problem_title: assignmentRows[0].problem_title || '',
+            has_solution_link: Boolean(normalizeNullableText(solutionLink, 1200)),
+            has_solution_code: Boolean(normalizeNullableText(solutionCode, 20000)),
+          },
+        });
+      } catch (threadError) {
+        console.error('Failed to mirror topic solution submission to student thread:', threadError);
+      }
+    }
 
     return c.json({ success: true, progress: progress[0] });
   } catch (error: any) {
@@ -2992,16 +4743,65 @@ export const verifyClassroomTopicProblemProgress = async (c: Context) => {
         `;
       }
       if (rows.length > 0) {
+        const notifyRows = await sql`
+          SELECT p.student_id, p.assignment_id, p.topic_problem_id, prob.title
+          FROM classroom_topic_problem_progress p
+          JOIN classroom_team_topic_assignments a ON a.id = p.assignment_id
+          JOIN classroom_topic_problems prob ON prob.id = p.topic_problem_id
+          WHERE p.id = ${rows[0].id}
+        `;
+        if (notifyRows.length > 0) {
+          queueTeacherFeedbackEmail(notifyRows[0].student_id, notifyRows[0].title, nextStatus);
+          try {
+            const feedbackLines = [`Trainer ${isApproved ? 'approved' : 'requested more work on'} ${cleanEmailSnippet(notifyRows[0].title || 'this topic solution', 160)}.`];
+            if (feedbackText) feedbackLines.push(`Feedback: ${feedbackText}`);
+            await appendStudentThreadEvent(classroomId, [notifyRows[0].student_id], {
+              actorId: trainerId,
+              eventType: feedbackText ? 'trainer_feedback' : 'solution_status_changed',
+              body: feedbackLines.join('\n\n'),
+              metadata: {
+                source: 'topic_problem',
+                assignment_id: notifyRows[0].assignment_id,
+                topic_problem_id: notifyRows[0].topic_problem_id,
+                problem_title: notifyRows[0].title || '',
+                status: nextStatus,
+              },
+            });
+          } catch (threadError) {
+            console.error('Failed to mirror topic trainer feedback to student thread:', threadError);
+          }
+        }
         return c.json({ success: true, progress: rows[0] });
       }
     } else if (problemId) {
       const rows = await sql`
-        UPDATE class_problems
+        UPDATE class_problems cp
         SET status = ${nextStatus}::text, solved_at = ${solvedAt}::timestamptz
-        WHERE id = ${problemId}
-        RETURNING *
+        FROM classes cl
+        WHERE cp.id = ${problemId}
+          AND cp.class_id = cl.id
+          AND cl.classroom_id = ${classroomId}
+        RETURNING cp.*
       `;
       if (rows.length > 0) {
+        queueTeacherFeedbackEmail(rows[0].student_id, rows[0].title, nextStatus);
+        try {
+          const feedbackLines = [`Trainer ${isApproved ? 'approved' : 'requested more work on'} ${cleanEmailSnippet(rows[0].title || 'this solution', 160)}.`];
+          if (feedbackText) feedbackLines.push(`Feedback: ${feedbackText}`);
+          await appendStudentThreadEvent(classroomId, [rows[0].student_id], {
+            actorId: trainerId,
+            eventType: feedbackText ? 'trainer_feedback' : 'solution_status_changed',
+            body: feedbackLines.join('\n\n'),
+            metadata: {
+              source: 'live_problem',
+              class_problem_id: rows[0].id,
+              problem_title: rows[0].title || '',
+              status: nextStatus,
+            },
+          });
+        } catch (threadError) {
+          console.error('Failed to mirror live trainer feedback to student thread:', threadError);
+        }
         return c.json({ success: true, problem: rows[0] });
       }
     }
@@ -3633,122 +5433,492 @@ export const getClassResources = async (c: Context) => {
   }
 };
 
-// -------------------------------------------------------------
-// Live chat (polling)
-// -------------------------------------------------------------
-
-export const sendChatMessage = async (c: Context) => {
+export const getClassroomStudentThreads = async (c: Context) => {
   const classroomId = c.req.param('id');
-  const { id: senderId } = c.get('jwtPayload');
-  try {
-    const { message, recipientId, classId } = await c.req.json();
-    const trimmedMessage = String(message ?? '').trim();
-    if (!classId) return c.json({ error: 'Class scope is required' }, 400);
-    if (!trimmedMessage) return c.json({ error: 'Message content is required' }, 400);
-    if (trimmedMessage.length > 2000) return c.json({ error: 'Message is too long' }, 400);
-
-    const access = await getClassAccess(senderId, classroomId, classId);
-    if ('error' in access) return c.json({ error: access.error }, access.status);
-
-    if (recipientId) {
-      const recipientAllowed = await isClassroomParticipant(recipientId, classroomId, access.createdBy);
-      if (!recipientAllowed) return c.json({ error: 'Recipient is not part of this classroom' }, 400);
-    }
-
-    const result = await sql`
-      INSERT INTO classroom_messages (classroom_id, class_id, sender_id, recipient_id, message)
-      VALUES (${classroomId}, ${classId}, ${senderId}, ${recipientId || null}, ${trimmedMessage})
-      RETURNING *
-    `;
-
-    // Fetch sender name
-    const sender = await sql`SELECT full_name FROM users WHERE id = ${senderId}`;
-    const senderName = sender[0]?.full_name || 'Someone';
-
-    return c.json({ success: true, message: result[0], senderName });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
-  }
-};
-
-export const getChatMessages = async (c: Context) => {
-  const classroomId = c.req.param('id');
-  const classId = c.req.query('classId');
   const { id: userId } = c.get('jwtPayload');
   try {
-    if (!classId) return c.json({ error: 'Class scope is required' }, 400);
-    const access = await getClassAccess(userId, classroomId, classId);
-    if ('error' in access) return c.json({ error: access.error }, access.status);
+    await ensureClassroomStudentThreadsSchema();
+    const isManager = await canManageClassroom(userId, classroomId);
+    const summaries = isManager
+      ? await listStudentThreadSummaries(classroomId)
+      : await listStudentThreadSummaries(classroomId, [userId]);
 
-    // Return class messages that are either broadcast OR sent by/to the current user.
-    const messages = await sql`
-      SELECT cm.*, u.full_name as sender_name, r.full_name as recipient_name,
-        COALESCE(
-          json_agg(
-            json_build_object(
-              'reaction', mr.reaction,
-              'count', mr.count,
-              'reactedByMe', mr.reacted_by_me
-            )
-            ORDER BY mr.reaction
-          ) FILTER (WHERE mr.reaction IS NOT NULL),
-          '[]'::json
-        ) AS reactions
-      FROM classroom_messages cm
-      JOIN users u ON cm.sender_id = u.id
-      LEFT JOIN users r ON cm.recipient_id = r.id
-      LEFT JOIN (
-        SELECT message_id, reaction, COUNT(*)::int AS count, BOOL_OR(user_id = ${userId}) AS reacted_by_me
-        FROM classroom_message_reactions
-        GROUP BY message_id, reaction
-      ) mr ON mr.message_id = cm.id
-      WHERE cm.classroom_id = ${classroomId}
-      AND cm.class_id = ${classId}
-      AND (cm.recipient_id IS NULL OR cm.recipient_id = ${userId} OR cm.sender_id = ${userId})
-      GROUP BY cm.id, u.full_name, r.full_name
-      ORDER BY cm.created_at ASC
-    `;
-    return c.json({ messages, classId, isTrainer: access.isTrainer });
+    if (!isManager && summaries.length === 0) {
+      const access = await getStudentThreadAccess(userId, classroomId, userId);
+      if ('error' in access) return c.json({ error: access.error }, access.status);
+      const refreshed = await listStudentThreadSummaries(classroomId, [userId]);
+      return c.json({
+        success: true,
+        canManage: false,
+        ownStudentId: userId,
+        threads: refreshed,
+        safeAttachments: {
+          accept: getClassroomStudentThreadAttachmentAccept(),
+          maxBytes: CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
+        },
+      });
+    }
+
+    return c.json({
+      success: true,
+      canManage: isManager,
+      ownStudentId: isManager ? null : userId,
+      threads: summaries,
+      safeAttachments: {
+        accept: getClassroomStudentThreadAttachmentAccept(),
+        maxBytes: CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
+      },
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
 };
 
-export const toggleChatReaction = async (c: Context) => {
+export const getClassroomStudentThread = async (c: Context) => {
   const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const eventsOnly = c.req.query('eventsOnly') === '1' || c.req.query('events_only') === '1';
+    if (eventsOnly) {
+      const eventPage = await listStudentThreadEvents(access.thread.id, userId, {
+        before: c.req.query('before') || c.req.query('beforeEvent') || c.req.query('before_event') || null,
+        limit: boundedPageLimit(c.req.query('eventLimit') || c.req.query('limit'), 20, 80),
+      });
+
+      return c.json({
+        success: true,
+        events: eventPage.events,
+        eventsPage: {
+          hasMore: eventPage.hasMore,
+          before: eventPage.before,
+        },
+      });
+    }
+
+    const messagePage = await listStudentThreadMessages(access.thread.id, userId, {
+      before: c.req.query('before') || c.req.query('beforeMessage') || c.req.query('before_message') || null,
+      limit: boundedPageLimit(c.req.query('messageLimit') || c.req.query('limit'), 40, 80),
+    });
+    const eventPage = await listStudentThreadEvents(access.thread.id, userId, { limit: 5 });
+
+    return c.json({
+      success: true,
+      canManage: access.isManager,
+      thread: {
+        id: access.thread.id,
+        classroom_id: classroomId,
+        student_id: access.thread.student_id,
+        updated_at: access.thread.updated_at,
+        realtime: {
+          channel: getStudentThreadChannel(access.thread),
+          event: 'thread_changed',
+        },
+      },
+      student: access.student,
+      messages: messagePage.messages,
+      messagesPage: {
+        hasMore: messagePage.hasMore,
+        before: messagePage.before,
+      },
+      latestEvents: eventPage.events,
+      eventsPage: {
+        hasMore: eventPage.hasMore,
+        before: eventPage.before,
+      },
+      safeAttachments: {
+        accept: getClassroomStudentThreadAttachmentAccept(),
+        maxBytes: CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
+      },
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const postClassroomStudentThreadMessage = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  try {
+    const { message, clientMessageId, submissionReference } = await c.req.json();
+    const body = normalizeText(message, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
+    if (!body) return c.json({ error: 'Message content is required' }, 400);
+    const normalizedClientMessageId = normalizeText(clientMessageId, 160);
+
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const referenceResult = await resolveStudentThreadSubmissionReference(
+      classroomId,
+      access.thread.student_id,
+      submissionReference
+    );
+    if ('error' in referenceResult) {
+      return c.json({ error: referenceResult.error }, referenceResult.status);
+    }
+
+    const metadata: Record<string, unknown> = {};
+    if (normalizedClientMessageId) metadata.client_message_id = normalizedClientMessageId;
+    if (referenceResult.reference) metadata.submission_reference = referenceResult.reference;
+
+    const inserted = await insertStudentThreadMessage({
+      thread: access.thread,
+      senderId: userId,
+      kind: 'message',
+      body,
+      metadata,
+    });
+    if (!inserted) return c.json({ error: 'Message content is required' }, 400);
+
+    const saved = await getStudentThreadMessageById(inserted.id, userId);
+    return c.json({ success: true, message: saved });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const postClassroomStudentThreadAttachment = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const parsed = await c.req.parseBody();
+    const maybeFile = Array.isArray((parsed as any).file) ? (parsed as any).file[0] : (parsed as any).file;
+    if (!maybeFile || typeof maybeFile !== 'object' || typeof maybeFile.arrayBuffer !== 'function') {
+      return c.json({ error: 'Choose a file to share.' }, 400);
+    }
+
+    const file = maybeFile as {
+      name?: string;
+      type?: string;
+      size?: number;
+      arrayBuffer: () => Promise<ArrayBuffer>;
+    };
+    const validation = validateStudentThreadAttachment({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+    });
+    if (!validation.ok) return c.json({ error: validation.error }, 400);
+
+    const messageBody = normalizeText((parsed as any).message, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
+    const normalizedClientMessageId = normalizeText((parsed as any).clientMessageId, 160);
+    const referenceResult = await resolveStudentThreadSubmissionReference(
+      classroomId,
+      access.thread.student_id,
+      (parsed as any).submissionReference
+    );
+    if ('error' in referenceResult) {
+      return c.json({ error: referenceResult.error }, referenceResult.status);
+    }
+
+    const metadata: Record<string, unknown> = { has_attachment: true };
+    if (normalizedClientMessageId) metadata.client_message_id = normalizedClientMessageId;
+    if (referenceResult.reference) metadata.submission_reference = referenceResult.reference;
+
+    const filename = sanitizeAttachmentFilename(file.name);
+    const storagePath = buildStudentThreadStoragePath(classroomId, access.thread.id, filename);
+    await uploadStudentThreadAttachmentToStorage({
+      storagePath,
+      body: await file.arrayBuffer(),
+      contentType: validation.contentType || file.type || 'application/octet-stream',
+    });
+
+    const inserted = await insertStudentThreadMessage({
+      thread: access.thread,
+      senderId: userId,
+      kind: 'message',
+      body: messageBody || `Shared ${filename}`,
+      metadata,
+    });
+    if (!inserted) return c.json({ error: 'Could not create attachment message.' }, 500);
+
+    const attachmentRows = await sql`
+      INSERT INTO classroom_student_thread_attachments (
+        thread_id,
+        message_id,
+        uploader_id,
+        storage_bucket,
+        storage_path,
+        original_filename,
+        content_type,
+        size_bytes
+      )
+      VALUES (
+        ${access.thread.id},
+        ${inserted.id},
+        ${userId},
+        ${CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET},
+        ${storagePath},
+        ${filename},
+        ${validation.contentType || file.type || 'application/octet-stream'},
+        ${Math.floor(Number(file.size || 0))}
+      )
+      RETURNING id
+    `;
+
+    await appendStudentThreadEvent(classroomId, [access.thread.student_id], {
+      actorId: userId,
+      eventType: 'attachment_shared',
+      body: `File shared: ${filename}.`,
+      metadata: {
+        attachment_id: attachmentRows[0]?.id || null,
+        filename,
+      },
+    });
+
+    const saved = await getStudentThreadMessageById(inserted.id, userId);
+    return c.json({ success: true, message: saved });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomStudentThreadAttachmentUrl = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const attachmentId = c.req.param('attachmentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const attachmentRows = await sql`
+      SELECT *
+      FROM classroom_student_thread_attachments
+      WHERE id = ${attachmentId}
+        AND thread_id = ${access.thread.id}
+      LIMIT 1
+    `;
+    if (attachmentRows.length === 0) return c.json({ error: 'Attachment not found' }, 404);
+
+    const attachment = attachmentRows[0];
+    const signed = await createStudentThreadAttachmentSignedUrl({
+      bucket: attachment.storage_bucket,
+      storagePath: attachment.storage_path,
+      filename: attachment.original_filename,
+      expiresIn: 300,
+    });
+
+    return c.json({
+      success: true,
+      attachment: {
+        id: attachment.id,
+        original_filename: attachment.original_filename,
+        content_type: attachment.content_type,
+        size_bytes: attachment.size_bytes,
+      },
+      ...signed,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomUpdates = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const result = await buildClassroomUpdatesForUser(userId, classroomId);
+    if ('error' in result) return c.json({ error: result.error }, result.status);
+    const limit = boundedPageLimit(c.req.query('limit'), 30, 80);
+    const offset = Math.max(0, Number(c.req.query('offset') || 0) || 0);
+    const total = result.updates.length;
+    return c.json({
+      ...result,
+      updates: result.updates.slice(offset, offset + limit),
+      page: {
+        limit,
+        offset,
+        total,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const markClassroomUpdateRead = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const body = await c.req.json();
+    const rawKeys = Array.isArray(body?.updateKeys)
+      ? body.updateKeys
+      : Array.isArray(body?.update_keys)
+        ? body.update_keys
+        : body?.updateKey
+          ? [body.updateKey]
+          : body?.update_key
+            ? [body.update_key]
+            : [];
+    const requestedKeys = [...new Set(rawKeys.map((key: unknown) => normalizeText(key, 260)).filter(Boolean))];
+    if (requestedKeys.length === 0) return c.json({ error: 'At least one update key is required' }, 400);
+
+    const result = await buildClassroomUpdatesForUser(userId, classroomId, false);
+    if ('error' in result) return c.json({ error: result.error }, result.status);
+
+    const authorizedKeys = visibleKeySet(result.updates);
+    const updateKeys = requestedKeys.filter((key) => authorizedKeys.has(key));
+    if (updateKeys.length > 0) {
+      await sql`
+        INSERT INTO classroom_update_read_receipts ${sql(
+          updateKeys.map((updateKey) => ({
+            classroom_id: classroomId,
+            user_id: userId,
+            update_key: updateKey,
+          }))
+        )}
+        ON CONFLICT (classroom_id, user_id, update_key)
+        DO UPDATE SET read_at = now(), updated_at = now()
+      `;
+    }
+
+    return c.json({ success: true, marked: updateKeys.length, updateKeys });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const markAllClassroomUpdatesRead = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const result = await buildClassroomUpdatesForUser(userId, classroomId, false);
+    if ('error' in result) return c.json({ error: result.error }, result.status);
+
+    const updateKeys = [...visibleKeySet(result.updates)];
+    if (updateKeys.length > 0) {
+      await sql`
+        INSERT INTO classroom_update_read_receipts ${sql(
+          updateKeys.map((updateKey) => ({
+            classroom_id: classroomId,
+            user_id: userId,
+            update_key: updateKey,
+          }))
+        )}
+        ON CONFLICT (classroom_id, user_id, update_key)
+        DO UPDATE SET read_at = now(), updated_at = now()
+      `;
+    }
+
+    return c.json({ success: true, marked: updateKeys.length, updateKeys });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getProblemThread = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const problemId = c.req.param('problemId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const problemType = c.req.query('problemType') || c.req.query('problem_type') || 'class_problem';
+    const assignmentId = c.req.query('assignmentId') || c.req.query('assignment_id') || null;
+    const access = await getThreadAccessForProblem(userId, classroomId, problemId, problemType, assignmentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const thread = await getOrCreateProblemThread(access);
+    const messages = await listProblemThreadMessages(thread.id, userId);
+    return c.json({
+      thread: {
+        ...thread,
+        problem_type: access.kind,
+        problem_title: access.title,
+      },
+      messages,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const postProblemThreadMessage = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const problemId = c.req.param('problemId');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const { message, is_solution, problem_type, assignmentId } = await c.req.json();
+    const trimmedMessage = String(message ?? '').trim();
+    if (!trimmedMessage) return c.json({ error: 'Message content is required' }, 400);
+    if (trimmedMessage.length > 5000) return c.json({ error: 'Message is too long' }, 400);
+
+    const access = await getThreadAccessForProblem(userId, classroomId, problemId, problem_type, assignmentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+    const thread = await getOrCreateProblemThread(access);
+
+    const result = await sql`
+      INSERT INTO classroom_problem_thread_messages (thread_id, user_id, message, is_solution)
+      VALUES (${thread.id}, ${userId}, ${trimmedMessage}, ${Boolean(is_solution)})
+      RETURNING *
+    `;
+    await sql`
+      UPDATE classroom_problem_threads
+      SET updated_at = now()
+      WHERE id = ${thread.id}
+    `;
+
+    const sender = await sql`SELECT full_name FROM users WHERE id = ${userId}`;
+    const senderName = sender[0]?.full_name || 'Someone';
+    queueThreadReplyEmail(access, userId, senderName, trimmedMessage);
+
+    return c.json({ success: true, message: { ...result[0], sender_name: senderName, reactions: [] } });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const toggleProblemThreadReaction = async (c: Context) => {
   const { id: userId } = c.get('jwtPayload');
   try {
     const { messageId, reaction } = await c.req.json();
-    if (!messageId) return c.json({ error: 'Message is required' }, 400);
-    if (!CHAT_REACTIONS.has(reaction)) return c.json({ error: 'Unsupported reaction' }, 400);
+    const normalizedReaction = normalizeText(reaction, 40);
+    if (!messageId || !isClassroomThreadReaction(normalizedReaction)) return c.json({ error: 'Invalid input' }, 400);
 
+    await ensureClassroomUpdatesSchema();
     const messageRows = await sql`
-      SELECT id, class_id
-      FROM classroom_messages
-      WHERE id = ${messageId} AND classroom_id = ${classroomId}
+      SELECT m.id AS message_id,
+             t.classroom_id,
+             t.class_problem_id,
+             t.topic_assignment_id,
+             t.topic_problem_id
+      FROM classroom_problem_thread_messages m
+      JOIN classroom_problem_threads t ON t.id = m.thread_id
+      WHERE m.id = ${messageId}
     `;
-    if (messageRows.length === 0 || !messageRows[0].class_id) {
-      return c.json({ error: 'Message not found' }, 404);
-    }
+    if (messageRows.length === 0) return c.json({ error: 'Thread message not found' }, 404);
 
-    const access = await getClassAccess(userId, classroomId, messageRows[0].class_id);
+    const row = messageRows[0];
+    const access = row.class_problem_id
+      ? await getClassProblemThreadAccess(userId, row.classroom_id, row.class_problem_id)
+      : await getTopicProblemThreadAccess(userId, row.classroom_id, row.topic_problem_id, row.topic_assignment_id);
     if ('error' in access) return c.json({ error: access.error }, access.status);
 
     const existing = await sql`
-      SELECT id
-      FROM classroom_message_reactions
-      WHERE message_id = ${messageId} AND user_id = ${userId} AND reaction = ${reaction}
+      SELECT id FROM classroom_problem_thread_reactions
+      WHERE message_id = ${messageId} AND user_id = ${userId} AND reaction = ${normalizedReaction}
     `;
 
     if (existing.length > 0) {
-      await sql`DELETE FROM classroom_message_reactions WHERE id = ${existing[0].id}`;
+      await sql`DELETE FROM classroom_problem_thread_reactions WHERE id = ${existing[0].id}`;
       return c.json({ success: true, active: false });
     }
 
     await sql`
-      INSERT INTO classroom_message_reactions (message_id, user_id, reaction)
-      VALUES (${messageId}, ${userId}, ${reaction})
-      ON CONFLICT (message_id, user_id, reaction) DO NOTHING
+      INSERT INTO classroom_problem_thread_reactions (message_id, user_id, reaction)
+      VALUES (${messageId}, ${userId}, ${normalizedReaction})
     `;
     return c.json({ success: true, active: true });
   } catch (error: any) {

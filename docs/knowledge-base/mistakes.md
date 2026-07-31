@@ -1,3 +1,45 @@
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Design Review Fix
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+What happened:
+The initial student-thread panel rendered latest event cards inline in a horizontal strip and relied on flexible panel height, which made the chat feel crowded and risked whole-page growth on high-volume threads.
+
+Detection:
+User screenshot review showed the event strip taking over the top of the chat panel and called out future high-message-volume risk.
+
+Prevention:
+Keep thread event history behind a compact modal trigger and give thread panels, bubble panels, message histories, and composers explicit bounded dimensions.
+
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Follow-up Design and Scale Fix
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+What happened:
+The first review fix bounded the visible chat surface, but the UI still showed pulsing pending badges, item counts, a visible realtime tag, and eager full-history loading paths for messages/events/updates.
+
+Detection:
+User screenshot review called out the flashing pending notification, count clutter, realtime tag, and future high-volume history risk.
+
+Prevention:
+For trainer communication surfaces, combine calm static controls with bounded API pages and explicit older/load-more actions before calling the design pass complete.
+
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Near Miss
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+What happened:
+The first implementation pass reset the thread composer when the selected student changed, but not when a trainer switched between two pending submission-context bubbles for the same student.
+
+Detection:
+Manual source review after lint/build caught that a draft could carry into a different referenced submission context.
+
+Prevention:
+When a composer is scoped by optional context metadata, include a stable context key in reset dependencies so drafts do not silently move between contexts.
+
 ## 2026-07-26 - trainer-logout-option - Hydration Error: Nested HTML Forms
 
 Source:
@@ -191,3 +233,43 @@ Trainer QA with `temp@mcc.trainer.com` showed the trainer account appearing as a
 
 Prevention:
 Treat classroom student membership as a role-clean domain relation: reject trainer/admin users on writes and filter existing polluted rows from every student-only read path.
+
+## 2026-07-28 - trainer-updates-problem-threads-20260728 - Destructive DDL in Unrelated Schema Guard Near Miss
+
+Source:
+- `docs/rsd/trainer-updates-problem-threads-20260728-rsd.md`
+- `server/src/utils/classroomPreEnrollment.ts`
+
+What happened:
+Preview-generated work placed `DROP TABLE IF EXISTS public.classroom_message_reactions CASCADE` and `DROP TABLE IF EXISTS public.classroom_messages CASCADE` inside `ensurePreEnrollmentSchema()`, an unrelated runtime schema helper.
+
+## 2026-07-29 - trainer-updates-problem-threads-20260728 - Eager Thread Mount Near Miss
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+What happened:
+Preview UI mounted `ProblemThread` directly inside repeated topic and challenge problem cards, which would fetch thread data for many cards during normal classroom load.
+
+Prevention:
+Mount thread UI lazily in dialogs from explicit Thread buttons on problem cards/lists, and keep Updates notification/read-state only.
+
+Detection:
+The RSD approval pass checked dirty workspace diffs before technical decisions and found destructive classroom chat cleanup tied to pre-enrollment schema setup.
+
+Prevention:
+Never place destructive table drops inside unrelated runtime schema guards. Removing UI/routes is not the same as deleting stored data. Physical cleanup needs an approved migration or rollback decision and must be scoped to the feature that owns the data.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Bucket/QA Near Miss
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+What happened:
+The implementation can use `SUPABASE_SERVICE_KEY` for private storage/realtime, but no explicit classroom attachment bucket env name was present locally. The code falls back to `classroom-thread-attachments`, which must exist as a private Supabase bucket before live file-sharing QA.
+
+Detection:
+Implementation review checked env key names without printing secret values and found Supabase URL/anon/service keys but no `SUPABASE_CLASSROOM_ATTACHMENTS_BUCKET` or `CLASSROOM_THREAD_ATTACHMENTS_BUCKET`.
+
+Prevention:
+For future Supabase Storage features, decide the bucket name during technical decisions, add deployment/env documentation, and run a live upload/download check with authenticated users before final release approval.

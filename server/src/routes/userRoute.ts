@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { jwt } from "hono/jwt";
 import {
   getSchedulesDash,
+  getClassroomSettings,
   getVjudgeId,
   listCodeforcesPending,
   listVjudgePending,
@@ -14,6 +15,7 @@ import {
   setProfilePic,
   setTrainerProfile,
   setTshirtSize,
+  updateClassroomSettings,
   setVjudgeId,
   verifyCodeforces,
   verifyVjudge,
@@ -31,6 +33,8 @@ route.use(
 
 route.get("/get_vjudge_id", getVjudgeId);
 route.get("/get_shchedules_dash", getSchedulesDash);
+route.get("/classroom-settings", getClassroomSettings);
+route.post("/classroom-settings", updateClassroomSettings);
 route.post("/vjudge_login", loginToVJudgeRoute);
 // Codeforces manual verification endpoints
 route.post("/cf/set", setCodeforcesId);

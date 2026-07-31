@@ -1,5 +1,35 @@
 # Decisions
 
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Student Thread Submission References
+
+Source:
+- `docs/decisions/trainer-submission-thread-bubbles-20260801-technical-decisions.md`
+- `docs/adr/0009-student-thread-submission-reference-metadata.md`
+
+Decision:
+Pending-submission discussion bubbles must use the active student-scoped classroom thread model, not legacy `ProblemThread`. Referenced messages and attachments store a server-generated `metadata.submission_reference` object in `classroom_student_thread_messages.metadata`, after validating the live `class_problems` row or topic `classroom_topic_problem_progress` row belongs to the route classroom, selected thread student, and still has `pending_approval` status. Normal thread bubbles send ordinary messages without requiring a submission reference.
+
+Applies when:
+Changing student-thread message/attachment endpoints, pending-submission review actions, `ClassroomThreadsTab.js`, floating thread bubbles, or submission-reference rendering.
+
+Do not overgeneralize:
+Do not let chat messages approve/reject submissions, trust client-provided reference labels, revive problem-thread bubbles as active UI, store solution code or private file paths in reference metadata, or use bubble keys as authorization.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Student Thread Realtime Model
+
+Source:
+- `docs/decisions/trainer-student-classroom-threads-realtime-20260731-technical-decisions.md`
+- `docs/adr/0008-classroom-student-thread-realtime-model.md`
+
+Decision:
+Classroom communication should use `Updates` as first/default notification UI, `Threads` as the only active conversation surface, and `Settings` for update priority/email preferences. `Threads` is one classroom-level trainer-student chat per active real student, with human messages, system event bubbles, private safe-file attachments, and Supabase Realtime used only as opaque invalidation before JWT-authorized refetch. Old problem-thread UI/data is legacy and should not be destructively deleted in this release.
+
+Applies when:
+Changing classroom tabs, student/trainer thread UI, thread APIs, thread schema, classroom event mirroring, Supabase Realtime channels, attachment storage/access, Updates priority settings placement, or old problem-thread entry points.
+
+Do not overgeneralize:
+Do not add student-to-student chat, direct browser writes to private classroom tables, public attachment URLs, full message payloads in realtime broadcasts, hidden polling, student-owned final verdicts, or migrations that delete/copy old problem-thread data without a separate approved plan.
+
 ## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Group, Topic, Schedule, and Submission Decisions
 
 Source:
@@ -494,3 +524,62 @@ Modifying problem creation, topic problem forms, problem list badges, or problem
 
 Do not overgeneralize:
 Does not alter student perceived difficulty rating feedback scale (1-5).
+
+## 2026-07-28 - trainer-updates-problem-threads-20260728 - Problem Threads, Updates, and Classroom Email Settings
+
+Source:
+- `docs/decisions/trainer-updates-problem-threads-20260728-technical-decisions.md`
+- `docs/adr/0007-classroom-problem-thread-update-model.md`
+
+Decision:
+1. Updates load on first tab mount and explicit refresh/action only; no polling, visibility refetch, cron, or global notification broadcast.
+2. Classroom update types use a fixed taxonomy with role filtering and user-managed priority ordering.
+3. Classroom update settings are namespaced user settings, separate from auth/password/non-classroom email behavior.
+4. Problem threads use explicit live-problem or topic-assignment/topic-problem references, not loose `problem_id text` polymorphism.
+5. Existing live/topic submission and verification endpoints remain authoritative; thread entries mirror successful submission, feedback, and status events.
+6. Classroom email sends only for event-backed updates in v1; `time_exceeded` is visual-only unless a future deduplicated email event model is approved.
+7. Generic classroom messaging is removed from the active surface without destructive table drops in unrelated runtime helpers.
+8. Update read state uses per-user classroom read receipts keyed by stable server-generated update keys; mark-all-read marks currently visible authorized updates only.
+9. Threads are accessed from problem cards/lists and authenticated problem-surface deep links, with server authorization checked on every read/post/reaction. Updates is notification/read-state only and must not open thread dialogs.
+
+Applies when:
+Implementing or reviewing classroom Updates, problem threads, classroom email preferences, old chat removal, or problem submission visualization.
+
+Do not overgeneralize:
+This does not approve realtime notifications, polling, global notification bells, page-load email side effects, public thread links, or destructive cleanup of old chat tables.
+
+## 2026-07-29 - trainer-updates-problem-threads-20260728 - Implemented Route and Data Model
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+Decision:
+The implemented route shape is classroom-scoped: `GET /classroom/:id/updates`, `POST /classroom/:id/updates/read`, `POST /classroom/:id/updates/read-all`, `GET /classroom/:id/problem-thread/:problemId`, `POST /classroom/:id/problem-thread/:problemId`, `POST /classroom/:id/problem-thread/reaction`, and `/user/classroom-settings` GET/POST. Topic problem thread access requires `assignmentId`.
+
+Applies when:
+Updating clients, tests, or docs for classroom Updates and problem threads.
+
+Do not overgeneralize:
+Do not reintroduce the old global `/classroom/problem-thread/:problemId` route shape; it lacks enough classroom and topic-assignment context.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Student Thread Communication Model
+
+Source:
+- `docs/decisions/trainer-student-classroom-threads-realtime-20260731-technical-decisions.md`
+- `docs/adr/0008-classroom-student-thread-realtime-model.md`
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Decision:
+1. `Updates` remains the first/default notification surface.
+2. `Threads` is the only active classroom conversation surface and is one thread per `(classroom_id, student_id)`.
+3. `Settings` owns classroom update priority ordering and classroom update email preferences.
+4. Server APIs own thread reads, writes, attachment upload/access, and authorization.
+5. Supabase Realtime carries only opaque invalidation payloads; clients refetch authorized content through MCC APIs.
+6. Safe attachments use private Supabase Storage metadata plus short-lived signed URLs.
+7. Legacy problem-thread UI is gated off without destructive table deletion.
+
+Applies when:
+Changing classroom chat, problem/thread UI, attachment behavior, classroom realtime, or notification settings.
+
+Do not overgeneralize:
+Do not let browser-side Supabase writes bypass MCC JWT/classroom authorization, and do not treat realtime payloads as the source of message content.

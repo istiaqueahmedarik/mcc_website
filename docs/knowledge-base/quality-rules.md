@@ -1,5 +1,47 @@
 # Quality Rules
 
+## 2026-08-01 - Bound Student Thread Surfaces
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Trainer and student chat surfaces must have bounded panel heights, internal scroll regions for message history, and composer max-height constraints so high-volume threads do not expand the whole classroom page.
+
+Applies when:
+Changing `ClassroomThreadsTab.js`, floating thread bubbles, thread lists, message history rendering, or chat composers.
+
+Do not overgeneralize:
+Bounded surfaces do not replace server-side pagination or virtualization if future measured volume exceeds the current message limit.
+
+## 2026-08-01 - Page Thread and Update History
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Student-thread messages, student-thread events, and classroom Updates should load an initial bounded page and then expose explicit older/load-more actions. Do not fetch full history on initial chat, modal, or tab open.
+
+Applies when:
+Changing `ClassroomThreadsTab.js`, `UpdatesTab.js`, student-thread message/event APIs, or classroom update list APIs.
+
+Do not overgeneralize:
+Small current pages can still render all items already returned by the bounded API page; virtualization can be added later if measured DOM volume requires it.
+
+## 2026-08-01 - Server Resolves Submission References
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Student-thread messages and attachments may carry submission context only after the server resolves the requested reference from authoritative live/topic pending submission rows. Never persist client-provided problem titles, student ids, class labels, or status values as authority.
+
+Applies when:
+Changing `ClassroomThreadsTab.js`, student-thread send endpoints, pending-submission chat buttons, or classroom message metadata.
+
+Do not overgeneralize:
+This rule is for submission-reference metadata; it does not make chat metadata a replacement for formal relational records when a future workflow needs querying or reporting.
+
 ## 2026-07-27 - trainer-feature-futureproof-crud-schedule-submission-20260727 - Bound Dense Member Lists
 
 Source:
@@ -348,3 +390,31 @@ Changing `fetchProblemMetadata`, `problem-preview`, or classroom problem assignm
 
 Do not overgeneralize:
 It is still valid to show real parsed time/memory limits when the source provides them.
+
+## 2026-07-29 - Lazy Problem Thread Loading
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+Rule:
+Problem-thread components should mount only when the user opens a thread dialog or directly navigates to a thread surface. Do not render a thread component for every problem card on initial classroom load.
+
+Applies when:
+Changing live problem cards, topic problem cards, problem lists, or any classroom thread preview.
+
+Do not overgeneralize:
+It is still acceptable to load the Updates list on the first Updates tab mount because that is the tab's primary content.
+
+## 2026-07-31 - Keep Student Thread Policy Server-Owned
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Rule:
+Classroom student-thread modules must keep access policy, active-real-student filtering, event fan-out, safe attachment validation, storage paths, and signed URL creation on the server. Client components may show hints and states, but they must not decide authorization or file safety.
+
+Applies when:
+Changing student-thread APIs, classroom attachment uploads, realtime channels, or thread list UI.
+
+Do not overgeneralize:
+This rule does not forbid focused client components; it forbids moving policy decisions into them.

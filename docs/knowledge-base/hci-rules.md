@@ -1,5 +1,47 @@
 # HCI Rules
 
+## 2026-08-01 - Thread Events Belong Behind a Compact Control
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Student-thread event history should not render as a long inline strip inside the chat pane. Use a compact event control without a visible count badge that opens a scrollable modal or equivalent bounded history view.
+
+Applies when:
+Changing `ClassroomThreadsTab.js`, student-thread system events, latest activity summaries, or trainer/student chat panels.
+
+Do not overgeneralize:
+Important one-off send/upload/status errors should still appear inline near the affected control.
+
+## 2026-08-01 - Avoid Flashing and Count-Heavy Thread Controls
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Trainer classroom thread and pending-review controls should stay calm by default: avoid pulsing badges for normal pending work and avoid showing item counts unless the count is required for a decision.
+
+Applies when:
+Changing pending submission entry points, student-thread rows, event controls, Updates tab headers, or trainer classroom notification badges.
+
+Do not overgeneralize:
+Blocking errors, destructive confirmations, and explicit unread indicators can still use stronger visual emphasis when the user must act immediately.
+
+## 2026-08-01 - Thread Bubbles Show Scope and Context
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Rule:
+Floating classroom thread bubbles must show the selected student scope in the header, and submission-launched bubbles must also show the referenced problem/submission context. Referenced messages need an icon/text chip so trainers and students can identify the discussed submission without relying on color.
+
+Applies when:
+Designing normal thread bubbles, pending-submission thread actions, student-thread message chips, or classroom review discussion UI.
+
+Do not overgeneralize:
+Normal thread bubbles should remain normal conversations without an invented submission context.
+
 ## 2026-07-25 - past-class-detail-visualization-20260725 - History Selection Maps To Detail
 
 Source:
@@ -124,3 +166,17 @@ Designing trainer IDE monitoring, per-student telemetry, board-like live views, 
 
 Do not overgeneralize:
 This does not require target selection for low-cost summary refreshes where the whole class is the natural object.
+
+## 2026-07-31 - Classroom Communication Mental Model
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Rule:
+Classroom communication surfaces must keep notification, conversation, and settings concepts separate: `Updates` for attention/read state, `Threads` for student-trainer conversation, and `Settings` for priority/email preferences. Realtime, upload, empty, error, and selected-student scope states should be visible near the chat.
+
+Applies when:
+Changing classroom tabs, notifications, student conversations, realtime state, upload state, or priority settings.
+
+Do not overgeneralize:
+This does not require `Threads` to become the default tab; the approved model keeps `Updates` first.

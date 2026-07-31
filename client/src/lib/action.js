@@ -73,26 +73,32 @@ export const get_with_token = cache(async (url) => {
       error: "Unauthorized",
     };
 
-  const response = await fetch(
-    server_url + url,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token.value}`,
-      },
-    },
-    {
-      cache: "force-cache",
-    },
-    { next: { revalidate: 900 } }
-  );
   try {
-    const json = await response.json();
-    return json;
+    const response = await fetch(
+      server_url + url,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token.value}`,
+        },
+      },
+      {
+        cache: "force-cache",
+      },
+      { next: { revalidate: 900 } }
+    );
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
   } catch (error) {
     return {
-      error: "An error occurred " + error,
+      error: error?.message || "Failed to reach server",
     };
   }
 });
@@ -104,38 +110,76 @@ export const post_with_token = cache(async (url, data) => {
       error: "Unauthorized",
     };
 
-  const response = await fetch(
-    server_url + url,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token.value}`,
-      },
-      body: JSON.stringify(data),
-    },
-    {
-      cache: "force-cache",
-    },
-    { next: { revalidate: 900 } }
-  );
   try {
-    const json = await response.json();
-    return json;
-  } catch (error) {
-    // If JSON parse fails, try to read text to surface the server response
+    const response = await fetch(
+      server_url + url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token.value}`,
+        },
+        body: JSON.stringify(data),
+      },
+      {
+        cache: "force-cache",
+      },
+      { next: { revalidate: 900 } }
+    );
     try {
-      const text = await response.text();
-      console.error("Non-JSON response:", text);
-      return { error: text || "An error occurred" };
-    } catch (inner) {
-      console.error("Error:", error, inner);
-      return {
-        error: "An error occurred",
-      };
+      const json = await response.json();
+      return json;
+    } catch (error) {
+      // If JSON parse fails, try to read text to surface the server response
+      try {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        return { error: text || "An error occurred" };
+      } catch (inner) {
+        console.error("Error:", error, inner);
+        return {
+          error: "An error occurred",
+        };
+      }
     }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
+    };
   }
 });
+
+export async function post_form_with_token(url, formData) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) {
+    return {
+      error: "Unauthorized",
+    };
+  }
+
+  try {
+    const response = await fetch(server_url + url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+      },
+      body: formData,
+    });
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
+    };
+  }
+}
 
 export const delete_with_token = cache(async (url) => {
   const token = (await cookies()).get("token");

@@ -43,9 +43,6 @@ import {
   addResource,
   getClassResourceDetail,
   getClassResources,
-  sendChatMessage,
-  getChatMessages,
-  toggleChatReaction,
   createTrainerUser,
   createAdminUser,
   changeUserPassword,
@@ -68,7 +65,18 @@ import {
   validateClassroomBoardSocketToken,
   getClassroomSubstitutes,
   addClassroomSubstitute,
-  removeClassroomSubstitute
+  removeClassroomSubstitute,
+  getClassroomUpdates,
+  markClassroomUpdateRead,
+  markAllClassroomUpdatesRead,
+  getClassroomStudentThreads,
+  getClassroomStudentThread,
+  postClassroomStudentThreadMessage,
+  postClassroomStudentThreadAttachment,
+  getClassroomStudentThreadAttachmentUrl,
+  getProblemThread,
+  postProblemThreadMessage,
+  toggleProblemThreadReaction
 } from '../controllers/classroomController';
 import { upgradeWebSocket } from '../utils/bunWebSocket';
 import {
@@ -204,6 +212,17 @@ route.get('/:id/topic-analytics', getClassroomTopicAnalytics);
 route.post('/:id/ide/activity', recordClassroomIdeActivity);
 route.post('/:id/ide/activity/list', listClassroomIdeActivity);
 route.post('/:id/ide/reset', resetClassroomIdeSession);
+route.get('/:id/updates', getClassroomUpdates);
+route.post('/:id/updates/read', markClassroomUpdateRead);
+route.post('/:id/updates/read-all', markAllClassroomUpdatesRead);
+route.get('/:id/student-threads', getClassroomStudentThreads);
+route.get('/:id/student-threads/:studentId', getClassroomStudentThread);
+route.post('/:id/student-threads/:studentId/messages', postClassroomStudentThreadMessage);
+route.post('/:id/student-threads/:studentId/attachments', postClassroomStudentThreadAttachment);
+route.get('/:id/student-threads/:studentId/attachments/:attachmentId', getClassroomStudentThreadAttachmentUrl);
+route.get('/:id/problem-thread/:problemId', getProblemThread);
+route.post('/:id/problem-thread/reaction', toggleProblemThreadReaction);
+route.post('/:id/problem-thread/:problemId', postProblemThreadMessage);
 
 // Ephemeral board broadcast
 route.get('/:id/board/session', getClassroomBoardSession);
@@ -214,11 +233,6 @@ route.post('/:id/board/join-token', createClassroomBoardJoinTokenHandler);
 // Resources
 route.post('/:id/add-resource', addResource);
 route.get('/:id/resources', getClassResources);
-
-// Chat endpoints
-route.post('/:id/chat/send', sendChatMessage);
-route.get('/:id/chat/history', getChatMessages);
-route.post('/:id/chat/reaction', toggleChatReaction);
 
 // Substitute trainers management
 route.get('/:id/substitutes', getClassroomSubstitutes);

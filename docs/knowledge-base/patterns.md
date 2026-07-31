@@ -1,5 +1,62 @@
 # Patterns
 
+## 2026-08-01 - Submission-Context Bubble Reuse
+
+Source:
+- `docs/reviews/trainer-submission-thread-bubbles-20260801-implementation-review.md`
+
+Pattern:
+Render floating student-thread bubbles by reusing the same thread panel, composer, attachment flow, realtime state, and message renderer used by the normal `Threads` tab. Pass an optional submission reference into the shared send path rather than duplicating a bubble-only chat implementation.
+
+Applies when:
+Adding floating conversation surfaces, contextual chat launchers, or trainer review discussion flows.
+
+Do not overgeneralize:
+Do not turn this into a global messaging framework unless multiple non-classroom domains need the same behavior.
+
+## 2026-08-01 - Server-Validated Submission Reference Metadata
+
+Source:
+- `docs/decisions/trainer-submission-thread-bubbles-20260801-technical-decisions.md`
+- `docs/adr/0009-student-thread-submission-reference-metadata.md`
+
+Fact:
+When a student-thread message is tied to a pending submission, accept only a compact client reference request and resolve the persisted `submission_reference` metadata server-side from authoritative live or topic submission rows. Validate classroom, selected student, source type, and `pending_approval` status before inserting the message or attachment.
+
+Applies when:
+Adding submission-context chat, floating bubbles, message metadata, or trainer review discussion features.
+
+Do not overgeneralize:
+Submission references are display context, not grading authority; do not store solution code, hidden notes, storage paths, or cross-student data in message metadata.
+
+## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Serial Bubble Work
+
+Source:
+- `docs/tasks/trainer-submission-thread-bubbles-20260801-task-plan.md`
+
+Fact:
+Submission-referenced thread bubbles should be implemented serially because server validation, `ClassroomThreadsTab.js`, floating dock behavior, and `ClassroomLiveClient.js` pending-submission entry points share the same student-thread conversation model.
+
+Applies when:
+Coordinating changes to pending-submission discussion, student-thread bubbles, message metadata, or classroom thread panels.
+
+Do not overgeneralize:
+This does not require serial work for unrelated trainer UI-only tasks with disjoint write scopes.
+
+## 2026-07-31 - trainer-student-classroom-threads-realtime-20260731 - Serial Student Thread Work
+
+Source:
+- `docs/tasks/trainer-student-classroom-threads-realtime-20260731-task-plan.md`
+
+Fact:
+Student-thread realtime work should be implemented serially because schema utilities, `classroomController.ts`, `classroomRoute.ts`, `ClassroomLiveClient.js`, Updates/Settings placement, legacy problem-thread cleanup, attachment validation, and event fan-out all share classroom communication semantics and overlapping files.
+
+Applies when:
+Coordinating classroom student-thread implementation, realtime thread APIs, attachment handling, event bubbles, Updates/Settings placement, or old problem-thread UI cleanup.
+
+Do not overgeneralize:
+This serial plan does not approve broad unrelated classroom refactors, destructive legacy thread migration, or bypassing approved RSD/decision gates.
+
 ## 2026-07-27 - Explicit SQL Parameter Type Casting & Null Handling Pattern
 
 Source:
@@ -394,3 +451,44 @@ Adding or modifying role-specific profile pages or navigation components.
 
 Do not overgeneralize:
 Do not duplicate token deletion logic in individual page handlers; always reuse `@/lib/action.js#logout`.
+## 2026-07-29 - Classroom Updates Read Receipts
+
+Source:
+- `docs/reviews/trainer-updates-problem-threads-20260728-implementation-review.md`
+
+Pattern:
+Generate stable `update_key` values on the server for the current authorized classroom feed, then validate mark-read requests against that visible key set before writing receipts. Mark-all-read should derive keys server-side from the same feed builder.
+
+Applies when:
+Adding new classroom update types or read/unread controls.
+
+Do not overgeneralize:
+Do not trust arbitrary client-provided update keys, and do not create page-load side effects such as email sends while deriving the feed.
+
+## 2026-07-31 - Student Thread Event Bubbles
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Pattern:
+Mirror successful classroom mutations into student-thread system bubbles through shared helpers. Fan out only to active real affected students, exclude trainer/admin/pre-enrolled identities, keep event bodies concise, and place sensitive details such as solution code in the original authorized workflow rather than the event metadata.
+
+Applies when:
+Adding new classroom actions that should appear in trainer-student conversation history.
+
+Do not overgeneralize:
+System bubbles are conversation history, not a second grading/status authority.
+
+## 2026-07-31 - Private Classroom Attachment Access
+
+Source:
+- `docs/reviews/trainer-student-classroom-threads-realtime-20260731-implementation-review.md`
+
+Pattern:
+Upload classroom thread attachments through authenticated server endpoints, validate extension/MIME/size server-side, store only private bucket/path metadata, and generate short-lived signed URLs only after rechecking thread authorization.
+
+Applies when:
+Adding classroom file sharing, download/open controls, or private learning artifacts.
+
+Do not overgeneralize:
+Public image upload helpers such as profile/achievement uploads are not suitable for private classroom thread files.

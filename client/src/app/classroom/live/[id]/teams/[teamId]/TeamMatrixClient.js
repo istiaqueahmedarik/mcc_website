@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { get_with_token, post_with_token } from "@/lib/action";
+import { FloatingThreadDock, getThreadBubbleKey } from "@/components/FloatingThreadDock";
 import ProgressLink from "@/components/ProgressLink";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,12 +14,15 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  MessageSquare,
   Pencil,
   ShieldCheck,
   Table,
   Users,
   X,
 } from "lucide-react";
+
+const LEGACY_PROBLEM_THREADS_VISIBLE = false;
 
 function platformName(platform, link) {
   if (platform) {
@@ -82,6 +86,44 @@ function parseDifficultyNum(diffStr) {
   return 1.0;
 }
 
+function MatrixProblemThreadDialog({
+  classroomId,
+  problemId,
+  problemType = "class_problem",
+  classId,
+  assignmentId,
+  currentUser,
+  title,
+  description,
+  onOpenThread,
+}) {
+  if (!LEGACY_PROBLEM_THREADS_VISIBLE) return null;
+  if (!classroomId || !problemId) return null;
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-7 gap-1 px-2 text-[11px] font-semibold"
+      disabled={!onOpenThread}
+      onClick={() => onOpenThread?.({
+        classroomId,
+        problemId,
+        problemType,
+        classId,
+        assignmentId,
+        currentUser,
+        title: title || "Problem thread",
+        description: description || "Discuss this problem with the classroom.",
+      })}
+    >
+      <MessageSquare className="h-3 w-3" />
+      Thread
+    </Button>
+  );
+}
+
 export default function TeamMatrixClient({ classroomId, teamId }) {
   const [loading, setLoading] = useState(true);
   const [classroom, setClassroom] = useState(null);
@@ -92,6 +134,9 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
   const [analytics, setAnalytics] = useState([]);
   const [selectedTopicTab, setSelectedTopicTab] = useState("all");
   const [isTrainer, setIsTrainer] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [threadBubbles, setThreadBubbles] = useState([]);
+  const [activeThreadBubbleKey, setActiveThreadBubbleKey] = useState("");
   const [editingTeam, setEditingTeam] = useState(false);
   const [editingStudentIds, setEditingStudentIds] = useState([]);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -120,6 +165,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
     if (classDetails && !classDetails.error) {
       targetClassroom = classDetails.classroom || null;
       setIsTrainer(Boolean(classDetails.isTrainer));
+      setCurrentUserId(classDetails.currentUserId || "");
       setStudents(classDetails.students || []);
       targetTeam = (classDetails.teams || []).find(
         (t) => String(t.id).toLowerCase() === String(teamId).toLowerCase()
@@ -208,6 +254,33 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
     setUpdateLoading(false);
   };
 
+  const openThreadBubble = useCallback((thread) => {
+    if (!LEGACY_PROBLEM_THREADS_VISIBLE) return;
+    const normalized = {
+      ...thread,
+      classroomId: thread.classroomId || classroomId,
+      currentUser: thread.currentUser || (currentUserId ? { id: currentUserId } : null),
+      title: thread.title || "Problem thread",
+      description: thread.description || "Problem discussion",
+    };
+    const key = getThreadBubbleKey(normalized);
+    const nextThread = { ...normalized, key };
+    setThreadBubbles((items) => {
+      const withoutDuplicate = items.filter((item) => item.key !== key);
+      return [...withoutDuplicate, nextThread].slice(-6);
+    });
+    setActiveThreadBubbleKey(key);
+  }, [classroomId, currentUserId]);
+
+  const closeThreadBubble = useCallback((key) => {
+    setThreadBubbles((items) => items.filter((item) => item.key !== key));
+    setActiveThreadBubbleKey((current) => (current === key ? "" : current));
+  }, []);
+
+  const activateThreadBubble = useCallback((key) => {
+    setActiveThreadBubbleKey((current) => (current === key ? "" : key));
+  }, []);
+
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
@@ -271,6 +344,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
         topicTitle,
         tag,
         link: prob.problem_link,
+        thread: null,
         rawDiffs: [],
         memberMap: new Map(),
       });
@@ -289,6 +363,12 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
     row.memberMap.set(String(prob.student_id).toLowerCase(), {
       difficulty: diffVal.toFixed(1).replace(/\.0$/, ""),
       verdict,
+      thread: {
+        problemId: prob.id,
+        problemType: "class_problem",
+        classId: prob.class_id,
+        title: prob.title || pId,
+      },
     });
   });
 
@@ -320,6 +400,12 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
           topicTitle: topicTitle,
           tag,
           link: prob.problem_link,
+          thread: {
+            problemId: prob.id,
+            problemType: "topic_problem",
+            assignmentId: assign.id,
+            title: prob.title || pId,
+          },
           memberMap: new Map(),
         });
       }
@@ -408,6 +494,7 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
     notSolved: totalUnsolvedCount || rawAnalytics?.notSolved || 0,
     solveRate,
   };
+  const currentUser = currentUserId ? { id: currentUserId } : null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -673,23 +760,37 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
 
                       {/* Problem ID / Link */}
                       <td className="border-r border-border px-3 py-2 font-medium">
-                        {row.link ? (
-                          <a
-                            href={row.link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 hover:underline text-primary"
-                          >
+                        <div className="flex flex-wrap items-center gap-2">
+                          {row.link ? (
+                            <a
+                              href={row.link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 hover:underline text-primary"
+                            >
+                              <span className="truncate max-w-[160px]">
+                                {row.problemId}
+                              </span>
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          ) : (
                             <span className="truncate max-w-[160px]">
                               {row.problemId}
                             </span>
-                            <ExternalLink className="h-3 w-3 shrink-0" />
-                          </a>
-                        ) : (
-                          <span className="truncate max-w-[160px]">
-                            {row.problemId}
-                          </span>
-                        )}
+                          )}
+                          {row.thread && (
+                            <MatrixProblemThreadDialog
+                              classroomId={classroomId}
+                              problemId={row.thread.problemId}
+                              problemType={row.thread.problemType}
+                              assignmentId={row.thread.assignmentId}
+                              currentUser={currentUser}
+                              onOpenThread={openThreadBubble}
+                              title={row.thread.title || row.title || "Problem thread"}
+                              description={`Group thread for ${row.topicTitle || "this topic problem"}.`}
+                            />
+                          )}
+                        </div>
                       </td>
 
                       {/* TAG */}
@@ -719,23 +820,37 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
 
                             {/* Member Verdict */}
                             <td className="border-r border-border px-2 py-2 text-center text-[11px] font-semibold">
-                              {isSolved ? (
-                                <span className="text-emerald-600 dark:text-emerald-400">
-                                  Solved
-                                </span>
-                              ) : isPending ? (
-                                <span className="text-amber-600 dark:text-amber-400 font-bold">
-                                  Pending Review
-                                </span>
-                              ) : isTried ? (
-                                <span className="text-blue-600 dark:text-blue-400">
-                                  Tried
-                                </span>
-                              ) : (
-                                <span className="text-red-600 dark:text-red-400">
-                                  Unsolved
-                                </span>
-                              )}
+                              <div className="flex flex-col items-center gap-1">
+                                {isSolved ? (
+                                  <span className="text-emerald-600 dark:text-emerald-400">
+                                    Solved
+                                  </span>
+                                ) : isPending ? (
+                                  <span className="text-amber-600 dark:text-amber-400 font-bold">
+                                    Pending Review
+                                  </span>
+                                ) : isTried ? (
+                                  <span className="text-blue-600 dark:text-blue-400">
+                                    Tried
+                                  </span>
+                                ) : (
+                                  <span className="text-red-600 dark:text-red-400">
+                                    Unsolved
+                                  </span>
+                                )}
+                                {mData?.thread && (
+                                  <MatrixProblemThreadDialog
+                                    classroomId={classroomId}
+                                    problemId={mData.thread.problemId}
+                                    problemType={mData.thread.problemType}
+                                    classId={mData.thread.classId}
+                                    currentUser={currentUser}
+                                    onOpenThread={openThreadBubble}
+                                    title={mData.thread.title || row.title || "Problem thread"}
+                                    description={`${getStudentDisplayName(member)} thread for this live problem.`}
+                                  />
+                                )}
+                              </div>
                             </td>
                           </Fragment>
                         );
@@ -748,6 +863,15 @@ export default function TeamMatrixClient({ classroomId, teamId }) {
           )}
         </section>
       </main>
+      {LEGACY_PROBLEM_THREADS_VISIBLE && (
+        <FloatingThreadDock
+          threads={threadBubbles}
+          activeKey={activeThreadBubbleKey}
+          onActivate={activateThreadBubble}
+          onClose={closeThreadBubble}
+          onMinimize={() => setActiveThreadBubbleKey("")}
+        />
+      )}
     </div>
   );
 }
