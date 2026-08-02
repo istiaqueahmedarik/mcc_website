@@ -1,5 +1,61 @@
 # Doc Usage
 
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Implementation Review Docs Used
+
+Source:
+- `docs/reviews/trainer-compact-ui-cleanup-20260802-implementation-review.md`
+
+Fact:
+Implementation review used the approved RSD, approved technical decisions, approved task plan, trainer client source, targeted ESLint, full client lint, production build output, headless Chrome route checks, and source audit of endpoint strings/route targets to verify the compact trainer UI cleanup.
+
+Applies when:
+Auditing the shipped trainer compact UI cleanup, mini-laptop verification limitations, or why authenticated browser layout QA remains a residual risk.
+
+Do not overgeneralize:
+The review did not prove authenticated trainer data screenshots because protected trainer routes redirected to `/login` in the headless session.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Task Plan Docs Used
+
+Source:
+- `docs/tasks/trainer-compact-ui-cleanup-20260802-task-plan.md`
+
+Fact:
+The approved task plan used the approved RSD, approved technical decisions, `AGENTS.md`, trainer/classroom knowledge-base entries, and current trainer route client files to sequence serial UI-only edits across dashboard, form builder, form detail, static verification, visual verification, implementation review, and memory updates.
+
+Applies when:
+Coordinating or auditing this trainer compact UI cleanup and its serial write scope.
+
+Do not overgeneralize:
+The plan does not approve server/API/schema/auth changes, route changes, new dependencies, or classroom live internals.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Technical Decision Docs Used
+
+Source:
+- `docs/decisions/trainer-compact-ui-cleanup-20260802-technical-decisions.md`
+
+Fact:
+The approved technical decision package used the approved RSD, `AGENTS.md`, trainer/classroom knowledge-base entries, current trainer route client files, global Tailwind tokens, and shadcn/lucide component context to choose a UI-only compact redesign with no route/API/auth/schema/dependency changes.
+
+Applies when:
+Auditing future trainer compact UI decisions, mini-laptop readability work, or route/process preservation for trainer pages.
+
+Do not overgeneralize:
+The decision package did not approve classroom live internals, behavior refactors, server changes, or global theme rewrites.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - RSD Docs Used
+
+Source:
+- `docs/rsd/trainer-compact-ui-cleanup-20260802-rsd.md`
+
+Fact:
+The approved RSD used `AGENTS.md`, the interface-design skill, trainer/classroom knowledge-base entries, `TrainerDashboardClient.js`, `TrainerFormsClient.js`, `TrainerFormDetailClient.js`, `globals.css`, `tailwind.config.js`, and local shadcn/lucide component context to scope a UI-only trainer cleanup for mini-laptop readability.
+
+Applies when:
+Auditing future trainer compact UI work, trainer route presentation changes, or why this cleanup excludes server/API/classroom-live internals.
+
+Do not overgeneralize:
+The RSD did not approve endpoint, route, authorization, schema, dependency, or classroom live workflow changes.
+
 ## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Docs Used
 
 Source:

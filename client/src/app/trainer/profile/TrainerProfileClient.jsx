@@ -1,12 +1,15 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { apiPost } from "@/lib/api-client";
 import {
+  AlertCircle,
   Briefcase,
   Camera,
   Check,
@@ -26,28 +29,82 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 
-export default function TrainerProfileClient({
-  user,
-  saveTrainerProfileAction,
-  saveProfilePicAction,
-  saveBasicProfileAction,
-  logoutAction,
-}) {
-  const [saving, setSaving] = useState(false);
-  const [picSaving, setPicSaving] = useState(false);
+async function saveTrainerProfile({ formData, tags }) {
+  const fullName = formData.get("full_name")?.toString().trim();
+  const phone = formData.get("phone")?.toString().trim() || null;
+
+  const basicPayload = { phone };
+  if (fullName) {
+    basicPayload.full_name = fullName;
+  }
+
+  const trainerPayload = {
+    trainer_title: formData.get("trainer_title")?.toString().trim() || null,
+    trainer_bio: formData.get("trainer_bio")?.toString().trim() || null,
+    trainer_experience: formData.get("trainer_experience")?.toString().trim() || null,
+    trainer_specializations: tags,
+    trainer_linkedin: formData.get("trainer_linkedin")?.toString().trim() || null,
+    trainer_github: formData.get("trainer_github")?.toString().trim() || null,
+    trainer_website: formData.get("trainer_website")?.toString().trim() || null,
+  };
+
+  const basicResult = await apiPost("user/basic/set", basicPayload);
+  const trainerResult = await apiPost("user/trainer-profile/set", trainerPayload);
+
+  return { basicResult, trainerResult };
+}
+
+async function uploadTrainerProfilePicture(file) {
+  const formData = new FormData();
+  formData.append("image", file);
+  return apiPost("trainer/profile-picture", formData);
+}
+
+export default function TrainerProfileClient({ user }) {
+  const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
-  const [isLoggingOut, startTransition] = useTransition();
+  const [saveError, setSaveError] = useState("");
   const [previewPic, setPreviewPic] = useState(user.profile_pic || null);
   const fileInputRef = useRef(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
+  const saveProfileMutation = useMutation({
+    mutationFn: saveTrainerProfile,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["trainer", "profile"] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    },
+  });
+
+  const profilePictureMutation = useMutation({
+    mutationFn: uploadTrainerProfilePicture,
+    onSuccess: async (data) => {
+      if (data?.profile_pic) {
+        setPreviewPic(data.profile_pic);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["trainer", "profile"] });
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: () => apiPost("auth/logout", {}),
+    onSuccess: () => {
+      window.location.href = "/";
+    },
+  });
+
+  const saving = saveProfileMutation.isPending;
+  const picSaving = profilePictureMutation.isPending;
+  const isLoggingOut = logoutMutation.isPending;
+
   const handleLogout = () => {
-    if (!logoutAction) return;
-    startTransition(async () => {
-      await logoutAction();
+    setSaveError("");
+    logoutMutation.mutate(undefined, {
+      onError: (error) => setSaveError(error?.message || "Failed to log out"),
     });
   };
 
@@ -77,26 +134,30 @@ export default function TrainerProfileClient({
   const handlePicChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setPreviewPic(URL.createObjectURL(file));
-    setPicSaving(true);
-    const fd = new FormData();
-    fd.append("image", file);
-    await saveProfilePicAction(fd);
-    setPicSaving(false);
+    const previewUrl = URL.createObjectURL(file);
+    setPreviewPic(previewUrl);
+    setSaveError("");
+    try {
+      await profilePictureMutation.mutateAsync(file);
+    } catch (error) {
+      setPreviewPic(user.profile_pic || null);
+      setSaveError(error?.message || "Failed to upload profile picture");
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+    }
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setSaving(true);
     setSaved(false);
+    setSaveError("");
     const form = e.target;
-    const fd = new FormData(form);
-    // Append tags as JSON — the server action will parse this
-    fd.set("trainer_specializations", JSON.stringify(tags));
-    await saveTrainerProfileAction(fd);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    const formData = new FormData(form);
+    try {
+      await saveProfileMutation.mutateAsync({ formData, tags });
+    } catch (error) {
+      setSaveError(error?.message || "Failed to save trainer profile");
+    }
   };
 
   const initials = (name) =>
@@ -115,14 +176,14 @@ export default function TrainerProfileClient({
 
   return (
     <>
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+    <div className="trainer-page">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {/* Page header */}
-        <div className="mb-8 flex flex-col gap-1 border-b pb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+        <div className="mb-6 flex flex-col gap-1 pb-1">
+          <p className="text-xs font-semibold text-muted-foreground">
             Trainer workspace
           </p>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h1 className="text-3xl font-semibold sm:text-4xl">
             My Profile
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -131,22 +192,22 @@ export default function TrainerProfileClient({
         </div>
 
         <form onSubmit={handleSave}>
-          <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+          <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
             {/* ── Left sidebar ── */}
             <aside className="flex flex-col gap-5">
               {/* Avatar card */}
-              <div className="rounded-xl border bg-card p-6 text-center shadow-sm">
+              <div className="trainer-panel p-6 text-center">
                 <div className="relative mx-auto mb-4 w-fit">
-                  <Avatar className="h-28 w-28 rounded-2xl border-2 border-primary/20">
+                  <Avatar className="h-28 w-28 rounded-lg border border-border/70">
                     <AvatarImage src={previewPic} className="object-cover" />
-                    <AvatarFallback className="rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-3xl font-bold text-white">
+                    <AvatarFallback className="rounded-lg bg-foreground text-3xl font-semibold text-background">
                       {initials(user.full_name)}
                     </AvatarFallback>
                   </Avatar>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-lg transition hover:scale-110"
+                    className="trainer-floating-help absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground"
                     aria-label="Change profile picture"
                   >
                     {picSaving ? (
@@ -169,14 +230,14 @@ export default function TrainerProfileClient({
                   {user.full_name || "Trainer"}
                 </h2>
                 <div className="mt-1 flex flex-wrap justify-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-500/10 px-2.5 py-0.5 text-xs font-semibold text-violet-600 dark:text-violet-400">
+                  <span className="trainer-chip">
                     <ShieldCheck className="h-3 w-3" />
                     {roleLabel}
                   </span>
                 </div>
 
                 <div className="mt-4 space-y-2 text-left">
-                  <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                  <div className="trainer-panel-soft flex items-center gap-2 px-3 py-2 text-sm">
                     <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="truncate text-muted-foreground">{user.email}</span>
                   </div>
@@ -189,28 +250,28 @@ export default function TrainerProfileClient({
                       type="text"
                       defaultValue={user.phone || ""}
                       placeholder="Phone number"
-                      className="pl-9 text-sm"
+                      className="pl-9"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Social links card */}
-              <div className="rounded-xl border bg-card p-5 shadow-sm">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              <div className="trainer-panel p-5">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                   <Globe className="h-4 w-4" />
                   Links
                 </h3>
                 <div className="space-y-3">
                   <div className="relative">
-                    <Linkedin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0A66C2]" />
+                    <Linkedin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       id="trainer-linkedin-input"
                       name="trainer_linkedin"
                       type="url"
                       defaultValue={user.trainer_linkedin || ""}
                       placeholder="linkedin.com/in/yourname"
-                      className="pl-9 text-sm"
+                      className="pl-9"
                     />
                   </div>
                   <div className="relative">
@@ -221,7 +282,7 @@ export default function TrainerProfileClient({
                       type="url"
                       defaultValue={user.trainer_github || ""}
                       placeholder="github.com/yourname"
-                      className="pl-9 text-sm"
+                      className="pl-9"
                     />
                   </div>
                   <div className="relative">
@@ -232,14 +293,13 @@ export default function TrainerProfileClient({
                       type="url"
                       defaultValue={user.trainer_website || ""}
                       placeholder="https://yourwebsite.com"
-                      className="pl-9 text-sm"
+                      className="pl-9"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Change Password card */}
-              <div className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="trainer-panel space-y-3 p-5">
                 <Button
                   type="button"
                   variant="outline"
@@ -250,35 +310,30 @@ export default function TrainerProfileClient({
                   <Key className="h-4 w-4" />
                   Change Password
                 </Button>
-              </div>
 
-              {/* Logout card */}
-              {logoutAction && (
-                <div className="rounded-xl border bg-card p-5 shadow-sm">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleLogout}
-                    disabled={isLoggingOut}
-                    className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-                    id="trainer-logout-btn"
-                  >
-                    {isLoggingOut ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <LogOut className="h-4 w-4" />
-                    )}
-                    Logout
-                  </Button>
-                </div>
-              )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                  id="trainer-logout-btn"
+                >
+                  {isLoggingOut ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  Logout
+                </Button>
+              </div>
             </aside>
 
             {/* ── Right main ── */}
             <main className="flex flex-col gap-5">
               {/* Identity */}
-              <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              <section className="trainer-panel p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                   <User className="h-4 w-4" />
                   Identity
                 </h3>
@@ -309,8 +364,8 @@ export default function TrainerProfileClient({
               </section>
 
               {/* Bio */}
-              <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              <section className="trainer-panel p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                   <Sparkles className="h-4 w-4" />
                   Bio
                 </h3>
@@ -323,14 +378,14 @@ export default function TrainerProfileClient({
                     name="trainer_bio"
                     defaultValue={user.trainer_bio || ""}
                     placeholder="Write a short bio — your background, teaching philosophy, and what you love about competitive programming."
-                    className="min-h-[120px] resize-y text-sm leading-relaxed"
+                    className="min-h-[120px] resize-y text-base leading-relaxed md:text-sm"
                   />
                 </div>
               </section>
 
               {/* Experience */}
-              <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              <section className="trainer-panel p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                   <Briefcase className="h-4 w-4" />
                   Previous Experience
                 </h3>
@@ -343,7 +398,7 @@ export default function TrainerProfileClient({
                     name="trainer_experience"
                     defaultValue={user.trainer_experience || ""}
                     placeholder={`Share your competitive programming journey and teaching experience.\n\nExamples:\n• ICPC Asia Regional Finalist (2022, 2023)\n• Trainer at XYZ University Programming Club\n• Codeforces Expert (max 1900)\n• 3+ years coaching competitive programming teams`}
-                    className="min-h-[180px] resize-y font-mono text-sm leading-relaxed"
+                    className="min-h-[180px] resize-y font-mono text-base leading-relaxed md:text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
                     Plain text or bullet points — this appears on your public trainer card.
@@ -352,8 +407,8 @@ export default function TrainerProfileClient({
               </section>
 
               {/* Specializations */}
-              <section className="rounded-xl border bg-card p-6 shadow-sm">
-                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+              <section className="trainer-panel p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                   <Tag className="h-4 w-4" />
                   Specializations
                 </h3>
@@ -389,7 +444,6 @@ export default function TrainerProfileClient({
                       onChange={(e) => setTagInput(e.target.value)}
                       onKeyDown={handleTagKeyDown}
                       placeholder="e.g. Graph Theory, DP, Segment Tree…"
-                      className="text-sm"
                       maxLength={40}
                     />
                     <Button
@@ -412,7 +466,12 @@ export default function TrainerProfileClient({
               </section>
 
               {/* Save bar */}
-              <div className="flex items-center justify-end gap-3 rounded-xl border bg-card px-6 py-4 shadow-sm">
+              <div className="trainer-command-bar sticky bottom-4 z-20 flex items-center justify-end gap-3 px-6 py-4">
+                {saveError && (
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
+                    <AlertCircle className="h-4 w-4" /> {saveError}
+                  </span>
+                )}
                 {saved && (
                   <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-600">
                     <Check className="h-4 w-4" /> Saved successfully

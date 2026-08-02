@@ -1,6 +1,6 @@
 'use client'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useMutation } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
     Dialog,
@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { changeOwnPassword } from '@/lib/action'
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Key, Lock } from 'lucide-react'
+import { apiPost } from '@/lib/api-client'
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Key } from 'lucide-react'
 import { useState } from 'react'
 
 export default function ChangePasswordModal({ isOpen, onClose }) {
@@ -22,9 +22,16 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const changePasswordMutation = useMutation({
+    mutationFn: ({ currentPassword, newPassword }) =>
+      apiPost('auth/user/change-password', {
+        currentPassword,
+        newPassword,
+      }),
+  })
+  const loading = changePasswordMutation.isPending
 
   const handleClose = () => {
     setCurrentPassword('')
@@ -35,36 +42,33 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     setShowCurrentPassword(false)
     setShowNewPassword(false)
     setShowConfirmPassword(false)
+    changePasswordMutation.reset()
     onClose()
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
     setError('')
     setSuccess('')
 
     if (!currentPassword) {
       setError('Please enter your current password')
-      setLoading(false)
       return
     }
 
     if (newPassword !== confirmPassword) {
       setError('New passwords do not match')
-      setLoading(false)
       return
     }
 
     if (newPassword.length < 8) {
       setError('New password must be at least 8 characters long')
-      setLoading(false)
       return
     }
 
     try {
-      const result = await changeOwnPassword(currentPassword, newPassword)
-      if (result.success) {
+      const result = await changePasswordMutation.mutateAsync({ currentPassword, newPassword })
+      if (result.success !== false) {
         setSuccess('Password updated successfully!')
         setTimeout(() => {
           handleClose()
@@ -73,9 +77,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
         setError(result.message || 'Failed to update password')
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+      setError(err?.message || 'An error occurred. Please try again.')
     }
   }
 

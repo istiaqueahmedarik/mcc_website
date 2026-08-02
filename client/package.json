@@ -53,6 +53,7 @@
     "@supabase/ssr": "^0.5.1",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/typography": "^0.5.15",
+    "@tanstack/react-query": "^5.101.4",
     "@tldraw/sync": "^5.2.5",
     "@types/three": "^0.168.0",
     "@udecode/cmdk": "^0.2.0",

@@ -9,22 +9,26 @@ This repository uses an RSD-first delivery workflow. Agents must read this file 
 - Trainer/classroom UI entry points live mainly under `client/src/app/trainer/`, `client/src/app/classroom/`, and `client/src/components/Navbar.js`.
 - Trainer/classroom API entry points live under `server/src/routes/classroomRoute.ts`, `server/src/controllers/classroomController.ts`, and trainer form routes/controllers.
 
+
+## Web Interface Guidelines
+
+For any new interface design, including new pages, new product surfaces, reusable UI components, and major page redesigns, follow Vercel's Web Interface Guidelines as a quality baseline:
+
+- Canonical source: https://vercel.com/design/guidelines
+- For any new interface design, load and apply this design skill stack before choosing layout, component structure, motion, or polish details:
+  - `interface-design` (`/home/arik/.agents/skills/interface-design/SKILL.md`) for product intent, domain-specific direction, hierarchy, tokens, density, states, and design-system fit.
+  - `apple-design` (`/home/arik/mcc_website/.agents/skills/apple-design/SKILL.md`) for direct manipulation, fluid/interruptible motion, spatial consistency, translucent materials, typography, and reduced-motion behavior.
+  - `emil-design-eng` (`/home/arik/mcc_website/.agents/skills/emil-design-eng/SKILL.md`) for component polish, animation purpose/timing/easing, press feedback, transform-origin details, and UI review format.
+- Apply the current guideline unless an approved RSD records a deliberate exception.
+- Before final handoff, audit generated interfaces for keyboard access, visible focus, focus management, hit targets, semantic links/buttons, URL-backed state when relevant, loading/empty/error states, responsive mobile/laptop/ultra-wide layout, long-content resilience, form behavior, reduced motion, compositor-friendly animation, contrast, and performance basics such as avoiding layout shift.
+- Preserve approved project-specific design decisions, including trainer/classroom operational UI guidance, and prefer existing shadcn/Radix, Tailwind semantic tokens, and lucide icons over new abstractions.
+- This rule does not approve retroactive cleanup of existing pages; use a separate approved RSD for broad redesign or compliance work.
+
 ## Start Here
 
 1. Read the user task.
 2. Read the knowledge base under `docs/knowledge-base/` if present.
-3. Create or update the RSD before implementation planning.
-4. Stop for user approval at required gates.
-5. Keep changes scoped to the approved task plan.
-
-## Required Gates
-
-Agents must pause and ask for user approval after:
-
-- Primary Requirement Satisfaction Document
-- Technical decisions and any ADRs
-- Full task plan and dependency graph
-- Implementation review before final merge
+3. Use context7 for proper documentation
 
 ## Project Memory
 
@@ -42,10 +46,7 @@ Update project memory after every approved RSD, approved technical decision pack
 
 Use these default locations:
 
-- RSDs: `docs/rsd/`
-- Technical decisions: `docs/decisions/`
 - ADRs: `docs/adr/`
-- Task plans: `docs/tasks/`
 - Reviews: `docs/reviews/`
 
 ## Parallel Work
@@ -118,3 +119,10 @@ Before final merge, check:
 - Logging of sensitive data
 - Dependency risk
 - Unsafe defaults
+
+
+## END
+
+Write for reviewer to review:
+ - explain clearly what you did, why you did
+ - which code file change and not just random order, need to have a flow so that reviewer can review as if he wrote it

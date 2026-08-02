@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { get_with_token, post_with_token, delete_with_token } from "@/lib/action";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { apiDelete, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,7 @@ import {
   ClipboardList,
   HelpCircle,
   Layers,
+  Loader2,
   Plus,
   Radio,
   ShieldCheck,
@@ -125,23 +127,117 @@ const trainerDashboardSteps = [
   },
 ];
 
+const dashboardQueryKeys = {
+  profile: ["trainer", "profile"],
+  classrooms: ["trainer", "classrooms"],
+  allTrainers: ["trainer", "all-trainers"],
+  substitutes: (classroomId) => ["trainer", "classrooms", classroomId, "substitutes"],
+};
+
+async function fetchTrainerProfile() {
+  const res = await apiGet("auth/user/profile");
+  return res?.result?.[0] || null;
+}
+
+async function fetchClassrooms() {
+  const res = await apiGet("classroom/list");
+  return res?.result || [];
+}
+
+async function fetchSubstitutes(classroomId) {
+  const res = await apiGet(`classroom/${classroomId}/substitutes`);
+  return res?.result || [];
+}
+
+async function fetchAllTrainers() {
+  const res = await apiGet("classroom/admin/trainers-list");
+  return res?.result || [];
+}
+
 export default function TrainerDashboardClient() {
-  const [classrooms, setClassrooms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [newClassName, setNewClassName] = useState("");
   const [newClassDesc, setNewClassDesc] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState("");
-  const [profile, setProfile] = useState(null);
 
   // Substitute trainer management state
   const [subModalOpen, setSubModalOpen] = useState(false);
   const [subModalClassroom, setSubModalClassroom] = useState(null);
-  const [substitutes, setSubstitutes] = useState([]);
-  const [allTrainers, setAllTrainers] = useState([]);
   const [subSearch, setSubSearch] = useState("");
-  const [subLoading, setSubLoading] = useState(false);
   const [subError, setSubError] = useState("");
+
+  const profileQuery = useQuery({
+    queryKey: dashboardQueryKeys.profile,
+    queryFn: fetchTrainerProfile,
+  });
+  const classroomsQuery = useQuery({
+    queryKey: dashboardQueryKeys.classrooms,
+    queryFn: fetchClassrooms,
+  });
+  const substitutesQuery = useQuery({
+    queryKey: dashboardQueryKeys.substitutes(subModalClassroom?.id),
+    queryFn: () => fetchSubstitutes(subModalClassroom.id),
+    enabled: subModalOpen && Boolean(subModalClassroom?.id),
+  });
+  const allTrainersQuery = useQuery({
+    queryKey: dashboardQueryKeys.allTrainers,
+    queryFn: fetchAllTrainers,
+    enabled: subModalOpen,
+  });
+
+  const createClassroomMutation = useMutation({
+    mutationFn: async (payload) => {
+      const res = await apiPost("classroom/create", payload);
+      if (!res?.success) {
+        throw new Error(res?.error || "Failed to create classroom");
+      }
+      return res;
+    },
+    onSuccess: async () => {
+      setNewClassName("");
+      setNewClassDesc("");
+      setModalOpen(false);
+      await queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.classrooms });
+    },
+  });
+
+  const addSubstituteMutation = useMutation({
+    mutationFn: async ({ classroomId, trainerId }) => {
+      const res = await apiPost(`classroom/${classroomId}/substitutes`, { trainerId });
+      if (!res?.message && !res?.success) {
+        throw new Error(res?.error || "Failed to add substitute");
+      }
+      return res;
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.substitutes(variables.classroomId),
+      });
+    },
+  });
+
+  const removeSubstituteMutation = useMutation({
+    mutationFn: async ({ classroomId, trainerId }) => {
+      const res = await apiDelete(`classroom/${classroomId}/substitutes/${trainerId}`);
+      if (!res?.message && !res?.success) {
+        throw new Error(res?.error || "Failed to remove substitute");
+      }
+      return res;
+    },
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.substitutes(variables.classroomId),
+      });
+    },
+  });
+
+  const profile = profileQuery.data;
+  const classrooms = classroomsQuery.data || [];
+  const substitutes = substitutesQuery.data || [];
+  const allTrainers = allTrainersQuery.data || [];
+  const loading = profileQuery.isLoading || classroomsQuery.isLoading;
+  const subLoading = substitutesQuery.isLoading || allTrainersQuery.isLoading;
 
   const { startTour } = useTour({
     storageKey: "mcc_trainer_dashboard_toured",
@@ -149,58 +245,34 @@ export default function TrainerDashboardClient() {
     autoStart: !loading,
   });
 
-
-  const fetchData = async () => {
-    setLoading(true);
-    const userRes = await get_with_token("auth/user/profile");
-    if (userRes && userRes.result && userRes.result[0]) {
-      setProfile(userRes.result[0]);
-    }
-
-    const res = await get_with_token("classroom/list");
-    if (res && res.result) {
-      setClassrooms(res.result);
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const openSubModal = async (classroom) => {
+  const openSubModal = (classroom) => {
     setSubModalClassroom(classroom);
     setSubError("");
     setSubSearch("");
     setSubModalOpen(true);
-    setSubLoading(true);
-    const [subRes, trainerRes] = await Promise.all([
-      get_with_token(`classroom/${classroom.id}/substitutes`),
-      get_with_token("classroom/admin/trainers-list"),
-    ]);
-    setSubstitutes(subRes?.result || []);
-    setAllTrainers(trainerRes?.result || []);
-    setSubLoading(false);
   };
 
   const handleAddSub = async (trainerId) => {
     setSubError("");
-    const res = await post_with_token(`classroom/${subModalClassroom.id}/substitutes`, { trainerId });
-    if (res?.message) {
-      const subRes = await get_with_token(`classroom/${subModalClassroom.id}/substitutes`);
-      setSubstitutes(subRes?.result || []);
-    } else {
-      setSubError(res?.error || "Failed to add substitute");
+    try {
+      await addSubstituteMutation.mutateAsync({
+        classroomId: subModalClassroom.id,
+        trainerId,
+      });
+    } catch (mutationError) {
+      setSubError(mutationError?.message || "Failed to add substitute");
     }
   };
 
   const handleRemoveSub = async (trainerId) => {
     setSubError("");
-    const res = await delete_with_token(`classroom/${subModalClassroom.id}/substitutes/${trainerId}`);
-    if (res?.message) {
-      setSubstitutes((prev) => prev.filter((s) => s.id !== trainerId));
-    } else {
-      setSubError(res?.error || "Failed to remove substitute");
+    try {
+      await removeSubstituteMutation.mutateAsync({
+        classroomId: subModalClassroom.id,
+        trainerId,
+      });
+    } catch (mutationError) {
+      setSubError(mutationError?.message || "Failed to remove substitute");
     }
   };
 
@@ -211,17 +283,13 @@ export default function TrainerDashboardClient() {
       setError("Classroom name is required");
       return;
     }
-    const res = await post_with_token("classroom/create", {
-      name: newClassName,
-      description: newClassDesc,
-    });
-    if (res && res.success) {
-      setNewClassName("");
-      setNewClassDesc("");
-      setModalOpen(false);
-      fetchData();
-    } else {
-      setError(res.error || "Failed to create classroom");
+    try {
+      await createClassroomMutation.mutateAsync({
+        name: newClassName,
+        description: newClassDesc,
+      });
+    } catch (mutationError) {
+      setError(mutationError?.message || "Failed to create classroom");
     }
   };
 
@@ -236,28 +304,28 @@ export default function TrainerDashboardClient() {
       value: classrooms.length,
       detail: `${quietClassrooms} ready`,
       icon: BookOpen,
-      tone: "border-sky-600 text-sky-600",
+      tone: "text-sky-600",
     },
     {
       label: "Live now",
       value: totalLive,
       detail: totalLive ? "Instructor action" : "No live room",
       icon: Radio,
-      tone: "border-red-600 text-red-600",
+      tone: "text-red-600",
     },
     {
       label: "Role",
       value: roleLabel,
       detail: profile?.admin ? "Trainer controls unlocked" : "Trainer access",
       icon: ShieldCheck,
-      tone: "border-emerald-600 text-emerald-600",
+      tone: "text-emerald-600",
     },
     {
       label: "Forms",
       value: "Builder",
       detail: "Create and manage",
       icon: ClipboardList,
-      tone: "border-violet-600 text-violet-600",
+      tone: "text-cyan-600",
     },
   ];
 
@@ -270,39 +338,44 @@ export default function TrainerDashboardClient() {
       .join("");
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section id="trainer-tour-header" className="grid gap-6 border-b pb-6 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase text-muted-foreground">Trainer dashboard</p>
-              <h1 className="mt-2 text-3xl font-bold leading-tight sm:text-4xl">
+    <div className="trainer-page relative">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section id="trainer-tour-header" className="space-y-4 pb-2">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold text-muted-foreground">Trainer dashboard</p>
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+                <span className="text-xs font-medium text-muted-foreground">{roleLabel}</span>
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">
                 Learning operations
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                Live rooms, classroom setup, and form tools without the noise.
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Open the right room, prepare the next class, or build a form.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               {profile?.admin && (
                 <ProgressLink href="/admin/trainers">
-                  <Button variant="default" className="gap-2 font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                  <Button variant="outline" size="sm" className="gap-2 font-semibold">
                     <ShieldCheck className="h-4 w-4" />
-                    Admin Dashboard
+                    Admin tools
                   </Button>
                 </ProgressLink>
               )}
 
               <ProgressLink href="/trainer/forms" id="trainer-tour-form-btn">
-                <Button variant="outline" className="gap-2 font-semibold">
+                <Button variant="outline" size="sm" className="gap-2 font-semibold">
                   <ClipboardList className="h-4 w-4" />
-                  Form Creator
+                  Forms
                 </Button>
               </ProgressLink>
 
               <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogTrigger asChild>
-                  <Button id="trainer-tour-new-classroom-btn" className="gap-2 font-semibold">
+                  <Button id="trainer-tour-new-classroom-btn" size="sm" className="gap-2 font-semibold">
                     <Plus className="h-4 w-4" />
                     New classroom
                   </Button>
@@ -324,8 +397,9 @@ export default function TrainerDashboardClient() {
 
                     <div className="grid gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-semibold">Classroom name</label>
+                        <label htmlFor="new-classroom-name" className="text-sm font-semibold">Classroom name</label>
                         <Input
+                          id="new-classroom-name"
                           placeholder="Advanced Graph Theory"
                           value={newClassName}
                           onChange={(e) => setNewClassName(e.target.value)}
@@ -333,66 +407,67 @@ export default function TrainerDashboardClient() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-semibold">Description</label>
+                        <label htmlFor="new-classroom-description" className="text-sm font-semibold">Description</label>
                         <Textarea
+                          id="new-classroom-description"
                           placeholder="Topics, schedule, audience, outcomes"
                           value={newClassDesc}
                           onChange={(e) => setNewClassDesc(e.target.value)}
-                          className="min-h-24"
+                          className="min-h-24 text-base md:text-sm"
                         />
                       </div>
                     </div>
 
                     <DialogFooter>
-                      <Button type="submit" className="w-full font-semibold sm:w-auto">
+                      <Button
+                        type="submit"
+                        disabled={createClassroomMutation.isPending}
+                        className="w-full gap-2 font-semibold sm:w-auto"
+                      >
+                        {createClassroomMutation.isPending && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
                         Create Classroom
                       </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
               </Dialog>
-
-              {profile?.admin && (
-                <ProgressLink href="/admin/trainers">
-                  <Button variant="outline" className="gap-2 font-semibold">
-                    <UserCheck className="h-4 w-4" />
-                    Manage Trainers
-                  </Button>
-                </ProgressLink>
-              )}
             </div>
+          </div>
+
+          <div className="trainer-panel grid overflow-hidden sm:grid-cols-2 lg:grid-cols-4">
+            {summaryCards.map((item, index) => (
+              <DashboardMetric key={item.label} item={item} index={index} />
+            ))}
+          </div>
         </section>
 
-
-
         {totalLive > 0 && (
-          <section id="trainer-tour-live-section" className="rounded-lg border border-red-500/30 bg-card">
-            <div className="flex flex-col gap-3 border-b border-red-500/20 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="relative flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
-                </span>
-                <div>
-                    <h2 className="text-base font-bold text-red-700 dark:text-red-300">
-                      Live sessions
-                    </h2>
-                  <p className="text-sm text-muted-foreground">{totalLive} active room{totalLive === 1 ? "" : "s"}</p>
+          <section id="trainer-tour-live-section" className="trainer-panel overflow-hidden border-red-500/25">
+            <div className="flex flex-col gap-2 border-b border-red-500/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600" />
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">Live sessions</h2>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {totalLive} active room{totalLive === 1 ? "" : "s"} ready to join
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="divide-y divide-red-500/10">
               {liveClassrooms.map((c) => (
-                <div key={c.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div key={c.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="min-w-0">
-                    <h3 className="truncate text-sm font-bold">{c.name}</h3>
-                    <p className="truncate text-xs text-muted-foreground">{c.trainer_name}</p>
+                    <h3 className="truncate text-sm font-semibold">{c.name}</h3>
+                    <p className="truncate text-xs text-muted-foreground">{c.trainer_name || "Trainer"}</p>
                   </div>
                   <ProgressLink href={`/classroom/live/${c.id}`}>
                     <Button size="sm" className="w-full gap-2 bg-red-600 text-white hover:bg-red-700 sm:w-auto">
                       <Video className="h-4 w-4" />
-                      Join Live
+                      Join live
                     </Button>
                   </ProgressLink>
                 </div>
@@ -401,48 +476,54 @@ export default function TrainerDashboardClient() {
           </section>
         )}
 
-        <section id="trainer-tour-classroom-grid" className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <section id="trainer-tour-classroom-grid" className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-xl font-bold tracking-tight">Classroom workspace</h2>
-              <p className="text-sm text-muted-foreground">Open, prepare, or continue.</p>
+              <h2 className="text-lg font-semibold">Classrooms</h2>
+              <p className="text-sm text-muted-foreground">Open a room or prep the next session.</p>
             </div>
-            <ProgressLink id="trainer-tour-all-classrooms" href="/classroom/list" className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">
+            <ProgressLink
+              id="trainer-tour-all-classrooms"
+              href="/classroom/list"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            >
               All classrooms
               <ArrowRight className="h-4 w-4" />
             </ProgressLink>
           </div>
 
           {loading ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-lg border bg-card p-5">
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-4 w-24 rounded bg-muted" />
-                    <div className="h-7 w-3/4 rounded bg-muted" />
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="trainer-panel p-4">
+                  <div className="animate-pulse space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="h-4 w-24 rounded bg-muted" />
+                      <div className="h-8 w-8 rounded bg-muted" />
+                    </div>
+                    <div className="h-5 w-3/4 rounded bg-muted" />
                     <div className="h-4 w-full rounded bg-muted" />
-                    <div className="h-4 w-2/3 rounded bg-muted" />
-                    <div className="h-10 w-full rounded bg-muted" />
+                    <div className="h-9 w-full rounded bg-muted" />
                   </div>
                 </div>
               ))}
             </div>
           ) : classrooms.length === 0 ? (
-            <div className="rounded-lg border border-dashed bg-card p-8 text-center">
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-muted">
-                <Layers className="h-6 w-6 text-muted-foreground" />
+            <div className="trainer-empty">
+              <div className="mx-auto grid h-10 w-10 place-items-center rounded-md bg-muted">
+                <Layers className="h-5 w-5 text-muted-foreground" />
               </div>
-              <h3 className="mt-4 text-lg font-bold">No classrooms yet</h3>
-              <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
+              <h3 className="mt-3 text-base font-semibold">No classrooms yet</h3>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
                 Create the first classroom to start trainer operations.
               </p>
-              <Button onClick={() => setModalOpen(true)} className="mt-5 gap-2 font-semibold">
+              <Button onClick={() => setModalOpen(true)} size="sm" className="mt-4 gap-2 font-semibold">
                 <Plus className="h-4 w-4" />
-                Create Classroom
+                Create classroom
               </Button>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 lg:grid-cols-2">
               {classrooms.map((classroom, idx) => {
                 const isLive = !!classroom.live_url;
                 const isOwner = classroom.is_owner;
@@ -452,80 +533,75 @@ export default function TrainerDashboardClient() {
                   <article
                     key={classroom.id}
                     id={idx === 0 ? "trainer-tour-classroom-card" : undefined}
-                    className={`group flex min-h-[238px] flex-col rounded-lg border bg-card p-5 transition hover:border-foreground/20 hover:shadow-sm ${
-                      isLive ? "border-red-500/40" : "hover:border-foreground/20"
+                    className={`trainer-panel group p-4 hover:border-foreground/20 ${
+                      isLive ? "border-red-500/40" : ""
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1.5 border-l-2 pl-2 text-xs font-semibold uppercase ${
-                            isLive
-                              ? "border-red-600 text-red-600"
-                              : "border-muted-foreground/40 text-muted-foreground"
-                          }`}
-                        >
-                          {isLive ? <Radio className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
-                          {isLive ? "Live" : "Ready"}
-                        </span>
-                        {isSubstitute && !isOwner && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-600">
-                            <UserCheck className="h-3 w-3" />
-                            Co-Trainer
-                          </span>
-                        )}
-                        {isOwner && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-sky-600">
-                            <ShieldCheck className="h-3 w-3" />
-                            Owner
-                          </span>
-                        )}
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <StatusPill
+                            icon={isLive ? Radio : BookOpen}
+                            label={isLive ? "Live" : "Ready"}
+                            live={isLive}
+                          />
+                          {isOwner && (
+                            <StatusPill icon={ShieldCheck} label="Owner" tone="sky" />
+                          )}
+                          {isSubstitute && !isOwner && (
+                            <StatusPill icon={UserCheck} label="Co-trainer" tone="amber" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h3 className="truncate text-base font-semibold">{classroom.name}</h3>
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                            {classroom.description || "No description provided."}
+                          </p>
+                        </div>
                       </div>
-                      <span className="grid h-8 w-8 place-items-center rounded-md bg-muted text-xs font-bold">
+
+                      <span className="trainer-icon-tile hidden h-9 w-9 text-xs font-semibold sm:grid">
                         {initialsOf(classroom.trainer_name) || "?"}
                       </span>
                     </div>
 
-                    <div className="mt-4 min-w-0 flex-1">
-                      <h3 className="line-clamp-2 text-lg font-bold">{classroom.name}</h3>
-                      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
-                        {classroom.description || "No description provided."}
-                      </p>
-                    </div>
-
-                    <div className="mt-5 grid gap-2 border-t pt-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        <span className="truncate">{classroom.trainer_name || "Trainer"}</span>
+                    <div className="mt-3 grid gap-3 border-t border-border/70 pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{classroom.trainer_name || "Trainer"}</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <CalendarDays className="h-3.5 w-3.5" />
+                          <span>{new Date(classroom.created_at).toLocaleDateString()}</span>
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="h-4 w-4" />
-                        <span>Created {new Date(classroom.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
 
-                    <div className="mt-5 flex gap-2">
-                      <ProgressLink href={`/classroom/live/${classroom.id}`} className="flex-1">
-                        <Button
-                          className={`w-full justify-between gap-2 font-semibold ${
-                            isLive ? "bg-red-600 text-white hover:bg-red-700" : ""
-                          }`}
-                        >
-                          <span>{isLive ? "Manage live session" : "Enter classroom"}</span>
-                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        </Button>
-                      </ProgressLink>
-                      {canManageSubs && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          title="Manage substitute trainers"
-                          onClick={() => openSubModal(classroom)}
-                          className="shrink-0"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                        <ProgressLink href={`/classroom/live/${classroom.id}`} className="min-w-0 flex-1 sm:flex-none">
+                          <Button
+                            size="sm"
+                            className={`w-full justify-between gap-2 font-semibold sm:w-auto ${
+                              isLive ? "bg-red-600 text-white hover:bg-red-700" : ""
+                            }`}
+                          >
+                            <span>{isLive ? "Manage live" : "Enter"}</span>
+                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                          </Button>
+                        </ProgressLink>
+                        {canManageSubs && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            title="Manage substitute trainers"
+                            aria-label={`Manage substitute trainers for ${classroom.name}`}
+                            onClick={() => openSubModal(classroom)}
+                            className="h-9 w-9 shrink-0"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </article>
                 );
@@ -538,31 +614,27 @@ export default function TrainerDashboardClient() {
       <button
         id="trainer-tour-take-tour-btn"
         onClick={startTour}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-lg hover:bg-muted transition-all active:scale-95"
+        className="trainer-floating-help fixed bottom-5 right-5 z-50 grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-muted"
         title="Re-launch onboarding tour"
+        aria-label="Re-launch onboarding tour"
       >
         <HelpCircle className="h-4 w-4 text-primary" />
-        <span>Take Tour</span>
       </button>
 
-      {/* Substitute Trainer Management Modal */}
-      {subModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border bg-card shadow-xl">
-            <div className="flex items-center justify-between border-b px-5 py-4">
-              <div>
-                <h2 className="text-base font-bold">Substitute Trainers</h2>
-                <p className="text-xs text-muted-foreground">{subModalClassroom?.name}</p>
-              </div>
-              <button
-                onClick={() => { setSubModalOpen(false); setSubError(""); }}
-                className="grid h-8 w-8 place-items-center rounded-md hover:bg-muted"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <Dialog
+        open={subModalOpen}
+        onOpenChange={(open) => {
+          setSubModalOpen(open);
+          if (!open) setSubError("");
+        }}
+      >
+        <DialogContent className="trainer-command-bar gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="border-b border-border/70 px-5 py-4">
+            <DialogTitle className="text-base tracking-normal">Substitute trainers</DialogTitle>
+            <DialogDescription>{subModalClassroom?.name}</DialogDescription>
+          </DialogHeader>
 
-            <div className="p-5">
+          <div className="p-5">
               {subError && (
                 <div className="mb-4 flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -576,11 +648,11 @@ export default function TrainerDashboardClient() {
                 <>
                   {/* Current substitutes */}
                   <div className="mb-4">
-                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Current Co-Trainers</p>
+                    <p className="mb-2 text-xs font-semibold text-muted-foreground">Current co-trainers</p>
                     {substitutes.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No substitute trainers assigned yet.</p>
                     ) : (
-                      <ul className="divide-y rounded-md border">
+                      <ul className="trainer-panel-soft divide-y">
                         {substitutes.map((s) => (
                           <li key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
                             <div>
@@ -589,8 +661,10 @@ export default function TrainerDashboardClient() {
                             </div>
                             <button
                               onClick={() => handleRemoveSub(s.id)}
-                              className="grid h-7 w-7 place-items-center rounded-md text-red-500 hover:bg-red-500/10"
+                              disabled={removeSubstituteMutation.isPending}
+                              className="grid h-9 w-9 place-items-center rounded-md text-red-500 hover:bg-red-500/10"
                               title="Remove substitute"
+                              aria-label={`Remove ${s.full_name} as substitute trainer`}
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -602,14 +676,15 @@ export default function TrainerDashboardClient() {
 
                   {/* Add new substitute */}
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Add Substitute</p>
+                    <label htmlFor="substitute-trainer-search" className="mb-2 block text-xs font-semibold text-muted-foreground">Add substitute</label>
                     <Input
+                      id="substitute-trainer-search"
                       placeholder="Search trainers by name or email…"
                       value={subSearch}
                       onChange={(e) => setSubSearch(e.target.value)}
-                      className="mb-2 h-8 text-sm"
+                      className="mb-2 h-10 text-base md:text-sm"
                     />
-                    <ul className="max-h-48 divide-y overflow-y-auto rounded-md border">
+                    <ul className="trainer-panel-soft max-h-48 divide-y overflow-y-auto">
                       {allTrainers
                         .filter(
                           (t) =>
@@ -631,8 +706,9 @@ export default function TrainerDashboardClient() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="shrink-0 h-7 text-xs gap-1"
+                              className="h-9 shrink-0 gap-1 text-xs"
                               onClick={() => handleAddSub(t.id)}
+                              disabled={addSubstituteMutation.isPending}
                             >
                               <UserPlus className="h-3 w-3" />
                               Add
@@ -653,11 +729,54 @@ export default function TrainerDashboardClient() {
                   </div>
                 </>
               )}
-            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
+function DashboardMetric({ item, index }) {
+  const Icon = item.icon;
+  const dividerClass = [
+    index < 2 ? "border-b" : "",
+    index % 2 === 0 ? "sm:border-r" : "",
+    index < 3 ? "lg:border-r" : "lg:border-r-0",
+    "lg:border-b-0",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className={`flex min-w-0 items-center gap-3 px-3 py-2.5 ${dividerClass}`}>
+      <span className={`trainer-icon-tile ${item.tone}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-[11px] font-semibold text-muted-foreground">
+          {item.label}
+        </p>
+        <p className="truncate text-sm font-semibold tabular-nums">{item.value}</p>
+        <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ icon: Icon, label, live = false, tone = "muted" }) {
+  const toneClass =
+    live
+      ? "trainer-status-danger"
+      : tone === "sky"
+        ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+        : tone === "amber"
+          ? "trainer-status-warning"
+          : "";
+
+  return (
+    <span className={`trainer-chip ${toneClass}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}

@@ -1,3 +1,31 @@
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Secret Handling Near Miss
+
+Source:
+- `docs/reviews/trainer-student-thread-realtime-hardening-performance-20260802-implementation-review.md`
+
+What happened:
+During environment inspection, a broad env search can expose Supabase service or database credentials in command output even when the intent is only to confirm variable presence.
+
+Detection:
+Realtime/Supabase setup work required checking env wiring, and the review identified that future checks must avoid printing env values.
+
+Prevention:
+When checking secrets, use presence-only commands that print variable names or booleans, never values. If env values are shared outside the local machine, committed, uploaded, or pasted into chat/logs, rotate affected Supabase service and database keys.
+
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Server Import Near Miss
+
+Source:
+- `docs/reviews/trainer-student-thread-realtime-hardening-performance-20260802-implementation-review.md`
+
+What happened:
+The attachment refactor wrote `CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET` into attachment metadata but initially missed the controller import.
+
+Detection:
+A temporary server TypeScript check was noisy because of existing repo tooling issues, but it still caught the missing symbol before handoff.
+
+Prevention:
+After moving constants into shared Supabase/schema utilities, run at least one server static check or focused symbol search around the changed imports, even when the full type suite is blocked by unrelated issues.
+
 ## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Design Review Fix
 
 Source:
@@ -273,3 +301,17 @@ Implementation review checked env key names without printing secret values and f
 
 Prevention:
 For future Supabase Storage features, decide the bucket name during technical decisions, add deployment/env documentation, and run a live upload/download check with authenticated users before final release approval.
+
+## 2026-08-02 - Realtime Was Fast but the Application Path Was Not
+
+Source:
+- `docs/reviews/trainer-student-thread-instant-realtime-20260802-implementation-review.md`
+
+What happened:
+An invalidation-only Broadcast still forced receiver HTTP/API/database refetches, while post-commit canonical/summary/registry rereads delayed publication. Initial live commit-to-receive was about 0.85 seconds even after private Broadcast was correct. The Auth bridge also initially used reserved `app_metadata.provider` as an ownership marker; Supabase normalized that value to the real `email` provider after magic-link verification.
+
+Detection:
+Two independent Realtime clients measured send-start and commit-to-receive separately. Restarting the server exposed the reserved-metadata collision because the in-memory token cache no longer hid the persisted Auth user shape.
+
+Prevention:
+Measure the complete click/commit/render path, eliminate redundant hot-path round trips, return canonical projections from the atomic persistence statement, and never use provider-managed/reserved Auth metadata as an application ownership marker. Use a protected custom `app_metadata` key and test after a process restart.

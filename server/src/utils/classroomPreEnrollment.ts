@@ -23,8 +23,6 @@ export interface PreEnrollStudentInput {
   rowNumber?: unknown;
 }
 
-let schemaPromise: Promise<void> | null = null;
-
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
 }
@@ -68,70 +66,9 @@ function rowNumberOf(value: unknown, fallback: number): number | string {
 }
 
 export async function ensurePreEnrollmentSchema() {
-  if (!schemaPromise) {
-    schemaPromise = (async () => {
-      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_pre_enrolled boolean NOT NULL DEFAULT false`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS enrollment_status text NOT NULL DEFAULT 'active'`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS claimed_user_id uuid NULL`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS pre_enrollment_method text NULL`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS pre_enrollment_identifier text NULL`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS pre_enrollment_email text NULL`;
-      await sql`ALTER TABLE classroom_students ADD COLUMN IF NOT EXISTS link_requested_at timestamptz NULL`;
-      await sql`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint WHERE conname = 'classroom_students_enrollment_status_check'
-          ) THEN
-            ALTER TABLE classroom_students
-            ADD CONSTRAINT classroom_students_enrollment_status_check
-            CHECK (enrollment_status IN ('active', 'pre_enrolled', 'link_pending'));
-          END IF;
-        END $$
-      `;
-      await sql`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint WHERE conname = 'classroom_students_claimed_user_id_fkey'
-          ) THEN
-            ALTER TABLE classroom_students
-            ADD CONSTRAINT classroom_students_claimed_user_id_fkey
-            FOREIGN KEY (claimed_user_id) REFERENCES users(id) ON DELETE SET NULL;
-          END IF;
-        END $$
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS users_pre_enrolled_mist_id_idx
-        ON users (mist_id)
-        WHERE is_pre_enrolled = true AND mist_id IS NOT NULL
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_students_status_student_idx
-        ON classroom_students (student_id, enrollment_status)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_students_claimed_user_idx
-        ON classroom_students (claimed_user_id)
-        WHERE claimed_user_id IS NOT NULL
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_students_pre_enrollment_email_idx
-        ON classroom_students (lower(pre_enrollment_email))
-        WHERE pre_enrollment_email IS NOT NULL
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_students_pre_enrollment_identifier_idx
-        ON classroom_students (classroom_id, pre_enrollment_method, lower(pre_enrollment_identifier))
-        WHERE pre_enrollment_identifier IS NOT NULL
-      `;
-    })().catch((error) => {
-      schemaPromise = null;
-      throw error;
-    });
-  }
-
-  return schemaPromise;
+  // Schema is deployed by docs/sql/trainer-student-thread-instant-realtime-20260802.sql.
+  // Keep this compatibility function while callers are migrated away from runtime guards.
+  return Promise.resolve();
 }
 
 async function findRealUserByIdentifier(tx: any, method: StudentLookupMethod, identifier: string) {

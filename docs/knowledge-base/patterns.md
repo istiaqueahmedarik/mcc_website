@@ -1,5 +1,48 @@
 # Patterns
 
+## 2026-08-02 - Opaque Realtime Invalidation With Incremental Fetch
+
+Source:
+- `docs/reviews/trainer-student-thread-realtime-hardening-performance-20260802-implementation-review.md`
+- `docs/decisions/trainer-student-thread-realtime-hardening-performance-20260802-technical-decisions.md`
+
+Pattern:
+For classroom student-thread Realtime, issue short-lived opaque channel names from authorized server routes, broadcast compact invalidation payloads containing only IDs and timestamps, then use JWT-authorized API routes to fetch the changed message or thread summary. Keep a full refresh fallback for malformed signals or fetch failures.
+
+Applies when:
+Changing student-thread Realtime delivery, trainer thread-list updates, message fan-out, attachment delivery, or thread fetch helpers.
+
+Do not overgeneralize:
+This is a student-thread pattern, not a mandate for unrelated realtime features or a substitute for Supabase private channels if a future approved JWT bridge is implemented.
+
+## 2026-08-02 - Scoped Student-Thread Realtime Work
+
+Source:
+- `docs/tasks/trainer-student-thread-realtime-hardening-performance-20260802-task-plan.md`
+
+Fact:
+Student-thread realtime hardening should be implemented serially because database grants/indexes, server channel issuance, broadcast fan-out, attachment ordering, and client incremental fetches all share the same conversation contract and overlapping files.
+
+Applies when:
+Changing trainer/student classroom thread realtime, scoped channel names, message/list invalidation payloads, thread attachment delivery, or thread read APIs.
+
+Do not overgeneralize:
+This is not a global realtime architecture mandate and does not authorize hidden polling or broad Supabase RLS remediation outside the approved student-thread scope.
+
+## 2026-08-02 - Compact Trainer Operations UI
+
+Source:
+- `docs/reviews/trainer-compact-ui-cleanup-20260802-implementation-review.md`
+
+Pattern:
+For trainer route dashboards and form workspaces, prefer compact command headers, metric strips, static semantic attention strips, dense operation items, bounded supporting panels, and icon-only secondary controls over tall repeated cards, pulsing badges, and always-visible explanatory text.
+
+Applies when:
+Refreshing trainer dashboard, trainer form builder, trainer form detail, or other repeated-use trainer operational surfaces.
+
+Do not overgeneralize:
+This pattern is for authenticated trainer operations. Student learning dashboards, public landing pages, and reading-focused resource pages may need different hierarchy and density.
+
 ## 2026-08-01 - Submission-Context Bubble Reuse
 
 Source:
@@ -492,3 +535,17 @@ Adding classroom file sharing, download/open controls, or private learning artif
 
 Do not overgeneralize:
 Public image upload helpers such as profile/achievement uploads are not suitable for private classroom thread files.
+
+## 2026-08-02 - Private Realtime Fast Path With Durable Catch-Up
+
+Source:
+- `docs/reviews/trainer-student-thread-instant-realtime-20260802-implementation-review.md`
+
+Pattern:
+For private low-latency application streams, authorize a receive-only private topic, publish the safe canonical committed projection directly, attach a monotonic aggregate revision, and run bounded database catch-up after every actual subscribe/re-subscribe. Deduplicate by persisted ID and reconcile optimistic writes by a server-enforced client ID.
+
+Applies when:
+Building private chat/activity delivery where the UI must feel instant but Broadcast cannot be the durable source of truth.
+
+Do not overgeneralize:
+Do not put secrets, private Storage paths, or fields outside the recipient's normal API projection into the Broadcast payload; use an authorized API for those values.

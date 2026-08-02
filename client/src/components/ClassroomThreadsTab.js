@@ -18,7 +18,12 @@ import {
   Send,
   X,
 } from "lucide-react";
-import { get_with_token, post_form_with_token, post_with_token } from "@/lib/action";
+import {
+  get_uncached_with_token,
+  get_with_token,
+  post_form_with_token,
+  post_uncached_with_token,
+} from "@/lib/action";
 import { useClassroomThreadRealtime } from "@/hooks/useClassroomThreadRealtime";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -295,6 +300,32 @@ function mergeUniqueById(existingItems, nextItems) {
     merged.push(item);
   }
   return merged;
+}
+
+function threadSortTime(thread) {
+  const value = thread?.last_message?.created_at || thread?.updated_at || "";
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortThreadSummaries(threads) {
+  return [...threads].sort((a, b) => {
+    const diff = threadSortTime(b) - threadSortTime(a);
+    if (diff !== 0) return diff;
+    return studentName(a?.student).localeCompare(studentName(b?.student));
+  });
+}
+
+function mergeThreadSummary(threads, summary) {
+  if (!summary?.student_id) return threads;
+  let found = false;
+  const nextThreads = threads.map((thread) => {
+    if (thread.student_id !== summary.student_id) return thread;
+    found = true;
+    return { ...thread, ...summary };
+  });
+  if (!found) nextThreads.push(summary);
+  return sortThreadSummaries(nextThreads);
 }
 
 function ThreadEventsModal({ classroomId, studentId, initialEvents }) {
@@ -616,6 +647,9 @@ function ThreadPanel({
   error,
   safeAttachments,
   onRefresh,
+  onRealtimeSignal,
+  onRealtimeSubscribed,
+  onRealtimeRenew,
   onSendText,
   onSendAttachment,
   onAttachmentError,
@@ -650,15 +684,28 @@ function ThreadPanel({
     return items.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }, [latestEvents, messages]);
 
-  useClassroomThreadRealtime({
-    channelName: thread?.realtime?.channel,
+  const realtimeState = useClassroomThreadRealtime({
+    realtime: thread?.realtime,
     eventName: thread?.realtime?.event || "thread_changed",
-    onSignal: useCallback(() => {
+    onSignal: useCallback((signal) => {
       const viewport = scrollViewportRef.current;
       if (!isNearBottom(viewport)) setHasNewActivity(true);
-      onRefresh?.({ keepPosition: true });
-    }, [onRefresh]),
+      if (onRealtimeSignal) onRealtimeSignal(signal);
+      else onRefresh?.({ keepPosition: true });
+    }, [onRealtimeSignal, onRefresh]),
+    onSubscribed: onRealtimeSubscribed,
+    onRenew: onRealtimeRenew,
   });
+
+  const liveLabel = realtimeState.status === "connected"
+    ? "Live"
+    : realtimeState.status === "reconnecting"
+      ? "Reconnecting"
+      : realtimeState.status === "connecting"
+        ? "Connecting"
+        : realtimeState.status === "unavailable"
+          ? "Offline"
+          : "";
 
   const scrollToBottom = useCallback(() => {
     const viewport = scrollViewportRef.current;
@@ -776,7 +823,14 @@ function ThreadPanel({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{studentName(student)}</p>
-            <p className="text-xs text-muted-foreground">Private classroom thread</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>Private classroom thread</span>
+              {liveLabel && (
+                <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[10px]">
+                  {liveLabel}
+                </Badge>
+              )}
+            </div>
             {submissionReference && (
               <div className="mt-3 max-w-xl">
                 <SubmissionReferenceChip reference={submissionReference} compact />
@@ -970,6 +1024,7 @@ export function ClassroomThreadsTab({
   const [optimisticMessages, dispatchOptimisticMessage] = useOptimisticThreadMessages(messages);
   const [latestEvents, setLatestEvents] = useState([]);
   const [messagePage, setMessagePage] = useState({ hasMore: false, before: null });
+  const [listRealtime, setListRealtime] = useState(null);
   const [safeAttachments, setSafeAttachments] = useState({
     accept: DEFAULT_ATTACHMENT_ACCEPT,
     maxBytes: 10 * 1024 * 1024,
@@ -979,6 +1034,11 @@ export function ClassroomThreadsTab({
   const [olderMessagesLoading, setOlderMessagesLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const activeStudentIdRef = useRef(forcedStudentId || "");
+  const threadLoadGenerationRef = useRef(0);
+  const highestRevisionRef = useRef(0);
+  const catchupInFlightRef = useRef(null);
+  const catchupQueuedAfterRef = useRef(null);
 
   const selectedThread = useMemo(() => {
     return threads.find((item) => item.student_id === selectedStudentId) || (
@@ -998,27 +1058,55 @@ export function ClassroomThreadsTab({
   }, [forcedStudentId]);
 
   useEffect(() => {
+    const activeStudentId = forcedStudentId || selectedStudentId || (!isTrainer ? currentUser?.id : "");
+    activeStudentIdRef.current = activeStudentId;
+    threadLoadGenerationRef.current += 1;
+    highestRevisionRef.current = 0;
+    catchupInFlightRef.current = null;
+    catchupQueuedAfterRef.current = null;
+    setThread(null);
+    setStudent(null);
+    setMessages([]);
+    setLatestEvents([]);
+    setMessagePage({ hasMore: false, before: null });
+    setThreadLoading(false);
+    setOlderMessagesLoading(false);
+    setError("");
     dispatchOptimisticMessage({ type: "clear" });
-  }, [dispatchOptimisticMessage, selectedStudentId, submissionReference]);
+  }, [
+    currentUser?.id,
+    dispatchOptimisticMessage,
+    forcedStudentId,
+    isTrainer,
+    selectedStudentId,
+    submissionReference,
+  ]);
 
-  const loadList = useCallback(async () => {
+  const loadList = useCallback(async ({ withoutRealtime = false } = {}) => {
     if (!classroomId) return;
     if (!showList) {
       setListLoading(false);
+      setListRealtime(null);
       if (forcedStudentId) setSelectedStudentId(forcedStudentId);
       return;
     }
-    setListLoading(true);
+    if (!withoutRealtime) setListLoading(true);
     setError("");
     try {
-      const response = await get_with_token(`classroom/${classroomId}/student-threads?t=${Date.now()}`);
+      const params = new URLSearchParams({ t: String(Date.now()) });
+      if (withoutRealtime) params.set("realtime", "0");
+      const response = await get_uncached_with_token(`classroom/${classroomId}/student-threads?${params.toString()}`);
       if (response?.error) {
         setError(response.error);
-        setThreads([]);
+        if (!withoutRealtime) {
+          setThreads([]);
+          setListRealtime(null);
+        }
         return;
       }
       const nextThreads = Array.isArray(response?.threads) ? response.threads : [];
       setThreads(nextThreads);
+      if (!withoutRealtime) setListRealtime(response?.realtime || null);
       setSafeAttachments(response?.safeAttachments || {
         accept: DEFAULT_ATTACHMENT_ACCEPT,
         maxBytes: 10 * 1024 * 1024,
@@ -1030,53 +1118,81 @@ export function ClassroomThreadsTab({
       });
     } catch (err) {
       setError(err?.message || "Failed to load threads");
-      setThreads([]);
+      if (!withoutRealtime) {
+        setThreads([]);
+        setListRealtime(null);
+      }
     } finally {
-      setListLoading(false);
+      if (!withoutRealtime) setListLoading(false);
     }
   }, [classroomId, forcedStudentId, isTrainer, showList]);
 
-  const appendDeliveredMessage = useCallback((message, studentId) => {
-    if (!message?.id || !studentId) return;
+  const appendDeliveredMessage = useCallback((message, studentId, summary = null) => {
+    if (!message?.id || !studentId || activeStudentIdRef.current !== studentId) return;
+    const deliveredMessage = {
+      ...message,
+      is_own: message.sender_id === currentUser?.id,
+      metadata: {
+        ...(message.metadata || {}),
+        ...(message.client_message_id ? { client_message_id: message.client_message_id } : {}),
+      },
+    };
+    const revision = Number(deliveredMessage.thread_revision || 0);
+    if (Number.isSafeInteger(revision) && revision > highestRevisionRef.current) {
+      highestRevisionRef.current = revision;
+    }
 
     setMessages((currentMessages) => {
-      if (currentMessages.some((item) => item.id === message.id)) return currentMessages;
-      return [...currentMessages, message];
+      if (currentMessages.some((item) => item.id === deliveredMessage.id)) return currentMessages;
+      return [...currentMessages, deliveredMessage].sort((a, b) => {
+        const aRevision = Number(a.thread_revision || 0);
+        const bRevision = Number(b.thread_revision || 0);
+        if (aRevision && bRevision && aRevision !== bRevision) return aRevision - bRevision;
+        return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+      });
     });
 
-    if (message.kind === "system") {
+    if (deliveredMessage.kind === "system") {
       setLatestEvents((currentEvents) => {
-        if (currentEvents.some((item) => item.id === message.id)) return currentEvents;
-        return [message, ...currentEvents].slice(0, 6);
+        if (currentEvents.some((item) => item.id === deliveredMessage.id)) return currentEvents;
+        return [deliveredMessage, ...currentEvents].slice(0, 6);
       });
     }
 
+    setThread((currentThread) => currentThread ? {
+      ...currentThread,
+      revision: Math.max(Number(currentThread.revision || 0), revision),
+      updated_at: deliveredMessage.created_at || currentThread.updated_at,
+    } : currentThread);
+
     setThreads((currentThreads) => {
+      if (summary?.student_id) return mergeThreadSummary(currentThreads, summary);
       let changed = false;
       const nextThreads = currentThreads.map((item) => {
         if (item.student_id !== studentId) return item;
         changed = true;
-        const alreadyLast = item.last_message?.id === message.id;
         return {
           ...item,
-          updated_at: message.created_at || item.updated_at,
+          revision: Math.max(Number(item.revision || 0), revision),
+          updated_at: deliveredMessage.created_at || item.updated_at,
           last_message: {
-            id: message.id,
-            kind: message.kind,
-            event_type: message.event_type,
-            body: message.body,
-            created_at: message.created_at,
-            sender_name: message.sender_name || "",
+            id: deliveredMessage.id,
+            kind: deliveredMessage.kind,
+            event_type: deliveredMessage.event_type,
+            body: deliveredMessage.body,
+            created_at: deliveredMessage.created_at,
+            sender_name: deliveredMessage.sender_name || "",
           },
         };
       });
-      return changed ? nextThreads : currentThreads;
+      return changed ? sortThreadSummaries(nextThreads) : currentThreads;
     });
-  }, []);
+  }, [currentUser?.id]);
 
   const loadThread = useCallback(async (options = {}) => {
     const studentId = forcedStudentId || selectedStudentId || (!isTrainer ? currentUser?.id : "");
     if (!classroomId || !studentId) return;
+    const generation = threadLoadGenerationRef.current;
     const before = options.before || "";
     const appendOlder = Boolean(before);
     if (appendOlder) setOlderMessagesLoading(true);
@@ -1086,8 +1202,14 @@ export function ClassroomThreadsTab({
         messageLimit: "40",
         t: String(Date.now()),
       });
-      if (before) params.set("before", before);
-      const response = await get_with_token(`classroom/${classroomId}/student-threads/${studentId}?${params.toString()}`);
+      if (before) {
+        params.set("before", before);
+        params.set("realtime", "0");
+      }
+      const response = await get_uncached_with_token(
+        `classroom/${classroomId}/student-threads/${studentId}?${params.toString()}`
+      );
+      if (generation !== threadLoadGenerationRef.current || activeStudentIdRef.current !== studentId) return;
       if (response?.error) {
         setError(response.error);
         if (!appendOlder) {
@@ -1099,9 +1221,20 @@ export function ClassroomThreadsTab({
         return;
       }
       setError("");
-      setThread(response.thread || null);
+      setThread((currentThread) => appendOlder
+        ? currentThread
+        : (response.thread || null));
       setStudent(response.student || selectedThreadRef.current?.student || null);
-      const nextMessages = Array.isArray(response.messages) ? response.messages : [];
+      const nextMessages = (Array.isArray(response.messages) ? response.messages : []).map((message) => ({
+        ...message,
+        is_own: message.sender_id === currentUser?.id,
+      }));
+      if (!appendOlder) {
+        highestRevisionRef.current = Math.max(
+          Number(response?.thread?.revision || 0),
+          ...nextMessages.map((message) => Number(message.thread_revision || 0))
+        );
+      }
       setMessages((currentMessages) => (
         appendOlder
           ? mergeUniqueById(nextMessages, currentMessages)
@@ -1110,14 +1243,18 @@ export function ClassroomThreadsTab({
       if (!appendOlder) setLatestEvents(Array.isArray(response.latestEvents) ? response.latestEvents : []);
       setMessagePage({
         hasMore: Boolean(response?.messagesPage?.hasMore),
-        before: response?.messagesPage?.before || nextMessages[0]?.created_at || null,
+        before: response?.messagesPage?.before || null,
       });
       if (response?.safeAttachments) setSafeAttachments(response.safeAttachments);
     } catch (err) {
-      setError(err?.message || "Failed to load thread");
+      if (generation === threadLoadGenerationRef.current && activeStudentIdRef.current === studentId) {
+        setError(err?.message || "Failed to load thread");
+      }
     } finally {
-      setThreadLoading(false);
-      setOlderMessagesLoading(false);
+      if (generation === threadLoadGenerationRef.current && activeStudentIdRef.current === studentId) {
+        setThreadLoading(false);
+        setOlderMessagesLoading(false);
+      }
     }
   }, [classroomId, currentUser?.id, forcedStudentId, isTrainer, selectedStudentId]);
 
@@ -1125,6 +1262,144 @@ export function ClassroomThreadsTab({
     if (!messagePage.hasMore || !messagePage.before) return Promise.resolve();
     return loadThread({ before: messagePage.before });
   }, [loadThread, messagePage.before, messagePage.hasMore]);
+
+  const renewListRealtime = useCallback(async () => {
+    const response = await post_uncached_with_token(
+      `classroom/${classroomId}/student-threads/realtime`,
+      { scope: "manager_list" }
+    );
+    if (response?.error || !response?.realtime) {
+      throw new Error(response?.error || "Could not renew the thread list subscription");
+    }
+    setListRealtime(response.realtime);
+    return response.realtime;
+  }, [classroomId]);
+
+  useClassroomThreadRealtime({
+    realtime: isTrainer && showList ? listRealtime : null,
+    eventName: listRealtime?.event || "thread_changed",
+    onSignal: useCallback((signal) => {
+      if (signal?.summary?.student_id) {
+        setThreads((currentThreads) => mergeThreadSummary(currentThreads, signal.summary));
+      }
+    }, []),
+    onSubscribed: useCallback(() => loadList({ withoutRealtime: true }), [loadList]),
+    onRenew: renewListRealtime,
+  });
+
+  const catchUpThreadMessages = useCallback((requestedAfterRevision = null) => {
+    if (catchupInFlightRef.current) {
+      const queuedAfter = requestedAfterRevision === null
+        ? highestRevisionRef.current
+        : Math.max(0, Number(requestedAfterRevision) || 0);
+      catchupQueuedAfterRef.current = catchupQueuedAfterRef.current === null
+        ? queuedAfter
+        : Math.min(catchupQueuedAfterRef.current, queuedAfter);
+      return catchupInFlightRef.current;
+    }
+    const studentId = activeStudentIdRef.current;
+    const generation = threadLoadGenerationRef.current;
+    const expectedThreadId = thread?.id;
+    if (!classroomId || !studentId || !expectedThreadId) return Promise.resolve();
+
+    const initialRevision = requestedAfterRevision !== null
+      && Number.isSafeInteger(Number(requestedAfterRevision))
+      ? Math.max(0, Number(requestedAfterRevision))
+      : highestRevisionRef.current;
+    const request = (async () => {
+      let afterRevision = initialRevision;
+      for (let pageNumber = 0; pageNumber < 20; pageNumber += 1) {
+        const params = new URLSearchParams({
+          afterRevision: String(afterRevision),
+          limit: "100",
+          t: String(Date.now()),
+        });
+        const response = await get_uncached_with_token(
+          `classroom/${classroomId}/student-threads/${studentId}/messages?${params.toString()}`
+        );
+        if (generation !== threadLoadGenerationRef.current || activeStudentIdRef.current !== studentId) return;
+        if (response?.error) throw new Error(response.error);
+        if (response?.threadId !== expectedThreadId) return;
+
+        const recoveredMessages = Array.isArray(response?.messages) ? response.messages : [];
+        for (const recoveredMessage of recoveredMessages) {
+          appendDeliveredMessage(recoveredMessage, studentId);
+          const clientMessageId = recoveredMessage?.client_message_id
+            || recoveredMessage?.metadata?.client_message_id;
+          if (clientMessageId) dispatchOptimisticMessage({ type: "resolve", id: clientMessageId });
+        }
+
+        const nextRevision = Number(response?.page?.afterRevision || afterRevision);
+        if (!response?.page?.hasMore || nextRevision <= afterRevision) return;
+        afterRevision = nextRevision;
+      }
+      throw new Error("Thread catch-up exceeded the safe page limit");
+    })()
+      .catch((catchupError) => {
+        if (generation === threadLoadGenerationRef.current && activeStudentIdRef.current === studentId) {
+          setError(catchupError?.message || "Failed to recover missed thread messages");
+        }
+      })
+      .finally(() => {
+        if (catchupInFlightRef.current === request) {
+          catchupInFlightRef.current = null;
+          const queuedAfter = catchupQueuedAfterRef.current;
+          catchupQueuedAfterRef.current = null;
+          if (
+            queuedAfter !== null
+            && generation === threadLoadGenerationRef.current
+            && activeStudentIdRef.current === studentId
+          ) {
+            void catchUpThreadMessages(queuedAfter);
+          }
+        }
+      });
+    catchupInFlightRef.current = request;
+    return request;
+  }, [appendDeliveredMessage, classroomId, dispatchOptimisticMessage, thread?.id]);
+
+  const renewThreadRealtime = useCallback(async () => {
+    const studentId = activeStudentIdRef.current;
+    if (!studentId) throw new Error("No student thread selected");
+    const response = await post_uncached_with_token(
+      `classroom/${classroomId}/student-threads/realtime`,
+      { scope: "thread", studentId }
+    );
+    if (response?.error || !response?.realtime) {
+      throw new Error(response?.error || "Could not renew the thread subscription");
+    }
+    if (response.threadId !== thread?.id) throw new Error("Thread changed during Realtime renewal");
+    setThread((currentThread) => currentThread?.id === response.threadId
+      ? { ...currentThread, realtime: response.realtime }
+      : currentThread);
+    return response.realtime;
+  }, [classroomId, thread?.id]);
+
+  const handleThreadRealtimeSignal = useCallback((signal) => {
+    const activeStudentId = activeStudentIdRef.current;
+
+    if (!classroomId || !activeStudentId) return;
+    if (signal?.student_id && signal.student_id !== activeStudentId) return;
+    if (signal?.thread_id && thread?.id && signal.thread_id !== thread.id) return;
+    const previousRevision = highestRevisionRef.current;
+    const deliveredMessage = signal?.message;
+    const deliveredRevision = Number(deliveredMessage?.thread_revision || signal?.thread_revision || 0);
+    if (deliveredMessage?.id) {
+      appendDeliveredMessage(deliveredMessage, activeStudentId, signal?.summary || null);
+      const clientMessageId = deliveredMessage.client_message_id
+        || deliveredMessage.metadata?.client_message_id;
+      if (clientMessageId) dispatchOptimisticMessage({ type: "resolve", id: clientMessageId });
+    }
+    if (!deliveredMessage?.id || (deliveredRevision > 0 && deliveredRevision > previousRevision + 1)) {
+      void catchUpThreadMessages(previousRevision);
+    }
+  }, [
+    appendDeliveredMessage,
+    catchUpThreadMessages,
+    classroomId,
+    dispatchOptimisticMessage,
+    thread?.id,
+  ]);
 
   useEffect(() => {
     loadList();
@@ -1155,13 +1430,16 @@ export function ClassroomThreadsTab({
         clientMessageId: optimisticId,
       };
       if (activeSubmissionReference) payload.submissionReference = activeSubmissionReference;
-      const response = await post_with_token(`classroom/${classroomId}/student-threads/${studentId}/messages`, payload);
+      const response = await post_uncached_with_token(
+        `classroom/${classroomId}/student-threads/${studentId}/messages`,
+        payload
+      );
       if (response?.error) {
         dispatchOptimisticMessage({ type: "fail", id: optimisticId, error: response.error });
         return response;
       }
       if (response?.message) {
-        appendDeliveredMessage(response.message, studentId);
+        appendDeliveredMessage(response.message, studentId, response.summary || null);
         dispatchOptimisticMessage({ type: "resolve", id: optimisticId });
       }
       return response;
@@ -1200,7 +1478,7 @@ export function ClassroomThreadsTab({
         return response;
       }
       if (response?.message) {
-        appendDeliveredMessage(response.message, studentId);
+        appendDeliveredMessage(response.message, studentId, response.summary || null);
         dispatchOptimisticMessage({ type: "resolve", id: optimisticId });
       }
       return response;
@@ -1268,6 +1546,9 @@ export function ClassroomThreadsTab({
               error={thread ? error : ""}
               safeAttachments={safeAttachments}
               onRefresh={loadThread}
+              onRealtimeSignal={handleThreadRealtimeSignal}
+              onRealtimeSubscribed={catchUpThreadMessages}
+              onRealtimeRenew={renewThreadRealtime}
               onSendText={sendText}
               onSendAttachment={sendAttachment}
               onAttachmentError={setError}
@@ -1291,6 +1572,9 @@ export function ClassroomThreadsTab({
             error={thread ? error : ""}
             safeAttachments={safeAttachments}
             onRefresh={loadThread}
+            onRealtimeSignal={handleThreadRealtimeSignal}
+            onRealtimeSubscribed={catchUpThreadMessages}
+            onRealtimeRenew={renewThreadRealtime}
             onSendText={sendText}
             onSendAttachment={sendAttachment}
             onAttachmentError={setError}

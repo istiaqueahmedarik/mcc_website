@@ -1,4 +1,5 @@
 import sql from '../db';
+import { issueStudentThreadRealtimeAccessToken } from './classroomStudentThreadRealtimeAuth';
 
 export const CLASSROOM_STUDENT_THREAD_EVENTS = [
   'student_solution_submitted',
@@ -17,6 +18,10 @@ export const CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET =
   process.env.SUPABASE_CLASSROOM_ATTACHMENTS_BUCKET ||
   process.env.CLASSROOM_THREAD_ATTACHMENTS_BUCKET ||
   'classroom-thread-attachments';
+export const CLASSROOM_STUDENT_THREAD_REALTIME_EVENT = 'thread_changed';
+export const CLASSROOM_STUDENT_THREAD_REALTIME_TTL_MINUTES = 10;
+const CLASSROOM_STUDENT_THREAD_REALTIME_RENEW_SECONDS = 90;
+const CLASSROOM_STUDENT_THREAD_BROADCAST_TIMEOUT_MS = 3000;
 
 export const CLASSROOM_STUDENT_THREAD_ATTACHMENT_EXTENSIONS = [
   '.png',
@@ -90,7 +95,17 @@ const textLikeExtensions = new Set([
   '.tsx',
 ]);
 
-let schemaPromise: Promise<void> | null = null;
+export type StudentThreadRealtimeScope = 'thread' | 'manager_list';
+
+export type StudentThreadRealtimeChannel = {
+  channel: string;
+  event: string;
+  scope: StudentThreadRealtimeScope;
+  expires_at: string;
+  renew_after: string;
+  access_token: string;
+  token_expires_at: string;
+};
 
 export type StudentThreadAttachmentValidation = {
   ok: boolean;
@@ -177,6 +192,23 @@ function getSupabaseServerConfig() {
   return { url, key, error: '' };
 }
 
+function getSupabaseRealtimeConfig() {
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    '';
+  if (!url || !key) {
+    return {
+      error: 'Supabase Realtime server broadcast is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.',
+      url,
+      key,
+    };
+  }
+  return { url, key, error: '' };
+}
+
 function encodeStoragePath(path: string): string {
   return path.split('/').map((segment) => encodeURIComponent(segment)).join('/');
 }
@@ -220,6 +252,30 @@ export async function uploadStudentThreadAttachmentToStorage(input: {
   };
 }
 
+export async function deleteStudentThreadAttachmentFromStorage(input: {
+  bucket?: string;
+  storagePath: string;
+}) {
+  const config = getSupabaseServerConfig();
+  if (config.error) throw new Error(config.error);
+  const bucket = input.bucket || CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET;
+  const response = await fetch(
+    `${config.url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(input.storagePath)}`,
+    {
+      method: 'DELETE',
+      headers: {
+        apikey: config.key,
+        Authorization: `Bearer ${config.key}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    }
+  );
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Supabase storage cleanup failed with status ${response.status}`);
+  }
+  return true;
+}
+
 export async function createStudentThreadAttachmentSignedUrl(input: {
   bucket: string;
   storagePath: string;
@@ -258,137 +314,195 @@ export async function createStudentThreadAttachmentSignedUrl(input: {
   };
 }
 
-export async function broadcastStudentThreadChange(channel: string, payload: Record<string, unknown>) {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
-  if (!url || !key || !channel) return false;
+async function cleanupExpiredStudentThreadRealtimeChannels() {
+  await sql`
+    DELETE FROM public.classroom_student_thread_realtime_channels
+    WHERE expires_at < now()
+  `;
+}
 
-  try {
-    const response = await fetch(
-      `${url}/realtime/v1/api/broadcast/${encodeURIComponent(channel)}/events/thread_changed`,
-      {
-        method: 'POST',
-        headers: {
-          apikey: key,
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      console.error('Student thread realtime broadcast failed:', text || response.statusText);
-      return false;
+function buildStudentThreadRealtimeChannelName(scope: StudentThreadRealtimeScope) {
+  return `classroom-student-thread:${scope}:${crypto.randomUUID()}`;
+}
+
+export async function issueStudentThreadRealtimeChannel(input: {
+  classroomId: string;
+  threadId?: string | null;
+  authorizedUserId: string;
+  scope: StudentThreadRealtimeScope;
+}): Promise<StudentThreadRealtimeChannel> {
+  await cleanupExpiredStudentThreadRealtimeChannels();
+
+  const expiresAt = new Date(Date.now() + CLASSROOM_STUDENT_THREAD_REALTIME_TTL_MINUTES * 60 * 1000).toISOString();
+  const renewAfter = new Date(
+    new Date(expiresAt).getTime() - CLASSROOM_STUDENT_THREAD_REALTIME_RENEW_SECONDS * 1000
+  ).toISOString();
+  const threadId = input.scope === 'thread' ? input.threadId || null : null;
+  if (input.scope === 'thread' && !threadId) {
+    throw new Error('Thread is required for a thread Realtime channel.');
+  }
+
+  const channelName = buildStudentThreadRealtimeChannelName(input.scope);
+  const [rows, access] = await Promise.all([
+    input.scope === 'thread'
+      ? sql`
+        INSERT INTO public.classroom_student_thread_realtime_channels (
+          classroom_id,
+          thread_id,
+          authorized_user_id,
+          scope,
+          channel_name,
+          expires_at
+        )
+        VALUES (
+          ${input.classroomId},
+          ${threadId},
+          ${input.authorizedUserId},
+          ${input.scope},
+          ${channelName},
+          ${expiresAt}::timestamptz
+        )
+        ON CONFLICT (authorized_user_id, thread_id) WHERE scope = 'thread'
+        DO UPDATE SET
+          classroom_id = EXCLUDED.classroom_id,
+          expires_at = EXCLUDED.expires_at,
+          updated_at = now()
+        RETURNING channel_name, scope, expires_at
+      `
+      : sql`
+        INSERT INTO public.classroom_student_thread_realtime_channels (
+          classroom_id,
+          thread_id,
+          authorized_user_id,
+          scope,
+          channel_name,
+          expires_at
+        )
+        VALUES (
+          ${input.classroomId},
+          NULL,
+          ${input.authorizedUserId},
+          'manager_list',
+          ${channelName},
+          ${expiresAt}::timestamptz
+        )
+        ON CONFLICT (authorized_user_id, classroom_id) WHERE scope = 'manager_list'
+        DO UPDATE SET
+          expires_at = EXCLUDED.expires_at,
+          updated_at = now()
+        RETURNING channel_name, scope, expires_at
+      `,
+    issueStudentThreadRealtimeAccessToken(input.authorizedUserId),
+  ]);
+
+  return {
+    channel: rows[0].channel_name,
+    event: CLASSROOM_STUDENT_THREAD_REALTIME_EVENT,
+    scope: rows[0].scope,
+    expires_at: rows[0].expires_at,
+    renew_after: renewAfter,
+    ...access,
+  };
+}
+
+export async function listActiveStudentThreadRealtimeChannels(input: {
+  classroomId: string;
+  threadId?: string | null;
+  scope?: StudentThreadRealtimeScope;
+}) {
+  const rows = input.scope === 'thread'
+    ? await sql`
+        SELECT channel_name
+        FROM public.classroom_student_thread_realtime_channels
+        WHERE scope = 'thread'
+          AND thread_id = ${input.threadId || null}
+          AND expires_at > now()
+      `
+    : input.scope === 'manager_list'
+      ? await sql`
+          SELECT channel_name
+          FROM public.classroom_student_thread_realtime_channels
+          WHERE scope = 'manager_list'
+            AND classroom_id = ${input.classroomId}
+            AND expires_at > now()
+        `
+      : await sql`
+          SELECT channel_name
+          FROM public.classroom_student_thread_realtime_channels
+          WHERE (
+              (scope = 'thread' AND thread_id = ${input.threadId || null})
+              OR (scope = 'manager_list' AND classroom_id = ${input.classroomId})
+            )
+            AND expires_at > now()
+        `;
+
+  return rows.map((row: any) => String(row.channel_name || '')).filter(Boolean);
+}
+
+async function broadcastStudentThreadChangePrivate(
+  url: string,
+  key: string,
+  channels: string[],
+  payload: Record<string, unknown>,
+  eventName: string
+) {
+  const response = await fetch(
+    `${url}/realtime/v1/api/broadcast`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: channels.map((topic) => ({
+          topic,
+          event: eventName,
+          payload,
+          private: true,
+        })),
+      }),
+      signal: AbortSignal.timeout(CLASSROOM_STUDENT_THREAD_BROADCAST_TIMEOUT_MS),
     }
-    return true;
+  );
+  return response.ok;
+}
+
+export async function broadcastStudentThreadChange(
+  channels: string | string[],
+  payload: Record<string, unknown>,
+  eventName = CLASSROOM_STUDENT_THREAD_REALTIME_EVENT
+) {
+  const config = getSupabaseRealtimeConfig();
+  const channelList = [...new Set((Array.isArray(channels) ? channels : [channels]).map((channel) => String(channel || '').trim()).filter(Boolean))];
+  if (config.error || channelList.length === 0) return false;
+
+  const startedAt = performance.now();
+  try {
+    const delivered = await broadcastStudentThreadChangePrivate(
+      config.url,
+      config.key,
+      channelList,
+      payload,
+      eventName
+    );
+    if (!delivered) {
+      console.error('[student-thread-realtime] private broadcast failed', {
+        channelCount: channelList.length,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+    }
+    return delivered;
   } catch (error) {
-    console.error('Student thread realtime broadcast failed:', error);
+    console.error('[student-thread-realtime] private broadcast failed', {
+      channelCount: channelList.length,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     return false;
   }
 }
 
 export async function ensureClassroomStudentThreadsSchema() {
-  if (!schemaPromise) {
-    schemaPromise = (async () => {
-      await sql`CREATE EXTENSION IF NOT EXISTS pgcrypto`;
-
-      await sql`
-        CREATE TABLE IF NOT EXISTS public.classroom_student_threads (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          classroom_id uuid NOT NULL REFERENCES public.classrooms(id) ON DELETE CASCADE,
-          student_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-          status text NOT NULL DEFAULT 'active',
-          realtime_token uuid NOT NULL DEFAULT gen_random_uuid(),
-          created_at timestamptz NOT NULL DEFAULT now(),
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          CONSTRAINT classroom_student_threads_unique_student UNIQUE (classroom_id, student_id),
-          CONSTRAINT classroom_student_threads_status_check CHECK (status IN ('active', 'archived'))
-        )
-      `;
-      await sql`ALTER TABLE public.classroom_student_threads ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'`;
-      await sql`ALTER TABLE public.classroom_student_threads ADD COLUMN IF NOT EXISTS realtime_token uuid NOT NULL DEFAULT gen_random_uuid()`;
-      await sql`ALTER TABLE public.classroom_student_threads ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
-      await sql`ALTER TABLE public.classroom_student_threads ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`;
-      await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS classroom_student_threads_classroom_student_idx
-        ON public.classroom_student_threads (classroom_id, student_id)
-      `;
-      await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS classroom_student_threads_realtime_token_idx
-        ON public.classroom_student_threads (realtime_token)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_student_threads_classroom_idx
-        ON public.classroom_student_threads (classroom_id, updated_at DESC)
-      `;
-
-      await sql`
-        CREATE TABLE IF NOT EXISTS public.classroom_student_thread_messages (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          thread_id uuid NOT NULL REFERENCES public.classroom_student_threads(id) ON DELETE CASCADE,
-          sender_id uuid NULL REFERENCES public.users(id) ON DELETE SET NULL,
-          kind text NOT NULL DEFAULT 'message',
-          event_type text NULL,
-          body text NOT NULL DEFAULT '',
-          metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          CONSTRAINT classroom_student_thread_messages_kind_check CHECK (kind IN ('message', 'system'))
-        )
-      `;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS sender_id uuid NULL REFERENCES public.users(id) ON DELETE SET NULL`;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'message'`;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS event_type text NULL`;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS body text NOT NULL DEFAULT ''`;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb`;
-      await sql`ALTER TABLE public.classroom_student_thread_messages ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_student_thread_messages_thread_idx
-        ON public.classroom_student_thread_messages (thread_id, created_at ASC)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_student_thread_messages_event_idx
-        ON public.classroom_student_thread_messages (event_type, created_at DESC)
-      `;
-
-      await sql`
-        CREATE TABLE IF NOT EXISTS public.classroom_student_thread_attachments (
-          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-          thread_id uuid NOT NULL REFERENCES public.classroom_student_threads(id) ON DELETE CASCADE,
-          message_id uuid NOT NULL REFERENCES public.classroom_student_thread_messages(id) ON DELETE CASCADE,
-          uploader_id uuid NULL REFERENCES public.users(id) ON DELETE SET NULL,
-          storage_bucket text NOT NULL,
-          storage_path text NOT NULL,
-          original_filename text NOT NULL,
-          content_type text NOT NULL,
-          size_bytes integer NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          CONSTRAINT classroom_student_thread_attachment_size_check CHECK (size_bytes > 0)
-        )
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_student_thread_attachments_message_idx
-        ON public.classroom_student_thread_attachments (message_id)
-      `;
-      await sql`
-        CREATE INDEX IF NOT EXISTS classroom_student_thread_attachments_thread_idx
-        ON public.classroom_student_thread_attachments (thread_id, created_at DESC)
-      `;
-      await sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS classroom_student_thread_attachments_storage_idx
-        ON public.classroom_student_thread_attachments (storage_bucket, storage_path)
-      `;
-    })().catch((error) => {
-      schemaPromise = null;
-      throw error;
-    });
-  }
-
-  return schemaPromise;
+  return Promise.resolve();
 }

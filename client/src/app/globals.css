@@ -800,6 +800,227 @@
   }
 }
 
+@layer components {
+  .trainer-page {
+    --trainer-hairline: hsl(var(--border) / 0.72);
+    --trainer-hairline-soft: hsl(var(--border) / 0.48);
+    --trainer-surface: hsl(var(--card));
+    --trainer-surface-soft: hsl(var(--background) / 0.72);
+    --trainer-shadow: 0 0 0 1px hsl(var(--border) / 0.52),
+      0 18px 50px -38px hsl(var(--foreground) / 0.42);
+    min-height: 100vh;
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background)) 0%,
+      hsl(var(--secondary) / 0.38) 100%
+    );
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .dark .trainer-page {
+    --trainer-hairline: hsl(var(--border) / 0.78);
+    --trainer-hairline-soft: hsl(var(--border) / 0.54);
+    --trainer-surface: hsl(var(--card) / 0.94);
+    --trainer-surface-soft: hsl(var(--background) / 0.62);
+    --trainer-shadow: 0 0 0 1px hsl(var(--border) / 0.6);
+    background: linear-gradient(
+      180deg,
+      hsl(var(--background)) 0%,
+      hsl(var(--muted) / 0.3) 100%
+    );
+  }
+
+  .trainer-page :is(h1, h2, h3, h4, p, span, label, button, a, input, textarea, select, summary, th, td) {
+    letter-spacing: 0;
+  }
+
+  .trainer-page :is(button, a, [role="button"]) {
+    touch-action: manipulation;
+  }
+
+  .trainer-page :is(button, a, [role="button"], input, textarea, select, summary) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .trainer-page :is(button, a, [role="button"]):active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  .trainer-page :is(button, a, input, textarea, select, summary):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  .trainer-panel {
+    border: 1px solid var(--trainer-hairline);
+    border-radius: 0.5rem;
+    background: var(--trainer-surface);
+    box-shadow: var(--trainer-shadow);
+  }
+
+  .trainer-panel-soft {
+    border: 1px solid var(--trainer-hairline-soft);
+    border-radius: 0.375rem;
+    background: var(--trainer-surface-soft);
+  }
+
+  .trainer-command-bar {
+    border: 1px solid var(--trainer-hairline);
+    border-radius: 0.5rem;
+    background: hsl(var(--card) / 0.82);
+    box-shadow: var(--trainer-shadow);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+  }
+
+  .trainer-icon-tile {
+    display: grid;
+    height: 2rem;
+    width: 2rem;
+    flex-shrink: 0;
+    place-items: center;
+    border: 1px solid var(--trainer-hairline-soft);
+    border-radius: 0.375rem;
+    background: hsl(var(--background) / 0.74);
+  }
+
+  .trainer-chip {
+    display: inline-flex;
+    min-height: 1.5rem;
+    align-items: center;
+    gap: 0.375rem;
+    border: 1px solid var(--trainer-hairline-soft);
+    border-radius: 0.375rem;
+    background: hsl(var(--background) / 0.68);
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    line-height: 1.1;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .trainer-status-success {
+    border-color: hsl(151 62% 38% / 0.28);
+    background: hsl(151 62% 38% / 0.1);
+    color: hsl(151 60% 26%);
+  }
+
+  .dark .trainer-status-success {
+    color: hsl(151 66% 70%);
+  }
+
+  .trainer-status-warning {
+    border-color: hsl(39 88% 48% / 0.32);
+    background: hsl(39 88% 48% / 0.1);
+    color: hsl(35 82% 30%);
+  }
+
+  .dark .trainer-status-warning {
+    color: hsl(39 88% 70%);
+  }
+
+  .trainer-status-danger {
+    border-color: hsl(0 78% 52% / 0.28);
+    background: hsl(0 78% 52% / 0.1);
+    color: hsl(0 70% 36%);
+  }
+
+  .dark .trainer-status-danger {
+    color: hsl(0 82% 72%);
+  }
+
+  .trainer-select {
+    height: 2.5rem;
+    width: 100%;
+    border: 1px solid hsl(var(--input));
+    border-radius: 0.375rem;
+    background: hsl(var(--background) / 0.86);
+    padding: 0 0.75rem;
+    color: hsl(var(--foreground));
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  @media (min-width: 768px) {
+    .trainer-select {
+      font-size: 0.875rem;
+    }
+  }
+
+  .trainer-select:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .trainer-empty {
+    border: 1px dashed var(--trainer-hairline);
+    border-radius: 0.5rem;
+    background: hsl(var(--background) / 0.64);
+    padding: 1.25rem;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .trainer-floating-help {
+    border: 1px solid var(--trainer-hairline);
+    background: hsl(var(--card) / 0.84);
+    box-shadow: 0 16px 36px -24px hsl(var(--foreground) / 0.44);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+  }
+
+  .trainer-table-shell {
+    overflow-x: auto;
+    border: 1px solid var(--trainer-hairline);
+    border-radius: 0.5rem;
+    background: var(--trainer-surface);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(page),
+  ::view-transition-new(page) {
+    animation: none;
+  }
+
+  .trainer-page *,
+  .trainer-page *::before,
+  .trainer-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .trainer-page :is(button, a, [role="button"]):active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .trainer-command-bar,
+  .trainer-floating-help {
+    background: hsl(var(--card));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .trainer-panel,
+  .trainer-panel-soft,
+  .trainer-command-bar,
+  .trainer-floating-help,
+  .trainer-table-shell {
+    border-color: hsl(var(--foreground) / 0.45);
+    box-shadow: none;
+  }
+}
+
 /* Driver.js ADHD Tour Popover Styling */
 .driver-popover {
   background-color: hsl(var(--card)) !important;

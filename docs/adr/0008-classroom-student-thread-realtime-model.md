@@ -1,6 +1,6 @@
 # ADR-0008: Classroom Student Thread Realtime Model
 
-Status: Accepted
+Status: Accepted for the student-scoped product model; opaque-invalidation transport superseded by ADR-0011
 Date: 2026-07-31
 Task ID: trainer-student-classroom-threads-realtime-20260731
 

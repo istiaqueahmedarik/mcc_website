@@ -71,6 +71,10 @@ import {
   markAllClassroomUpdatesRead,
   getClassroomStudentThreads,
   getClassroomStudentThread,
+  getClassroomStudentThreadMessagesAfterRevision,
+  getClassroomStudentThreadMessage,
+  getClassroomStudentThreadSummary,
+  postClassroomStudentThreadRealtimeCredentials,
   postClassroomStudentThreadMessage,
   postClassroomStudentThreadAttachment,
   getClassroomStudentThreadAttachmentUrl,
@@ -216,6 +220,10 @@ route.get('/:id/updates', getClassroomUpdates);
 route.post('/:id/updates/read', markClassroomUpdateRead);
 route.post('/:id/updates/read-all', markAllClassroomUpdatesRead);
 route.get('/:id/student-threads', getClassroomStudentThreads);
+route.post('/:id/student-threads/realtime', postClassroomStudentThreadRealtimeCredentials);
+route.get('/:id/student-threads/:studentId/summary', getClassroomStudentThreadSummary);
+route.get('/:id/student-threads/:studentId/messages', getClassroomStudentThreadMessagesAfterRevision);
+route.get('/:id/student-threads/:studentId/messages/:messageId', getClassroomStudentThreadMessage);
 route.get('/:id/student-threads/:studentId', getClassroomStudentThread);
 route.post('/:id/student-threads/:studentId/messages', postClassroomStudentThreadMessage);
 route.post('/:id/student-threads/:studentId/attachments', postClassroomStudentThreadAttachment);

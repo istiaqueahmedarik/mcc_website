@@ -47,3 +47,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   return forward(request, params, "POST");
 }
+
+export async function PUT(request, { params }) {
+  return forward(request, params, "PUT");
+}

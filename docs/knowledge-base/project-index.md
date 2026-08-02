@@ -1,5 +1,118 @@
 # Project Index
 
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Approved Implementation Plan
+
+Source:
+- `docs/tasks/trainer-student-thread-instant-realtime-20260802-task-plan.md`
+
+Fact:
+Instant student-thread work proceeds serially through additive SQL, removal of runtime DDL, private shadow-identity Realtime authorization/registry/publishing, transactional read/write/catch-up APIs, client private subscription/renewal/state isolation, local/live verification, and implementation review. SQL must be applied before server/client code depends on revisions, idempotency, registry uniqueness, and private policies.
+
+Applies when:
+Coordinating or reviewing the instant student-thread implementation and deployment order.
+
+Do not overgeneralize:
+The plan does not approve destructive down migrations, public fallback, service-key exposure, broad project-wide RLS cleanup, or claiming two-browser latency without measured sessions.
+
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Approved Technical Design
+
+Source:
+- `docs/decisions/trainer-student-thread-instant-realtime-20260802-technical-decisions.md`
+- `docs/adr/0011-private-gap-free-classroom-thread-realtime.md`
+
+Fact:
+The approved instant-thread design uses an MCC-authorized, server-managed Supabase Auth shadow identity with the MCC UUID and `anon` role; private receive-only Realtime RLS bound to the active channel registry; canonical safe message payloads after commit; per-thread revision catch-up; transactional/idempotent sends; membership-lifecycle thread provisioning; expiring renewed topics; and browser generation guards. ADR-0011 supersedes ADR-0010's scoped-public-topic transport and ADR-0008's opaque-refetch transport choice while preserving the student-scoped product model.
+
+Applies when:
+Implementing or reviewing the instant student-thread migration, server auth bridge, Realtime hook, thread controller, registry lifecycle, or catch-up UI.
+
+Do not overgeneralize:
+The shadow token does not authorize direct application-table access and must remain `anon`; a future signing-key bridge or role change requires a new security decision.
+
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-student-thread-instant-realtime-20260802-rsd.md`
+
+Fact:
+Trainer/student thread realtime is approved for an instant, private, gap-free delivery redesign. The healthy receive path must render canonical committed messages without per-message HTTP refetches; reconnects and initial subscription must catch up with a stable `(created_at, id)` cursor; writes must be transactional and idempotent; thread switching must reject stale responses; request-time DDL and read-path provisioning writes must be removed; and two-session commit-to-render latency targets are p50 at or below 250 ms and p95 at or below 750 ms.
+
+Applies when:
+Changing student-thread Realtime credentials/channels, thread/manager payloads, message transactions, attachment persistence, cursor pagination, idempotency, browser thread state, channel renewal, classroom schema guards, or realtime latency telemetry.
+
+Do not overgeneralize:
+This does not approve direct browser application-table writes, service-key exposure, public message payloads, hidden polling, legacy problem-thread revival, broad UI redesign, or unrelated project-wide RLS remediation. The solution must not widen the existing public-schema exposure.
+
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-student-thread-realtime-hardening-performance-20260802-implementation-review.md`
+
+Fact:
+Trainer/student thread realtime hardening passed implementation-review approval on 2026-08-02. It is implemented through scoped SQL in `docs/sql/trainer-student-thread-realtime-hardening-20260802.sql`, server-issued opaque channel helpers in `server/src/utils/classroomStudentThreadsSchema.ts`, student-thread summary/message routes in `server/src/controllers/classroomController.ts` and `server/src/routes/classroomRoute.ts`, uncached authorized fetch support in `client/src/lib/action.js`, broadcast-envelope handling in `client/src/hooks/useClassroomThreadRealtime.js`, and incremental list/thread updates in `client/src/components/ClassroomThreadsTab.js`.
+
+Applies when:
+Maintaining trainer/student classroom threads, Realtime channel issuance, thread-message fetches, trainer thread-list invalidation, attachment broadcasts, or student-thread SQL/RLS/index setup.
+
+Do not overgeneralize:
+This implementation does not add a global Supabase private-channel JWT bridge, browser table access, full message payloads in Realtime, hidden polling, or broad unrelated Supabase advisor cleanup.
+
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Approved Implementation Plan
+
+Source:
+- `docs/tasks/trainer-student-thread-realtime-hardening-performance-20260802-task-plan.md`
+
+Fact:
+Trainer/student thread realtime hardening should proceed serially through baseline safety checks, scoped SQL/RLS/index deployment, removal of request-time thread DDL, server-issued scoped realtime channels, lightweight message and summary APIs, attachment broadcast ordering cleanup, client incremental realtime fetches, verification, and implementation review.
+
+Applies when:
+Coordinating or reviewing changes to student-thread RLS/grants/indexes, `classroomStudentThreadsSchema.ts`, student-thread controller/routes, `ClassroomThreadsTab.js`, or the thread realtime hook.
+
+Do not overgeneralize:
+This plan does not approve unrelated Supabase advisor remediation, private-channel auth integration, hidden polling, UI redesign, or legacy problem-thread migration.
+
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-student-thread-realtime-hardening-performance-20260802-rsd.md`
+
+Fact:
+Trainer/student classroom thread hardening is approved to fix Supabase Realtime security exposure, public-schema RLS exposure, request-time DDL slowness, heavy realtime refetches, missing trainer list realtime, attachment broadcast ordering, and student-thread indexes while preserving the existing student-scoped thread product model.
+
+Applies when:
+Changing `ClassroomThreadsTab.js`, `useClassroomThreadRealtime.js`, student-thread APIs, student-thread schema/indexes, Supabase Realtime broadcast channels, private attachment flow, or request-time schema guards used by classroom thread paths.
+
+Do not overgeneralize:
+This does not approve UI redesign, legacy problem-thread migration/deletion, direct browser writes to private classroom tables, full private payloads in Realtime, hidden polling, or changes to student submission final-verdict ownership.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-compact-ui-cleanup-20260802-rsd.md`
+
+Fact:
+Trainer compact UI cleanup is approved as a UI-only redesign for `/trainer/dashboard`, `/trainer/forms`, and `/trainer/forms/[id]`, focused on reducing visual clutter and improving mini-laptop readability while preserving existing routes, API endpoints, state transitions, authorization behavior, and trainer workflows.
+
+Applies when:
+Changing trainer dashboard classroom presentation, trainer form-builder layout, trainer form-detail analytics/explore/JSON presentation, permanent tour launcher treatment, or compact trainer operational UI.
+
+Do not overgeneralize:
+This does not approve server/API changes, database changes, auth changes, classroom live internals, new dependencies, route changes, or a global design-system rewrite.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-compact-ui-cleanup-20260802-implementation-review.md`
+
+Fact:
+Trainer compact UI cleanup is implemented in `TrainerDashboardClient.js`, `TrainerFormsClient.js`, and `TrainerFormDetailClient.js`. Dashboard uses a compact command header, metric strip, static live-session strip, slim classroom operation items, and icon-only tour launcher. Form builder uses tighter setup/type/identity/target panels, compact cell presets, denser field queue rows, and bounded supporting panels. Form detail uses compact title/status/actions, share/metric strip, lighter tabs, and tighter analytics/explore/JSON panels.
+
+Applies when:
+Maintaining trainer route presentation, compact trainer dashboard, trainer form-builder layout, trainer form response review, or mini-laptop trainer UI.
+
+Do not overgeneralize:
+This implementation did not change server/API routes, auth, database schema, trainer workflows, or classroom live internals.
+
 ## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Implemented Entry Points
 
 Source:
@@ -707,3 +820,18 @@ Changing classroom communication, student-thread chat, system event bubbles, saf
 
 Do not overgeneralize:
 Legacy problem-thread routes and tables still exist for compatibility, but active classroom UI should guide users to `Threads`.
+
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Private Gap-Free Realtime Entry Points
+
+Source:
+- `docs/reviews/trainer-student-thread-instant-realtime-20260802-implementation-review.md`
+- `docs/adr/0011-private-gap-free-classroom-thread-realtime.md`
+
+Fact:
+Student Threads now use private identity-bound Supabase Broadcast with canonical committed payloads and durable revision catch-up. New server entry points are `POST /classroom/:id/student-threads/realtime` for credential renewal and `GET /classroom/:id/student-threads/:studentId/messages?afterRevision=` for gap recovery. Realtime Auth bridging is in `server/src/utils/classroomStudentThreadRealtimeAuth.ts`; subscription/renewal is in `client/src/hooks/useClassroomThreadRealtime.js`. Migration `trainer_student_thread_instant_realtime_20260802` (version `20260802081644`) is applied.
+
+Applies when:
+Changing student-thread delivery, Realtime authorization, message ordering, reconnect behavior, optimistic reconciliation, or thread membership provisioning.
+
+Do not overgeneralize:
+The canonical Broadcast is a fast delivery path, not the durable source of truth. PostgreSQL messages/revisions and authorized catch-up remain authoritative.

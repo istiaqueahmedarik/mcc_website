@@ -1,5 +1,71 @@
 # Quality Rules
 
+## 2026-08-02 - Use Design Skill Stack For New Interfaces
+
+Source:
+- User instruction on 2026-08-02
+- `AGENTS.md`
+- `/home/arik/.agents/skills/interface-design/SKILL.md`
+- `/home/arik/mcc_website/.agents/skills/apple-design/SKILL.md`
+- `/home/arik/mcc_website/.agents/skills/emil-design-eng/SKILL.md`
+
+Rule:
+Before designing any new interface, load and apply `interface-design`, `apple-design`, and `emil-design-eng`. Record or keep a compact working intent/hierarchy/palette/depth/type/spacing rationale, use existing shadcn/Radix/Tailwind/lucide patterns first, make motion purposeful and accessible, and verify visible states/responsiveness before handoff.
+
+Applies when:
+Creating new pages, new product surfaces, major interface additions, dashboard/tool/admin/classroom/trainer UI, or reusable UI components that need designed layout, interaction, or motion.
+
+Do not overgeneralize:
+This is a design discipline, not permission for retroactive cleanup, new dependencies, behavior changes, server/API/schema/auth edits, or bypassing approved project-specific UI decisions.
+
+## 2026-08-02 - Keep DDL Out Of Student Thread Request Paths
+
+Source:
+- `docs/reviews/trainer-student-thread-realtime-hardening-performance-20260802-implementation-review.md`
+- `docs/sql/trainer-student-thread-realtime-hardening-20260802.sql`
+
+Rule:
+Student-thread controllers and schema utilities must not run `CREATE TABLE`, `ALTER TABLE`, `CREATE INDEX`, `DROP INDEX`, or extension setup during normal request handling. Put schema, RLS, grant, and index changes in SQL artifacts or the repository's migration workflow, then verify them with Supabase-focused checks.
+
+Applies when:
+Changing `classroomStudentThreadsSchema.ts`, student-thread routes/controllers, attachment tables, realtime-channel tables, or topic-assignment schema touched by student-thread workflows.
+
+Do not overgeneralize:
+This does not ban narrow existence checks for runtime data; it bans request-time DDL and schema mutation on user-facing thread paths.
+
+## 2026-08-02 - Vercel Web Interface Guidelines Baseline
+
+Source:
+- `https://vercel.com/design/guidelines`
+- `https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/AGENTS.md`
+- `docs/rsd/vercel-web-interface-guidelines-20260802-rsd.md`
+- `docs/decisions/vercel-web-interface-guidelines-20260802-technical-decisions.md`
+- `docs/tasks/vercel-web-interface-guidelines-20260802-task-plan.md`
+- `docs/reviews/vercel-web-interface-guidelines-20260802-implementation-review.md`
+
+Rule:
+New pages and major page redesigns must use Vercel's Web Interface Guidelines as a quality baseline. Before handoff, review generated UI for keyboard operation, focus visibility/management, hit targets, semantic navigation, URL-backed state when relevant, loading/empty/error states, responsive coverage, resilient content, form behavior, reduced motion, compositor-friendly animation, contrast, and performance basics.
+
+Applies when:
+Creating new web pages, doing major page redesigns, reviewing generated interfaces, or adding page-level trainer/classroom UI.
+
+Do not overgeneralize:
+This does not authorize retroactive cleanup of existing pages, new dependencies, external guideline command installation, or overriding approved MCC trainer/classroom design decisions and local shadcn/Radix/Tailwind/lucide patterns.
+
+## 2026-08-02 - Trainer Mini-Laptop Density
+
+Source:
+- `docs/reviews/trainer-compact-ui-cleanup-20260802-implementation-review.md`
+
+Rule:
+Trainer route UI should optimize for mini-laptop scan speed: avoid tall repeated cards for classroom/form operations, keep secondary panels bounded, use `min-w-0` and explicit responsive grid tracks, prefer static semantic status accents over pulsing/count-heavy controls, and keep permanent helper/tour controls visually quiet.
+
+Applies when:
+Changing `/trainer/dashboard`, `/trainer/forms`, `/trainer/forms/[id]`, trainer operation cards/lists, form-builder side panels, or trainer route tour launchers.
+
+Do not overgeneralize:
+Do not hide decision-critical trainer controls just to reduce density; compacting should demote repeated metadata and explanatory copy, not remove required actions.
+
 ## 2026-08-01 - Bound Student Thread Surfaces
 
 Source:
@@ -418,3 +484,17 @@ Changing student-thread APIs, classroom attachment uploads, realtime channels, o
 
 Do not overgeneralize:
 This rule does not forbid focused client components; it forbids moving policy decisions into them.
+
+## 2026-08-02 - Realtime Delivery Must Be Direct, Ordered, and Recoverable
+
+Source:
+- `docs/reviews/trainer-student-thread-instant-realtime-20260802-implementation-review.md`
+
+Rule:
+Student-thread sends must keep persistence authoritative, return/publish the canonical safe projection without post-commit rereads, carry a monotonic thread revision, and provide bounded authorized catch-up. Private Broadcast authorization must bind the verified user subject to the exact current topic, and browsers must remain receive-only.
+
+Applies when:
+Changing student-thread message writes, Broadcast envelopes, subscription lifecycle, optimistic reconciliation, or performance-sensitive server queries.
+
+Do not overgeneralize:
+Direct canonical Broadcast is appropriate only for fields already authorized for every topic recipient; sensitive or separately authorized data must stay behind the API.

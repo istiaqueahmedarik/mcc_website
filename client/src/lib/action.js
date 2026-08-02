@@ -103,6 +103,38 @@ export const get_with_token = cache(async (url) => {
   }
 });
 
+export async function get_uncached_with_token(url) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) {
+    return {
+      error: "Unauthorized",
+    };
+  }
+
+  try {
+    const response = await fetch(server_url + url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.value}`,
+      },
+      cache: "no-store",
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
+    };
+  }
+}
+
 export const post_with_token = cache(async (url, data) => {
   const token = (await cookies()).get("token");
   if (token === undefined)
@@ -148,6 +180,31 @@ export const post_with_token = cache(async (url, data) => {
     };
   }
 });
+
+export async function post_uncached_with_token(url, data) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) return { error: "Unauthorized" };
+
+  try {
+    const response = await fetch(server_url + url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify(data),
+      cache: "no-store",
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return { error: text || "An error occurred " + error };
+    }
+  } catch (error) {
+    return { error: error?.message || "Failed to reach server" };
+  }
+}
 
 export async function post_form_with_token(url, formData) {
   const token = (await cookies()).get("token");

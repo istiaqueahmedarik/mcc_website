@@ -1,7 +1,8 @@
 "use client";
 
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { get_with_token, post_with_token } from "@/lib/action";
+import { apiGet, apiPost } from "@/lib/api-client";
 import ProgressLink from "@/components/ProgressLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -186,6 +187,8 @@ const FIELD_TYPES = [
   { value: "checkbox", label: "Checkbox" },
 ];
 
+const SELECT_CLASS_NAME = "trainer-select";
+
 const CUSTOM_CELL_PRESETS = [
   {
     label: "Short Answer",
@@ -285,17 +288,72 @@ function emptyForm() {
   };
 }
 
+const formQueryKeys = {
+  forms: ["trainer", "forms"],
+  userFields: ["trainer", "forms", "user-fields"],
+  classrooms: ["trainer", "classrooms"],
+  classroomClasses: (classroomId) => ["trainer", "classrooms", classroomId, "classes"],
+};
+
+async function fetchTrainerForms() {
+  const res = await apiGet("trainer-forms/manage/forms");
+  return res?.result || [];
+}
+
+async function fetchUserFields() {
+  const res = await apiGet("trainer-forms/manage/user-fields");
+  return res?.result || FALLBACK_USER_FIELDS;
+}
+
+async function fetchClassrooms() {
+  const res = await apiGet("classroom/list");
+  return res?.result || [];
+}
+
+async function fetchClassroomClasses(classroomId) {
+  const res = await apiGet(`classroom/${classroomId}`);
+  return res?.classes || [];
+}
+
 export default function TrainerFormsClient() {
-  const [forms, setForms] = useState([]);
-  const [classrooms, setClassrooms] = useState([]);
-  const [userFields, setUserFields] = useState(FALLBACK_USER_FIELDS);
-  const [classes, setClasses] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState("");
+
+  const formsQuery = useQuery({
+    queryKey: formQueryKeys.forms,
+    queryFn: fetchTrainerForms,
+  });
+  const userFieldsQuery = useQuery({
+    queryKey: formQueryKeys.userFields,
+    queryFn: fetchUserFields,
+  });
+  const classroomsQuery = useQuery({
+    queryKey: formQueryKeys.classrooms,
+    queryFn: fetchClassrooms,
+  });
+  const classesQuery = useQuery({
+    queryKey: formQueryKeys.classroomClasses(form.classroom_id),
+    queryFn: () => fetchClassroomClasses(form.classroom_id),
+    enabled: Boolean(form.classroom_id),
+  });
+  const createFormMutation = useMutation({
+    mutationFn: async (payload) => {
+      const res = await apiPost("trainer-forms/manage/forms", payload);
+      if (!res?.success || !res?.form?.id) {
+        throw new Error(res?.error || "Failed to create form.");
+      }
+      return res;
+    },
+  });
+
+  const forms = formsQuery.data || [];
+  const classrooms = classroomsQuery.data || [];
+  const userFields = userFieldsQuery.data || FALLBACK_USER_FIELDS;
+  const classes = form.classroom_id ? classesQuery.data || [] : [];
+  const loading = formsQuery.isLoading || userFieldsQuery.isLoading || classroomsQuery.isLoading;
+  const saving = createFormMutation.isPending;
 
   const { startTour } = useTour({
     storageKey: "mcc_trainer_forms_toured",
@@ -321,40 +379,16 @@ export default function TrainerFormsClient() {
   const customFieldCount = form.fields.length - mappedFieldCount;
   const needsClassroomTarget = form.type === "classroom_invitation" || form.type === "attendance";
 
-  const fetchData = async () => {
-    setLoading(true);
-    const [formsRes, fieldsRes, classroomRes] = await Promise.all([
-      get_with_token("trainer-forms/manage/forms"),
-      get_with_token("trainer-forms/manage/user-fields"),
-      get_with_token("classroom/list"),
-    ]);
-
-    if (formsRes?.result) setForms(formsRes.result);
-    if (fieldsRes?.result) setUserFields(fieldsRes.result);
-    if (classroomRes?.result) setClassrooms(classroomRes.result);
-    setLoading(false);
-  };
-
   useEffect(() => {
     setOrigin(window.location.origin);
-    fetchData();
   }, []);
 
-  useEffect(() => {
-    async function loadClasses() {
-      if (!form.classroom_id) {
-        setClasses([]);
-        setForm((current) => ({ ...current, class_id: "" }));
-        return;
-      }
-      const res = await get_with_token(`classroom/${form.classroom_id}`);
-      setClasses(res?.classes || []);
-    }
-    loadClasses();
-  }, [form.classroom_id]);
-
   const updateForm = (key, value) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) =>
+      key === "classroom_id"
+        ? { ...current, classroom_id: value, class_id: "" }
+        : { ...current, [key]: value },
+    );
   };
 
   const updateField = (fieldId, key, value) => {
@@ -478,7 +512,6 @@ export default function TrainerFormsClient() {
       return;
     }
 
-    setSaving(true);
     const payload = {
       ...form,
       fields: form.fields.map((field) => ({
@@ -491,22 +524,21 @@ export default function TrainerFormsClient() {
               .filter(Boolean),
       })),
     };
-    const res = await post_with_token("trainer-forms/manage/forms", payload);
-    setSaving(false);
 
-    if (res?.success && res.form?.id) {
+    try {
+      const res = await createFormMutation.mutateAsync(payload);
       window.location.href = `/trainer/forms/${res.form.id}`;
       return;
+    } catch (mutationError) {
+      setError(mutationError?.message || "Failed to create form.");
     }
-
-    setError(res?.error || "Failed to create form.");
   };
 
   return (
-    <div className="min-h-screen bg-background relative">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section id="forms-tour-header" className="border-b pb-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="trainer-page relative">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section id="forms-tour-header" className="pb-1">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div className="max-w-3xl">
               <ProgressLink
                 href="/trainer/dashboard"
@@ -515,15 +547,15 @@ export default function TrainerFormsClient() {
                 Trainer dashboard
                 <ArrowRight className="h-4 w-4" />
               </ProgressLink>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">
                 Form operations
               </h1>
-              <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                Build invitation, attendance, and general forms without changing the trainer workflow.
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Build, publish, and inspect classroom forms from one compact workbench.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:min-w-[360px]">
+            <div className="trainer-panel grid grid-cols-3 overflow-hidden sm:min-w-[360px]">
               <HeaderMetric label="Forms" value={forms.length} />
               <HeaderMetric label="Fields" value={form.fields.length} />
               <HeaderMetric label="Mode" value={selectedType.label.split(" ")[0]} />
@@ -532,15 +564,15 @@ export default function TrainerFormsClient() {
         </section>
 
         {notice && (
-          <div className="flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-300">
+          <div className="flex items-center gap-2 rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
             <CheckCircle2 className="h-4 w-4" />
             {notice}
           </div>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <form onSubmit={handleCreate} className="space-y-6">
-            <section id="forms-tour-setup" className="rounded-lg border bg-card p-5 shadow-sm">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <form onSubmit={handleCreate} className="space-y-5">
+            <section id="forms-tour-setup" className="trainer-panel p-4">
               <SectionTitle
                 icon={Settings2}
                 label="Setup"
@@ -548,48 +580,52 @@ export default function TrainerFormsClient() {
                 detail={selectedType.description}
               />
 
-              <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+              <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_150px]">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Title</label>
+                  <label htmlFor="form-title-input" className="text-sm font-semibold">Title</label>
                   <Input
+                    id="form-title-input"
                     value={form.title}
                     onChange={(event) => updateForm("title", event.target.value)}
                     placeholder="Week 4 Attendance"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Status</label>
+                  <label htmlFor="form-status-select" className="text-sm font-semibold">Status</label>
                   <select
+                    id="form-status-select"
                     value={form.status}
                     onChange={(event) => updateForm("status", event.target.value)}
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                    className={SELECT_CLASS_NAME}
                   >
                     <option value="published">Published</option>
                     <option value="draft">Draft</option>
                   </select>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-semibold">Description</label>
+                  <label htmlFor="form-description-input" className="text-sm font-semibold">Description</label>
                   <Textarea
+                    id="form-description-input"
                     value={form.description}
                     onChange={(event) => updateForm("description", event.target.value)}
                     placeholder="Short context shown on the shared form."
-                    className="min-h-24"
+                    className="min-h-20 text-base md:text-sm"
                   />
                 </div>
               </div>
 
-              <div id="forms-tour-type-selector" className="mt-5 grid gap-3 md:grid-cols-3">
+              <div id="forms-tour-type-selector" className="mt-4 grid gap-2 md:grid-cols-3">
                 {FORM_TYPES.map((type) => (
                   <button
                     type="button"
                     key={type.value}
                     onClick={() => updateForm("type", type.value)}
-                    className={`rounded-lg border p-4 text-left transition ${
+                    className={`min-h-24 rounded-md border px-3 py-3 text-left ${
                       form.type === type.value
-                        ? "border-foreground bg-foreground text-background shadow-sm"
-                        : "bg-background hover:border-foreground/30"
+                        ? "border-foreground bg-foreground text-background"
+                        : "bg-background/70 hover:border-foreground/30"
                     }`}
+                    aria-pressed={form.type === type.value}
                   >
                     <div className="flex items-center gap-2">
                       {type.value === "attendance" ? (
@@ -599,11 +635,11 @@ export default function TrainerFormsClient() {
                       ) : (
                         <FileText className="h-4 w-4" />
                       )}
-                      <span className="text-sm font-bold">{type.label}</span>
+                      <span className="truncate text-sm font-semibold">{type.label}</span>
                     </div>
                     <p
-                      className={`mt-2 text-xs ${
-                        form.type === type.value ? "text-background/75" : "text-muted-foreground"
+                      className={`mt-1 line-clamp-2 text-xs ${
+                        form.type === type.value ? "text-background/80" : "text-muted-foreground"
                       }`}
                     >
                       {type.description}
@@ -613,8 +649,8 @@ export default function TrainerFormsClient() {
               </div>
             </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <section id="forms-tour-primary-key" className="rounded-lg border bg-card p-5 shadow-sm">
+            <div className="grid gap-4 lg:grid-cols-2">
+                <section id="forms-tour-primary-key" className="trainer-panel p-4">
                 <SectionTitle
                   icon={UserRoundSearch}
                   label="Identity"
@@ -622,13 +658,14 @@ export default function TrainerFormsClient() {
                   detail="Responder lookup and mapped alias source."
                 />
 
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Primary key field</label>
+                    <label htmlFor="primary-key-field-select" className="text-sm font-semibold">Primary key field</label>
                     <select
+                      id="primary-key-field-select"
                       value={form.primary_key_field}
                       onChange={(event) => updateForm("primary_key_field", event.target.value)}
-                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      className={SELECT_CLASS_NAME}
                     >
                       {userFields.map((field) => (
                         <option key={field.value} value={field.value}>
@@ -638,8 +675,9 @@ export default function TrainerFormsClient() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Label on form</label>
+                    <label htmlFor="primary-key-label-input" className="text-sm font-semibold">Label on form</label>
                     <Input
+                      id="primary-key-label-input"
                       value={form.primary_key_label}
                       onChange={(event) => updateForm("primary_key_label", event.target.value)}
                       placeholder="Student ID"
@@ -648,7 +686,7 @@ export default function TrainerFormsClient() {
                 </div>
               </section>
 
-              <section id="forms-tour-target" className="rounded-lg border bg-card p-5 shadow-sm">
+              <section id="forms-tour-target" className="trainer-panel p-4">
                 <SectionTitle
                   icon={BarChart3}
                   label="Target"
@@ -657,13 +695,14 @@ export default function TrainerFormsClient() {
                 />
 
                 {needsClassroomTarget ? (
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold">Classroom</label>
+                      <label htmlFor="form-classroom-select" className="text-sm font-semibold">Classroom</label>
                       <select
+                        id="form-classroom-select"
                         value={form.classroom_id}
                         onChange={(event) => updateForm("classroom_id", event.target.value)}
-                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        className={SELECT_CLASS_NAME}
                       >
                         <option value="">Select classroom</option>
                         {classrooms.map((classroom) => (
@@ -674,11 +713,12 @@ export default function TrainerFormsClient() {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-semibold">Class session</label>
+                      <label htmlFor="form-class-select" className="text-sm font-semibold">Class session</label>
                       <select
+                        id="form-class-select"
                         value={form.class_id}
                         onChange={(event) => updateForm("class_id", event.target.value)}
-                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                        className={SELECT_CLASS_NAME}
                         disabled={!form.classroom_id || classes.length === 0}
                       >
                         <option value="">Optional session</option>
@@ -691,19 +731,19 @@ export default function TrainerFormsClient() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-lg border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                  <div className="trainer-empty mt-4 px-3 py-3 text-sm">
                     General forms skip classroom targeting and store response JSON.
                   </div>
                 )}
               </section>
             </div>
 
-            <section className="space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <section className="space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <SectionEyebrow icon={FileText} label="Cells" />
-                  <h2 className="mt-1 text-xl font-bold tracking-tight">Response structure</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <h2 className="mt-1 text-lg font-semibold">Response structure</h2>
+                  <p className="text-sm text-muted-foreground">
                     Mapped aliases plus custom answer cells.
                   </p>
                 </div>
@@ -713,24 +753,24 @@ export default function TrainerFormsClient() {
                 </div>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-lg border bg-card p-5 shadow-sm">
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="trainer-panel p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold">Mapped user cells</h3>
+                      <h3 className="text-sm font-semibold">Mapped user cells</h3>
                       <p className="mt-1 text-xs text-muted-foreground">Aliases from the users table.</p>
                     </div>
                     <Button type="button" size="sm" variant="outline" onClick={addInvitationSet}>
                       Profile Set
                     </Button>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                     {mappedCellPresets.map((preset) => (
                       <button
                         key={preset.value}
                         type="button"
                         onClick={() => addMappedField(preset)}
-                        className="min-h-10 rounded-md border bg-background px-3 py-2 text-left text-xs font-semibold transition hover:border-foreground/30"
+                        className="trainer-panel-soft min-h-9 px-3 py-2 text-left text-xs font-semibold hover:border-foreground/30"
                       >
                         <Plus className="mr-1 inline h-3.5 w-3.5" />
                         {preset.label}
@@ -739,25 +779,25 @@ export default function TrainerFormsClient() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border bg-card p-5 shadow-sm">
+                <div className="trainer-panel p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold">Custom question cells</h3>
+                      <h3 className="text-sm font-semibold">Custom question cells</h3>
                       <p className="mt-1 text-xs text-muted-foreground">Fields saved in response JSON.</p>
                     </div>
                     <Button type="button" size="sm" variant="outline" onClick={addAttendanceSet}>
                       Attendance Set
                     </Button>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
                     {CUSTOM_CELL_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
                         type="button"
                         onClick={() => addField(preset.field)}
-                        className="min-h-[64px] rounded-md border bg-background px-3 py-2 text-left transition hover:border-foreground/30"
+                        className="trainer-panel-soft min-h-[58px] px-3 py-2 text-left hover:border-foreground/30"
                       >
-                        <span className="block text-xs font-bold">{preset.label}</span>
+                        <span className="block text-xs font-semibold">{preset.label}</span>
                         <span className="mt-0.5 block text-[11px] text-muted-foreground">
                           {preset.description}
                         </span>
@@ -768,23 +808,26 @@ export default function TrainerFormsClient() {
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <section className="space-y-3">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight">Field queue</h2>
+                  <h2 className="text-lg font-semibold">Field queue</h2>
                   <p className="text-sm text-muted-foreground">
                     {form.fields.length} total fields in submit order.
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {form.fields.map((field, index) => (
-                  <div key={field.id} className="rounded-lg border bg-card p-4 shadow-sm">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div key={field.id} className="trainer-panel p-3">
+                    <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <Badge variant="outline">#{index + 1}</Badge>
-                        <Badge className={field.mapUserField ? "bg-sky-600" : "bg-emerald-600"}>
+                        <Badge variant="outline" className="tabular-nums">#{index + 1}</Badge>
+                        <Badge
+                          variant="outline"
+                          className={field.mapUserField ? "trainer-status-success" : "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"}
+                        >
                           {field.mapUserField ? "Mapped" : "Custom"}
                         </Badge>
                         <span className="min-w-0 truncate text-sm font-semibold">
@@ -818,23 +861,25 @@ export default function TrainerFormsClient() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <div className="space-y-2">
-                        <label className="text-sm font-semibold">Alias label</label>
+                        <label htmlFor={`field-${field.id}-label`} className="text-xs font-semibold text-muted-foreground">Alias label</label>
                         <Input
+                          id={`field-${field.id}-label`}
                           value={field.label}
                           onChange={(event) => updateField(field.id, "label", event.target.value)}
                           placeholder="Student Name"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-semibold">Cell source</label>
+                        <label htmlFor={`field-${field.id}-source`} className="text-xs font-semibold text-muted-foreground">Cell source</label>
                         <select
+                          id={`field-${field.id}-source`}
                           value={field.mapUserField || ""}
                           onChange={(event) =>
                             updateField(field.id, "mapUserField", event.target.value || null)
                           }
-                          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                          className={SELECT_CLASS_NAME}
                         >
                           <option value="">Custom answer cell</option>
                           {userFields.map((userField) => (
@@ -852,11 +897,12 @@ export default function TrainerFormsClient() {
                       {!field.mapUserField && (
                         <>
                           <div className="space-y-2">
-                            <label className="text-sm font-semibold">Input type</label>
+                            <label htmlFor={`field-${field.id}-type`} className="text-xs font-semibold text-muted-foreground">Input type</label>
                             <select
+                              id={`field-${field.id}-type`}
                               value={field.type}
                               onChange={(event) => updateField(field.id, "type", event.target.value)}
-                              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                              className={SELECT_CLASS_NAME}
                             >
                               {FIELD_TYPES.map((type) => (
                                 <option key={type.value} value={type.value}>
@@ -866,8 +912,9 @@ export default function TrainerFormsClient() {
                             </select>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-semibold">Placeholder</label>
+                            <label htmlFor={`field-${field.id}-placeholder`} className="text-xs font-semibold text-muted-foreground">Placeholder</label>
                             <Input
+                              id={`field-${field.id}-placeholder`}
                               value={field.placeholder}
                               onChange={(event) =>
                                 updateField(field.id, "placeholder", event.target.value)
@@ -877,8 +924,9 @@ export default function TrainerFormsClient() {
                           </div>
                           {field.type === "select" && (
                             <div className="space-y-2 md:col-span-2">
-                              <label className="text-sm font-semibold">Options</label>
+                              <label htmlFor={`field-${field.id}-options`} className="text-sm font-semibold">Options</label>
                               <Textarea
+                                id={`field-${field.id}-options`}
                                 value={(field.options || []).join("\n")}
                                 onChange={(event) =>
                                   updateField(
@@ -891,14 +939,16 @@ export default function TrainerFormsClient() {
                                   )
                                 }
                                 placeholder={"Option one\nOption two"}
+                                className="text-base md:text-sm"
                               />
                             </div>
                           )}
                         </>
                       )}
                       <div className="space-y-2 md:col-span-2">
-                        <label className="text-sm font-semibold">Help text</label>
+                        <label htmlFor={`field-${field.id}-help`} className="text-xs font-semibold text-muted-foreground">Help text</label>
                         <Input
+                          id={`field-${field.id}-help`}
                           value={field.helpText}
                           onChange={(event) => updateField(field.id, "helpText", event.target.value)}
                           placeholder="Optional hint under the field"
@@ -924,7 +974,7 @@ export default function TrainerFormsClient() {
                 </div>
               )}
 
-              <div id="forms-tour-submit-bar" className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div id="forms-tour-submit-bar" className="trainer-command-bar sticky bottom-4 z-20 flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm text-muted-foreground">
                   {mappedFieldCount} mapped, {customFieldCount} custom, JSON response saved.
                 </div>
@@ -936,8 +986,8 @@ export default function TrainerFormsClient() {
             </section>
           </form>
 
-          <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-            <section id="forms-tour-library" className="rounded-lg border bg-card p-5 shadow-sm">
+          <aside className="space-y-3 xl:sticky xl:top-5 xl:self-start">
+            <section id="forms-tour-library" className="trainer-panel p-4">
               <SectionTitle
                 icon={ClipboardList}
                 label="Library"
@@ -945,22 +995,22 @@ export default function TrainerFormsClient() {
                 detail="Share links, analytics, and saved JSON."
               />
 
-              <div className="mt-5 max-h-[480px] space-y-3 overflow-y-auto pr-1">
+              <div className="mt-4 max-h-[440px] space-y-2 overflow-y-auto pr-1">
                 {loading ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-dashed p-5 text-sm text-muted-foreground">
+                  <div className="trainer-empty flex items-center justify-center gap-2 p-4 text-sm">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Loading forms
                   </div>
                 ) : forms.length === 0 ? (
-                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  <div className="trainer-empty p-5 text-sm">
                     No trainer forms yet.
                   </div>
                 ) : (
                   forms.map((item) => (
-                    <div key={item.id} className="rounded-lg border bg-background p-4">
+                    <div key={item.id} className="trainer-panel-soft p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <h3 className="truncate text-sm font-bold">{item.title}</h3>
+                          <h3 className="truncate text-sm font-semibold">{item.title}</h3>
                           <p className="mt-1 text-xs text-muted-foreground">
                             {FORM_TYPES.find((type) => type.value === item.type)?.label || "General"} - {item.response_count || 0} responses
                           </p>
@@ -975,7 +1025,7 @@ export default function TrainerFormsClient() {
                           {item.class_name ? ` / ${item.class_name}` : ""}
                         </p>
                       )}
-                      <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="mt-3 grid grid-cols-3 gap-2">
                         <Button
                           type="button"
                           size="sm"
@@ -1004,14 +1054,14 @@ export default function TrainerFormsClient() {
               </div>
             </section>
 
-            <section id="forms-tour-draft-payload" className="rounded-lg border bg-card p-5 shadow-sm">
+            <section id="forms-tour-draft-payload" className="trainer-panel p-4">
               <SectionTitle
                 icon={FileJson}
                 label="Current draft"
                 title="Payload profile"
                 detail="Summary of the form being assembled."
               />
-              <div className="mt-5 grid gap-2 text-sm">
+              <div className="mt-4 grid gap-2 text-sm">
                 <DraftRow label="Type" value={selectedType.label} />
                 <DraftRow label="Status" value={form.status} />
                 <DraftRow label="Primary key" value={form.primary_key_label || form.primary_key_field} />
@@ -1026,11 +1076,11 @@ export default function TrainerFormsClient() {
       <button
         id="forms-tour-take-tour-btn"
         onClick={startTour}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full border border-primary/20 bg-card px-4 py-2.5 text-sm font-semibold text-foreground shadow-lg hover:bg-muted transition-all active:scale-95"
+        className="trainer-floating-help fixed bottom-5 right-5 z-50 grid h-11 w-11 place-items-center rounded-full text-foreground hover:bg-muted"
         title="Re-launch Forms tour"
+        aria-label="Re-launch Forms tour"
       >
         <HelpCircle className="h-4 w-4 text-primary" />
-        <span>Take Tour</span>
       </button>
     </div>
   );
@@ -1038,8 +1088,8 @@ export default function TrainerFormsClient() {
 
 function SectionEyebrow({ icon: Icon, label }) {
   return (
-    <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-      <Icon className="h-4 w-4" />
+    <div className="inline-flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+      <Icon className="h-3.5 w-3.5" />
       {label}
     </div>
   );
@@ -1049,7 +1099,7 @@ function SectionTitle({ icon: Icon, label, title, detail }) {
   return (
     <div>
       <SectionEyebrow icon={Icon} label={label} />
-      <h2 className="mt-1 text-lg font-bold tracking-tight">{title}</h2>
+      <h2 className="mt-0.5 text-base font-semibold">{title}</h2>
       {detail && <p className="mt-1 text-sm text-muted-foreground">{detail}</p>}
     </div>
   );
@@ -1057,11 +1107,11 @@ function SectionTitle({ icon: Icon, label, title, detail }) {
 
 function HeaderMetric({ label, value }) {
   return (
-    <div className="rounded-lg border bg-card px-3 py-2 text-center">
-      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="min-w-0 border-r px-3 py-2 text-center last:border-r-0">
+      <p className="truncate text-[11px] font-semibold text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-bold">{value}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
@@ -1072,10 +1122,11 @@ function IconButton({ icon: Icon, title, onClick, disabled = false, danger = fal
       type="button"
       variant="ghost"
       size="sm"
-      className={`h-8 w-8 p-0 ${danger ? "text-red-600 hover:text-red-700" : ""}`}
+      className={`h-9 w-9 p-0 ${danger ? "text-red-600 hover:text-red-700" : ""}`}
       disabled={disabled}
       onClick={onClick}
       title={title}
+      aria-label={title}
     >
       <Icon className="h-4 w-4" />
     </Button>
@@ -1084,7 +1135,7 @@ function IconButton({ icon: Icon, title, onClick, disabled = false, danger = fal
 
 function DraftRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2">
+    <div className="trainer-panel-soft flex items-center justify-between gap-3 px-3 py-2">
       <span className="text-muted-foreground">{label}</span>
       <span className="min-w-0 truncate font-semibold capitalize">{value || "-"}</span>
     </div>

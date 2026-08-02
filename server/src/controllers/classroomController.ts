@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { Context } from 'hono';
 import sql from '../db';
 import * as cheerio from 'cheerio';
@@ -24,13 +25,16 @@ import {
   normalizeClassroomUpdatePriorities,
 } from '../utils/classroomUpdatesSchema';
 import {
+  CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET,
   CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
   CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH,
   broadcastStudentThreadChange,
   buildStudentThreadStoragePath,
   createStudentThreadAttachmentSignedUrl,
-  ensureClassroomStudentThreadsSchema,
+  deleteStudentThreadAttachmentFromStorage,
   getClassroomStudentThreadAttachmentAccept,
+  issueStudentThreadRealtimeChannel,
+  listActiveStudentThreadRealtimeChannels,
   sanitizeAttachmentFilename,
   uploadStudentThreadAttachmentToStorage,
   validateStudentThreadAttachment,
@@ -350,17 +354,34 @@ export const changeUserPassword = async (c: Context) => {
 // -------------------------------------------------------------
 
 async function canManageClassroom(userId: string, classroomId: string): Promise<boolean> {
-  const userCheck = await sql`SELECT admin, trainer FROM users WHERE id = ${userId}`;
-  if (userCheck.length === 0) return false;
-  if (userCheck[0].admin) return true;
-  if (!userCheck[0].trainer) return false;
-
-  const ownerOrSubCheck = await sql`
-    SELECT id FROM classrooms WHERE id = ${classroomId} AND created_by = ${userId}
-    UNION
-    SELECT id FROM classroom_substitutes WHERE classroom_id = ${classroomId} AND trainer_id = ${userId}
+  const rows = await sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM users actor
+      WHERE actor.id = ${userId}
+        AND (
+          actor.admin IS TRUE
+          OR (
+            actor.trainer IS TRUE
+            AND (
+              EXISTS (
+                SELECT 1
+                FROM classrooms classroom
+                WHERE classroom.id = ${classroomId}
+                  AND classroom.created_by = ${userId}
+              )
+              OR EXISTS (
+                SELECT 1
+                FROM classroom_substitutes substitute
+                WHERE substitute.classroom_id = ${classroomId}
+                  AND substitute.trainer_id = ${userId}
+              )
+            )
+          )
+        )
+    ) AS can_manage
   `;
-  return ownerOrSubCheck.length > 0;
+  return Boolean(rows[0]?.can_manage);
 }
 
 const TAG_ALLOWED_REGEX = /^[a-z0-9][a-z0-9 +#._-]{0,39}$/i;
@@ -1090,10 +1111,6 @@ type StudentThreadSubmissionReference = {
   class_name?: string;
 };
 
-function getStudentThreadChannel(thread: any): string {
-  return `classroom-student-thread:${thread?.realtime_token || thread?.id || 'unknown'}`;
-}
-
 function normalizeThreadMetadataRecord(value: unknown, depth = 0): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const metadata: Record<string, unknown> = {};
@@ -1156,6 +1173,74 @@ function boundedPageLimit(value: unknown, fallback: number, max: number): number
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(1, Math.min(max, Math.floor(parsed)));
+}
+
+async function issueThreadRealtimeChannel(classroomId: string, thread: any, userId: string) {
+  return issueStudentThreadRealtimeChannel({
+    classroomId,
+    threadId: thread.id,
+    authorizedUserId: userId,
+    scope: 'thread',
+  });
+}
+
+async function issueManagerListRealtimeChannel(classroomId: string, userId: string) {
+  return issueStudentThreadRealtimeChannel({
+    classroomId,
+    authorizedUserId: userId,
+    scope: 'manager_list',
+  });
+}
+
+async function broadcastStudentThreadMessageChange(
+  thread: any,
+  message: any,
+  summary: any,
+  preloadedChannels?: string[]
+) {
+  if (!thread?.id || !thread?.classroom_id || !message?.id) return false;
+
+  const channels = preloadedChannels || await listActiveStudentThreadRealtimeChannels({
+    classroomId: thread.classroom_id,
+    threadId: thread.id,
+  });
+
+  if (channels.length === 0) return false;
+
+  const { is_own: _isOwn, sender_email: _senderEmail, sender_mist_id: _senderMistId, ...safeMessage } = message;
+  const safeSummary = summary ? {
+    id: summary.id,
+    classroom_id: summary.classroom_id,
+    student_id: summary.student_id,
+    updated_at: summary.updated_at,
+    revision: summary.revision,
+    last_message: summary.last_message,
+  } : null;
+  const correlationId = crypto.randomUUID();
+  const publishStartedAt = performance.now();
+  const delivered = await broadcastStudentThreadChange(channels, {
+    version: 2,
+    type: 'message_committed',
+    correlation_id: correlationId,
+    classroom_id: thread.classroom_id,
+    thread_id: thread.id,
+    student_id: thread.student_id,
+    message_id: message.id,
+    thread_revision: message.thread_revision,
+    committed_at: message.created_at,
+    message: safeMessage,
+    summary: safeSummary,
+  });
+  console.info('[student-thread-realtime] publish', {
+    correlationId,
+    classroomId: thread.classroom_id,
+    threadId: thread.id,
+    messageId: message.id,
+    revision: message.thread_revision,
+    delivered,
+    durationMs: Math.round(performance.now() - publishStartedAt),
+  });
+  return delivered;
 }
 
 async function resolveStudentThreadSubmissionReference(
@@ -1270,9 +1355,14 @@ async function resolveStudentThreadSubmissionReference(
 }
 
 function mapStudentThreadMessage(row: any, currentUserId: string) {
+  const metadata = row.metadata && typeof row.metadata === 'object' ? { ...row.metadata } : {};
+  if (row.client_message_id && !metadata.client_message_id) {
+    metadata.client_message_id = row.client_message_id;
+  }
   return {
     id: row.id,
     thread_id: row.thread_id,
+    thread_revision: Number(row.thread_revision || 0),
     sender_id: row.sender_id,
     sender_name: row.sender_name || (row.kind === 'system' ? 'Classroom event' : 'Unknown user'),
     sender_email: row.sender_email || '',
@@ -1280,7 +1370,7 @@ function mapStudentThreadMessage(row: any, currentUserId: string) {
     kind: row.kind || 'message',
     event_type: row.event_type,
     body: row.body || '',
-    metadata: row.metadata || {},
+    metadata,
     created_at: row.created_at,
     is_own: Boolean(row.sender_id && row.sender_id === currentUserId),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -1299,8 +1389,10 @@ function mapStudentThreadSummary(row: any) {
       mist_id: row.student_mist_id || '',
     },
     updated_at: row.thread_updated_at,
+    revision: Number(row.thread_revision || 0),
     last_message: row.last_message_id ? {
       id: row.last_message_id,
+      thread_revision: Number(row.last_message_thread_revision || 0),
       kind: row.last_message_kind,
       event_type: row.last_message_event_type,
       body: row.last_message_body,
@@ -1310,23 +1402,52 @@ function mapStudentThreadSummary(row: any) {
   };
 }
 
-async function getActiveStudentRowsForClassroom(classroomId: string, studentIds: string[] = []) {
-  await ensurePreEnrollmentSchema();
+function mapCommittedStudentThreadMessage(message: any, access: any, currentUserId: string) {
+  return mapStudentThreadMessage({
+    ...message,
+    sender_name: access.thread.actor_name,
+    sender_email: access.thread.actor_email,
+    sender_mist_id: access.thread.actor_mist_id,
+    attachments: Array.isArray(message.attachments) ? message.attachments : [],
+  }, currentUserId);
+}
+
+function buildCommittedStudentThreadSummary(access: any, message: any) {
+  return {
+    id: access.thread.id,
+    classroom_id: access.thread.classroom_id,
+    student_id: access.thread.student_id,
+    student: access.student,
+    updated_at: message.created_at,
+    revision: Number(message.thread_revision || 0),
+    last_message: {
+      id: message.id,
+      thread_revision: Number(message.thread_revision || 0),
+      kind: message.kind,
+      event_type: message.event_type,
+      body: message.body,
+      created_at: message.created_at,
+      sender_name: message.sender_name || '',
+    },
+  };
+}
+
+async function getStudentThreadsForActiveStudents(classroomId: string, studentIds: string[] = []) {
   const uniqueStudentIds = [...new Set(studentIds.map((id) => normalizeUuid(id)).filter((id): id is string => Boolean(id)))];
   if (studentIds.length > 0 && uniqueStudentIds.length === 0) return [];
 
   if (uniqueStudentIds.length > 0) {
     return sql`
-      SELECT cs.student_id,
-             u.full_name,
-             u.email,
-             u.mist_id,
-             u.admin,
-             u.trainer,
-             u.is_pre_enrolled,
-             cs.enrollment_status
+      SELECT t.*,
+             u.full_name AS student_name,
+             u.email AS student_email,
+             u.mist_id AS student_mist_id
       FROM classroom_students cs
       JOIN users u ON u.id = cs.student_id
+      JOIN classroom_student_threads t
+        ON t.classroom_id = cs.classroom_id
+       AND t.student_id = cs.student_id
+       AND t.status = 'active'
       WHERE cs.classroom_id = ${classroomId}
         AND cs.student_id = ANY(${uniqueStudentIds})
         AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
@@ -1337,16 +1458,16 @@ async function getActiveStudentRowsForClassroom(classroomId: string, studentIds:
   }
 
   return sql`
-    SELECT cs.student_id,
-           u.full_name,
-           u.email,
-           u.mist_id,
-           u.admin,
-           u.trainer,
-           u.is_pre_enrolled,
-           cs.enrollment_status
+    SELECT t.*,
+           u.full_name AS student_name,
+           u.email AS student_email,
+           u.mist_id AS student_mist_id
     FROM classroom_students cs
     JOIN users u ON u.id = cs.student_id
+    JOIN classroom_student_threads t
+      ON t.classroom_id = cs.classroom_id
+     AND t.student_id = cs.student_id
+     AND t.status = 'active'
     WHERE cs.classroom_id = ${classroomId}
       AND cs.enrollment_status = ${ENROLLMENT_ACTIVE}
       AND u.admin IS NOT TRUE
@@ -1355,104 +1476,156 @@ async function getActiveStudentRowsForClassroom(classroomId: string, studentIds:
   `;
 }
 
-async function ensureStudentThreadsForActiveStudents(classroomId: string, studentIds: string[] = []) {
-  await ensureClassroomStudentThreadsSchema();
-  const activeStudents = await getActiveStudentRowsForClassroom(classroomId, studentIds);
-  if (activeStudents.length === 0) return [];
-
-  await sql`
-    INSERT INTO classroom_student_threads ${sql(
-      activeStudents.map((student: any) => ({
-        classroom_id: classroomId,
-        student_id: student.student_id,
-      }))
-    )}
-    ON CONFLICT (classroom_id, student_id) DO NOTHING
-  `;
-
-  const activeStudentIds = activeStudents.map((student: any) => student.student_id);
-  return sql`
-    SELECT t.*,
-           u.full_name AS student_name,
-           u.email AS student_email,
-           u.mist_id AS student_mist_id
-    FROM classroom_student_threads t
-    JOIN users u ON u.id = t.student_id
-    WHERE t.classroom_id = ${classroomId}
-      AND t.student_id = ANY(${activeStudentIds})
-      AND t.status = 'active'
-  `;
-}
-
-async function getOrCreateStudentThread(classroomId: string, studentId: string) {
-  const threads = await ensureStudentThreadsForActiveStudents(classroomId, [studentId]);
-  return threads[0] || null;
-}
-
 async function getStudentThreadAccess(userId: string, classroomId: string, rawStudentId: string) {
   const studentId = normalizeUuid(rawStudentId);
   if (!studentId) return { error: 'Student is required', status: 400 as const };
 
-  const studentRows = await getActiveStudentRowsForClassroom(classroomId, [studentId]);
-  if (studentRows.length === 0) {
+  const rows = await sql`
+    SELECT t.*,
+           student.full_name AS student_name,
+           student.email AS student_email,
+           student.mist_id AS student_mist_id,
+           actor.full_name AS actor_name,
+           actor.email AS actor_email,
+           actor.mist_id AS actor_mist_id,
+           COALESCE(actor.admin, false)
+             OR (
+               COALESCE(actor.trainer, false)
+               AND (
+                 classroom.created_by = ${userId}
+                 OR EXISTS (
+                   SELECT 1
+                   FROM classroom_substitutes substitute
+                   WHERE substitute.classroom_id = classroom.id
+                     AND substitute.trainer_id = ${userId}
+                 )
+               )
+             ) AS is_manager
+    FROM classroom_students membership
+    JOIN users student ON student.id = membership.student_id
+    JOIN classrooms classroom ON classroom.id = membership.classroom_id
+    JOIN classroom_student_threads t
+      ON t.classroom_id = membership.classroom_id
+     AND t.student_id = membership.student_id
+     AND t.status = 'active'
+    LEFT JOIN users actor ON actor.id = ${userId}
+    WHERE membership.classroom_id = ${classroomId}
+      AND membership.student_id = ${studentId}
+      AND membership.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND student.admin IS NOT TRUE
+      AND student.trainer IS NOT TRUE
+      AND student.is_pre_enrolled IS NOT TRUE
+    LIMIT 1
+  `;
+  if (rows.length === 0) {
     return { error: 'This student cannot chat until they are an active classroom student.', status: 404 as const };
   }
 
-  const isManager = await canManageClassroom(userId, classroomId);
+  const thread = rows[0];
+  const isManager = Boolean(thread.is_manager);
   const isOwnStudent = studentId === userId;
   if (!isManager && !isOwnStudent) {
     return { error: 'Unauthorized', status: 403 as const };
   }
 
-  const thread = await getOrCreateStudentThread(classroomId, studentId);
-  if (!thread) return { error: 'Thread is unavailable for this student.', status: 404 as const };
-
-  const student = studentRows[0];
   return {
     isManager,
     thread,
     student: {
-      id: student.student_id,
-      full_name: student.full_name || 'Student',
-      email: student.email || '',
-      mist_id: student.mist_id || '',
+      id: thread.student_id,
+      full_name: thread.student_name || 'Student',
+      email: thread.student_email || '',
+      mist_id: thread.student_mist_id || '',
     },
   };
 }
 
 async function listStudentThreadSummaries(classroomId: string, studentIds: string[] = []) {
-  const threads = await ensureStudentThreadsForActiveStudents(classroomId, studentIds);
-  if (threads.length === 0) return [];
-  const threadIds = threads.map((thread: any) => thread.id);
-
-  const rows = await sql`
+  const uniqueStudentIds = [...new Set(studentIds.map((id) => normalizeUuid(id)).filter((id): id is string => Boolean(id)))];
+  if (studentIds.length > 0 && uniqueStudentIds.length === 0) return [];
+  const query = uniqueStudentIds.length > 0
+    ? sql`
     SELECT t.id AS thread_id,
            t.classroom_id,
            t.student_id,
            t.updated_at AS thread_updated_at,
+           t.revision AS thread_revision,
            u.full_name AS student_name,
            u.email AS student_email,
            u.mist_id AS student_mist_id,
            last_message.id AS last_message_id,
+           last_message.thread_revision AS last_message_thread_revision,
            last_message.kind AS last_message_kind,
            last_message.event_type AS last_message_event_type,
            last_message.body AS last_message_body,
            last_message.created_at AS last_message_created_at,
            last_sender.full_name AS last_message_sender_name
-    FROM classroom_student_threads t
+    FROM classroom_students membership
+    JOIN classroom_student_threads t
+      ON t.classroom_id = membership.classroom_id
+     AND t.student_id = membership.student_id
+     AND t.status = 'active'
     JOIN users u ON u.id = t.student_id
     LEFT JOIN LATERAL (
       SELECT m.*
       FROM classroom_student_thread_messages m
       WHERE m.thread_id = t.id
-      ORDER BY m.created_at DESC
+      ORDER BY m.created_at DESC, m.id DESC
       LIMIT 1
     ) last_message ON true
     LEFT JOIN users last_sender ON last_sender.id = last_message.sender_id
-    WHERE t.id = ANY(${threadIds})
+    WHERE membership.classroom_id = ${classroomId}
+      AND membership.student_id = ANY(${uniqueStudentIds})
+      AND membership.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND u.admin IS NOT TRUE
+      AND u.trainer IS NOT TRUE
+      AND u.is_pre_enrolled IS NOT TRUE
+    ORDER BY COALESCE(last_message.created_at, t.updated_at) DESC, u.full_name ASC
+  `
+    : sql`
+    SELECT t.id AS thread_id,
+           t.classroom_id,
+           t.student_id,
+           t.updated_at AS thread_updated_at,
+           t.revision AS thread_revision,
+           u.full_name AS student_name,
+           u.email AS student_email,
+           u.mist_id AS student_mist_id,
+           last_message.id AS last_message_id,
+           last_message.thread_revision AS last_message_thread_revision,
+           last_message.kind AS last_message_kind,
+           last_message.event_type AS last_message_event_type,
+           last_message.body AS last_message_body,
+           last_message.created_at AS last_message_created_at,
+           last_sender.full_name AS last_message_sender_name
+    FROM classroom_students membership
+    JOIN classroom_student_threads t
+      ON t.classroom_id = membership.classroom_id
+     AND t.student_id = membership.student_id
+     AND t.status = 'active'
+    JOIN users u ON u.id = t.student_id
+    LEFT JOIN LATERAL (
+      SELECT m.*
+      FROM classroom_student_thread_messages m
+      WHERE m.thread_id = t.id
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT 1
+    ) last_message ON true
+    LEFT JOIN users last_sender ON last_sender.id = last_message.sender_id
+    WHERE membership.classroom_id = ${classroomId}
+      AND membership.enrollment_status = ${ENROLLMENT_ACTIVE}
+      AND u.admin IS NOT TRUE
+      AND u.trainer IS NOT TRUE
+      AND u.is_pre_enrolled IS NOT TRUE
     ORDER BY COALESCE(last_message.created_at, t.updated_at) DESC, u.full_name ASC
   `;
+  const rows = await query;
   return rows.map(mapStudentThreadSummary);
+}
+
+async function getStudentThreadSummaryForStudent(classroomId: string, studentId: string) {
+  const summaries = await listStudentThreadSummaries(classroomId, [studentId]);
+  return summaries[0] || null;
 }
 
 async function listStudentThreadMessages(
@@ -1461,12 +1634,14 @@ async function listStudentThreadMessages(
   options: { before?: string | null; limit?: number } = {}
 ) {
   const limit = boundedPageLimit(options.limit, 40, 80);
-  const before = toIsoStringOrNull(options.before);
+  const before = parseStudentThreadCursor(options.before);
   const rows = before
     ? await sql`
         SELECT m.id,
                m.thread_id,
                m.sender_id,
+               m.thread_revision,
+               m.client_message_id,
                m.kind,
                m.event_type,
                m.body,
@@ -1492,7 +1667,7 @@ async function listStudentThreadMessages(
         LEFT JOIN users u ON u.id = m.sender_id
         LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
         WHERE m.thread_id = ${threadId}
-          AND m.created_at < ${before}::timestamptz
+          AND (m.created_at, m.id) < (${before.createdAt}::timestamptz, ${before.id}::uuid)
         GROUP BY m.id, u.full_name, u.email, u.mist_id
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT ${limit + 1}
@@ -1501,6 +1676,8 @@ async function listStudentThreadMessages(
         SELECT m.id,
                m.thread_id,
                m.sender_id,
+               m.thread_revision,
+               m.client_message_id,
                m.kind,
                m.event_type,
                m.body,
@@ -1536,7 +1713,7 @@ async function listStudentThreadMessages(
   return {
     messages,
     hasMore,
-    before: messages[0]?.created_at || null,
+    before: pageRows[0] ? encodeStudentThreadCursor(pageRows[0]) : null,
   };
 }
 
@@ -1546,12 +1723,14 @@ async function listStudentThreadEvents(
   options: { before?: string | null; limit?: number } = {}
 ) {
   const limit = boundedPageLimit(options.limit, 20, 80);
-  const before = toIsoStringOrNull(options.before);
+  const before = parseStudentThreadCursor(options.before);
   const rows = before
     ? await sql`
         SELECT m.id,
                m.thread_id,
                m.sender_id,
+               m.thread_revision,
+               m.client_message_id,
                m.kind,
                m.event_type,
                m.body,
@@ -1565,7 +1744,7 @@ async function listStudentThreadEvents(
         LEFT JOIN users u ON u.id = m.sender_id
         WHERE m.thread_id = ${threadId}
           AND m.kind = 'system'
-          AND m.created_at < ${before}::timestamptz
+          AND (m.created_at, m.id) < (${before.createdAt}::timestamptz, ${before.id}::uuid)
         ORDER BY m.created_at DESC, m.id DESC
         LIMIT ${limit + 1}
       `
@@ -1573,6 +1752,8 @@ async function listStudentThreadEvents(
         SELECT m.id,
                m.thread_id,
                m.sender_id,
+               m.thread_revision,
+               m.client_message_id,
                m.kind,
                m.event_type,
                m.body,
@@ -1594,15 +1775,19 @@ async function listStudentThreadEvents(
   return {
     events,
     hasMore,
-    before: events[events.length - 1]?.created_at || null,
+    before: rows[Math.min(limit, rows.length) - 1]
+      ? encodeStudentThreadCursor(rows[Math.min(limit, rows.length) - 1])
+      : null,
   };
 }
 
-async function getStudentThreadMessageById(messageId: string, currentUserId: string) {
+async function getStudentThreadMessageById(threadId: string, messageId: string, currentUserId: string) {
   const rows = await sql`
     SELECT m.id,
            m.thread_id,
            m.sender_id,
+           m.thread_revision,
+           m.client_message_id,
            m.kind,
            m.event_type,
            m.body,
@@ -1628,9 +1813,101 @@ async function getStudentThreadMessageById(messageId: string, currentUserId: str
     LEFT JOIN users u ON u.id = m.sender_id
     LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
     WHERE m.id = ${messageId}
+      AND m.thread_id = ${threadId}
     GROUP BY m.id, u.full_name, u.email, u.mist_id
   `;
   return rows[0] ? mapStudentThreadMessage(rows[0], currentUserId) : null;
+}
+
+function encodeStudentThreadCursor(row: any): string {
+  return Buffer.from(JSON.stringify({
+    createdAt: toIsoStringOrNull(row?.created_at),
+    id: normalizeUuid(row?.id),
+  })).toString('base64url');
+}
+
+function parseStudentThreadCursor(value: unknown): { createdAt: string; id: string } | null {
+  const text = normalizeText(value, 500);
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(text, 'base64url').toString('utf8'));
+    const createdAt = toIsoStringOrNull(parsed?.createdAt);
+    const id = normalizeUuid(parsed?.id);
+    return createdAt && id ? { createdAt, id } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function listStudentThreadMessagesAfterRevision(
+  threadId: string,
+  currentUserId: string,
+  afterRevision: number,
+  limitValue: unknown
+) {
+  const limit = boundedPageLimit(limitValue, 100, 200);
+  const rows = await sql`
+    SELECT m.id,
+           m.thread_id,
+           m.sender_id,
+           m.thread_revision,
+           m.client_message_id,
+           m.kind,
+           m.event_type,
+           m.body,
+           m.metadata,
+           m.created_at,
+           u.full_name AS sender_name,
+           u.email AS sender_email,
+           u.mist_id AS sender_mist_id,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'id', a.id,
+                 'original_filename', a.original_filename,
+                 'content_type', a.content_type,
+                 'size_bytes', a.size_bytes,
+                 'created_at', a.created_at
+               )
+               ORDER BY a.created_at ASC
+             ) FILTER (WHERE a.id IS NOT NULL),
+             '[]'::json
+           ) AS attachments
+    FROM classroom_student_thread_messages m
+    LEFT JOIN users u ON u.id = m.sender_id
+    LEFT JOIN classroom_student_thread_attachments a ON a.message_id = m.id
+    WHERE m.thread_id = ${threadId}
+      AND m.thread_revision > ${afterRevision}
+    GROUP BY m.id, u.full_name, u.email, u.mist_id
+    ORDER BY m.thread_revision ASC
+    LIMIT ${limit + 1}
+  `;
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  return {
+    messages: pageRows.map((row: any) => mapStudentThreadMessage(row, currentUserId)),
+    hasMore,
+    afterRevision: Number(pageRows[pageRows.length - 1]?.thread_revision || afterRevision),
+  };
+}
+
+async function getStudentThreadMessageByClientId(
+  threadId: string,
+  senderId: string,
+  clientMessageId: string,
+  currentUserId: string
+) {
+  const rows = await sql`
+    SELECT id
+    FROM classroom_student_thread_messages
+    WHERE thread_id = ${threadId}
+      AND sender_id = ${senderId}
+      AND client_message_id = ${clientMessageId}
+    LIMIT 1
+  `;
+  return rows[0]
+    ? getStudentThreadMessageById(threadId, rows[0].id, currentUserId)
+    : null;
 }
 
 async function insertStudentThreadMessage(input: {
@@ -1640,57 +1917,138 @@ async function insertStudentThreadMessage(input: {
   eventType?: string | null;
   body: string;
   metadata?: Record<string, unknown>;
+  clientMessageId?: string | null;
+  attachment?: {
+    uploaderId: string;
+    storageBucket: string;
+    storagePath: string;
+    originalFilename: string;
+    contentType: string;
+    sizeBytes: number;
+  };
 }) {
   const body = normalizeText(input.body, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
   if (!body) return null;
   const metadata = normalizeThreadMetadata(input.metadata);
-
+  const clientMessageId = normalizeText(input.clientMessageId, 160) || null;
+  const attachment = input.attachment || null;
   const rows = await sql`
-    INSERT INTO classroom_student_thread_messages (
-      thread_id,
-      sender_id,
-      kind,
-      event_type,
-      body,
-      metadata
+    WITH locked_thread AS MATERIALIZED (
+      SELECT id, revision
+      FROM classroom_student_threads
+      WHERE id = ${input.thread.id}
+        AND status = 'active'
+      FOR UPDATE
+    ),
+    existing_message AS MATERIALIZED (
+      SELECT message.*
+      FROM classroom_student_thread_messages message
+      JOIN locked_thread ON true
+      WHERE ${clientMessageId}::text IS NOT NULL
+        AND ${input.senderId}::uuid IS NOT NULL
+        AND message.thread_id = ${input.thread.id}
+        AND message.sender_id = ${input.senderId}
+        AND message.client_message_id = ${clientMessageId}
+      LIMIT 1
+    ),
+    inserted_message AS (
+      INSERT INTO classroom_student_thread_messages (
+        thread_id,
+        sender_id,
+        thread_revision,
+        client_message_id,
+        kind,
+        event_type,
+        body,
+        metadata
+      )
+      SELECT locked_thread.id,
+             ${input.senderId}::uuid,
+             locked_thread.revision + 1,
+             ${clientMessageId}::text,
+             ${input.kind},
+             ${input.eventType || null}::text,
+             ${body},
+             ${sql.json(metadata)}
+      FROM locked_thread
+      WHERE NOT EXISTS (SELECT 1 FROM existing_message)
+      ON CONFLICT (thread_id, sender_id, client_message_id)
+        WHERE sender_id IS NOT NULL AND client_message_id IS NOT NULL
+      DO NOTHING
+      RETURNING *
+    ),
+    updated_thread AS (
+      UPDATE classroom_student_threads thread
+      SET revision = inserted_message.thread_revision,
+          updated_at = now()
+      FROM inserted_message
+      WHERE thread.id = inserted_message.thread_id
+      RETURNING thread.id
+    ),
+    inserted_attachment AS (
+      INSERT INTO classroom_student_thread_attachments (
+        thread_id,
+        message_id,
+        uploader_id,
+        storage_bucket,
+        storage_path,
+        original_filename,
+        content_type,
+        size_bytes
+      )
+      SELECT inserted_message.thread_id,
+             inserted_message.id,
+             ${attachment?.uploaderId || null}::uuid,
+             ${attachment?.storageBucket || null}::text,
+             ${attachment?.storagePath || null}::text,
+             ${attachment?.originalFilename || null}::text,
+             ${attachment?.contentType || null}::text,
+             ${attachment?.sizeBytes || null}::bigint
+      FROM inserted_message
+      WHERE ${Boolean(attachment)}
+      RETURNING id, original_filename, content_type, size_bytes, created_at
+    ),
+    chosen_message AS (
+      SELECT inserted_message.*, true AS inserted
+      FROM inserted_message
+      UNION ALL
+      SELECT existing_message.*, false AS inserted
+      FROM existing_message
+      LIMIT 1
     )
-    VALUES (
-      ${input.thread.id},
-      ${input.senderId},
-      ${input.kind},
-      ${input.eventType || null},
-      ${body},
-      ${sql.json(metadata)}
-    )
-    RETURNING *
-  `;
-  const message = rows[0] || null;
-  await sql`
-    UPDATE classroom_student_threads
-    SET updated_at = now()
-    WHERE id = ${input.thread.id}
+    SELECT chosen_message.*,
+           COALESCE(
+             (SELECT json_agg(inserted_attachment ORDER BY inserted_attachment.created_at)
+              FROM inserted_attachment),
+             '[]'::json
+           ) AS attachments,
+           EXISTS (SELECT 1 FROM updated_thread) AS thread_updated
+    FROM chosen_message
   `;
 
-  if (message) {
-    void broadcastStudentThreadChange(getStudentThreadChannel(input.thread), {
-      thread_id: input.thread.id,
-      message_id: message.id,
-      kind: input.kind,
-      event_type: input.eventType || null,
-      created_at: message.created_at,
-    });
+  if (rows.length === 0) {
+    const threadExists = await sql`
+      SELECT 1
+      FROM classroom_student_threads
+      WHERE id = ${input.thread.id}
+        AND status = 'active'
+      LIMIT 1
+    `;
+    if (threadExists.length === 0) throw new Error('Thread is unavailable.');
+    throw new Error('Message idempotency conflict; retry the request.');
   }
 
-  return message;
+  const { inserted, thread_updated: _threadUpdated, ...message } = rows[0];
+  return { message, inserted: Boolean(inserted) };
 }
 
 async function appendStudentThreadEvent(classroomId: string, studentIds: string[], event: StudentThreadEventOptions) {
   const uniqueStudentIds = [...new Set(studentIds.map((id) => normalizeUuid(id)).filter((id): id is string => Boolean(id)))];
   if (uniqueStudentIds.length === 0) return [];
-  const threads = await ensureStudentThreadsForActiveStudents(classroomId, uniqueStudentIds);
+  const threads = await getStudentThreadsForActiveStudents(classroomId, uniqueStudentIds);
   const messages = [];
   for (const thread of threads) {
-    const message = await insertStudentThreadMessage({
+    const persisted = await insertStudentThreadMessage({
       thread,
       senderId: event.actorId || null,
       kind: 'system',
@@ -1698,7 +2056,14 @@ async function appendStudentThreadEvent(classroomId: string, studentIds: string[
       body: event.body,
       metadata: event.metadata,
     });
-    if (message) messages.push(message);
+    if (!persisted?.message) continue;
+    const [message, summary] = await Promise.all([
+      getStudentThreadMessageById(thread.id, persisted.message.id, event.actorId || ''),
+      getStudentThreadSummaryForStudent(classroomId, thread.student_id),
+    ]);
+    if (!message) continue;
+    await broadcastStudentThreadMessageChange(thread, message, summary);
+    messages.push(message);
   }
   return messages;
 }
@@ -1730,7 +2095,6 @@ async function getStudentIdsForTopicAssignments(classroomId: string, assignments
 }
 
 async function getStudentIdsForAssignedTopic(classroomId: string, topicId: string) {
-  await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
   const assignments = await sql`
     SELECT id, team_id, student_id
     FROM classroom_team_topic_assignments
@@ -4320,11 +4684,6 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
     const isAuthorized = await canManageClassroom(userId, classroomId);
     if (!isAuthorized) return c.json({ error: 'Unauthorized' }, 403);
 
-    // Ensure table structure and relax old constraints for individual student assignments
-    await sql`ALTER TABLE classroom_team_topic_assignments DROP CONSTRAINT IF EXISTS classroom_team_topic_assignments_unique;`;
-    await sql`ALTER TABLE classroom_team_topic_assignments ALTER COLUMN team_id DROP NOT NULL;`;
-    await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
-
     const body = await c.req.json();
     const targetType = body.targetType === 'student' ? 'student' : 'group';
 
@@ -4477,7 +4836,6 @@ export const getClassroomTopicAssignments = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
-    await sql`ALTER TABLE classroom_team_topic_assignments ADD COLUMN IF NOT EXISTS student_id uuid;`;
     const canAccess = await canAccessClassroom(userId, classroomId);
     if (!canAccess) return c.json({ error: 'Unauthorized' }, 403);
     const isManager = await canManageClassroom(userId, classroomId);
@@ -5437,21 +5795,26 @@ export const getClassroomStudentThreads = async (c: Context) => {
   const classroomId = c.req.param('id');
   const { id: userId } = c.get('jwtPayload');
   try {
-    await ensureClassroomStudentThreadsSchema();
     const isManager = await canManageClassroom(userId, classroomId);
-    const summaries = isManager
-      ? await listStudentThreadSummaries(classroomId)
-      : await listStudentThreadSummaries(classroomId, [userId]);
+    const includeRealtime = c.req.query('realtime') !== '0';
+    const [summaries, listRealtime] = await Promise.all([
+      isManager
+        ? listStudentThreadSummaries(classroomId)
+        : listStudentThreadSummaries(classroomId, [userId]),
+      isManager && includeRealtime
+        ? issueManagerListRealtimeChannel(classroomId, userId)
+        : Promise.resolve(null),
+    ]);
 
     if (!isManager && summaries.length === 0) {
       const access = await getStudentThreadAccess(userId, classroomId, userId);
       if ('error' in access) return c.json({ error: access.error }, access.status);
-      const refreshed = await listStudentThreadSummaries(classroomId, [userId]);
       return c.json({
         success: true,
         canManage: false,
         ownStudentId: userId,
-        threads: refreshed,
+        threads: [],
+        realtime: null,
         safeAttachments: {
           accept: getClassroomStudentThreadAttachmentAccept(),
           maxBytes: CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
@@ -5464,6 +5827,7 @@ export const getClassroomStudentThreads = async (c: Context) => {
       canManage: isManager,
       ownStudentId: isManager ? null : userId,
       threads: summaries,
+      realtime: listRealtime,
       safeAttachments: {
         accept: getClassroomStudentThreadAttachmentAccept(),
         maxBytes: CLASSROOM_STUDENT_THREAD_ATTACHMENT_MAX_BYTES,
@@ -5500,11 +5864,17 @@ export const getClassroomStudentThread = async (c: Context) => {
       });
     }
 
-    const messagePage = await listStudentThreadMessages(access.thread.id, userId, {
-      before: c.req.query('before') || c.req.query('beforeMessage') || c.req.query('before_message') || null,
-      limit: boundedPageLimit(c.req.query('messageLimit') || c.req.query('limit'), 40, 80),
-    });
-    const eventPage = await listStudentThreadEvents(access.thread.id, userId, { limit: 5 });
+    const includeRealtime = c.req.query('realtime') !== '0';
+    const [messagePage, eventPage, realtime] = await Promise.all([
+      listStudentThreadMessages(access.thread.id, userId, {
+        before: c.req.query('before') || c.req.query('beforeMessage') || c.req.query('before_message') || null,
+        limit: boundedPageLimit(c.req.query('messageLimit') || c.req.query('limit'), 40, 80),
+      }),
+      listStudentThreadEvents(access.thread.id, userId, { limit: 5 }),
+      includeRealtime
+        ? issueThreadRealtimeChannel(classroomId, access.thread, userId)
+        : Promise.resolve(null),
+    ]);
 
     return c.json({
       success: true,
@@ -5514,10 +5884,8 @@ export const getClassroomStudentThread = async (c: Context) => {
         classroom_id: classroomId,
         student_id: access.thread.student_id,
         updated_at: access.thread.updated_at,
-        realtime: {
-          channel: getStudentThreadChannel(access.thread),
-          event: 'thread_changed',
-        },
+        revision: Number(access.thread.revision || 0),
+        realtime,
       },
       student: access.student,
       messages: messagePage.messages,
@@ -5540,6 +5908,115 @@ export const getClassroomStudentThread = async (c: Context) => {
   }
 };
 
+export const getClassroomStudentThreadMessagesAfterRevision = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  const rawAfterRevision = Number(c.req.query('afterRevision') || c.req.query('after_revision') || 0);
+  if (!Number.isSafeInteger(rawAfterRevision) || rawAfterRevision < 0) {
+    return c.json({ error: 'After revision must be a non-negative integer.' }, 400);
+  }
+
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const page = await listStudentThreadMessagesAfterRevision(
+      access.thread.id,
+      userId,
+      rawAfterRevision,
+      c.req.query('limit')
+    );
+    return c.json({
+      success: true,
+      threadId: access.thread.id,
+      threadRevision: Number(access.thread.revision || 0),
+      messages: page.messages,
+      page: {
+        hasMore: page.hasMore,
+        afterRevision: page.afterRevision,
+      },
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const postClassroomStudentThreadRealtimeCredentials = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const { id: userId } = c.get('jwtPayload');
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const scope = normalizeText(body?.scope, 40);
+
+    if (scope === 'manager_list') {
+      if (!(await canManageClassroom(userId, classroomId))) {
+        return c.json({ error: 'Unauthorized' }, 403);
+      }
+      const realtime = await issueManagerListRealtimeChannel(classroomId, userId);
+      return c.json({ success: true, realtime });
+    }
+
+    if (scope !== 'thread') {
+      return c.json({ error: 'Realtime scope is invalid.' }, 400);
+    }
+    const requestedStudentId = body?.studentId === 'me' ? userId : body?.studentId;
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const realtime = await issueThreadRealtimeChannel(classroomId, access.thread, userId);
+    return c.json({
+      success: true,
+      threadId: access.thread.id,
+      threadRevision: Number(access.thread.revision || 0),
+      realtime,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomStudentThreadMessage = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const messageId = normalizeUuid(c.req.param('messageId'));
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  if (!messageId) return c.json({ error: 'Message is required' }, 400);
+
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const message = await getStudentThreadMessageById(access.thread.id, messageId, userId);
+    if (!message) return c.json({ error: 'Message not found' }, 404);
+
+    return c.json({ success: true, message });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const getClassroomStudentThreadSummary = async (c: Context) => {
+  const classroomId = c.req.param('id');
+  const studentIdParam = c.req.param('studentId');
+  const { id: userId } = c.get('jwtPayload');
+  const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+
+  try {
+    const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
+    if ('error' in access) return c.json({ error: access.error }, access.status);
+
+    const summary = await getStudentThreadSummaryForStudent(classroomId, access.thread.student_id);
+    if (!summary) return c.json({ error: 'Thread summary not found' }, 404);
+
+    return c.json({ success: true, summary });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 export const postClassroomStudentThreadMessage = async (c: Context) => {
   const classroomId = c.req.param('id');
   const studentIdParam = c.req.param('studentId');
@@ -5550,6 +6027,9 @@ export const postClassroomStudentThreadMessage = async (c: Context) => {
     const body = normalizeText(message, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
     if (!body) return c.json({ error: 'Message content is required' }, 400);
     const normalizedClientMessageId = normalizeText(clientMessageId, 160);
+    if (!normalizedClientMessageId) {
+      return c.json({ error: 'Client message ID is required.' }, 400);
+    }
 
     const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
     if ('error' in access) return c.json({ error: access.error }, access.status);
@@ -5567,17 +6047,35 @@ export const postClassroomStudentThreadMessage = async (c: Context) => {
     if (normalizedClientMessageId) metadata.client_message_id = normalizedClientMessageId;
     if (referenceResult.reference) metadata.submission_reference = referenceResult.reference;
 
-    const inserted = await insertStudentThreadMessage({
+    const channelsPromise = listActiveStudentThreadRealtimeChannels({
+      classroomId,
+      threadId: access.thread.id,
+    }).catch(() => [] as string[]);
+    const persisted = await insertStudentThreadMessage({
       thread: access.thread,
       senderId: userId,
       kind: 'message',
       body,
       metadata,
+      clientMessageId: normalizedClientMessageId,
     });
-    if (!inserted) return c.json({ error: 'Message content is required' }, 400);
+    if (!persisted?.message) return c.json({ error: 'Message content is required' }, 400);
 
-    const saved = await getStudentThreadMessageById(inserted.id, userId);
-    return c.json({ success: true, message: saved });
+    const saved = persisted.inserted
+      ? mapCommittedStudentThreadMessage(persisted.message, access, userId)
+      : await getStudentThreadMessageById(access.thread.id, persisted.message.id, userId);
+    if (!saved) return c.json({ error: 'Saved message could not be loaded.' }, 500);
+    const summary = buildCommittedStudentThreadSummary(access, saved);
+    const realtimeDelivered = persisted.inserted
+      ? await broadcastStudentThreadMessageChange(access.thread, saved, summary, await channelsPromise)
+      : true;
+    return c.json({
+      success: true,
+      message: saved,
+      summary,
+      deduplicated: !persisted.inserted,
+      realtimeDelivered,
+    });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -5588,6 +6086,7 @@ export const postClassroomStudentThreadAttachment = async (c: Context) => {
   const studentIdParam = c.req.param('studentId');
   const { id: userId } = c.get('jwtPayload');
   const requestedStudentId = studentIdParam === 'me' ? userId : studentIdParam;
+  let cleanupStoragePath: string | null = null;
   try {
     const access = await getStudentThreadAccess(userId, classroomId, requestedStudentId);
     if ('error' in access) return c.json({ error: access.error }, access.status);
@@ -5613,6 +6112,9 @@ export const postClassroomStudentThreadAttachment = async (c: Context) => {
 
     const messageBody = normalizeText((parsed as any).message, CLASSROOM_STUDENT_THREAD_MAX_MESSAGE_LENGTH);
     const normalizedClientMessageId = normalizeText((parsed as any).clientMessageId, 160);
+    if (!normalizedClientMessageId) {
+      return c.json({ error: 'Client message ID is required.' }, 400);
+    }
     const referenceResult = await resolveStudentThreadSubmissionReference(
       classroomId,
       access.thread.student_id,
@@ -5626,6 +6128,16 @@ export const postClassroomStudentThreadAttachment = async (c: Context) => {
     if (normalizedClientMessageId) metadata.client_message_id = normalizedClientMessageId;
     if (referenceResult.reference) metadata.submission_reference = referenceResult.reference;
 
+    const existing = await getStudentThreadMessageByClientId(
+      access.thread.id,
+      userId,
+      normalizedClientMessageId,
+      userId
+    );
+    if (existing) {
+      return c.json({ success: true, message: existing, deduplicated: true, realtimeDelivered: true });
+    }
+
     const filename = sanitizeAttachmentFilename(file.name);
     const storagePath = buildStudentThreadStoragePath(classroomId, access.thread.id, filename);
     await uploadStudentThreadAttachmentToStorage({
@@ -5633,53 +6145,65 @@ export const postClassroomStudentThreadAttachment = async (c: Context) => {
       body: await file.arrayBuffer(),
       contentType: validation.contentType || file.type || 'application/octet-stream',
     });
+    cleanupStoragePath = storagePath;
 
-    const inserted = await insertStudentThreadMessage({
+    const channelsPromise = listActiveStudentThreadRealtimeChannels({
+      classroomId,
+      threadId: access.thread.id,
+    }).catch(() => [] as string[]);
+    const persisted = await insertStudentThreadMessage({
       thread: access.thread,
       senderId: userId,
       kind: 'message',
       body: messageBody || `Shared ${filename}`,
       metadata,
-    });
-    if (!inserted) return c.json({ error: 'Could not create attachment message.' }, 500);
-
-    const attachmentRows = await sql`
-      INSERT INTO classroom_student_thread_attachments (
-        thread_id,
-        message_id,
-        uploader_id,
-        storage_bucket,
-        storage_path,
-        original_filename,
-        content_type,
-        size_bytes
-      )
-      VALUES (
-        ${access.thread.id},
-        ${inserted.id},
-        ${userId},
-        ${CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET},
-        ${storagePath},
-        ${filename},
-        ${validation.contentType || file.type || 'application/octet-stream'},
-        ${Math.floor(Number(file.size || 0))}
-      )
-      RETURNING id
-    `;
-
-    await appendStudentThreadEvent(classroomId, [access.thread.student_id], {
-      actorId: userId,
-      eventType: 'attachment_shared',
-      body: `File shared: ${filename}.`,
-      metadata: {
-        attachment_id: attachmentRows[0]?.id || null,
-        filename,
+      clientMessageId: normalizedClientMessageId,
+      attachment: {
+        uploaderId: userId,
+        storageBucket: CLASSROOM_STUDENT_THREAD_ATTACHMENT_BUCKET,
+        storagePath,
+        originalFilename: filename,
+        contentType: validation.contentType || file.type || 'application/octet-stream',
+        sizeBytes: Math.floor(Number(file.size || 0)),
       },
     });
+    if (!persisted?.message) throw new Error('Could not create attachment message.');
 
-    const saved = await getStudentThreadMessageById(inserted.id, userId);
-    return c.json({ success: true, message: saved });
+    if (!persisted.inserted) {
+      await deleteStudentThreadAttachmentFromStorage({ storagePath }).catch(() => false);
+      cleanupStoragePath = null;
+    } else {
+      cleanupStoragePath = null;
+    }
+
+    const saved = persisted.inserted
+      ? mapCommittedStudentThreadMessage(persisted.message, access, userId)
+      : await getStudentThreadMessageById(access.thread.id, persisted.message.id, userId);
+    if (!saved) return c.json({ error: 'Saved attachment message could not be loaded.' }, 500);
+    const summary = buildCommittedStudentThreadSummary(access, saved);
+    const realtimeDelivered = persisted.inserted
+      ? await broadcastStudentThreadMessageChange(access.thread, saved, summary, await channelsPromise)
+      : true;
+    return c.json({
+      success: true,
+      message: saved,
+      summary,
+      deduplicated: !persisted.inserted,
+      realtimeDelivered,
+    });
   } catch (error: any) {
+    if (cleanupStoragePath) {
+      const orphanedPath = cleanupStoragePath;
+      const removed = await deleteStudentThreadAttachmentFromStorage({ storagePath: orphanedPath })
+        .then(() => true)
+        .catch(() => false);
+      if (!removed) {
+        console.error('[student-thread-attachment] storage cleanup failed', {
+          classroomId,
+          storageObjectId: orphanedPath.split('/').slice(-1)[0]?.split('-').slice(0, 3).join('-') || 'unknown',
+        });
+      }
+    }
     return c.json({ error: error.message }, 500);
   }
 };

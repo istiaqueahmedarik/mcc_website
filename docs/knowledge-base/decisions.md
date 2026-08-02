@@ -1,5 +1,84 @@
 # Decisions
 
+## 2026-08-02 - design-skill-stack-for-new-interfaces - Required UI Design Skills
+
+Source:
+- User instruction on 2026-08-02
+- `AGENTS.md`
+- `/home/arik/.agents/skills/interface-design/SKILL.md`
+- `/home/arik/mcc_website/.agents/skills/apple-design/SKILL.md`
+- `/home/arik/mcc_website/.agents/skills/emil-design-eng/SKILL.md`
+
+Decision:
+When designing any new repository interface, Codex should load and apply `interface-design`, `apple-design`, and `emil-design-eng` before choosing layout, component structure, motion, or polish details. Use `interface-design` for intent, hierarchy, tokens, density, states, and design-system fit; `apple-design` for fluid direct manipulation, spatial consistency, material behavior, typography, and reduced motion; and `emil-design-eng` for animation purpose, timing/easing, press feedback, transform-origin polish, and UI review format.
+
+Applies when:
+Creating a new page, new product surface, new dashboard/tool/admin/classroom/trainer interface, or a new reusable UI component whose layout/motion/polish is being designed.
+
+Do not overgeneralize:
+This does not authorize retroactive UI cleanup, dependency additions, global design-system rewrites, server/API/schema/auth changes, or overriding approved MCC trainer/classroom decisions, Vercel Web Interface Guidelines, local shadcn/Radix/Tailwind/lucide patterns, or accessibility requirements.
+
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Private Canonical Realtime
+
+Source:
+- `docs/decisions/trainer-student-thread-instant-realtime-20260802-technical-decisions.md`
+- `docs/adr/0011-private-gap-free-classroom-thread-realtime.md`
+
+Decision:
+Student threads use server-managed Supabase Auth shadow identities with the same UUID as the MCC user and the least-expanding `anon` database role. Private receive-only Realtime policies bind `auth.uid()` to one unexpired server-issued registry topic. After a short idempotent transaction commits, the server awaits a private Broadcast carrying the canonical safe message and updated summary. Per-thread revisions plus catch-up after every subscribe/reconnect provide correctness; reads never provision threads, and stale browser responses are rejected by thread generation.
+
+Applies when:
+Changing student-thread Realtime auth, registry policies, canonical payloads, broadcast publication, thread revisions/catch-up, send transactions, idempotency, membership provisioning, or browser thread switching.
+
+Do not overgeneralize:
+Shadow access tokens are for Realtime only, never service-role or normal authenticated browser data access. Do not add a client Broadcast INSERT policy, public fallback, direct application-table writes, content logging, or reliance on Broadcast as durable storage.
+
+## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Realtime Hardening and Performance
+
+Source:
+- `docs/decisions/trainer-student-thread-realtime-hardening-performance-20260802-technical-decisions.md`
+- `docs/adr/0010-classroom-student-thread-realtime-hardening.md`
+
+Decision:
+Student-thread hardening must preserve ADR-0008's server-authorized, opaque-Realtime model while closing immediate exposure and latency gaps. Direct browser privileges on `classroom_student_threads`, `classroom_student_thread_messages`, and `classroom_student_thread_attachments` should be revoked and RLS enabled. Stable public per-thread topics should be replaced with server-issued scoped opaque topics for active thread panels and manager list views. Runtime DDL should move out of hot request paths into approved SQL. Realtime signals should fetch one changed message or summary where possible, not a full page.
+
+Applies when:
+Changing student-thread schema, RLS/grants, Supabase Realtime channels, thread broadcast fan-out, trainer thread list updates, thread message fetch APIs, attachment send ordering, or live thread fetch helpers.
+
+Do not overgeneralize:
+This is not approval for a full Supabase private-channel JWT bridge, direct browser writes to private thread tables, full message payloads in Realtime, global authenticated action rewrites, hidden polling, or broad unrelated database advisor cleanup.
+
+## 2026-08-02 - vercel-web-interface-guidelines-20260802 - Approved Agent Policy Scope
+
+Source:
+- `docs/rsd/vercel-web-interface-guidelines-20260802-rsd.md`
+- `docs/decisions/vercel-web-interface-guidelines-20260802-technical-decisions.md`
+- `docs/tasks/vercel-web-interface-guidelines-20260802-task-plan.md`
+- `docs/reviews/vercel-web-interface-guidelines-20260802-implementation-review.md`
+
+Decision:
+Future new pages and major page redesigns need durable Codex guidance to follow Vercel's Web Interface Guidelines as a quality baseline, while preserving approved project-specific trainer/classroom UI decisions and existing shadcn/Radix/Tailwind/lucide patterns. Link to the canonical Vercel guideline instead of copying the full checklist, require generated-interface review before handoff, update `AGENTS.md` and quality memory serially, and do not install external guideline tooling for this policy update. Implementation review approved this documentation-only policy change with no application code, server/API/schema/auth, dependency, or retroactive UI cleanup changes.
+
+Applies when:
+Creating or redesigning repository web pages, adding agent instructions for UI generation, or reviewing generated interface work.
+
+Do not overgeneralize:
+This approved RSD does not authorize retroactive cleanup of existing pages, external command installation, new dependencies, server/API/schema/auth changes, or replacing the repository's RSD approval workflow.
+
+## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Compact Trainer UI Scope
+
+Source:
+- `docs/decisions/trainer-compact-ui-cleanup-20260802-technical-decisions.md`
+
+Decision:
+Trainer compact UI cleanup must stay UI-only in `TrainerDashboardClient.js`, `TrainerFormsClient.js`, and `TrainerFormDetailClient.js`; preserve route paths, endpoint strings, state/handler semantics, authorization behavior, and existing workflows. Use a compact operations-index dashboard, two-zone form-builder workbench, response-first form detail, existing Tailwind/shadcn/lucide tools, and mini-laptop/mobile visual verification.
+
+Applies when:
+Changing trainer dashboard, trainer forms builder, trainer form detail, compact trainer UI patterns, tour launcher presentation, or trainer route presentation.
+
+Do not overgeneralize:
+Does not approve server/API/schema/auth changes, classroom live internals, new dependencies, route changes, or global design-system extraction.
+
 ## 2026-08-01 - trainer-submission-thread-bubbles-20260801 - Student Thread Submission References
 
 Source:
@@ -583,3 +662,24 @@ Changing classroom chat, problem/thread UI, attachment behavior, classroom realt
 
 Do not overgeneralize:
 Do not let browser-side Supabase writes bypass MCC JWT/classroom authorization, and do not treat realtime payloads as the source of message content.
+
+## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Private Canonical Broadcast With Revision Catch-Up
+
+Source:
+- `docs/decisions/trainer-student-thread-instant-realtime-20260802-technical-decisions.md`
+- `docs/adr/0011-private-gap-free-classroom-thread-realtime.md`
+- `docs/reviews/trainer-student-thread-instant-realtime-20260802-implementation-review.md`
+
+Decision:
+1. Supabase Realtime channels are private, receive-only, and authorized by a short-lived `anon` shadow JWT subject plus an unexpired per-user topic registry row.
+2. The server publishes the safe canonical committed message and trainer-list summary through the documented private REST batch Broadcast contract; receivers do not refetch each message.
+3. PostgreSQL per-thread revisions and an authorized `afterRevision` endpoint repair initial-subscribe, reconnect, and detected sequence gaps.
+4. Text and attachment sends are server-idempotent by client message ID and advance revision atomically.
+5. Registry renewal preserves the scoped random topic so multiple tabs for one user remain valid.
+6. Runtime classroom schema DDL is replaced by applied migration `20260802081644`.
+
+Applies when:
+Changing classroom thread Realtime, Supabase Auth integration, message persistence, channel renewal, or reconnect recovery.
+
+Do not overgeneralize:
+This supersedes ADR-0008's opaque-invalidation/refetch transport decision, but not its one-thread-per-active-student product model or server-owned attachment/access policy.
