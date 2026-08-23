@@ -93,7 +93,7 @@ const Navbar = async () => {
 
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="flex w-full items-center justify-between">
         <div className="flex items-center w-full space-x-8">
           <ProgressLink href="/" className="flex items-center space-x-2">
             <MccLogo w={60} h={60} />

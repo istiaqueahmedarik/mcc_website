@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
 import { UpdatesTab } from '@/components/UpdatesTab';
 import { PrioritySettings } from '@/components/PrioritySettings';
 import { ClassroomThreadsTab } from '@/components/ClassroomThreadsTab';
+import { ClassroomDiscordSettingsCard } from '@/components/ClassroomDiscordSettingsCard';
+import ClassroomContestPanel from '@/components/ClassroomContestPanel';
+import DiscordConnectionRequiredCard from '@/components/DiscordConnectionRequiredCard';
 import { StudentThreadBubbleDock, getStudentThreadBubbleKey } from '@/components/StudentThreadBubbleDock';
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -23,6 +28,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -41,7 +54,7 @@ import {
 } from "@/components/ui/command";
 import {
   Play, Square, BookOpen, Clock, MessageSquare, CheckCircle2,
-  AlertCircle, Plus, Trash2, Award, FileText, HelpCircle,
+  AlertCircle, Plus, Trash2, Award, FileText, HelpCircle, Trophy,
   ChevronRight, Sparkles, ShieldCheck, Users,
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
   Check, ChevronsUpDown, X,
@@ -65,6 +78,39 @@ import { toast } from 'sonner';
 
 const LEGACY_PROBLEM_THREADS_VISIBLE = false;
 
+const TRAINER_PRIMARY_NAVIGATION = [
+  { value: 'updates', label: 'Updates', icon: Bell },
+  { value: 'live', label: 'Live', icon: Target, tourId: 'classroom-tour-tab-live' },
+  { value: 'topics', label: 'Topics', icon: Layers3, tourId: 'classroom-tour-tab-topics' },
+  { value: 'students', label: 'People', icon: Users, tourId: 'classroom-tour-tab-students' },
+];
+
+const TRAINER_SECONDARY_NAVIGATION = [
+  { value: 'threads', label: 'Threads', icon: MessageSquare },
+  { value: 'board', label: 'Board', icon: PenTool },
+  { value: 'analytics', label: 'Progress Matrix', icon: BarChart3 },
+  { value: 'contests', label: 'Contests', icon: Trophy },
+  { value: 'schedule', label: 'Schedule', icon: Calendar },
+  { value: 'attendance-summary', label: 'Attendance', icon: UserCheck },
+  { value: 'settings', label: 'Settings', icon: SlidersHorizontal },
+];
+
+const STUDENT_PRIMARY_NAVIGATION = [
+  { value: 'updates', label: 'Updates', icon: Bell },
+  { value: 'topics', label: 'Topics', icon: Layers3, tourId: 'student-tour-tab-topics' },
+  { value: 'challenges', label: 'Challenges', icon: Award, tourId: 'student-tour-tab-challenges' },
+  { value: 'live', label: 'Live', icon: Target, tourId: 'student-tour-tab-live' },
+];
+
+const STUDENT_SECONDARY_NAVIGATION = [
+  { value: 'threads', label: 'Threads', icon: MessageSquare },
+  { value: 'contests', label: 'Contests', icon: Trophy },
+  { value: 'contest-progress', label: 'Contest Progress', icon: BarChart3 },
+  { value: 'people', label: 'Group & Roster', icon: Users },
+  { value: 'attendance-summary', label: 'Attendance', icon: UserCheck },
+  { value: 'settings', label: 'Settings', icon: SlidersHorizontal },
+];
+
 const trainerClassroomSteps = [
   {
     popover: {
@@ -86,8 +132,8 @@ const trainerClassroomSteps = [
   {
     element: "#classroom-tour-tabs",
     popover: {
-      title: "🎛️ Navigation Tabs",
-      description: "These tabs are your control panel. Each one opens a different teaching tool — live practice, topic modules, whiteboard, group tracking, scheduling, and more.",
+      title: "🎛️ Primary Classroom Tools",
+      description: "Your four frequent destinations stay visible: Updates, Live, Topics, and People. Secondary teaching and administration tools live under More.",
       side: "bottom",
       align: "start",
     },
@@ -111,48 +157,21 @@ const trainerClassroomSteps = [
     },
   },
   {
-    element: "#classroom-tour-tab-board",
-    popover: {
-      title: "🖊️ Board Tab — Live Whiteboard",
-      description: "Draw on an interactive tldraw canvas and broadcast it live to all student screens simultaneously. Perfect for explaining algorithms, graphs, or problem intuitions.",
-      side: "bottom",
-      align: "start",
-    },
-  },
-  {
-    element: "#classroom-tour-tab-analytics",
-    popover: {
-      title: "👥 Groups Tab",
-      description: "View the group matrix: each column is a student, each row is a problem. See solve status, perceived difficulty ratings, and group-level statistics at a glance.",
-      side: "bottom",
-      align: "start",
-    },
-  },
-  {
-    element: "#classroom-tour-tab-schedule",
-    popover: {
-      title: "📅 Schedule Tab",
-      description: "Plan your upcoming sessions here. Set a date, session type (onsite/online), and duration. Start sessions directly from this tab when the time comes.",
-      side: "bottom",
-      align: "start",
-    },
-  },
-  {
-    element: "#classroom-tour-tab-attendance",
-    popover: {
-      title: "✅ Attendance Tab",
-      description: "Review attendance records for all past sessions. You can also open the attendance dialog from any session card under the Live tab to mark students as present, absent, late, or excused.",
-      side: "bottom",
-      align: "start",
-    },
-  },
-  {
     element: "#classroom-tour-tab-students",
     popover: {
       title: "👤 People Tab",
       description: "Browse the student roster, view group assignments, and check who is enrolled in this classroom. Useful for managing large cohorts.",
       side: "bottom",
       align: "start",
+    },
+  },
+  {
+    element: "#classroom-tour-more",
+    popover: {
+      title: "••• More Classroom Tools",
+      description: "Open Threads, Board, Progress Matrix, Contests, Schedule, Attendance, and Settings here. You can also right-click the navigation strip for the same shortcuts.",
+      side: "bottom",
+      align: "end",
     },
   },
   {
@@ -177,8 +196,8 @@ const studentClassroomSteps = [
   {
     element: "#student-tour-tabs",
     popover: {
-      title: "🗺️ Your Navigation Tabs",
-      description: "These tabs organise everything in your classroom. Switch between them to find topics, join live sessions, view your challenges, or see your teammates.",
+      title: "🗺️ Your Primary Classroom Tools",
+      description: "Updates, Topics, Challenges, and Live stay visible. Communication, contest progress, your roster, attendance, and settings live under More.",
       side: "bottom",
       align: "start",
     },
@@ -211,21 +230,12 @@ const studentClassroomSteps = [
     },
   },
   {
-    element: "#student-tour-tab-people",
+    element: "#student-tour-more",
     popover: {
-      title: "👫 Group & Roster",
-      description: "See who is in your group and the full classroom roster. Group assignments come from your trainer — you'll collaborate and compete as a group during live sessions.",
+      title: "••• More Classroom Tools",
+      description: "Open Threads, Contests, Contest Progress, Group & Roster, Attendance, and Settings here. Right-click the navigation strip for the same shortcuts.",
       side: "bottom",
-      align: "start",
-    },
-  },
-  {
-    element: "#student-tour-tab-attendance",
-    popover: {
-      title: "✅ Attendance",
-      description: "Check your personal attendance record across all sessions. Statuses include: present, late, very late, excused, and absent.",
-      side: "bottom",
-      align: "start",
+      align: "end",
     },
   },
   {
@@ -317,6 +327,82 @@ const getStudentStatusClass = (student) => {
   if (status === 'link_pending') return 'border-blue-500/25 bg-blue-500/10 text-blue-700';
   return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700';
 };
+const rosterStatusRank = {
+  link_pending: 0,
+  pre_enrolled: 1,
+  active: 2,
+};
+const peoplePanelTransition = {
+  duration: 0.16,
+  ease: [0.23, 1, 0.32, 1],
+};
+const peoplePanelExitTransition = {
+  duration: 0.1,
+  ease: [0.23, 1, 0.32, 1],
+};
+
+function getRosterStatusRank(student) {
+  return rosterStatusRank[getStudentEnrollmentStatus(student)] ?? 2;
+}
+
+function normalizeSearchText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getStudentSearchText(student) {
+  return [
+    getStudentDisplayName(student),
+    student?.email,
+    student?.mist_id,
+    getStudentStatusLabel(student),
+    student?.claimed_full_name,
+    student?.claimed_email,
+    student?.claimed_mist_id,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function getTeamSearchText(team) {
+  return [
+    team?.name,
+    ...(team?.members || []).flatMap((member) => [
+      getStudentDisplayName(member),
+      member?.email,
+      member?.mist_id,
+    ]),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function sortRosterStudents(students) {
+  return [...(students || [])].sort((a, b) => (
+    getRosterStatusRank(a) - getRosterStatusRank(b)
+    || getStudentDisplayName(a).localeCompare(getStudentDisplayName(b))
+    || String(a?.id || '').localeCompare(String(b?.id || ''))
+  ));
+}
+
+function teamHasStudent(team, studentId) {
+  if (!studentId) return false;
+  return (team?.members || []).some((member) => String(member.id) === String(studentId));
+}
+
+function sortTeamsForStudent(teams, studentId) {
+  return [...(teams || [])].sort((a, b) => (
+    Number(teamHasStudent(b, studentId)) - Number(teamHasStudent(a, studentId))
+    || String(a?.name || '').localeCompare(String(b?.name || ''))
+  ));
+}
+
+function filterStudentsByQuery(students, query) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return students;
+  return students.filter((student) => getStudentSearchText(student).includes(normalized));
+}
+
+function filterTeamsByQuery(teams, query) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return teams;
+  return teams.filter((team) => getTeamSearchText(team).includes(normalized));
+}
 
 function toDatetimeLocalValue(value) {
   if (!value) return '';
@@ -774,45 +860,401 @@ function byPositionThenTime(a, b) {
   return (a.position || 0) - (b.position || 0) || sortTimeOf(a) - sortTimeOf(b);
 }
 
-function MemberPreview({ members = [], limit = 4, compact = false }) {
-  const [expanded, setExpanded] = useState(false);
-  const safeMembers = Array.isArray(members) ? members : [];
-  const visibleMembers = expanded ? safeMembers : safeMembers.slice(0, limit);
-  const hiddenCount = Math.max(safeMembers.length - visibleMembers.length, 0);
+function ActionMenuItems({ actions, ItemComponent, SeparatorComponent }) {
+  return actions.map((action) => {
+    const Icon = action.icon;
+    const content = (
+      <>
+        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        <span className="min-w-0 flex-1 truncate">
+          {action.label}
+          {action.selected && <span className="sr-only"> (current)</span>}
+        </span>
+        {action.selected && <Check className="ml-auto h-4 w-4 shrink-0" aria-hidden="true" />}
+      </>
+    );
+    const itemClassName = `gap-2 ${action.destructive ? 'text-red-600 focus:text-red-600' : ''}`;
 
-  if (safeMembers.length === 0) {
-    return <p className="text-xs text-muted-foreground">No members assigned.</p>;
-  }
+    return (
+      <Fragment key={action.key || action.label}>
+        {action.separatorBefore && <SeparatorComponent />}
+        {action.href ? (
+          <ItemComponent asChild className={itemClassName} disabled={action.disabled}>
+            <a href={action.href} target={action.external ? '_blank' : undefined} rel={action.external ? 'noreferrer' : undefined}>
+              {content}
+            </a>
+          </ItemComponent>
+        ) : (
+          <ItemComponent
+            className={itemClassName}
+            disabled={action.disabled}
+            onSelect={(event) => action.onSelect?.(event)}
+          >
+            {content}
+          </ItemComponent>
+        )}
+      </Fragment>
+    );
+  });
+}
+
+function VisibleActionMenu({ actions, label, triggerId, triggerLabel, className = '' }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          id={triggerId}
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={`h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground active:scale-[0.98] ${className}`}
+          aria-label={triggerLabel}
+          onContextMenu={(event) => event.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={6} className="w-56 data-[state=open]:animate-none data-[state=closed]:animate-none motion-reduce:transition-none">
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <ActionMenuItems actions={actions} ItemComponent={DropdownMenuItem} SeparatorComponent={DropdownMenuSeparator} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ContextActionContent({ actions, label }) {
+  return (
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel>{label}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ActionMenuItems actions={actions} ItemComponent={ContextMenuItem} SeparatorComponent={ContextMenuSeparator} />
+    </ContextMenuContent>
+  );
+}
+
+function ClassroomRoleNavigation({ role, value, onSelect }) {
+  const trainer = role === 'trainer';
+  const primaryItems = trainer ? TRAINER_PRIMARY_NAVIGATION : STUDENT_PRIMARY_NAVIGATION;
+  const secondaryItems = trainer ? TRAINER_SECONDARY_NAVIGATION : STUDENT_SECONDARY_NAVIGATION;
+  const activeSecondaryItem = secondaryItems.find((item) => item.value === value);
+  const actions = secondaryItems.map((item) => ({
+    ...item,
+    key: item.value,
+    selected: item.value === value,
+    onSelect: () => onSelect(item.value),
+  }));
+  const moreId = trainer ? 'classroom-tour-more' : 'student-tour-more';
+  const tabsId = trainer ? 'classroom-tour-tabs' : 'student-tour-tabs';
+  const navigationLabel = trainer ? 'Trainer classroom sections' : 'Student classroom sections';
+  const moreLabel = activeSecondaryItem ? `More, current section: ${activeSecondaryItem.label}` : 'More classroom sections';
 
   return (
-    <div className="space-y-2 rounded-lg border bg-muted/20 p-2.5">
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-semibold text-muted-foreground">Members ({safeMembers.length})</span>
-        {safeMembers.length > limit && (
-          <Button
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <nav aria-label={navigationLabel} className="grid w-full grid-cols-5 gap-1 rounded-lg border bg-background p-1 sm:flex">
+          <TabsList id={tabsId} className="col-span-4 grid h-auto w-full grid-cols-4 gap-1 bg-transparent p-0 text-muted-foreground sm:flex sm:flex-1 sm:justify-start">
+            {primaryItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <TabsTrigger
+                  key={item.value}
+                  id={item.tourId}
+                  value={item.value}
+                  className="min-h-11 min-w-0 flex-col gap-1 rounded-md px-1 py-1.5 text-[10px] data-[state=active]:bg-foreground data-[state=active]:text-background sm:min-h-10 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                id={moreId}
+                type="button"
+                className={`inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[10px] font-medium outline-none ring-offset-background transition-[background-color,color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:min-h-10 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm ${
+                  activeSecondaryItem
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+                aria-label={moreLabel}
+                aria-current={activeSecondaryItem ? 'page' : undefined}
+              >
+                <MoreHorizontal className="h-4 w-4 shrink-0" />
+                <span>More</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={6} className="w-60 data-[state=open]:animate-none data-[state=closed]:animate-none motion-reduce:transition-none">
+              <DropdownMenuLabel>{activeSecondaryItem ? `Current: ${activeSecondaryItem.label}` : 'More classroom sections'}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <ActionMenuItems actions={actions} ItemComponent={DropdownMenuItem} SeparatorComponent={DropdownMenuSeparator} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </nav>
+      </ContextMenuTrigger>
+      <ContextActionContent actions={actions} label="More classroom sections" />
+    </ContextMenu>
+  );
+}
+
+function PeopleModeSwitch({ value, onChange, options, ariaLabel }) {
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="inline-flex min-h-10 items-center gap-1 rounded-md bg-muted/60 p-1 text-sm"
+    >
+      {options.map((option) => {
+        const active = value === option.value;
+        return (
+          <button
+            key={option.value}
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 px-2 text-[11px] font-semibold"
-            onClick={() => setExpanded((current) => !current)}
+            role="tab"
+            aria-selected={active}
+            onClick={(event) => onChange(option.value, event)}
+            className={`inline-flex min-h-8 items-center gap-1.5 rounded px-3 text-sm font-medium transition-[background-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] ${
+              active
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
           >
-            {expanded ? 'Show less' : `Show all ${safeMembers.length}`}
-          </Button>
-        )}
+            {option.icon}
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PeoplePanelMotion({ panelKey, animate, children }) {
+  return (
+    <MotionConfig reducedMotion="user">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={panelKey}
+          initial={animate ? { opacity: 0, transform: 'translateY(4px)' } : { opacity: 1, transform: 'translateY(0px)' }}
+          animate={{ opacity: 1, transform: 'translateY(0px)' }}
+          exit={animate ? { opacity: 0, transform: 'translateY(-4px)', transition: peoplePanelExitTransition } : { opacity: 1, transform: 'translateY(0px)', transition: { duration: 0 } }}
+          transition={animate ? peoplePanelTransition : { duration: 0 }}
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
+    </MotionConfig>
+  );
+}
+
+function PeopleSearchInput({ value, onChange, placeholder, className = '' }) {
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-10 min-w-0 pl-9 text-sm"
+      />
+    </div>
+  );
+}
+
+function PeopleEmptyState({ icon: Icon = Users, title, description }) {
+  return (
+    <div className="grid min-h-40 place-items-center rounded-lg bg-muted/20 px-4 py-8 text-center">
+      <div className="max-w-sm space-y-2">
+        <span className="mx-auto grid h-10 w-10 place-items-center rounded-md bg-background text-muted-foreground shadow-sm ring-1 ring-border/50">
+          <Icon className="h-5 w-5" />
+        </span>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        {description && <p className="text-xs leading-5 text-muted-foreground">{description}</p>}
       </div>
-      <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto pr-1">
-        {visibleMembers.map((member) => (
-          <Badge key={member.id} variant="outline" className={`${compact ? 'max-w-[180px]' : 'max-w-[240px]'} bg-background px-2 py-0.5 text-[11px] font-medium`}>
-            <span className="truncate">{getStudentLabelWithId(member)}</span>
-          </Badge>
-        ))}
-        {!expanded && hiddenCount > 0 && (
-          <Badge variant="secondary" className="px-2 py-0.5 text-[11px] font-semibold">
-            +{hiddenCount} more
-          </Badge>
+    </div>
+  );
+}
+
+function StudentIdentity({ student, compact = false }) {
+  const initial = getStudentDisplayName(student).charAt(0).toUpperCase() || 'S';
+  const studentId = getStudentIdLabel(student);
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span className={`${compact ? 'h-8 w-8 text-xs' : 'h-9 w-9 text-sm'} grid shrink-0 place-items-center rounded-full bg-primary/10 font-semibold text-primary`}>
+        {initial}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold leading-5 text-foreground">{getStudentDisplayName(student)}</p>
+        {studentId && <p className="truncate text-xs leading-5 text-muted-foreground">ID: {studentId}</p>}
+      </div>
+    </div>
+  );
+}
+
+function StudentPickerList({
+  students,
+  selectedIds,
+  onToggle,
+  searchQuery,
+  onSearchChange,
+  searchPlaceholder,
+  emptyText,
+  idPrefix,
+}) {
+  const filteredStudents = filterStudentsByQuery(students, searchQuery);
+
+  return (
+    <div className="space-y-3">
+      <PeopleSearchInput value={searchQuery} onChange={onSearchChange} placeholder={searchPlaceholder} />
+      <div className="rounded-lg bg-muted/20">
+        {filteredStudents.length === 0 ? (
+          <p className="px-3 py-5 text-center text-sm text-muted-foreground">{emptyText}</p>
+        ) : (
+          <ScrollArea className="max-h-[320px]">
+            <div className="divide-y divide-border/50">
+              {filteredStudents.map((student) => {
+                const inputId = `${idPrefix}-${student.id}`;
+                return (
+                  <div
+                    key={student.id}
+                    className="flex min-h-12 items-center gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                  >
+                    <Checkbox
+                      id={inputId}
+                      checked={selectedIds.includes(student.id)}
+                      onCheckedChange={() => onToggle(student.id)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer">
+                      <p className="truncate font-medium text-foreground">{getStudentLabelWithId(student)}</p>
+                      <p className="truncate text-xs text-muted-foreground">{student.email || getStudentStatusLabel(student)}</p>
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
         )}
       </div>
     </div>
+  );
+}
+
+function ReadOnlyRosterStudentRow({ student, current = false, onOpenDetails }) {
+  const triggerId = `classmate-actions-${student.id}`;
+  const actions = [
+    {
+      key: 'details',
+      label: 'View details',
+      icon: Info,
+      onSelect: () => onOpenDetails({ type: 'student', data: student }, triggerId),
+    },
+  ];
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/20 sm:px-4">
+          <StudentIdentity student={student} compact />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            {current && (
+              <Badge variant="secondary" className="bg-primary/10 text-xs font-medium text-primary">You</Badge>
+            )}
+            <Badge variant="outline" className={`text-[10px] font-medium ${getStudentStatusClass(student)}`}>
+              {getStudentStatusLabel(student)}
+            </Badge>
+            <VisibleActionMenu
+              actions={actions}
+              label="Classmate"
+              triggerId={triggerId}
+              triggerLabel={`More information about ${getStudentDisplayName(student)}`}
+            />
+          </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextActionContent actions={actions} label="Classmate" />
+    </ContextMenu>
+  );
+}
+
+function PeopleDetailsDialog({ target, isTrainer, onOpenChange, onCloseAutoFocus }) {
+  const open = Boolean(target);
+  const item = target?.data;
+  const student = target?.type === 'student' ? item : null;
+  const group = target?.type === 'group' ? item : null;
+  const members = group?.members || [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-h-[85vh] w-[calc(100%-2rem)] overflow-hidden p-0 sm:max-w-md motion-reduce:animate-none motion-reduce:transition-none"
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        <DialogHeader className="border-b px-5 py-4">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            {student ? <GraduationCap className="h-4 w-4 text-muted-foreground" /> : <Users className="h-4 w-4 text-muted-foreground" />}
+            {student ? 'Student details' : 'Group members'}
+          </DialogTitle>
+          <DialogDescription>
+            {student ? 'Identity and classroom enrollment information.' : group?.name || 'Classroom group'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {student ? (
+          <div className="space-y-4 px-5 py-4">
+            <StudentIdentity student={student} />
+            <dl className="divide-y rounded-lg border bg-muted/10 text-sm">
+              {[
+                ['Name', getStudentDisplayName(student)],
+                ['Student ID', getStudentIdLabel(student) || 'Not provided'],
+                ['Email', student.email || 'Not provided'],
+                ['Enrollment', getStudentStatusLabel(student)],
+              ].map(([label, value]) => (
+                <div key={label} className="grid gap-1 px-3 py-2.5 sm:grid-cols-[100px_minmax(0,1fr)]">
+                  <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+                  <dd className="min-w-0 break-words text-sm font-medium text-foreground">{value}</dd>
+                </div>
+              ))}
+            </dl>
+
+            {isTrainer && getStudentEnrollmentStatus(student) === 'link_pending' && (
+              <section className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+                <p className="text-xs font-semibold text-blue-700">Requested account match</p>
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <p className="break-words">{student.claimed_full_name || 'Name not provided'}</p>
+                  <p className="break-words">{student.claimed_mist_id ? `ID: ${student.claimed_mist_id}` : 'Student ID not provided'}</p>
+                  <p className="break-words">{student.claimed_email || 'Email not provided'}</p>
+                </div>
+              </section>
+            )}
+          </div>
+        ) : (
+          <div className="min-h-0 px-5 py-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="truncate text-sm font-semibold text-foreground">{group?.name || 'Group'}</p>
+              <Badge variant="secondary" className="shrink-0 text-xs">
+                {members.length} member{members.length === 1 ? '' : 's'}
+              </Badge>
+            </div>
+            {members.length === 0 ? (
+              <PeopleEmptyState icon={Users} title="No members assigned" description="The trainer can add members from the group actions menu." />
+            ) : (
+              <ScrollArea className="max-h-[360px] rounded-lg border">
+                <div className="divide-y">
+                  {members.map((member) => (
+                    <div key={member.id} className="px-3 py-3">
+                      <StudentIdentity student={member} compact />
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -852,59 +1294,50 @@ function SubmissionReviewContent({ solutionLink, solutionCode, submissionNotes }
 function ResourceCard({ resource, classroomId, label = 'Resource' }) {
   const href = resourceReaderHref(classroomId, resource.id);
   const excerpt = resourceExcerpt(resource);
+  const actions = [
+    { key: 'read', label: 'Read page', icon: BookOpen, href },
+    ...(resource.url ? [{ key: 'source', label: 'Open source link', icon: ExternalLink, href: resource.url, external: true }] : []),
+  ];
 
   return (
-    <article className="group flex min-h-[190px] flex-col justify-between rounded-lg border bg-card p-4 transition-colors hover:border-foreground/20 hover:bg-muted/10">
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border bg-muted/40 text-muted-foreground">
-              <BookOpen className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <Badge variant="outline" className="mb-2 text-[10px] text-muted-foreground">
-                {label}
-              </Badge>
-              <h3 className="line-clamp-2 text-sm font-bold text-foreground">{resource.title}</h3>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <article className="group flex min-h-[156px] flex-col justify-between rounded-lg border bg-card p-4 transition-colors hover:border-foreground/20 hover:bg-muted/10">
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md border bg-muted/40 text-muted-foreground">
+                  <BookOpen className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <Badge variant="outline" className="mb-2 text-[10px] text-muted-foreground">
+                    {label}
+                  </Badge>
+                  <h3 className="line-clamp-2 text-sm font-bold text-foreground">{resource.title}</h3>
+                </div>
+              </div>
+              <VisibleActionMenu
+                actions={actions}
+                label="Resource"
+                triggerId={`resource-actions-${resource.id}`}
+                triggerLabel={`More actions for ${resource.title}`}
+                className="-mr-1 -mt-1"
+              />
             </div>
+            <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{excerpt}</p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                <MoreHorizontal className="h-4 w-4" />
+          <div className="mt-4 border-t pt-3" onContextMenu={(event) => event.stopPropagation()}>
+            <ProgressLink href={href}>
+              <Button size="sm" className="gap-2 font-semibold">
+                <BookOpen className="h-4 w-4" />
+                Read
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>Resource</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a href={href}>Read page</a>
-              </DropdownMenuItem>
-              {resource.url && (
-                <DropdownMenuItem asChild>
-                  <a href={resource.url} target="_blank" rel="noreferrer">Open source link</a>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{excerpt}</p>
-      </div>
-      <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
-        <ProgressLink href={href}>
-          <Button size="sm" className="gap-2 font-semibold">
-            <BookOpen className="h-4 w-4" />
-            Read
-          </Button>
-        </ProgressLink>
-        {resource.url && (
-          <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex max-w-[45%] items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
-            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">Source</span>
-          </a>
-        )}
-      </div>
-    </article>
+            </ProgressLink>
+          </div>
+        </article>
+      </ContextMenuTrigger>
+      <ContextActionContent actions={actions} label="Resource" />
+    </ContextMenu>
   );
 }
 
@@ -2665,6 +3098,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [discordGate, setDiscordGate] = useState(null);
   const [activeClass, setActiveClass] = useState(null);
   const [problems, setProblems] = useState([]);
   const [selectedPastClassId, setSelectedPastClassId] = useState('');
@@ -2677,6 +3111,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [studentLookupMethod, setStudentLookupMethod] = useState('email');
   const [studentAddLoading, setStudentAddLoading] = useState(false);
   const [studentImportOpen, setStudentImportOpen] = useState(false);
+  const [studentAddMode, setStudentAddMode] = useState('single');
   const [studentImport, setStudentImport] = useState(emptyStudentImportState);
   const [studentImportLoading, setStudentImportLoading] = useState(false);
   const [preEnrollOpen, setPreEnrollOpen] = useState(false);
@@ -2686,6 +3121,14 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [teamName, setTeamName] = useState('');
   const [teamStudentIds, setTeamStudentIds] = useState([]);
   const [teamFormError, setTeamFormError] = useState('');
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
+  const [teamMembersOpen, setTeamMembersOpen] = useState(false);
+  const [teamMemberSearchQuery, setTeamMemberSearchQuery] = useState('');
+  const [groupCreateSearchQuery, setGroupCreateSearchQuery] = useState('');
+  const [studentRemovalTarget, setStudentRemovalTarget] = useState(null);
+  const [studentRemoveLoading, setStudentRemoveLoading] = useState(false);
+  const [peopleDetailsTarget, setPeopleDetailsTarget] = useState(null);
+  const peopleDetailsReturnFocusIdRef = useRef('');
   const [className, setClassName] = useState('');
   const [classSchedule, setClassSchedule] = useState('');
   const [classScheduleEndTime, setClassScheduleEndTime] = useState('');
@@ -2696,7 +3139,16 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [visibleResourceCount, setVisibleResourceCount] = useState(RESOURCE_BATCH_SIZE);
   const [visibleProblemCount, setVisibleProblemCount] = useState(PROBLEM_BATCH_SIZE);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(HISTORY_BATCH_SIZE);
-  const [visiblePeopleCount, setVisiblePeopleCount] = useState(PEOPLE_BATCH_SIZE);
+  const [visibleRosterStudentCount, setVisibleRosterStudentCount] = useState(PEOPLE_BATCH_SIZE);
+  const [visibleRosterGroupCount, setVisibleRosterGroupCount] = useState(PEOPLE_BATCH_SIZE);
+  const [visibleStudentGroupCount, setVisibleStudentGroupCount] = useState(PEOPLE_BATCH_SIZE);
+  const [visibleClassmateCount, setVisibleClassmateCount] = useState(PEOPLE_BATCH_SIZE);
+  const [trainerPeopleView, setTrainerPeopleView] = useState('students');
+  const [studentPeopleView, setStudentPeopleView] = useState('groups');
+  const [trainerStudentSearchQuery, setTrainerStudentSearchQuery] = useState('');
+  const [trainerGroupSearchQuery, setTrainerGroupSearchQuery] = useState('');
+  const [studentGroupSearchQuery, setStudentGroupSearchQuery] = useState('');
+  const [studentClassmateSearchQuery, setStudentClassmateSearchQuery] = useState('');
   
   // CP Problem Assignment Form States
   const [assignTarget, setAssignTarget] = useState({ type: 'student', id: '' });
@@ -2795,6 +3247,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   // --- Deduplication: prevent overlapping concurrent fetches ---
   const fetchingDetails = useRef(false);
   const trackedIdeStudentIdRef = useRef('');
+  const peoplePanelAnimateRef = useRef(false);
 
   const classroom = data?.classroom;
   const students = data?.students || EMPTY_LIST;
@@ -2804,6 +3257,10 @@ export default function ClassroomLiveClient({ classroomId }) {
   const isTrainer = data?.isTrainer || false;
   const currentUserId = data?.currentUserId || '';
   const currentUser = useMemo(() => ({ id: currentUserId }), [currentUserId]);
+  const currentStudent = useMemo(
+    () => students.find((student) => String(student.id) === String(currentUserId)) || currentUser,
+    [currentUser, currentUserId, students],
+  );
   const [threadBubbles, setThreadBubbles] = useState([]);
   const [activeThreadBubbleKey, setActiveThreadBubbleKey] = useState('');
   const token = null;
@@ -2929,6 +3386,34 @@ export default function ClassroomLiveClient({ classroomId }) {
     setActiveThreadBubbleKey((current) => (current === key ? '' : key));
   }, []);
 
+  const switchPeoplePanel = (setter, currentValue, nextValue, event) => {
+    if (!nextValue || currentValue === nextValue) return;
+    peoplePanelAnimateRef.current = (event?.detail ?? 0) > 0;
+    setter(nextValue);
+  };
+
+  const handleTrainerPeopleViewChange = (nextValue, event) => {
+    switchPeoplePanel(setTrainerPeopleView, trainerPeopleView, nextValue, event);
+  };
+
+  const handleStudentPeopleViewChange = (nextValue, event) => {
+    switchPeoplePanel(setStudentPeopleView, studentPeopleView, nextValue, event);
+  };
+
+  const openPeopleDetails = (target, returnFocusId) => {
+    peopleDetailsReturnFocusIdRef.current = returnFocusId || '';
+    setPeopleDetailsTarget(target);
+  };
+
+  const restorePeopleDetailsFocus = (event) => {
+    const focusTarget = peopleDetailsReturnFocusIdRef.current
+      ? document.getElementById(peopleDetailsReturnFocusIdRef.current)
+      : null;
+    if (!focusTarget) return;
+    event.preventDefault();
+    window.requestAnimationFrame(() => focusTarget.focus());
+  };
+
   const classroomResources = resources.filter((resource) => !resource.class_id);
   const activeClassResources = activeClass
     ? resources.filter((resource) => resource.class_id === activeClass.id)
@@ -2955,18 +3440,35 @@ export default function ClassroomLiveClient({ classroomId }) {
     { label: 'Open', value: liveProgressStats.tried + liveProgressStats.notSolved, tone: 'border-blue-500/25 bg-blue-500/10 text-blue-600' },
   ];
   const visibleCompletedClasses = completedClasses.slice(0, visibleHistoryCount);
-  const visibleStudents = students.slice(0, visiblePeopleCount);
-  const preEnrollmentRosterStudents = students
-    .filter((student) => getStudentEnrollmentStatus(student) !== 'active')
-    .sort((a, b) => {
-      const aPending = getStudentEnrollmentStatus(a) === 'link_pending' ? 0 : 1;
-      const bPending = getStudentEnrollmentStatus(b) === 'link_pending' ? 0 : 1;
-      return aPending - bPending || getStudentDisplayName(a).localeCompare(getStudentDisplayName(b));
-    });
-  const activeRosterStudents = students.filter((student) => getStudentEnrollmentStatus(student) === 'active');
-  const visiblePreEnrollmentStudents = preEnrollmentRosterStudents.slice(0, visiblePeopleCount);
-  const visibleActiveRosterStudents = activeRosterStudents.slice(0, Math.max(visiblePeopleCount - visiblePreEnrollmentStudents.length, 0));
-  const visibleTeams = teams.slice(0, visiblePeopleCount);
+  const trainerSortedRosterStudents = useMemo(() => sortRosterStudents(students), [students]);
+  const trainerFilteredRosterStudents = useMemo(
+    () => filterStudentsByQuery(trainerSortedRosterStudents, trainerStudentSearchQuery),
+    [trainerSortedRosterStudents, trainerStudentSearchQuery]
+  );
+  const visibleTrainerRosterStudents = trainerFilteredRosterStudents.slice(0, visibleRosterStudentCount);
+  const visibleLinkPendingStudents = visibleTrainerRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'link_pending');
+  const visiblePreEnrolledStudents = visibleTrainerRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'pre_enrolled');
+  const visibleActiveRosterStudents = visibleTrainerRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'active');
+  const trainerLinkPendingCount = trainerFilteredRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'link_pending').length;
+  const trainerPreEnrolledCount = trainerFilteredRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'pre_enrolled').length;
+  const trainerActiveRosterCount = trainerFilteredRosterStudents.filter((student) => getStudentEnrollmentStatus(student) === 'active').length;
+  const trainerFilteredTeams = useMemo(
+    () => filterTeamsByQuery(teams, trainerGroupSearchQuery),
+    [teams, trainerGroupSearchQuery]
+  );
+  const visibleTrainerTeams = trainerFilteredTeams.slice(0, visibleRosterGroupCount);
+  const studentSortedTeams = useMemo(() => sortTeamsForStudent(teams, currentUserId), [teams, currentUserId]);
+  const studentFilteredTeams = useMemo(
+    () => filterTeamsByQuery(studentSortedTeams, studentGroupSearchQuery),
+    [studentSortedTeams, studentGroupSearchQuery]
+  );
+  const visibleStudentTeams = studentFilteredTeams.slice(0, visibleStudentGroupCount);
+  const studentFilteredClassmates = useMemo(
+    () => filterStudentsByQuery(sortRosterStudents(students), studentClassmateSearchQuery),
+    [students, studentClassmateSearchQuery]
+  );
+  const visibleClassmates = studentFilteredClassmates.slice(0, visibleClassmateCount);
+  const editingTeam = teams.find((team) => team.id === editingTeamId) || null;
   const resourceTargetClassId = resourceScope === 'active' && activeClass?.id ? activeClass.id : null;
   const pastStats = getProblemStats(pastClassProblems);
   const topicTotals = topics.reduce((totals, topic) => ({
@@ -3035,7 +3537,16 @@ export default function ClassroomLiveClient({ classroomId }) {
     try {
       const response = await fetch(`/api/classroom/${classroomId}`, { cache: 'no-store' });
       const res = await response.json();
+      if (response.status === 428 && res?.code === 'DISCORD_LINK_REQUIRED') {
+        setDiscordGate(res);
+        setError('');
+        setData(null);
+        setLoading(false);
+        fetchingDetails.current = false;
+        return;
+      }
       if (res && !res.error) {
+        setDiscordGate(null);
         setData(res);
         const active = res.classes.find(c => c.status === 'started');
         setActiveClass(active || null);
@@ -3051,9 +3562,11 @@ export default function ClassroomLiveClient({ classroomId }) {
           } catch (err) {}
         }
       } else {
+        setDiscordGate(null);
         setError(res?.error || 'Failed to load classroom');
       }
     } catch (err) {
+      setDiscordGate(null);
       setError('Failed to load classroom');
     }
     setLoading(false);
@@ -3369,10 +3882,22 @@ export default function ClassroomLiveClient({ classroomId }) {
   };
 
   const handleRemoveStudent = async (studentId) => {
-    if (!confirm('Are you sure you want to remove this student?')) return;
-    const res = await post_with_token(`classroom/${classroomId}/remove-student`, { studentId });
-    if (res && res.success) {
-      fetchClassroomDetails();
+    if (!studentId || studentRemoveLoading) return;
+    setStudentRemoveLoading(true);
+    const toastId = toast.loading('Removing student...');
+    try {
+      const res = await post_with_token(`classroom/${classroomId}/remove-student`, { studentId });
+      if (res && res.success) {
+        setStudentRemovalTarget(null);
+        fetchClassroomDetails();
+        toast.success('Student removed from classroom', { id: toastId });
+      } else {
+        toast.error(res?.error || 'Failed to remove student', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to remove student', { id: toastId });
+    } finally {
+      setStudentRemoveLoading(false);
     }
   };
 
@@ -3518,6 +4043,8 @@ export default function ClassroomLiveClient({ classroomId }) {
     if (res && res.success) {
       setTeamName('');
       setTeamStudentIds([]);
+      setGroupCreateSearchQuery('');
+      setGroupCreateOpen(false);
       fetchClassroomDetails();
     } else {
       setTeamFormError(res?.error || 'Failed to create group');
@@ -3529,9 +4056,16 @@ export default function ClassroomLiveClient({ classroomId }) {
     setEditingTeamStudentIds((team.members || []).map((member) => member.id));
   };
 
+  const openTeamMembersDialog = (team) => {
+    startEditingTeamMembers(team);
+    setTeamMemberSearchQuery('');
+    setTeamMembersOpen(true);
+  };
+
   const cancelEditingTeamMembers = () => {
     setEditingTeamId('');
     setEditingTeamStudentIds([]);
+    setTeamMemberSearchQuery('');
   };
 
   const handleToggleEditingTeamStudent = (studentId) => {
@@ -3550,11 +4084,13 @@ export default function ClassroomLiveClient({ classroomId }) {
     });
     setTeamUpdateLoading(false);
     if (res?.success) {
+      setTeamMembersOpen(false);
       cancelEditingTeamMembers();
       fetchClassroomDetails();
       fetchTopicData();
+      toast.success('Group members updated');
     } else {
-      alert(res?.error || 'Failed to update group members');
+      toast.error(res?.error || 'Failed to update group members');
     }
   };
 
@@ -3600,6 +4136,16 @@ export default function ClassroomLiveClient({ classroomId }) {
       setAttendanceSummaryLoading(false);
     }
   };
+
+  const selectClassroomTab = (setTab, nextTab) => {
+    setTab(nextTab);
+    if (nextTab === 'attendance-summary') {
+      fetchAttendanceSummary();
+    }
+  };
+
+  const handleTrainerTabChange = (nextTab) => selectClassroomTab(setTrainerTab, nextTab);
+  const handleStudentTabChange = (nextTab) => selectClassroomTab(setStudentTab, nextTab);
 
   const openAttendanceModal = async (classItem) => {
     setAttendanceClass(classItem);
@@ -4416,53 +4962,93 @@ export default function ClassroomLiveClient({ classroomId }) {
     const status = getStudentEnrollmentStatus(s);
     const approveKey = `${s.id}-approve`;
     const rejectKey = `${s.id}-reject`;
+    const triggerId = `student-actions-${s.id}`;
+    const actions = [
+      {
+        key: 'details',
+        label: 'View details',
+        icon: Info,
+        onSelect: () => openPeopleDetails({ type: 'student', data: s }, triggerId),
+      },
+      ...(status === 'link_pending' ? [
+        {
+          key: 'approve',
+          label: 'Approve account link',
+          icon: Check,
+          disabled: Boolean(preEnrollClaimLoading),
+          onSelect: () => handlePreEnrollmentClaim(s, 'approve'),
+        },
+        {
+          key: 'reject',
+          label: 'Reject account link',
+          icon: X,
+          disabled: Boolean(preEnrollClaimLoading),
+          onSelect: () => handlePreEnrollmentClaim(s, 'reject'),
+        },
+      ] : []),
+      {
+        key: 'remove',
+        label: 'Remove from classroom',
+        icon: Trash2,
+        separatorBefore: true,
+        destructive: true,
+        onSelect: () => setStudentRemovalTarget(s),
+      },
+    ];
 
     return (
-      <div key={s.id} className="flex items-start justify-between gap-3 border-b p-3 text-sm last:border-b-0 hover:bg-muted/10">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{getStudentLabelWithId(s)}</p>
-            <Badge variant="outline" className={`text-[10px] ${getStudentStatusClass(s)}`}>{getStudentStatusLabel(s)}</Badge>
+      <ContextMenu key={s.id}>
+        <ContextMenuTrigger asChild>
+          <div className="flex min-h-16 flex-col gap-3 px-3 py-3 transition-colors hover:bg-muted/20 sm:flex-row sm:items-start sm:justify-between sm:px-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <StudentIdentity student={s} />
+                <Badge variant="outline" className={`text-[10px] font-medium ${getStudentStatusClass(s)}`}>{getStudentStatusLabel(s)}</Badge>
+              </div>
+              {status === 'link_pending' && (
+                <p className="sm:ml-12 text-xs leading-5 text-blue-700">
+                  Match requested by {s.claimed_full_name || s.claimed_email || 'new account'}{s.claimed_mist_id ? ` [${s.claimed_mist_id}]` : ''}.
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-1">
+              {status === 'link_pending' && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 text-xs font-semibold active:scale-[0.98]"
+                    onClick={() => handlePreEnrollmentClaim(s, 'approve')}
+                    disabled={Boolean(preEnrollClaimLoading)}
+                  >
+                    {preEnrollClaimLoading === approveKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    Approve
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 text-xs font-semibold active:scale-[0.98]"
+                    onClick={() => handlePreEnrollmentClaim(s, 'reject')}
+                    disabled={Boolean(preEnrollClaimLoading)}
+                  >
+                    {preEnrollClaimLoading === rejectKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                    Reject
+                  </Button>
+                </>
+              )}
+              <VisibleActionMenu
+                actions={actions}
+                label="Student actions"
+                triggerId={triggerId}
+                triggerLabel={`More actions for ${getStudentDisplayName(s)}`}
+              />
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground">{s.email || (s.is_pre_enrolled ? 'No email added yet' : 'No email')}</p>
-          {status === 'link_pending' && (
-            <p className="text-xs text-blue-700">
-              Match requested by {s.claimed_full_name || s.claimed_email || 'new account'}{s.claimed_mist_id ? ` [${s.claimed_mist_id}]` : ''}.
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {status === 'link_pending' && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1 text-xs"
-                onClick={() => handlePreEnrollmentClaim(s, 'approve')}
-                disabled={Boolean(preEnrollClaimLoading)}
-              >
-                {preEnrollClaimLoading === approveKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Approve
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1 text-xs"
-                onClick={() => handlePreEnrollmentClaim(s, 'reject')}
-                disabled={Boolean(preEnrollClaimLoading)}
-              >
-                {preEnrollClaimLoading === rejectKey ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                Reject
-              </Button>
-            </>
-          )}
-          <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveStudent(s.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+        </ContextMenuTrigger>
+        <ContextActionContent actions={actions} label="Student actions" />
+      </ContextMenu>
     );
   };
 
@@ -4470,6 +5056,24 @@ export default function ClassroomLiveClient({ classroomId }) {
     return (
       <div className="flex justify-center items-center py-20 min-h-screen bg-background">
         <span className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></span>
+      </div>
+    );
+  }
+
+  if (discordGate) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="container mx-auto max-w-4xl px-4 py-10">
+          <ProgressLink href="/classroom/list" className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> All classrooms
+          </ProgressLink>
+          <DiscordConnectionRequiredCard
+            className="mt-6"
+            title="Connect Discord to enter this classroom"
+            description="This classroom has a Discord server attached. Link your Discord account once, then the bot will provision your private trainer channel when the worker reconciles the roster."
+            returnTo={`/classroom/live/${classroomId}`}
+          />
+        </main>
       </div>
     );
   }
@@ -4488,7 +5092,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   }
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
       <ProgressLink href="/classroom/list" className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> All classrooms
       </ProgressLink>
@@ -4559,45 +5163,8 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* ========================================================= */
             /* TRAINER BOARD PANELS                                      */
             /* ========================================================= */
-            <Tabs value={trainerTab} onValueChange={setTrainerTab} className="space-y-5">
-              <div className="flex flex-col gap-2 xl:flex-row xl:items-start">
-                <TabsList id="classroom-tour-tabs" className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border bg-background p-1 xl:flex-1">
-                  <TabsTrigger value="updates" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Bell className="h-4 w-4" /> Updates
-                  </TabsTrigger>
-                  <TabsTrigger value="threads" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <MessageSquare className="h-4 w-4" /> Threads
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Target className="h-4 w-4" /> Live
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Layers3 className="h-4 w-4" /> Topics
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-board" value="board" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <PenTool className="h-4 w-4" /> Board
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-analytics" value="analytics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <BarChart3 className="h-4 w-4" /> Progress Matrix
-                  </TabsTrigger>
-                  {/* TODO: Classroom IDE Feature (Beta Mode) - Hidden from active navigation for now. To re-enable, uncomment the TabsTrigger below: */}
-                  {/* <TabsTrigger value="ide" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Code2 className="h-4 w-4" /> IDE
-                  </TabsTrigger> */}
-                  <TabsTrigger id="classroom-tour-tab-schedule" value="schedule" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Calendar className="h-4 w-4" /> Schedule
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
-                    <UserCheck className="h-4 w-4" /> Attendance
-                  </TabsTrigger>
-                  <TabsTrigger id="classroom-tour-tab-students" value="students" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <Users className="h-4 w-4" /> People
-                  </TabsTrigger>
-                  <TabsTrigger value="settings" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                    <SlidersHorizontal className="h-4 w-4" /> Settings
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className="space-y-5">
+              <ClassroomRoleNavigation role="trainer" value={trainerTab} onSelect={handleTrainerTabChange} />
 
             <TabsContent value="updates" className="mt-4 space-y-4">
               <UpdatesTab classroomId={classroomId} isTrainer={true} token={token} currentUser={currentUser} active={trainerTab === 'updates'} />
@@ -4607,7 +5174,12 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <ClassroomThreadsTab classroomId={classroomId} isTrainer={true} currentUser={currentUser} onOpenBubble={openThreadBubble} />
               </TabsContent>
 
-              <TabsContent value="settings" className="mt-4">
+              <TabsContent value="contests" className="mt-4">
+                <ClassroomContestPanel classroomId={classroomId} students={students} teams={teams} isTrainer={true} />
+              </TabsContent>
+
+              <TabsContent value="settings" className="mt-4 space-y-4">
+                <ClassroomDiscordSettingsCard classroomId={classroomId} isTrainer={true} />
                 <PrioritySettings token={token} />
               </TabsContent>
 
@@ -6994,468 +7566,584 @@ export default function ClassroomLiveClient({ classroomId }) {
                 </Card>
               </TabsContent>
 
-                {/* STUDENTS & GROUPS TAB */}
-              <TabsContent value="students" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {/* STUDENTS MANAGEMENT */}
-                <Card className="rounded-lg border">
-                  <CollapsibleSectionHeader
-                    open={sectionOpen.students}
-                    onToggle={() => toggleSection('students')}
-                    title="Students"
-                    description="Enroll by email, Student ID, CSV, or pre-enroll missing accounts."
-                    Icon={GraduationCap}
-                  />
-                  {sectionOpen.students && (
-                  <CardContent className="space-y-4">
-                    <form onSubmit={handleAddStudent} className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)_auto_auto]">
-                      <select
-                        value={studentLookupMethod}
-                        onChange={(e) => {
-                          const nextMethod = e.target.value;
-                          setStudentLookupMethod(nextMethod);
-                          setStudentImport((current) => current.headers.length
-                            ? { ...current, mapping: guessStudentImportMapping(current.headers, nextMethod), result: null }
-                            : current);
-                        }}
-                        className="rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
-                      >
-                        <option value="email">Email</option>
-                        <option value="mist_id">Student ID</option>
-                      </select>
-                      <Input
-                        type={studentLookupMethod === 'email' ? 'email' : 'text'}
-                        placeholder={studentLookupMethod === 'email' ? 'Student email...' : 'Student ID...'}
-                        value={studentEmail}
-                        onChange={(e) => setStudentEmail(e.target.value)}
-                        required
-                      />
-                      <Button type="submit" className="gap-2 font-semibold" disabled={studentAddLoading}>
-                        {studentAddLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                        {studentAddLoading ? 'Adding' : 'Add'}
-                      </Button>
-                      <Dialog open={studentImportOpen} onOpenChange={setStudentImportOpen}>
-                        <DialogTrigger asChild>
-                          <Button type="button" variant="outline" className="gap-2 font-semibold">
-                            <FilePlus2 className="h-4 w-4" /> CSV
+                {/* PEOPLE TAB */}
+              <TabsContent value="students" className="space-y-4">
+                <section className="space-y-4" aria-label="Classroom people workspace">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        People
+                      </div>
+                      <h2 className="text-xl font-semibold tracking-tight text-foreground">Roster desk</h2>
+                      <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                        Add students, review account links, and shape groups without keeping every tool open at once.
+                      </p>
+                    </div>
+                    <PeopleModeSwitch
+                      value={trainerPeopleView}
+                      onChange={handleTrainerPeopleViewChange}
+                      ariaLabel="Trainer people views"
+                      options={[
+                        { value: 'students', label: 'Students', icon: <GraduationCap className="h-4 w-4" /> },
+                        { value: 'groups', label: 'Groups', icon: <Users className="h-4 w-4" /> },
+                      ]}
+                    />
+                  </div>
+
+                  <PeoplePanelMotion panelKey={`trainer-${trainerPeopleView}`} animate={peoplePanelAnimateRef.current}>
+                    {trainerPeopleView === 'students' ? (
+                      <section className="space-y-4" aria-label="Students roster">
+                        <div className="flex flex-col gap-3 rounded-lg bg-background/80 p-2 shadow-sm ring-1 ring-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:flex-row sm:items-center sm:justify-between">
+                          <PeopleSearchInput
+                            value={trainerStudentSearchQuery}
+                            onChange={setTrainerStudentSearchQuery}
+                            placeholder="Search students, IDs, emails, status..."
+                            className="flex-1"
+                          />
+                          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            <span className="rounded-md bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                              {trainerFilteredRosterStudents.length} of {students.length} students
+                            </span>
+                            {trainerLinkPendingCount > 0 && (
+                              <Badge variant="outline" className="border-blue-500/25 bg-blue-500/10 text-xs font-medium text-blue-700">
+                                {trainerLinkPendingCount} need review
+                              </Badge>
+                            )}
+                            <Button
+                              type="button"
+                              className="gap-2 font-semibold active:scale-[0.98]"
+                              onClick={() => {
+                                setStudentAddMode('single');
+                                setStudentImportOpen(true);
+                              }}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add students
+                            </Button>
+                          </div>
+                        </div>
+
+                        {trainerFilteredRosterStudents.length === 0 ? (
+                          <PeopleEmptyState
+                            icon={GraduationCap}
+                            title={trainerStudentSearchQuery ? 'No students match that search' : 'No students enrolled yet'}
+                            description={trainerStudentSearchQuery ? 'Try a name, Student ID, email, or status.' : 'Add one student or import a CSV to start building the classroom roster.'}
+                          />
+                        ) : (
+                          <div className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/50">
+                            <ScrollArea className="max-h-[560px]">
+                              <div className="divide-y divide-border/50">
+                                {visibleLinkPendingStudents.length > 0 && (
+                                  <div className="bg-blue-500/5">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4">
+                                      <div className="flex items-center gap-2 text-xs font-semibold text-blue-700">
+                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                        Needs attention ({trainerLinkPendingCount})
+                                      </div>
+                                      <span className="text-xs text-muted-foreground">Approve only after identity checks out.</span>
+                                    </div>
+                                    <div className="divide-y divide-blue-500/10">
+                                      {visibleLinkPendingStudents.map(renderTrainerRosterStudent)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {visiblePreEnrolledStudents.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center justify-between gap-2 px-3 py-2 sm:px-4">
+                                      <p className="text-xs font-semibold uppercase text-muted-foreground">Pre-enrolled ({trainerPreEnrolledCount})</p>
+                                      <span className="text-xs text-muted-foreground">Trainer planning only until linked.</span>
+                                    </div>
+                                    <div className="divide-y divide-border/50">
+                                      {visiblePreEnrolledStudents.map(renderTrainerRosterStudent)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {visibleActiveRosterStudents.length > 0 && (
+                                  <div>
+                                    <div className="px-3 py-2 sm:px-4">
+                                      <p className="text-xs font-semibold uppercase text-muted-foreground">Active students ({trainerActiveRosterCount})</p>
+                                    </div>
+                                    <div className="divide-y divide-border/50">
+                                      {visibleActiveRosterStudents.map(renderTrainerRosterStudent)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        )}
+
+                        {trainerFilteredRosterStudents.length > visibleRosterStudentCount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 font-semibold active:scale-[0.98]"
+                            onClick={() => setVisibleRosterStudentCount((count) => count + PEOPLE_BATCH_SIZE)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Show more students ({trainerFilteredRosterStudents.length - visibleRosterStudentCount} remaining)
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[760px]">
-                          <DialogHeader>
-                            <DialogTitle>Bulk add students from CSV</DialogTitle>
-                            <DialogDescription>
-                              Choose a local CSV, map the identifier column, preview, then import.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-[160px_minmax(0,1fr)]">
-                              <div>
-                                <label className="text-xs font-semibold">Lookup method</label>
+                        )}
+                      </section>
+                    ) : (
+                      <section className="space-y-4" aria-label="Groups roster">
+                        <div className="flex flex-col gap-3 rounded-lg bg-background/80 p-2 shadow-sm ring-1 ring-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:flex-row sm:items-center sm:justify-between">
+                          <PeopleSearchInput
+                            value={trainerGroupSearchQuery}
+                            onChange={setTrainerGroupSearchQuery}
+                            placeholder="Search groups or members..."
+                            className="flex-1"
+                          />
+                          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                            <span className="rounded-md bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                              {trainerFilteredTeams.length} of {teams.length} groups
+                            </span>
+                            <Button
+                              type="button"
+                              className="gap-2 font-semibold active:scale-[0.98]"
+                              onClick={() => setGroupCreateOpen(true)}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Create group
+                            </Button>
+                          </div>
+                        </div>
+
+                        {trainerFilteredTeams.length === 0 ? (
+                          <PeopleEmptyState
+                            icon={Users}
+                            title={trainerGroupSearchQuery ? 'No groups match that search' : 'No groups created yet'}
+                            description={trainerGroupSearchQuery ? 'Try a group name, member name, Student ID, or email.' : 'Create a group when you are ready to organize practice work.'}
+                          />
+                        ) : (
+                          <div className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/50">
+                            <ScrollArea className="max-h-[560px]">
+                              <div className="divide-y divide-border/50">
+                                {visibleTrainerTeams.map((team) => {
+                                  const triggerId = `trainer-group-actions-${team.id}`;
+                                  const actions = [
+                                    {
+                                      key: 'members',
+                                      label: 'View members',
+                                      icon: Users,
+                                      onSelect: () => openPeopleDetails({ type: 'group', data: team }, triggerId),
+                                    },
+                                    {
+                                      key: 'edit',
+                                      label: 'Edit members',
+                                      icon: Pencil,
+                                      onSelect: () => openTeamMembersDialog(team),
+                                    },
+                                  ];
+                                  return (
+                                    <ContextMenu key={team.id}>
+                                      <ContextMenuTrigger asChild>
+                                        <div className="flex min-h-14 items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/20 sm:px-4">
+                                          <div className="flex min-w-0 items-center gap-2">
+                                            <p className="truncate text-sm font-semibold text-foreground">{team.name}</p>
+                                            <Badge variant="secondary" className="shrink-0 bg-muted/80 text-xs font-medium text-muted-foreground">
+                                              {team.members?.length || 0} member{(team.members?.length || 0) === 1 ? '' : 's'}
+                                            </Badge>
+                                          </div>
+                                          <VisibleActionMenu
+                                            actions={actions}
+                                            label="Group actions"
+                                            triggerId={triggerId}
+                                            triggerLabel={`More actions for ${team.name}`}
+                                          />
+                                        </div>
+                                      </ContextMenuTrigger>
+                                      <ContextActionContent actions={actions} label="Group actions" />
+                                    </ContextMenu>
+                                  );
+                                })}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        )}
+
+                        {trainerFilteredTeams.length > visibleRosterGroupCount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 font-semibold active:scale-[0.98]"
+                            onClick={() => setVisibleRosterGroupCount((count) => count + PEOPLE_BATCH_SIZE)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Show more groups ({trainerFilteredTeams.length - visibleRosterGroupCount} remaining)
+                          </Button>
+                        )}
+                      </section>
+                    )}
+                  </PeoplePanelMotion>
+
+                  <Dialog open={studentImportOpen} onOpenChange={setStudentImportOpen}>
+                    <DialogContent className="sm:max-w-[780px]">
+                      <DialogHeader>
+                        <DialogTitle>Add students</DialogTitle>
+                        <DialogDescription>
+                          Add one student by email or Student ID, or import a CSV. Missing accounts continue into pre-enrollment review.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <PeopleModeSwitch
+                          value={studentAddMode}
+                          onChange={(nextMode) => setStudentAddMode(nextMode)}
+                          ariaLabel="Add students mode"
+                          options={[
+                            { value: 'single', label: 'Single', icon: <UserCheck className="h-4 w-4" /> },
+                            { value: 'csv', label: 'CSV', icon: <FilePlus2 className="h-4 w-4" /> },
+                          ]}
+                        />
+
+                        {studentAddMode === 'single' ? (
+                          <form onSubmit={handleAddStudent} className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Lookup method</label>
                                 <select
                                   value={studentLookupMethod}
-                                  onChange={(e) => {
-                                    const nextMethod = e.target.value;
+                                  onChange={(event) => {
+                                    const nextMethod = event.target.value;
                                     setStudentLookupMethod(nextMethod);
                                     setStudentImport((current) => current.headers.length
                                       ? { ...current, mapping: guessStudentImportMapping(current.headers, nextMethod), result: null }
                                       : current);
                                   }}
-                                  className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                   <option value="email">Email</option>
                                   <option value="mist_id">Student ID</option>
                                 </select>
                               </div>
-                              <div>
-                                <label className="text-xs font-semibold">CSV file</label>
-                                <Input className="mt-1" type="file" accept=".csv,text/csv" onChange={handleStudentCsvFile} />
-                                {studentImport.fileName && <p className="mt-1 text-xs text-muted-foreground">Loaded {studentImport.fileName}</p>}
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Student</label>
+                                <Input
+                                  type={studentLookupMethod === 'email' ? 'email' : 'text'}
+                                  placeholder={studentLookupMethod === 'email' ? 'student@email.com' : 'Student ID'}
+                                  value={studentEmail}
+                                  onChange={(event) => setStudentEmail(event.target.value)}
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button type="button" variant="outline" onClick={() => setStudentImportOpen(false)} disabled={studentAddLoading}>Close</Button>
+                              <Button type="submit" className="gap-2 font-semibold" disabled={studentAddLoading}>
+                                {studentAddLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {studentAddLoading ? 'Adding...' : 'Add student'}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="grid gap-3 rounded-lg bg-muted/20 p-3 sm:grid-cols-[160px_minmax(0,1fr)]">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">Lookup method</label>
+                                <select
+                                  value={studentLookupMethod}
+                                  onChange={(event) => {
+                                    const nextMethod = event.target.value;
+                                    setStudentLookupMethod(nextMethod);
+                                    setStudentImport((current) => current.headers.length
+                                      ? { ...current, mapping: guessStudentImportMapping(current.headers, nextMethod), result: null }
+                                      : current);
+                                  }}
+                                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                >
+                                  <option value="email">Email</option>
+                                  <option value="mist_id">Student ID</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-muted-foreground">CSV file</label>
+                                <Input type="file" accept=".csv,text/csv" onChange={handleStudentCsvFile} />
+                                {studentImport.fileName && <p className="text-xs text-muted-foreground">Loaded {studentImport.fileName}</p>}
                               </div>
                             </div>
 
                             {studentImport.parseError && (
-                              <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-600">{studentImport.parseError}</p>
+                              <p className="rounded-md bg-red-500/10 p-2 text-xs font-semibold text-red-600">{studentImport.parseError}</p>
                             )}
 
                             {studentImport.headers.length > 0 && (
                               <div className="space-y-3">
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  <div>
-                                    <label className="text-xs font-semibold">Student identifier column</label>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-muted-foreground">Student identifier column</label>
                                     <select
                                       value={studentImport.mapping.identifier}
-                                      onChange={(e) => updateStudentImportMapping('identifier', e.target.value)}
-                                      className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                      onChange={(event) => updateStudentImportMapping('identifier', event.target.value)}
+                                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                       <option value="">Choose column</option>
                                       {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
                                     </select>
                                   </div>
-                                  <div>
-                                    <label className="text-xs font-semibold">Name column for pre-enrollment</label>
+                                  <div className="space-y-1">
+                                    <label className="text-xs font-semibold text-muted-foreground">Name column for pre-enrollment</label>
                                     <select
                                       value={studentImport.mapping.fullName}
-                                      onChange={(e) => updateStudentImportMapping('fullName', e.target.value)}
-                                      className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                      onChange={(event) => updateStudentImportMapping('fullName', event.target.value)}
+                                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     >
                                       <option value="">Choose column if available</option>
                                       {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
                                     </select>
                                   </div>
                                   {studentLookupMethod === 'mist_id' && (
-                                    <div>
-                                      <label className="text-xs font-semibold">Email column (optional)</label>
+                                    <div className="space-y-1">
+                                      <label className="text-xs font-semibold text-muted-foreground">Email column (optional)</label>
                                       <select
                                         value={studentImport.mapping.email}
-                                        onChange={(e) => updateStudentImportMapping('email', e.target.value)}
-                                        className="mt-1 w-full rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-foreground"
+                                        onChange={(event) => updateStudentImportMapping('email', event.target.value)}
+                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                       >
                                         <option value="">Choose column if available</option>
                                         {studentImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
                                       </select>
                                     </div>
                                   )}
-                                  <div className="rounded-md border bg-card p-3 text-xs">
-                                    <p className="font-semibold">Preview</p>
-                                    <p className="mt-1 text-muted-foreground">{studentImportPreview.identifiers.length} unique identifiers ready.</p>
-                                    <p className="text-muted-foreground">{studentImportPreview.rows.filter((row) => row.fullName).length} rows have names ready.</p>
-                                    <p className="text-muted-foreground">{studentImportPreview.rowErrors.length} rows need attention.</p>
+                                  <div className="rounded-md bg-muted/20 p-3 text-xs leading-5 text-muted-foreground">
+                                    <p className="font-semibold text-foreground">Preview</p>
+                                    <p>{studentImportPreview.identifiers.length} unique identifiers ready.</p>
+                                    <p>{studentImportPreview.rows.filter((row) => row.fullName).length} rows have names ready.</p>
+                                    <p>{studentImportPreview.rowErrors.length} rows need attention.</p>
                                   </div>
                                 </div>
                                 {studentImportPreview.rowErrors.length > 0 && (
-                                  <div className="max-h-28 overflow-auto rounded-md border bg-muted/20 p-2 text-xs text-red-600">
+                                  <div className="max-h-28 overflow-auto rounded-md bg-red-500/10 p-2 text-xs text-red-600">
                                     {studentImportPreview.rowErrors.slice(0, 8).map((error, index) => (
                                       <p key={`${error.rowNumber}-${index}`}>Row {error.rowNumber}: {error.reason}</p>
                                     ))}
                                   </div>
                                 )}
                                 {studentImport.result?.summary && (
-                                  <div className="rounded-md border bg-emerald-50 p-2 text-xs text-emerald-700">
+                                  <div className="rounded-md bg-emerald-500/10 p-2 text-xs text-emerald-700">
                                     Added {studentImport.result.summary.added}; already enrolled {studentImport.result.summary.alreadyEnrolled}; not found {studentImport.result.summary.notFound}; invalid role {studentImport.result.summary.invalidRole}.
                                   </div>
                                 )}
                               </div>
                             )}
+                            <DialogFooter>
+                              <Button type="button" variant="outline" onClick={() => setStudentImportOpen(false)}>Close</Button>
+                              <Button type="button" className="gap-2 font-semibold" disabled={studentImportLoading || studentImportPreview.identifiers.length === 0} onClick={handleConfirmStudentImport}>
+                                {studentImportLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {studentImportLoading ? 'Importing...' : 'Import students'}
+                              </Button>
+                            </DialogFooter>
                           </div>
-                          <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setStudentImportOpen(false)}>Close</Button>
-                            <Button type="button" className="gap-2" disabled={studentImportLoading || studentImportPreview.identifiers.length === 0} onClick={handleConfirmStudentImport}>
-                              {studentImportLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                              {studentImportLoading ? 'Importing...' : 'Import students'}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </form>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
-                    <Dialog open={preEnrollOpen} onOpenChange={setPreEnrollOpen}>
-                      <DialogContent className="sm:max-w-[820px]">
-                        <DialogHeader>
-                          <DialogTitle>Pre-enroll missing students</DialogTitle>
-                          <DialogDescription>
-                            These students do not have MCC accounts yet. Add names so trainers can use them in groups, attendance, and problem assignment. Student dashboard access stays blocked until account link approval.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-3">
-                          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800">
-                            <p className="font-semibold">Security note</p>
-                            <p className="mt-1">Pre-enrollment creates trainer-side roster entries only. If a student later signs up with a matching ID/email, you must approve the account link before they can access this classroom.</p>
-                          </div>
-                          <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
-                            {preEnrollRows.map((row) => (
-                              <div key={row.rowKey} className="grid gap-2 rounded-md border bg-card p-3 sm:grid-cols-[90px_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
-                                <div className="text-xs text-muted-foreground">
-                                  <p className="font-semibold text-foreground">Row {row.rowNumber}</p>
-                                  <p>{row.lookupMethod === 'mist_id' ? 'Student ID' : 'Email'}</p>
-                                </div>
-                                <div>
-                                  <label className="text-xs font-semibold">Identifier</label>
-                                  <Input className="mt-1" value={row.identifier} disabled />
-                                </div>
-                                <div>
-                                  <label className="text-xs font-semibold">Student name</label>
-                                  <Input
-                                    className="mt-1"
-                                    value={row.fullName}
-                                    onChange={(e) => updatePreEnrollRow(row.rowKey, 'fullName', e.target.value)}
-                                    placeholder="Enter student name"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs font-semibold">Email (optional)</label>
-                                  <Input
-                                    className="mt-1"
-                                    value={row.email}
-                                    onChange={(e) => updatePreEnrollRow(row.rowKey, 'email', e.target.value)}
-                                    placeholder="student@email.com"
-                                  />
-                                </div>
+                  <Dialog open={preEnrollOpen} onOpenChange={setPreEnrollOpen}>
+                    <DialogContent className="sm:max-w-[820px]">
+                      <DialogHeader>
+                        <DialogTitle>Pre-enroll missing students</DialogTitle>
+                        <DialogDescription>
+                          These students do not have MCC accounts yet. Add names so trainers can use them in groups, attendance, and problem assignment. Student dashboard access stays blocked until account link approval.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-3">
+                        <div className="rounded-md bg-amber-500/10 p-3 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                          <p className="font-semibold">Security note</p>
+                          <p className="mt-1">Pre-enrollment creates trainer-side roster entries only. If a student later signs up with a matching ID/email, you must approve the account link before they can access this classroom.</p>
+                        </div>
+                        <div className="max-h-[360px] space-y-2 overflow-auto pr-1">
+                          {preEnrollRows.map((row) => (
+                            <div key={row.rowKey} className="grid gap-2 rounded-md bg-muted/20 p-3 sm:grid-cols-[90px_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)]">
+                              <div className="text-xs text-muted-foreground">
+                                <p className="font-semibold text-foreground">Row {row.rowNumber}</p>
+                                <p>{row.lookupMethod === 'mist_id' ? 'Student ID' : 'Email'}</p>
                               </div>
-                            ))}
+                              <div>
+                                <label className="text-xs font-semibold text-muted-foreground">Identifier</label>
+                                <Input className="mt-1" value={row.identifier} disabled />
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-muted-foreground">Student name</label>
+                                <Input
+                                  className="mt-1"
+                                  value={row.fullName}
+                                  onChange={(event) => updatePreEnrollRow(row.rowKey, 'fullName', event.target.value)}
+                                  placeholder="Enter student name"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-muted-foreground">Email (optional)</label>
+                                <Input
+                                  className="mt-1"
+                                  value={row.email}
+                                  onChange={(event) => updatePreEnrollRow(row.rowKey, 'email', event.target.value)}
+                                  placeholder="student@email.com"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {preEnrollRowsNeedingNames > 0 && (
+                          <p className="text-xs font-semibold text-red-600">{preEnrollRowsNeedingNames} students need names before confirmation.</p>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setPreEnrollOpen(false)} disabled={preEnrollLoading}>Cancel</Button>
+                        <Button type="button" className="gap-2 font-semibold" onClick={handleConfirmPreEnrollment} disabled={preEnrollLoading || preEnrollRows.length === 0 || preEnrollRowsNeedingNames > 0}>
+                          {preEnrollLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {preEnrollLoading ? 'Pre-enrolling...' : 'Create pre-enrolled students'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={Boolean(studentRemovalTarget)}
+                    onOpenChange={(open) => {
+                      if (!open && !studentRemoveLoading) setStudentRemovalTarget(null);
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-[440px]">
+                      <DialogHeader>
+                        <DialogTitle>Remove student?</DialogTitle>
+                        <DialogDescription>
+                          Remove {studentRemovalTarget ? getStudentDisplayName(studentRemovalTarget) : 'this student'} from this classroom roster. Trainer-created group and planning views will update after removal.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setStudentRemovalTarget(null)} disabled={studentRemoveLoading}>Cancel</Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="gap-2 font-semibold"
+                          onClick={() => handleRemoveStudent(studentRemovalTarget?.id)}
+                          disabled={studentRemoveLoading || !studentRemovalTarget?.id}
+                        >
+                          {studentRemoveLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                          Remove student
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={groupCreateOpen}
+                    onOpenChange={(open) => {
+                      setGroupCreateOpen(open);
+                      if (!open) {
+                        setTeamName('');
+                        setTeamStudentIds([]);
+                        setTeamFormError('');
+                        setGroupCreateSearchQuery('');
+                      }
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-[620px]">
+                      <DialogHeader>
+                        <DialogTitle>Create group</DialogTitle>
+                        <DialogDescription>Select roster members for a practice group. Pre-enrolled students remain available for trainer planning.</DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleCreateTeam} className="space-y-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Group name</label>
+                          <Input
+                            placeholder="e.g. MCC Alpha"
+                            value={teamName}
+                            onChange={(event) => {
+                              setTeamName(event.target.value);
+                              setTeamFormError('');
+                            }}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <label className="text-xs font-semibold text-muted-foreground">Members</label>
+                            <Badge variant="outline" className="text-[10px]">{teamStudentIds.length} selected</Badge>
                           </div>
-                          {preEnrollRowsNeedingNames > 0 && (
-                            <p className="text-xs font-semibold text-red-600">{preEnrollRowsNeedingNames} students need names before confirmation.</p>
+                          <StudentPickerList
+                            students={students}
+                            selectedIds={teamStudentIds}
+                            onToggle={(studentId) => {
+                              setTeamFormError('');
+                              setTeamStudentIds((current) => current.includes(studentId)
+                                ? current.filter((id) => id !== studentId)
+                                : [...current, studentId]);
+                            }}
+                            searchQuery={groupCreateSearchQuery}
+                            onSearchChange={setGroupCreateSearchQuery}
+                            searchPlaceholder="Search roster members..."
+                            emptyText="No roster members match that search."
+                            idPrefix="create-group-member"
+                          />
+                          {teamFormError && (
+                            <p className="flex items-center gap-1 text-xs font-semibold text-red-600">
+                              <AlertCircle className="h-3.5 w-3.5" />
+                              {teamFormError}
+                            </p>
                           )}
                         </div>
                         <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => setPreEnrollOpen(false)} disabled={preEnrollLoading}>Cancel</Button>
-                          <Button type="button" className="gap-2" onClick={handleConfirmPreEnrollment} disabled={preEnrollLoading || preEnrollRows.length === 0 || preEnrollRowsNeedingNames > 0}>
-                            {preEnrollLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                            {preEnrollLoading ? 'Pre-enrolling...' : 'Create pre-enrolled students'}
-                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setGroupCreateOpen(false)}>Cancel</Button>
+                          <Button type="submit" className="font-semibold">Create group</Button>
                         </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
 
-                    <div className="overflow-hidden rounded-lg border">
-                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Classroom roster ({students.length})</div>
-                      {students.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No students enrolled yet.</div>
-                      ) : (
-                        <ScrollArea className="h-[420px]">
-                          <div>
-                            {preEnrollmentRosterStudents.length > 0 && (
-                              <div className="group/pre-enroll border-b bg-amber-500/5">
-                                <div className="border-b border-amber-500/20 px-3 py-2">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <p className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                                      Pre-enrolled & pending links ({preEnrollmentRosterStudents.length})
-                                    </p>
-                                    <Badge variant="outline" className="border-amber-500/25 bg-amber-500/10 text-[10px] text-amber-700">
-                                      Trainer action first
-                                    </Badge>
-                                  </div>
-                                  <div className="mt-2 hidden gap-2 rounded-md border border-amber-500/20 bg-background/80 p-2 text-xs text-muted-foreground group-hover/pre-enroll:flex group-focus-within/pre-enroll:flex">
-                                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                                    <p>
-                                      Pre-enrolled students are usable for trainer planning, groups, attendance, and problem assignment. Link pending means a real account matched; approve it to give student classroom access.
-                                    </p>
-                                  </div>
-                                </div>
-                                {visiblePreEnrollmentStudents.map(renderTrainerRosterStudent)}
-                              </div>
-                            )}
-                            {visibleActiveRosterStudents.length > 0 && (
-                              <div>
-                                <div className="border-b bg-muted/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                  Active students ({activeRosterStudents.length})
-                                </div>
-                                {visibleActiveRosterStudents.map(renderTrainerRosterStudent)}
-                              </div>
-                            )}
-                          </div>
-                        </ScrollArea>
-                      )}
-                    </div>
-                    {students.length > visiblePeopleCount && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 font-semibold"
-                        onClick={() => setVisiblePeopleCount((count) => count + PEOPLE_BATCH_SIZE)}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        Show more people
-                      </Button>
-                    )}
-                  </CardContent>
-                  )}
-                </Card>
-
-                {/* GROUPS SETUP */}
-                <Card className="rounded-lg border">
-                  <CollapsibleSectionHeader
-                    open={sectionOpen.teams}
-                    onToggle={() => toggleSection('teams')}
-                    title="Groups"
-                    description="Group students for practice."
-                    Icon={Users}
-                  />
-                  {sectionOpen.teams && (
-                  <CardContent className="space-y-4">
-                    <form onSubmit={handleCreateTeam} className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold">Group Name</label>
-                        <Input 
-                          placeholder="e.g. MCC Alpha"
-                          value={teamName}
-                          onChange={(e) => {
-                            setTeamName(e.target.value);
-                            setTeamFormError('');
-                          }}
-                          required
+                  <Dialog
+                    open={teamMembersOpen}
+                    onOpenChange={(open) => {
+                      setTeamMembersOpen(open);
+                      if (!open) cancelEditingTeamMembers();
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-[620px]">
+                      <DialogHeader>
+                        <DialogTitle>Edit members</DialogTitle>
+                        <DialogDescription>
+                          {editingTeam ? `Update membership for ${editingTeam.name}.` : 'Update this group membership.'}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-2 rounded-md bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                          <span>{editingTeam?.members?.length || 0} currently assigned</span>
+                          <Badge variant="outline" className="text-[10px]">{editingTeamStudentIds.length} selected</Badge>
+                        </div>
+                        <StudentPickerList
+                          students={students}
+                          selectedIds={editingTeamStudentIds}
+                          onToggle={handleToggleEditingTeamStudent}
+                          searchQuery={teamMemberSearchQuery}
+                          onSearchChange={setTeamMemberSearchQuery}
+                          searchPlaceholder="Search roster members..."
+                          emptyText="No roster members match that search."
+                          idPrefix={`edit-group-member-${editingTeamId || 'team'}`}
                         />
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-semibold">Select Members</label>
-                        <div className="max-h-[140px] space-y-1.5 overflow-y-auto rounded-md border bg-background p-2">
-                          {students.map(s => {
-                            const inputId = `group-member-${s.id}`;
-                            return (
-                            <label key={s.id} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
-                              <input 
-                                id={inputId}
-                                type="checkbox" 
-                                checked={teamStudentIds.includes(s.id)}
-                                onChange={(e) => {
-                                  setTeamFormError('');
-                                  if (e.target.checked) setTeamStudentIds(prev => [...prev, s.id]);
-                                  else setTeamStudentIds(prev => prev.filter(id => id !== s.id));
-                                }}
-                              />
-                              <span>{getStudentLabelWithId(s)}</span>
-                            </label>
-                            );
-                          })}
-                        </div>
-                        {teamFormError && (
-                          <p className="flex items-center gap-1 text-xs font-semibold text-red-600">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            {teamFormError}
-                          </p>
-                        )}
-                      </div>
-                      <Button type="submit" className="w-full font-semibold">Create group</Button>
-                    </form>
-
-                    <div className="overflow-hidden rounded-lg border">
-                      <div className="border-b bg-muted/30 px-3 py-2 text-xs font-bold text-muted-foreground">Groups ({teams.length})</div>
-                      {teams.length === 0 ? (
-                        <div className="p-4 text-center text-sm text-muted-foreground">No groups created yet.</div>
-                      ) : (
-                        <ScrollArea className="h-[420px]">
-                          <div>
-                            {visibleTeams.map(t => (
-                              <div key={t.id} className="border-b p-3 text-sm last:border-b-0">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <p className="truncate font-bold">{t.name}</p>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                      {t.members?.length || 0} member{(t.members?.length || 0) === 1 ? '' : 's'} assigned
-                                    </p>
-                                  </div>
-                                  {editingTeamId === t.id ? (
-                                    <div className="flex shrink-0 gap-1">
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-1"
-                                        onClick={cancelEditingTeamMembers}
-                                        disabled={teamUpdateLoading}
-                                      >
-                                        <X className="h-3.5 w-3.5" />
-                                        Cancel
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        className="gap-1"
-                                        onClick={() => handleUpdateTeamMembers(t.id)}
-                                        disabled={teamUpdateLoading}
-                                      >
-                                        {teamUpdateLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                                        Save
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="gap-1"
-                                      onClick={() => startEditingTeamMembers(t)}
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                      Edit
-                                    </Button>
-                                  )}
-                                </div>
-                                {editingTeamId !== t.id && (
-                                  <div className="mt-3">
-                                    <MemberPreview members={t.members || []} limit={4} compact />
-                                  </div>
-                                )}
-                                {editingTeamId === t.id && (
-                                  <div className="mt-3 space-y-2 rounded-md border bg-muted/10 p-2">
-                                    <div className="flex items-center justify-between gap-2 text-xs">
-                                      <span className="font-semibold">Group members</span>
-                                      <Badge variant="outline" className="text-[10px]">
-                                        {editingTeamStudentIds.length} selected
-                                      </Badge>
-                                    </div>
-                                    <div className="max-h-[180px] space-y-1.5 overflow-y-auto">
-                                      {students.map(s => {
-                                        const inputId = `group-${t.id}-${s.id}-edit`;
-                                        return (
-                                        <label key={`${t.id}-${s.id}-edit`} htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded p-1 text-xs hover:bg-muted/50">
-                                          <input
-                                            id={inputId}
-                                            type="checkbox"
-                                            checked={editingTeamStudentIds.includes(s.id)}
-                                            onChange={() => handleToggleEditingTeamStudent(s.id)}
-                                          />
-                                          <span className="min-w-0 truncate">{getStudentLabelWithId(s)}</span>
-                                        </label>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      )}
-                    </div>
-                    {teams.length > visiblePeopleCount && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 font-semibold"
-                        onClick={() => setVisiblePeopleCount((count) => count + PEOPLE_BATCH_SIZE)}
-                      >
-                        <RefreshCw className="h-4 w-4" />
-                        Show more groups
-                      </Button>
-                    )}
-                  </CardContent>
-                  )}
-                </Card>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setTeamMembersOpen(false)} disabled={teamUpdateLoading}>Cancel</Button>
+                        <Button type="button" className="gap-2 font-semibold" onClick={() => handleUpdateTeamMembers(editingTeamId)} disabled={teamUpdateLoading || !editingTeamId}>
+                          {teamUpdateLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          Save members
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </section>
               </TabsContent>
             </Tabs>
           ) : (
             /* ========================================================= */
             /* STUDENT BOARD VIEWS                                       */
             /* ========================================================= */
-            <Tabs value={studentTab} onValueChange={setStudentTab} className="space-y-5">
-              <TabsList id="student-tour-tabs" className="h-auto w-full flex-wrap justify-start gap-1 rounded-lg border bg-background p-1">
-                <TabsTrigger value="updates" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Bell className="h-4 w-4" /> Updates
-                </TabsTrigger>
-                <TabsTrigger value="threads" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <MessageSquare className="h-4 w-4" /> Threads
-                </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-topics" value="topics" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Layers3 className="h-4 w-4" /> Topics
-                </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-challenges" value="challenges" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Award className="h-4 w-4" /> Challenges
-                </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-live" value="live" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Target className="h-4 w-4" /> Live Sessions &amp; IDE
-                </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-people" value="people" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <Users className="h-4 w-4" /> Group &amp; Roster
-                </TabsTrigger>
-                <TabsTrigger id="student-tour-tab-attendance" value="attendance-summary" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background" onClick={fetchAttendanceSummary}>
-                  <UserCheck className="h-4 w-4" /> Attendance
-                </TabsTrigger>
-                <TabsTrigger value="settings" className="gap-1.5 rounded-md data-[state=active]:bg-foreground data-[state=active]:text-background">
-                  <SlidersHorizontal className="h-4 w-4" /> Settings
-                </TabsTrigger>
-              </TabsList>
+            <Tabs value={studentTab} onValueChange={handleStudentTabChange} className="space-y-5">
+              <ClassroomRoleNavigation role="student" value={studentTab} onSelect={handleStudentTabChange} />
 
             <TabsContent value="updates" className="mt-4 space-y-4">
               <UpdatesTab classroomId={classroomId} isTrainer={false} token={token} currentUser={currentUser} active={studentTab === 'updates'} />
@@ -7465,8 +8153,31 @@ export default function ClassroomLiveClient({ classroomId }) {
                 <ClassroomThreadsTab classroomId={classroomId} isTrainer={false} currentUser={currentUser} onOpenBubble={openThreadBubble} />
               </TabsContent>
 
-              <TabsContent value="settings" className="mt-4">
+              <TabsContent value="settings" className="mt-4 space-y-4">
+                <ClassroomDiscordSettingsCard classroomId={classroomId} isTrainer={false} />
                 <PrioritySettings token={token} />
+              </TabsContent>
+
+              <TabsContent value="contests" className="mt-4">
+                <ClassroomContestPanel
+                  classroomId={classroomId}
+                  students={students}
+                  teams={teams}
+                  isTrainer={false}
+                  currentUser={currentStudent}
+                  initialStudentView="rankings"
+                />
+              </TabsContent>
+
+              <TabsContent value="contest-progress" className="mt-4">
+                <ClassroomContestPanel
+                  classroomId={classroomId}
+                  students={students}
+                  teams={teams}
+                  isTrainer={false}
+                  currentUser={currentStudent}
+                  initialStudentView="progress"
+                />
               </TabsContent>
 
               {/* TAB 1: TOPICS */}
@@ -7722,52 +8433,160 @@ export default function ClassroomLiveClient({ classroomId }) {
               </TabsContent>
 
               {/* TAB 4: GROUP & ROSTER */}
-              <TabsContent value="people">
-                <Card className="rounded-lg border">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Users className="h-5 w-5 text-primary" /> Group &amp; Classroom Members
-                    </CardTitle>
-                    <CardDescription>View your assigned group and classmates in this classroom.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Groups</h4>
-                      {teams.length === 0 ? (
-                        <p className="text-xs text-muted-foreground border border-dashed rounded-lg p-4">No groups created yet.</p>
-                      ) : (
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {visibleTeams.map((t) => (
-                            <div key={t.id} className="rounded-lg border p-3 bg-muted/10 space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="font-bold text-sm">{t.name}</span>
-                                <Badge variant="outline" className="text-[10px]">{t.members?.length || 0} members</Badge>
-                              </div>
-                              <MemberPreview members={t.members || []} limit={4} compact />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <hr />
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Classroom Roster</h4>
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {visibleStudents.map((s) => (
-                          <div key={s.id} className="flex items-center gap-2.5 rounded-lg border p-2.5 bg-card">
-                            <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                              {s.full_name ? s.full_name.charAt(0).toUpperCase() : 'S'}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-xs font-semibold">{getStudentLabelWithId(s)}</p>
-                              <p className="truncate text-[10px] text-muted-foreground">{s.email}</p>
-                            </div>
-                          </div>
-                        ))}
+              <TabsContent value="people" className="space-y-4">
+                <section className="space-y-4" aria-label="Student group and roster workspace">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        Group &amp; Roster
                       </div>
+                      <h2 className="text-xl font-semibold tracking-tight text-foreground">Classmates</h2>
+                      <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                        See your group first, then the rest of the classroom roster.
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+                    <PeopleModeSwitch
+                      value={studentPeopleView}
+                      onChange={handleStudentPeopleViewChange}
+                      ariaLabel="Student people views"
+                      options={[
+                        { value: 'groups', label: 'Groups', icon: <Users className="h-4 w-4" /> },
+                        { value: 'classmates', label: 'Classmates', icon: <GraduationCap className="h-4 w-4" /> },
+                      ]}
+                    />
+                  </div>
+
+                  <PeoplePanelMotion panelKey={`student-${studentPeopleView}`} animate={peoplePanelAnimateRef.current}>
+                    {studentPeopleView === 'groups' ? (
+                      <section className="space-y-4" aria-label="Student groups">
+                        <div className="flex flex-col gap-3 rounded-lg bg-background/80 p-2 shadow-sm ring-1 ring-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:flex-row sm:items-center sm:justify-between">
+                          <PeopleSearchInput
+                            value={studentGroupSearchQuery}
+                            onChange={setStudentGroupSearchQuery}
+                            placeholder="Search groups or members..."
+                            className="flex-1"
+                          />
+                          <span className="w-fit rounded-md bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                            {studentFilteredTeams.length} of {teams.length} groups
+                          </span>
+                        </div>
+
+                        {studentFilteredTeams.length === 0 ? (
+                          <PeopleEmptyState
+                            icon={Users}
+                            title={studentGroupSearchQuery ? 'No groups match that search' : 'No groups created yet'}
+                            description={studentGroupSearchQuery ? 'Try a group name or teammate.' : 'Your trainer will create groups when the class needs them.'}
+                          />
+                        ) : (
+                          <div className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/50">
+                            <ScrollArea className="max-h-[560px]">
+                              <div className="divide-y divide-border/50">
+                                {visibleStudentTeams.map((team) => {
+                                  const isMyGroup = teamHasStudent(team, currentUserId);
+                                  const triggerId = `student-group-actions-${team.id}`;
+                                  const actions = [
+                                    {
+                                      key: 'members',
+                                      label: 'View members',
+                                      icon: Users,
+                                      onSelect: () => openPeopleDetails({ type: 'group', data: team }, triggerId),
+                                    },
+                                  ];
+                                  return (
+                                    <ContextMenu key={team.id}>
+                                      <ContextMenuTrigger asChild>
+                                        <div className={`flex min-h-14 items-center justify-between gap-3 px-3 py-3 transition-colors hover:bg-muted/20 sm:px-4 ${isMyGroup ? 'bg-primary/5' : ''}`}>
+                                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                            <p className="truncate text-sm font-semibold text-foreground">{team.name}</p>
+                                            {isMyGroup && <Badge variant="secondary" className="bg-primary/10 text-xs font-medium text-primary">My group</Badge>}
+                                            <Badge variant="secondary" className="bg-muted/80 text-xs font-medium text-muted-foreground">
+                                              {team.members?.length || 0} member{(team.members?.length || 0) === 1 ? '' : 's'}
+                                            </Badge>
+                                          </div>
+                                          <VisibleActionMenu
+                                            actions={actions}
+                                            label="Group"
+                                            triggerId={triggerId}
+                                            triggerLabel={`More information about ${team.name}`}
+                                          />
+                                        </div>
+                                      </ContextMenuTrigger>
+                                      <ContextActionContent actions={actions} label="Group" />
+                                    </ContextMenu>
+                                  );
+                                })}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        )}
+
+                        {studentFilteredTeams.length > visibleStudentGroupCount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 font-semibold active:scale-[0.98]"
+                            onClick={() => setVisibleStudentGroupCount((count) => count + PEOPLE_BATCH_SIZE)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Show more groups ({studentFilteredTeams.length - visibleStudentGroupCount} remaining)
+                          </Button>
+                        )}
+                      </section>
+                    ) : (
+                      <section className="space-y-4" aria-label="Classroom classmates">
+                        <div className="flex flex-col gap-3 rounded-lg bg-background/80 p-2 shadow-sm ring-1 ring-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:flex-row sm:items-center sm:justify-between">
+                          <PeopleSearchInput
+                            value={studentClassmateSearchQuery}
+                            onChange={setStudentClassmateSearchQuery}
+                            placeholder="Search classmates..."
+                            className="flex-1"
+                          />
+                          <span className="w-fit rounded-md bg-muted/60 px-2.5 py-1.5 text-xs font-medium text-muted-foreground">
+                            {studentFilteredClassmates.length} of {students.length} classmates
+                          </span>
+                        </div>
+
+                        {studentFilteredClassmates.length === 0 ? (
+                          <PeopleEmptyState
+                            icon={GraduationCap}
+                            title={studentClassmateSearchQuery ? 'No classmates match that search' : 'No classmates to show yet'}
+                            description={studentClassmateSearchQuery ? 'Try another name, Student ID, or email.' : 'The classroom roster appears here after enrollment.'}
+                          />
+                        ) : (
+                          <div className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/50">
+                            <ScrollArea className="max-h-[560px]">
+                              <div className="divide-y divide-border/50">
+                                {visibleClassmates.map((student) => (
+                                  <ReadOnlyRosterStudentRow
+                                    key={student.id}
+                                    student={student}
+                                    current={String(student.id) === String(currentUserId)}
+                                    onOpenDetails={openPeopleDetails}
+                                  />
+                                ))}
+                              </div>
+                            </ScrollArea>
+                          </div>
+                        )}
+
+                        {studentFilteredClassmates.length > visibleClassmateCount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full gap-2 font-semibold active:scale-[0.98]"
+                            onClick={() => setVisibleClassmateCount((count) => count + PEOPLE_BATCH_SIZE)}
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                            Show more classmates ({studentFilteredClassmates.length - visibleClassmateCount} remaining)
+                          </Button>
+                        )}
+                      </section>
+                    )}
+                  </PeoplePanelMotion>
+                </section>
               </TabsContent>
 
               {/* TAB 5: ATTENDANCE SUMMARY (STUDENT VIEW) */}
@@ -8277,6 +9096,14 @@ export default function ClassroomLiveClient({ classroomId }) {
           </Card>
         </div>
       </div>
+      <PeopleDetailsDialog
+        target={peopleDetailsTarget}
+        isTrainer={isTrainer}
+        onOpenChange={(open) => {
+          if (!open) setPeopleDetailsTarget(null);
+        }}
+        onCloseAutoFocus={restorePeopleDetailsFocus}
+      />
       <Dialog open={classroomEditOpen} onOpenChange={setClassroomEditOpen}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>

@@ -1,3 +1,62 @@
+## 2026-08-09 - Classroom Contest Migration RLS Near Miss
+
+Source:
+- `docs/sql/trainer-classroom-contests-20260809.sql`
+
+What happened:
+The first classroom contest SQL artifact created six new `public.classroom_contest_*` tables without explicit `enable row level security` statements. The feature still used server-side Hono authorization, but Supabase public-schema tables should have RLS enabled as defense in depth.
+
+Detection:
+Post-SQL Supabase checklist review caught the missing RLS block before final handoff. A live DB verification query then confirmed all six tables had `relrowsecurity = true`.
+
+Prevention:
+For every new table in the `public` schema, add explicit RLS enable statements in the same SQL artifact before commit, and run a read-only `pg_class.relrowsecurity` verification after applying the migration.
+
+## 2026-08-09 - Discord Guild Picker Was Not Mutation Authorization
+
+Source:
+- `docs/reviews/trainer-shared-discord-guild-classrooms-20260809-implementation-review.md`
+- `server/src/controllers/discordController.ts`
+- `server/src/controllers/classroomController.ts`
+
+What happened:
+The classroom wizard fetched only Discord guilds where the trainer had Manage Server permission, but the create endpoint accepted the posted guild snowflake and label without rechecking that permission. The original unique-guild constraint limited reuse, but enabling an already-installed shared guild would make a crafted request materially dangerous.
+
+Detection:
+Security review traced the creation request from the client select through `createClassroom` and found no server-side call to the trainer's current Discord guild list before inserting the binding.
+
+Prevention:
+Treat external-resource pickers as discovery UI, not authorization. At mutation time, normalize the immutable external ID, refresh/read current external permissions server-side, reject unauthorized IDs, and persist trusted provider metadata rather than client labels.
+
+## 2026-08-09 - Discord OAuth Callback Reason Hidden
+
+Source:
+- `client/src/components/DiscordConnectionRequiredCard.jsx`
+- `server/src/controllers/discordController.ts`
+
+What happened:
+The student classroom gate showed the same "Connect Discord" card after Discord OAuth failed or was rejected, so a valid duplicate-account rejection such as `account_in_use` looked like the connect button had done nothing. Recent OAuth state rows remained unconsumed, but the UI did not surface the callback `reason` query parameter.
+
+Detection:
+Database inspection showed multiple recent unconsumed student `discord_oauth_states` rows and no active student `discord_user_connections` row, while an existing trainer account already had a Discord OAuth connection.
+
+Prevention:
+OAuth recovery screens must read and display safe callback result parameters, especially `account_in_use`, `state`, `access_denied`, and `callback_failed`. Server callbacks should redirect failures back to the original `return_to` when the state row is valid, and callback catch blocks may log only safe error codes, not tokens or message bodies.
+
+## 2026-08-02 - trainer-classroom-discord-integration-20260802 - Secret Inspection Repeat
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+
+What happened:
+During Discord integration setup verification, an environment-file search printed local secret values into tool output even though the useful check was only whether Discord/Supabase variables existed.
+
+Detection:
+Manual review of command output showed that broad env-value searches remain unsafe for this workspace.
+
+Prevention:
+For env checks, print only variable names and presence booleans, never full lines or values. Use a small allowlisted presence-only command or inspect config code instead of searching `.env` contents. If env values are copied outside the local tool context, committed, or pasted into external logs/chat, rotate the affected keys.
+
 ## 2026-08-02 - trainer-student-thread-realtime-hardening-performance-20260802 - Secret Handling Near Miss
 
 Source:

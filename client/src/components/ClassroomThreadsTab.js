@@ -589,6 +589,8 @@ function ThreadMessage({ message, previousMessage, classroomId, studentId, onAtt
   const pending = message.delivery_status === "pending";
   const failed = message.delivery_status === "failed";
   const submissionReference = message.metadata?.submission_reference;
+  const deleted = Boolean(message.deleted_at);
+  const edited = Boolean(message.edited_at) && !deleted;
 
   if (message.kind === "system") {
     return (
@@ -618,7 +620,9 @@ function ThreadMessage({ message, previousMessage, classroomId, studentId, onAtt
           <div className={`rounded-2xl px-4 py-2 shadow-sm ${own ? "rounded-br-md bg-blue-600 text-white" : "rounded-bl-md border bg-background text-foreground"} ${pending ? "opacity-75" : ""} ${failed ? "ring-1 ring-red-400" : ""}`}>
             {!own && <p className="mb-1 text-[11px] font-semibold text-muted-foreground">{message.sender_name}</p>}
             <SubmissionReferenceChip reference={submissionReference} own={own} />
-            <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
+            <p className={`whitespace-pre-wrap break-words text-sm leading-6 ${deleted ? "italic opacity-75" : ""}`}>
+              {message.body}
+            </p>
             <AttachmentList
               attachments={message.attachments}
               classroomId={classroomId}
@@ -627,7 +631,7 @@ function ThreadMessage({ message, previousMessage, classroomId, studentId, onAtt
             />
           </div>
           <span className={`mt-1 px-1 text-[11px] ${failed ? "text-red-500" : "text-muted-foreground"}`}>
-            {pending ? "Sending..." : failed ? "Not sent" : formatTime(message.created_at)}
+            {pending ? "Sending..." : failed ? "Not sent" : `${formatTime(message.created_at)}${deleted ? " · deleted" : edited ? " · edited" : ""}`}
           </span>
         </div>
       </div>
@@ -1127,8 +1131,9 @@ export function ClassroomThreadsTab({
     }
   }, [classroomId, forcedStudentId, isTrainer, showList]);
 
-  const appendDeliveredMessage = useCallback((message, studentId, summary = null) => {
+  const appendDeliveredMessage = useCallback((message, studentId, summary = null, options = {}) => {
     if (!message?.id || !studentId || activeStudentIdRef.current !== studentId) return;
+    const updateThreadSummary = options.updateThreadSummary !== false;
     const deliveredMessage = {
       ...message,
       is_own: message.sender_id === currentUser?.id,
@@ -1143,8 +1148,14 @@ export function ClassroomThreadsTab({
     }
 
     setMessages((currentMessages) => {
-      if (currentMessages.some((item) => item.id === deliveredMessage.id)) return currentMessages;
-      return [...currentMessages, deliveredMessage].sort((a, b) => {
+      const nextMessages = currentMessages.some((item) => item.id === deliveredMessage.id)
+        ? currentMessages.map((item) => (
+            item.id === deliveredMessage.id
+              ? { ...item, ...deliveredMessage }
+              : item
+          ))
+        : [...currentMessages, deliveredMessage];
+      return nextMessages.sort((a, b) => {
         const aRevision = Number(a.thread_revision || 0);
         const bRevision = Number(b.thread_revision || 0);
         if (aRevision && bRevision && aRevision !== bRevision) return aRevision - bRevision;
@@ -1154,39 +1165,47 @@ export function ClassroomThreadsTab({
 
     if (deliveredMessage.kind === "system") {
       setLatestEvents((currentEvents) => {
-        if (currentEvents.some((item) => item.id === deliveredMessage.id)) return currentEvents;
+        if (currentEvents.some((item) => item.id === deliveredMessage.id)) {
+          return currentEvents.map((item) => (
+            item.id === deliveredMessage.id
+              ? { ...item, ...deliveredMessage }
+              : item
+          ));
+        }
         return [deliveredMessage, ...currentEvents].slice(0, 6);
       });
     }
 
-    setThread((currentThread) => currentThread ? {
-      ...currentThread,
-      revision: Math.max(Number(currentThread.revision || 0), revision),
-      updated_at: deliveredMessage.created_at || currentThread.updated_at,
-    } : currentThread);
+    if (updateThreadSummary) {
+      setThread((currentThread) => currentThread ? {
+        ...currentThread,
+        revision: Math.max(Number(currentThread.revision || 0), revision),
+        updated_at: deliveredMessage.created_at || currentThread.updated_at,
+      } : currentThread);
 
-    setThreads((currentThreads) => {
-      if (summary?.student_id) return mergeThreadSummary(currentThreads, summary);
-      let changed = false;
-      const nextThreads = currentThreads.map((item) => {
-        if (item.student_id !== studentId) return item;
-        changed = true;
-        return {
-          ...item,
-          revision: Math.max(Number(item.revision || 0), revision),
-          updated_at: deliveredMessage.created_at || item.updated_at,
-          last_message: {
-            id: deliveredMessage.id,
-            kind: deliveredMessage.kind,
-            event_type: deliveredMessage.event_type,
-            body: deliveredMessage.body,
-            created_at: deliveredMessage.created_at,
-            sender_name: deliveredMessage.sender_name || "",
-          },
-        };
+      setThreads((currentThreads) => {
+        if (summary?.student_id) return mergeThreadSummary(currentThreads, summary);
+        let changed = false;
+        const nextThreads = currentThreads.map((item) => {
+          if (item.student_id !== studentId) return item;
+          changed = true;
+          return {
+            ...item,
+            revision: Math.max(Number(item.revision || 0), revision),
+            updated_at: deliveredMessage.created_at || item.updated_at,
+            last_message: {
+              id: deliveredMessage.id,
+              kind: deliveredMessage.kind,
+              event_type: deliveredMessage.event_type,
+              body: deliveredMessage.body,
+              created_at: deliveredMessage.created_at,
+              sender_name: deliveredMessage.sender_name || "",
+            },
+          };
+        });
+        return changed ? sortThreadSummaries(nextThreads) : currentThreads;
       });
-      return changed ? sortThreadSummaries(nextThreads) : currentThreads;
-    });
+    }
   }, [currentUser?.id]);
 
   const loadThread = useCallback(async (options = {}) => {
@@ -1384,8 +1403,14 @@ export function ClassroomThreadsTab({
     const previousRevision = highestRevisionRef.current;
     const deliveredMessage = signal?.message;
     const deliveredRevision = Number(deliveredMessage?.thread_revision || signal?.thread_revision || 0);
+    const isMutationDelta = signal?.type === "message_edited" || signal?.type === "message_deleted";
     if (deliveredMessage?.id) {
-      appendDeliveredMessage(deliveredMessage, activeStudentId, signal?.summary || null);
+      appendDeliveredMessage(
+        deliveredMessage,
+        activeStudentId,
+        isMutationDelta ? null : signal?.summary || null,
+        { updateThreadSummary: !isMutationDelta }
+      );
       const clientMessageId = deliveredMessage.client_message_id
         || deliveredMessage.metadata?.client_message_id;
       if (clientMessageId) dispatchOptimisticMessage({ type: "resolve", id: clientMessageId });

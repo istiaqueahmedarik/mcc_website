@@ -39,6 +39,17 @@ import {
   uploadStudentThreadAttachmentToStorage,
   validateStudentThreadAttachment,
 } from '../utils/classroomStudentThreadsSchema';
+import {
+  createClassroomDiscordBindingForNewClassroom,
+  getManageableDiscordGuildForUser,
+  isDiscordConnectionActive,
+} from './discordController';
+import {
+  getDiscordEnforcementMode,
+  isDiscordIntegrationEnabled,
+  normalizeDiscordTimezone,
+} from '../utils/discordConfig';
+import { enqueueDiscordReconcileForClassroom } from '../utils/discordProvisioningRequests';
 
 // Scrape helper for problem details
 function cleanProblemTitle(title: string, fallback: string) {
@@ -145,6 +156,377 @@ async function fetchProblemMetadata(platform: string, problemLink: string) {
 // Admin Endpoints
 // -------------------------------------------------------------
 
+const ADMIN_BULK_USER_LIMIT = 250;
+const TSHIRT_SIZES = new Set(['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL']);
+
+type AdminUserInput = Record<string, unknown>;
+
+type AdminUserError = {
+  rowNumber: number;
+  email?: string | null;
+  reason: string;
+};
+
+type NormalizedAdminUserInput = {
+  rowNumber: number;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  password: string;
+  profile_pic: string | null;
+  mist_id_card: string | null;
+  mist_id: number | null;
+  trainer: boolean;
+  admin: boolean;
+  granted: boolean;
+  vjudge_id: string | null;
+  cf_id: string | null;
+  codechef_id: string | null;
+  atcoder_id: string | null;
+  vjudge_verified: boolean;
+  cf_verified: boolean;
+  tshirt_size: string | null;
+  batch_name: string | null;
+  trainer_title: string | null;
+  trainer_bio: string | null;
+  trainer_experience: string | null;
+  trainer_specializations: string[];
+  trainer_linkedin: string | null;
+  trainer_github: string | null;
+  trainer_website: string | null;
+};
+
+const adminUserInsertColumns = [
+  'full_name',
+  'email',
+  'phone',
+  'password',
+  'profile_pic',
+  'mist_id_card',
+  'mist_id',
+  'trainer',
+  'admin',
+  'granted',
+  'vjudge_id',
+  'cf_id',
+  'codechef_id',
+  'atcoder_id',
+  'vjudge_verified',
+  'cf_verified',
+  'tshirt_size',
+  'batch_name',
+  'trainer_title',
+  'trainer_bio',
+  'trainer_experience',
+  'trainer_specializations',
+  'trainer_linkedin',
+  'trainer_github',
+  'trainer_website',
+  'is_pre_enrolled',
+] as const;
+
+async function requireAdminUser(c: Context) {
+  const { id } = c.get('jwtPayload') || {};
+  if (!id) return null;
+  const rows = await sql`SELECT id FROM users WHERE id = ${id} AND admin IS TRUE LIMIT 1`;
+  return rows[0] || null;
+}
+
+function normalizeAdminEmail(value: unknown): string | null {
+  const email = normalizeText(value, 254).toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
+}
+
+function normalizeAdminBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const text = normalizeText(value, 20).toLowerCase();
+  if (!text) return fallback;
+  if (['true', '1', 'yes', 'y', 'on'].includes(text)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(text)) return false;
+  return fallback;
+}
+
+function normalizeAdminUrl(value: unknown): string | null {
+  const text = normalizeNullableText(value, 1000);
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAdminMistId(value: unknown): { value: number | null; error?: string } {
+  const text = normalizeText(value, 30);
+  if (!text) return { value: null };
+  if (!/^\d+$/.test(text)) return { value: null, error: 'MIST ID must contain digits only' };
+  const numeric = Number(text);
+  if (!Number.isSafeInteger(numeric)) return { value: null, error: 'MIST ID is too large' };
+  return { value: numeric };
+}
+
+function normalizeAdminSpecializations(value: unknown): string[] {
+  const source = Array.isArray(value) ? value : String(value ?? '').split(/[;,|]/);
+  return source
+    .map((item) => normalizeText(item, 80))
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function validateAdminUserInput(raw: AdminUserInput, rowNumber = 1): {
+  user: NormalizedAdminUserInput | null;
+  errors: AdminUserError[];
+} {
+  const errors: AdminUserError[] = [];
+  const email = normalizeAdminEmail(raw.email);
+  const fullName = normalizeText(raw.full_name ?? raw.name, 160);
+  const password = String(raw.password ?? '');
+  const mistId = normalizeAdminMistId(raw.mist_id ?? raw.student_id);
+  const tshirtSize = normalizeNullableText(raw.tshirt_size, 10);
+  const vjudgeId = normalizeNullableText(raw.vjudge_id, 80);
+  const cfId = normalizeNullableText(raw.cf_id ?? raw.codeforces_id, 80);
+  const vjudgeVerified = normalizeAdminBoolean(raw.vjudge_verified, false);
+  const cfVerified = normalizeAdminBoolean(raw.cf_verified, false);
+  const profilePicRaw = normalizeNullableText(raw.profile_pic, 1000);
+  const mistCardRaw = normalizeNullableText(raw.mist_id_card, 1000);
+  const profilePic = normalizeAdminUrl(raw.profile_pic);
+  const mistCard = normalizeAdminUrl(raw.mist_id_card);
+
+  if (!fullName) errors.push({ rowNumber, email, reason: 'Full name is required' });
+  if (!email) errors.push({ rowNumber, email, reason: 'Valid email is required' });
+  if (!password || password.length < 8) {
+    errors.push({ rowNumber, email, reason: 'Password must be at least 8 characters long' });
+  }
+  if (mistId.error) errors.push({ rowNumber, email, reason: mistId.error });
+  if (tshirtSize && !TSHIRT_SIZES.has(tshirtSize)) {
+    errors.push({ rowNumber, email, reason: 'T-shirt size must be one of XS, S, M, L, XL, XXL, 3XL, 4XL' });
+  }
+  if (vjudgeVerified && !vjudgeId) {
+    errors.push({ rowNumber, email, reason: 'VJudge handle is required before marking it verified' });
+  }
+  if (cfVerified && !cfId) {
+    errors.push({ rowNumber, email, reason: 'Codeforces handle is required before marking it verified' });
+  }
+  if (profilePicRaw && !profilePic) {
+    errors.push({ rowNumber, email, reason: 'Profile picture must be a valid http(s) URL' });
+  }
+  if (mistCardRaw && !mistCard) {
+    errors.push({ rowNumber, email, reason: 'MIST ID card must be a valid http(s) URL' });
+  }
+
+  if (errors.length > 0 || !email) {
+    return { user: null, errors };
+  }
+
+  return {
+    user: {
+      rowNumber,
+      full_name: fullName,
+      email,
+      phone: normalizeNullableText(raw.phone, 80),
+      password,
+      profile_pic: profilePic,
+      mist_id_card: mistCard,
+      mist_id: mistId.value,
+      trainer: normalizeAdminBoolean(raw.trainer ?? raw.is_trainer, false),
+      admin: normalizeAdminBoolean(raw.admin ?? raw.is_admin, false),
+      granted: normalizeAdminBoolean(raw.granted, true),
+      vjudge_id: vjudgeId,
+      cf_id: cfId,
+      codechef_id: normalizeNullableText(raw.codechef_id, 80),
+      atcoder_id: normalizeNullableText(raw.atcoder_id, 80),
+      vjudge_verified: vjudgeVerified,
+      cf_verified: cfVerified,
+      tshirt_size: tshirtSize,
+      batch_name: normalizeNullableText(raw.batch_name ?? raw.batch, 120),
+      trainer_title: normalizeNullableText(raw.trainer_title, 160),
+      trainer_bio: normalizeNullableText(raw.trainer_bio, 2000),
+      trainer_experience: normalizeNullableText(raw.trainer_experience, 500),
+      trainer_specializations: normalizeAdminSpecializations(raw.trainer_specializations),
+      trainer_linkedin: normalizeAdminUrl(raw.trainer_linkedin),
+      trainer_github: normalizeAdminUrl(raw.trainer_github),
+      trainer_website: normalizeAdminUrl(raw.trainer_website),
+    },
+    errors: [],
+  };
+}
+
+async function getExistingAdminUserEmails(emails: string[]): Promise<Set<string>> {
+  if (emails.length === 0) return new Set();
+  const rows = await sql`
+    SELECT lower(email) AS email
+    FROM users
+    WHERE lower(email) = ANY(${emails}::text[])
+  `;
+  return new Set(rows.map((row: any) => String(row.email).toLowerCase()));
+}
+
+async function insertAdminUsers(users: NormalizedAdminUserInput[]) {
+  const insertRows = await Promise.all(users.map(async (user) => ({
+    full_name: user.full_name,
+    email: user.email,
+    phone: user.phone,
+    password: await Bun.password.hash(user.password),
+    profile_pic: user.profile_pic,
+    mist_id_card: user.mist_id_card,
+    mist_id: user.mist_id,
+    trainer: user.trainer,
+    admin: user.admin,
+    granted: user.granted,
+    vjudge_id: user.vjudge_id,
+    cf_id: user.cf_id,
+    codechef_id: user.codechef_id,
+    atcoder_id: user.atcoder_id,
+    vjudge_verified: user.vjudge_verified,
+    cf_verified: user.cf_verified,
+    tshirt_size: user.tshirt_size,
+    batch_name: user.batch_name,
+    trainer_title: user.trainer_title,
+    trainer_bio: user.trainer_bio,
+    trainer_experience: user.trainer_experience,
+    trainer_specializations: user.trainer_specializations,
+    trainer_linkedin: user.trainer_linkedin,
+    trainer_github: user.trainer_github,
+    trainer_website: user.trainer_website,
+    is_pre_enrolled: false,
+  })));
+
+  return sql`
+    INSERT INTO users ${sql(insertRows, ...adminUserInsertColumns)}
+    RETURNING
+      id,
+      full_name,
+      email,
+      phone,
+      mist_id,
+      batch_name,
+      vjudge_id,
+      vjudge_verified,
+      cf_id,
+      cf_verified,
+      codechef_id,
+      atcoder_id,
+      tshirt_size,
+      profile_pic,
+      mist_id_card,
+      trainer,
+      admin,
+      granted,
+      trainer_title,
+      trainer_bio,
+      trainer_experience,
+      trainer_specializations,
+      trainer_linkedin,
+      trainer_github,
+      trainer_website
+  `;
+}
+
+export const createFullUser = async (c: Context) => {
+  try {
+    const admin = await requireAdminUser(c);
+    if (!admin) return c.json({ error: 'Unauthorized: Admins only' }, 403);
+
+    const body = await c.req.json();
+    const validation = validateAdminUserInput(body, 1);
+    if (!validation.user) {
+      return c.json({ error: validation.errors[0]?.reason || 'Invalid user payload', errors: validation.errors }, 400);
+    }
+
+    const existingEmails = await getExistingAdminUserEmails([validation.user.email]);
+    if (existingEmails.has(validation.user.email)) {
+      return c.json({ error: 'This email already exists' }, 400);
+    }
+
+    const result = await insertAdminUsers([validation.user]);
+    return c.json({ success: true, user: result[0] }, 201);
+  } catch (error: any) {
+    if (error?.code === '23505') {
+      return c.json({ error: 'This email already exists' }, 400);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+};
+
+export const createUsersBulk = async (c: Context) => {
+  try {
+    const admin = await requireAdminUser(c);
+    if (!admin) return c.json({ error: 'Unauthorized: Admins only' }, 403);
+
+    const body = await c.req.json();
+    const rows = Array.isArray(body?.users) ? body.users : [];
+    if (rows.length === 0) {
+      return c.json({ error: 'At least one user row is required' }, 400);
+    }
+    if (rows.length > ADMIN_BULK_USER_LIMIT) {
+      return c.json({ error: `CSV import is limited to ${ADMIN_BULK_USER_LIMIT} users at a time` }, 400);
+    }
+
+    const errors: AdminUserError[] = [];
+    const normalized: NormalizedAdminUserInput[] = [];
+
+    rows.forEach((row: AdminUserInput, index: number) => {
+      const rowNumber = Number(row?.rowNumber) || index + 2;
+      const validation = validateAdminUserInput(row, rowNumber);
+      errors.push(...validation.errors);
+      if (validation.user) normalized.push(validation.user);
+    });
+
+    const emailCounts = normalized.reduce((map, user) => {
+      map.set(user.email, (map.get(user.email) || 0) + 1);
+      return map;
+    }, new Map<string, number>());
+    const duplicateEmails = new Set(
+      Array.from(emailCounts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([email]) => email)
+    );
+
+    for (const user of normalized) {
+      if (duplicateEmails.has(user.email)) {
+        errors.push({ rowNumber: user.rowNumber, email: user.email, reason: 'Duplicate email in CSV' });
+      }
+    }
+
+    const candidates = normalized.filter((user) => !duplicateEmails.has(user.email));
+    const existingEmails = await getExistingAdminUserEmails(candidates.map((user) => user.email));
+    for (const user of candidates) {
+      if (existingEmails.has(user.email)) {
+        errors.push({ rowNumber: user.rowNumber, email: user.email, reason: 'Email already exists' });
+      }
+    }
+
+    const insertable = candidates.filter((user) => !existingEmails.has(user.email));
+    if (insertable.length === 0) {
+      return c.json({
+        success: false,
+        createdCount: 0,
+        failedCount: errors.length,
+        created: [],
+        errors,
+      }, 400);
+    }
+
+    const created = await insertAdminUsers(insertable);
+    return c.json({
+      success: true,
+      createdCount: created.length,
+      failedCount: errors.length,
+      created,
+      errors,
+    });
+  } catch (error: any) {
+    if (error?.code === '23505') {
+      return c.json({ error: 'One or more emails already exist. Refresh the users list and retry the remaining rows.' }, 409);
+    }
+    return c.json({ error: error.message }, 500);
+  }
+};
+
 // Toggle user trainer status
 export const toggleTrainerRole = async (c: Context) => {
   const { id } = c.get('jwtPayload');
@@ -176,7 +558,40 @@ export const toggleTrainerRole = async (c: Context) => {
 // List all users
 export const listAllUsers = async (c: Context) => {
   try {
-    const result = await sql`SELECT id, full_name, email, trainer, admin FROM users ORDER BY full_name ASC`;
+    const admin = await requireAdminUser(c);
+    if (!admin) return c.json({ error: 'Unauthorized: Admins only' }, 403);
+
+    const result = await sql`
+      SELECT
+        id,
+        full_name,
+        email,
+        phone,
+        mist_id,
+        batch_name,
+        vjudge_id,
+        vjudge_verified,
+        cf_id,
+        cf_verified,
+        codechef_id,
+        atcoder_id,
+        tshirt_size,
+        profile_pic,
+        mist_id_card,
+        trainer,
+        admin,
+        granted,
+        trainer_title,
+        trainer_bio,
+        trainer_experience,
+        trainer_specializations,
+        trainer_linkedin,
+        trainer_github,
+        trainer_website
+      FROM users
+      WHERE is_pre_enrolled IS NOT TRUE
+      ORDER BY full_name ASC NULLS LAST, email ASC
+    `;
     return c.json({ result });
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -433,6 +848,10 @@ function normalizePositiveInteger(value: unknown): number | null {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) return null;
   return Math.floor(num);
+}
+
+function normalizeDueAt(value: unknown): string | null {
+  return toIsoStringOrNull(value);
 }
 
 function normalizeIdeEventType(value: unknown): string {
@@ -1372,6 +1791,8 @@ function mapStudentThreadMessage(row: any, currentUserId: string) {
     body: row.body || '',
     metadata,
     created_at: row.created_at,
+    edited_at: row.edited_at,
+    deleted_at: row.deleted_at,
     is_own: Boolean(row.sender_id && row.sender_id === currentUserId),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
   };
@@ -1647,6 +2068,8 @@ async function listStudentThreadMessages(
                m.body,
                m.metadata,
                m.created_at,
+               m.edited_at,
+               m.deleted_at,
                u.full_name AS sender_name,
                u.email AS sender_email,
                u.mist_id AS sender_mist_id,
@@ -1683,6 +2106,8 @@ async function listStudentThreadMessages(
                m.body,
                m.metadata,
                m.created_at,
+               m.edited_at,
+               m.deleted_at,
                u.full_name AS sender_name,
                u.email AS sender_email,
                u.mist_id AS sender_mist_id,
@@ -1736,6 +2161,8 @@ async function listStudentThreadEvents(
                m.body,
                m.metadata,
                m.created_at,
+               m.edited_at,
+               m.deleted_at,
                u.full_name AS sender_name,
                u.email AS sender_email,
                u.mist_id AS sender_mist_id,
@@ -1759,6 +2186,8 @@ async function listStudentThreadEvents(
                m.body,
                m.metadata,
                m.created_at,
+               m.edited_at,
+               m.deleted_at,
                u.full_name AS sender_name,
                u.email AS sender_email,
                u.mist_id AS sender_mist_id,
@@ -1793,6 +2222,8 @@ async function getStudentThreadMessageById(threadId: string, messageId: string, 
            m.body,
            m.metadata,
            m.created_at,
+           m.edited_at,
+           m.deleted_at,
            u.full_name AS sender_name,
            u.email AS sender_email,
            u.mist_id AS sender_mist_id,
@@ -1857,6 +2288,8 @@ async function listStudentThreadMessagesAfterRevision(
            m.body,
            m.metadata,
            m.created_at,
+           m.edited_at,
+           m.deleted_at,
            u.full_name AS sender_name,
            u.email AS sender_email,
            u.mist_id AS sender_mist_id,
@@ -2546,14 +2979,53 @@ export const createClassroom = async (c: Context) => {
       return c.json({ error: 'Unauthorized: Trainers and Admins only' }, 403);
     }
 
-    const { name, description } = await c.req.json();
+    const { name, description, discord } = await c.req.json();
     if (!name) return c.json({ error: 'Name is required' }, 400);
 
-    const result = await sql`
-      INSERT INTO classrooms (name, description, created_by)
-      VALUES (${name}, ${description || null}, ${id})
-      RETURNING *
-    `;
+    const discordRequired = isDiscordIntegrationEnabled() && getDiscordEnforcementMode() !== 'off';
+    if (discordRequired && !(await isDiscordConnectionActive(id))) {
+      return c.json({
+        error: 'Discord account is required before creating a classroom.',
+        code: 'DISCORD_LINK_REQUIRED',
+      }, 428);
+    }
+
+    const shouldBindDiscord = isDiscordIntegrationEnabled() && Boolean(discord?.guildId);
+    if (discordRequired && !shouldBindDiscord) {
+      return c.json({ error: 'Choose a Discord server for this classroom.' }, 400);
+    }
+
+    let manageableDiscordGuild: { id: string; name: string | null } | null = null;
+    if (shouldBindDiscord) {
+      const guildAccess = await getManageableDiscordGuildForUser(id, discord.guildId);
+      if (!guildAccess.ok) {
+        return c.json({ error: guildAccess.error, code: guildAccess.code }, guildAccess.status);
+      }
+      manageableDiscordGuild = guildAccess.guild;
+    }
+
+    const result = await sql.begin(async (tx) => {
+      const classroomRows = await tx`
+        INSERT INTO classrooms (name, description, created_by)
+        VALUES (${name}, ${description || null}, ${id})
+        RETURNING *
+      `;
+      const classroom = classroomRows[0];
+
+      if (shouldBindDiscord) {
+        await createClassroomDiscordBindingForNewClassroom({
+          tx,
+          classroomId: classroom.id,
+          trainerId: id,
+          guildId: manageableDiscordGuild!.id,
+          guildName: manageableDiscordGuild!.name,
+          timezone: normalizeDiscordTimezone(discord.timezone),
+          reminderPreset: discord.reminderPreset || 'default',
+        });
+      }
+
+      return classroomRows;
+    });
 
     return c.json({ success: true, classroom: result[0] });
   } catch (error: any) {
@@ -2632,6 +3104,8 @@ export const getClassroomDetails = async (c: Context) => {
           CASE WHEN u.is_pre_enrolled THEN cs.pre_enrollment_email ELSE u.email END AS email,
           u.email AS account_email,
           u.mist_id,
+          u.vjudge_id,
+          u.vjudge_verified,
           u.cf_id,
           u.atcoder_id,
           u.codechef_id,
@@ -2669,6 +3143,8 @@ export const getClassroomDetails = async (c: Context) => {
                  'email', CASE WHEN u.is_pre_enrolled THEN cs_member.pre_enrollment_email ELSE u.email END,
                  'account_email', u.email,
                  'mist_id', u.mist_id,
+                 'vjudge_id', u.vjudge_id,
+                 'vjudge_verified', u.vjudge_verified,
                  'is_pre_enrolled', u.is_pre_enrolled,
                  'enrollment_status', cs_member.enrollment_status,
                  'claimed_user_id', cs_member.claimed_user_id,
@@ -2896,16 +3372,25 @@ export const addStudentToClassroom = async (c: Context) => {
       return c.json({ error: 'This user is a trainer/admin and cannot be enrolled as a classroom student.' }, 400);
     }
 
-    await sql`
-      INSERT INTO classroom_students (classroom_id, student_id, enrollment_status)
-      VALUES (${classroomId}, ${student[0].id}, ${ENROLLMENT_ACTIVE})
-      ON CONFLICT DO NOTHING
-    `;
-    await sql`
-      UPDATE classroom_students
-      SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
-      WHERE classroom_id = ${classroomId} AND student_id = ${student[0].id}
-    `;
+    await sql.begin(async (tx) => {
+      await tx`
+        INSERT INTO classroom_students (classroom_id, student_id, enrollment_status)
+        VALUES (${classroomId}, ${student[0].id}, ${ENROLLMENT_ACTIVE})
+        ON CONFLICT DO NOTHING
+      `;
+      await tx`
+        UPDATE classroom_students
+        SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
+        WHERE classroom_id = ${classroomId} AND student_id = ${student[0].id}
+      `;
+      await enqueueDiscordReconcileForClassroom({
+        tx,
+        classroomId,
+        userId: trainerId,
+        reason: 'student_enrolled',
+        payload: { studentId: student[0].id },
+      });
+    });
 
     return c.json({ success: true, message: `${student[0].full_name} added successfully.` });
   } catch (error: any) {
@@ -2981,20 +3466,29 @@ export const addStudentsToClassroom = async (c: Context) => {
     }
 
     const studentsToAdd = eligibleStudents.filter(student => !existingIds.has(student.id));
-    if (studentsToAdd.length > 0) {
-      await sql`
-        INSERT INTO classroom_students ${sql(
-          studentsToAdd.map(student => ({ classroom_id: classroomId, student_id: student.id, enrollment_status: ENROLLMENT_ACTIVE }))
-        )}
-        ON CONFLICT DO NOTHING
-      `;
-    }
     if (eligibleStudentIds.length > 0) {
-      await sql`
-        UPDATE classroom_students
-        SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
-        WHERE classroom_id = ${classroomId} AND student_id = ANY(${eligibleStudentIds})
-      `;
+      await sql.begin(async (tx) => {
+        if (studentsToAdd.length > 0) {
+          await tx`
+            INSERT INTO classroom_students ${tx(
+              studentsToAdd.map(student => ({ classroom_id: classroomId, student_id: student.id, enrollment_status: ENROLLMENT_ACTIVE }))
+            )}
+            ON CONFLICT DO NOTHING
+          `;
+        }
+        await tx`
+          UPDATE classroom_students
+          SET enrollment_status = ${ENROLLMENT_ACTIVE}, claimed_user_id = NULL, link_requested_at = NULL
+          WHERE classroom_id = ${classroomId} AND student_id = ANY(${eligibleStudentIds})
+        `;
+        await enqueueDiscordReconcileForClassroom({
+          tx,
+          classroomId,
+          userId: trainerId,
+          reason: 'students_enrolled',
+          payload: { studentIds: eligibleStudentIds.slice(0, 100) },
+        });
+      });
     }
 
     const alreadyEnrolled = eligibleStudents
@@ -3058,6 +3552,15 @@ export const handlePreEnrollmentClaim = async (c: Context) => {
       ? await approvePreEnrollmentClaim(classroomId, studentId)
       : await rejectPreEnrollmentClaim(classroomId, studentId);
     if (!result.success) return c.json({ error: result.error }, result.status as any);
+    const approvedStudentId = (result as any).student?.id;
+    if (action === 'approve' && approvedStudentId) {
+      await enqueueDiscordReconcileForClassroom({
+        classroomId,
+        userId: trainerId,
+        reason: 'pre_enrollment_approved',
+        payload: { studentId: approvedStudentId },
+      });
+    }
     return c.json(result);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
@@ -3617,11 +4120,12 @@ export const getClassroomAttendanceSummary = async (c: Context) => {
 export const assignProblem = async (c: Context) => {
   const { id: trainerId } = c.get('jwtPayload');
   try {
-    const { classId, studentId, teamId, platform, problemLink, timerMinutes, difficulty, tags } = await c.req.json();
+    const { classId, studentId, teamId, platform, problemLink, timerMinutes, dueAt, difficulty, tags } = await c.req.json();
     if (!classId || (!studentId && !teamId) || !platform || !problemLink) {
       return c.json({ error: 'Missing required parameters' }, 400);
     }
     const normalizedTags = normalizeProblemTags(tags);
+    const normalizedDueAt = normalizeDueAt(dueAt);
     const trainerDifficulty = typeof difficulty === 'string'
       ? difficulty.trim().slice(0, 60)
       : '';
@@ -3699,6 +4203,7 @@ export const assignProblem = async (c: Context) => {
             difficulty: difficultyLabel,
             points: details,
             timer_minutes: timerMinutes || null,
+            due_at: normalizedDueAt,
             tags: normalizedTags,
           }))
         )}
@@ -3747,6 +4252,7 @@ export const assignProblemsBulk = async (c: Context) => {
       const platform = normalizeProblemPlatform(row?.platform);
       const problemLink = normalizeText(row?.problemLink, 1200);
       const timerMinutes = normalizePositiveInteger(row?.timerMinutes);
+      const dueAt = normalizeDueAt(row?.dueAt || row?.due_at);
       const difficulty = normalizeText(row?.difficulty, 80);
       const tags = normalizeProblemTags(row?.tags);
 
@@ -3757,7 +4263,7 @@ export const assignProblemsBulk = async (c: Context) => {
       if (!problemLink) errors.push('Problem link is required');
       if (errors.length > 0) rejectedRows.push({ rowNumber, reason: errors.join('; ') });
 
-      return { rowNumber, targetType, targetId, platform, problemLink, timerMinutes, difficulty, tags, valid: errors.length === 0 };
+      return { rowNumber, targetType, targetId, platform, problemLink, timerMinutes, dueAt, difficulty, tags, valid: errors.length === 0 };
     }).filter((row: any) => row.valid);
 
     const studentTargetIds = [...new Set(normalizedRows.filter((row: any) => row.targetType === 'student').map((row: any) => row.targetId))];
@@ -3846,7 +4352,7 @@ export const assignProblemsBulk = async (c: Context) => {
     for (const row of rowsWithTargets) {
       const meta = metadataByProblem.get(`${row.platform}\u0000${row.problemLink}`) || { title: 'CP Problem', details: '' };
       for (const studentId of row.targetStudentIds) {
-        const dedupeKey = `${studentId}\u0000${row.platform}\u0000${row.problemLink}\u0000${row.timerMinutes || ''}\u0000${row.difficulty}\u0000${row.tags.join('|')}`;
+        const dedupeKey = `${studentId}\u0000${row.platform}\u0000${row.problemLink}\u0000${row.timerMinutes || ''}\u0000${row.dueAt || ''}\u0000${row.difficulty}\u0000${row.tags.join('|')}`;
         if (seenAssignments.has(dedupeKey)) continue;
         seenAssignments.add(dedupeKey);
         insertRows.push({
@@ -3858,6 +4364,7 @@ export const assignProblemsBulk = async (c: Context) => {
           difficulty: row.difficulty,
           points: meta.details || '',
           timer_minutes: row.timerMinutes || null,
+          due_at: row.dueAt || null,
           tags: row.tags,
         });
       }
@@ -4686,6 +5193,7 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
 
     const body = await c.req.json();
     const targetType = body.targetType === 'student' ? 'student' : 'group';
+    const dueAt = normalizeDueAt(body.dueAt || body.due_at);
 
     const [topicRows, problemRows] = await Promise.all([
       sql`SELECT id, title FROM classroom_topics WHERE id = ${topicId} AND classroom_id = ${classroomId}`,
@@ -4720,15 +5228,15 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
         if (existing.length > 0) {
           const updated = await sql`
             UPDATE classroom_team_topic_assignments
-            SET assigned_by = ${userId}, assigned_at = now(), status = 'active'
+            SET assigned_by = ${userId}, assigned_at = now(), status = 'active', due_at = ${dueAt}::timestamptz
             WHERE id = ${existing[0].id}
             RETURNING *
           `;
           assignmentRow = updated[0];
         } else {
           const inserted = await sql`
-            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status)
-            VALUES (${classroomId}, ${topicId}, NULL, ${student.id}, ${userId}, 'active')
+            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status, due_at)
+            VALUES (${classroomId}, ${topicId}, NULL, ${student.id}, ${userId}, 'active', ${dueAt}::timestamptz)
             RETURNING *
           `;
           assignmentRow = inserted[0];
@@ -4765,15 +5273,15 @@ export const assignClassroomTopicToTeam = async (c: Context) => {
         if (existingGroup.length > 0) {
           const updatedGroup = await sql`
             UPDATE classroom_team_topic_assignments
-            SET assigned_by = ${userId}, assigned_at = now(), status = 'active'
+            SET assigned_by = ${userId}, assigned_at = now(), status = 'active', due_at = ${dueAt}::timestamptz
             WHERE id = ${existingGroup[0].id}
             RETURNING *
           `;
           assignmentRow = updatedGroup[0];
         } else {
           const insertedGroup = await sql`
-            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status)
-            VALUES (${classroomId}, ${topicId}, ${team.id}, NULL, ${userId}, 'active')
+            INSERT INTO classroom_team_topic_assignments (classroom_id, topic_id, team_id, student_id, assigned_by, status, due_at)
+            VALUES (${classroomId}, ${topicId}, ${team.id}, NULL, ${userId}, 'active', ${dueAt}::timestamptz)
             RETURNING *
           `;
           assignmentRow = insertedGroup[0];

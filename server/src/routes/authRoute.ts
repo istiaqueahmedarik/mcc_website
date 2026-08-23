@@ -15,6 +15,11 @@ import {
   verifyOTP,
   changeOwnPassword,
 } from "../controllers/authController";
+import {
+  beginDiscordAuthorize as beginDiscordAuthorizeHandler,
+  getDiscordStatus as getDiscordStatusHandler,
+  handleDiscordCallback as handleDiscordCallbackHandler,
+} from "../controllers/discordController";
 
 const route = new Hono();
 
@@ -55,6 +60,23 @@ route.use(
 
 route.post("/signup", signup);
 route.post("/login", login);
+route.post(
+  "/discord/authorize",
+  jwt({
+    secret: process.env.SECRET || "",
+    alg: "HS256",
+  }),
+  beginDiscordAuthorizeHandler,
+);
+route.get("/discord/callback", handleDiscordCallbackHandler);
+route.get(
+  "/discord/status",
+  jwt({
+    secret: process.env.SECRET || "",
+    alg: "HS256",
+  }),
+  getDiscordStatusHandler,
+);
 
 // Password reset routes
 route.post("/reset-password/send-otp", sendResetOTP);

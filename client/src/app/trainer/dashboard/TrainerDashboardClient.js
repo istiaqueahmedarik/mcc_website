@@ -2,11 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { apiDelete, apiGet, apiPost } from "@/lib/api-client";
+import { ApiClientError, apiDelete, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import ProgressLink from "@/components/ProgressLink";
+import CreateClassroomWizard from "@/components/CreateClassroomWizard";
+import DiscordConnectionRequiredCard from "@/components/DiscordConnectionRequiredCard";
 import {
   AlertCircle,
   ArrowRight,
@@ -15,7 +16,6 @@ import {
   ClipboardList,
   HelpCircle,
   Layers,
-  Loader2,
   Plus,
   Radio,
   ShieldCheck,
@@ -29,10 +29,8 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useTour } from "@/hooks/useTour";
 
@@ -156,10 +154,7 @@ async function fetchAllTrainers() {
 
 export default function TrainerDashboardClient() {
   const queryClient = useQueryClient();
-  const [newClassName, setNewClassName] = useState("");
-  const [newClassDesc, setNewClassDesc] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [error, setError] = useState("");
 
   // Substitute trainer management state
   const [subModalOpen, setSubModalOpen] = useState(false);
@@ -184,22 +179,6 @@ export default function TrainerDashboardClient() {
     queryKey: dashboardQueryKeys.allTrainers,
     queryFn: fetchAllTrainers,
     enabled: subModalOpen,
-  });
-
-  const createClassroomMutation = useMutation({
-    mutationFn: async (payload) => {
-      const res = await apiPost("classroom/create", payload);
-      if (!res?.success) {
-        throw new Error(res?.error || "Failed to create classroom");
-      }
-      return res;
-    },
-    onSuccess: async () => {
-      setNewClassName("");
-      setNewClassDesc("");
-      setModalOpen(false);
-      await queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.classrooms });
-    },
   });
 
   const addSubstituteMutation = useMutation({
@@ -238,6 +217,8 @@ export default function TrainerDashboardClient() {
   const allTrainers = allTrainersQuery.data || [];
   const loading = profileQuery.isLoading || classroomsQuery.isLoading;
   const subLoading = substitutesQuery.isLoading || allTrainersQuery.isLoading;
+  const discordLinkRequired = classroomsQuery.error instanceof ApiClientError
+    && classroomsQuery.error.data?.code === "DISCORD_LINK_REQUIRED";
 
   const { startTour } = useTour({
     storageKey: "mcc_trainer_dashboard_toured",
@@ -273,23 +254,6 @@ export default function TrainerDashboardClient() {
       });
     } catch (mutationError) {
       setSubError(mutationError?.message || "Failed to remove substitute");
-    }
-  };
-
-  const handleCreateClassroom = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (!newClassName.trim()) {
-      setError("Classroom name is required");
-      return;
-    }
-    try {
-      await createClassroomMutation.mutateAsync({
-        name: newClassName,
-        description: newClassDesc,
-      });
-    } catch (mutationError) {
-      setError(mutationError?.message || "Failed to create classroom");
     }
   };
 
@@ -373,66 +337,17 @@ export default function TrainerDashboardClient() {
                 </Button>
               </ProgressLink>
 
-              <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogTrigger asChild>
+              <CreateClassroomWizard
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+                onCreated={() => queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.classrooms })}
+                trigger={
                   <Button id="trainer-tour-new-classroom-btn" size="sm" className="gap-2 font-semibold">
                     <Plus className="h-4 w-4" />
                     New classroom
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[560px]">
-                  <DialogHeader>
-                    <DialogTitle>Create classroom</DialogTitle>
-                    <DialogDescription>
-                      Set a clear name and short description for students.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateClassroom} className="space-y-4 py-2">
-                    {error && (
-                      <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-                        <AlertCircle className="h-4 w-4" />
-                        {error}
-                      </div>
-                    )}
-
-                    <div className="grid gap-4">
-                      <div className="space-y-2">
-                        <label htmlFor="new-classroom-name" className="text-sm font-semibold">Classroom name</label>
-                        <Input
-                          id="new-classroom-name"
-                          placeholder="Advanced Graph Theory"
-                          value={newClassName}
-                          onChange={(e) => setNewClassName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label htmlFor="new-classroom-description" className="text-sm font-semibold">Description</label>
-                        <Textarea
-                          id="new-classroom-description"
-                          placeholder="Topics, schedule, audience, outcomes"
-                          value={newClassDesc}
-                          onChange={(e) => setNewClassDesc(e.target.value)}
-                          className="min-h-24 text-base md:text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <DialogFooter>
-                      <Button
-                        type="submit"
-                        disabled={createClassroomMutation.isPending}
-                        className="w-full gap-2 font-semibold sm:w-auto"
-                      >
-                        {createClassroomMutation.isPending && (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        )}
-                        Create Classroom
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                }
+              />
             </div>
           </div>
 
@@ -443,6 +358,10 @@ export default function TrainerDashboardClient() {
           </div>
         </section>
 
+        {discordLinkRequired ? (
+          <DiscordConnectionRequiredCard />
+        ) : (
+          <>
         {totalLive > 0 && (
           <section id="trainer-tour-live-section" className="trainer-panel overflow-hidden border-red-500/25">
             <div className="flex flex-col gap-2 border-b border-red-500/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -609,6 +528,8 @@ export default function TrainerDashboardClient() {
             </div>
           )}
         </section>
+          </>
+        )}
       </main>
 
       <button

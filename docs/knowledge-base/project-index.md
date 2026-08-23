@@ -1,5 +1,167 @@
 # Project Index
 
+## 2026-08-17 - trainer-student-context-menu-simplification-20260817 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-student-context-menu-simplification-20260817-implementation-review.md`
+- `docs/decisions/trainer-student-context-menu-simplification-20260817-technical-decisions.md`
+
+Fact:
+The role-prioritized classroom navigation, scoped context menus, and compact repeaters are implemented in `client/src/app/classroom/live/[id]/ClassroomLiveClient.js`; the reusable Radix wrapper is `client/src/components/ui/context-menu.jsx`. Trainers keep Updates, Live, Topics, and People visible; students keep Updates, Topics, Challenges, and Live visible; all existing secondary tab values remain reachable through More. Student/group/classmate/resource actions share definitions between visible overflow and context menus, while secondary identity/member facts use a bounded focus-returning details dialog.
+
+Applies when:
+Implementing or reviewing this task's live classroom navigation, compact People rows, resource-card actions, tours, or context-menu primitive.
+
+Do not overgeneralize:
+This implementation does not change server/API/schema/auth/polling behavior, URL-backed tabs, dependencies, whole-page context-menu behavior, or unrelated classroom content.
+
+## 2026-08-10 - trainer-classroom-codeforces-contests-20260810 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-classroom-codeforces-contests-20260810-implementation-review.md`
+- `docs/decisions/trainer-classroom-codeforces-contests-20260810-technical-decisions.md`
+
+Fact:
+Classroom contest reports now support mixed VJudge and Codeforces contest items inside the classroom-private workflow. Provider adapters live in `server/src/services/classroomContestRankService.ts` and `server/src/services/codeforcesContestService.ts`; encrypted trainer Codeforces credential helpers live in `server/src/utils/codeforcesCredentialCrypto.ts`; classroom persistence, credential endpoints, unmapped Codeforces row review, and report generation stay in `server/src/controllers/classroomContestController.ts`; trainer/student UI stays in `client/src/components/ClassroomContestPanel.jsx`; report display compatibility stays in `client/src/components/ReportTable.js`; rollout SQL is split into `docs/sql/trainer-classroom-codeforces-contests-20260810-expand.sql` and `docs/sql/trainer-classroom-codeforces-contests-20260810-contract.sql`.
+
+Applies when:
+Maintaining classroom contest provider selection, Codeforces standings fetches, trainer Codeforces credential setup, classroom contest snapshots, provider-aware handle overrides, map/ignore handling for unmatched Codeforces rows, contest demerits, mixed-provider report generation, report table identity/profile display, or classroom-only Codeforces rollout.
+
+Do not overgeneralize:
+This does not change global VJudge contest-rank routes, global contest-report tables/routes, saved standings, public report sharing, BAPS/Toph standings, team collection, or student-managed Codeforces credentials.
+
+## 2026-08-10 - classroom-discord-channel-change-20260810 - Implemented Entry Points
+
+Source:
+- `server/src/controllers/discordController.ts`
+- `server/src/routes/classroomRoute.ts`
+- `client/src/components/ClassroomDiscordSettingsCard.jsx`
+
+Fact:
+Bound classroom Discord settings now include a trainer-only Change channels option. The UI opens from `ClassroomDiscordSettingsCard.jsx`, lists eligible Discord servers through the existing guild endpoint, and posts to `POST /classroom/:id/discord/channels/change` via `client/src/app/api/classroom/[id]/discord/channels/change/route.js`. The server revalidates MCC classroom-manager access and current Discord Manage Server permission, archives old active channel mappings, deletes old category mappings, updates the binding's guild installation when needed, clears `staff_channel_id`, marks provisioning, and queues a fresh `provision_classroom` job. The worker reuses student channel rows and clears archive markers when new channel IDs are assigned.
+
+Applies when:
+Maintaining Discord channel/server moves, fresh channel reprovisioning, old-classroom Discord repair, classroom Discord settings, provisioning counts, or channel mapping archive behavior.
+
+Do not overgeneralize:
+This does not delete old Discord channels from the server, let trainers type arbitrary channel IDs/names, bypass current Discord permission checks, change classroom thread history, or use Discord names as authorization.
+
+## 2026-08-10 - admin-full-user-csv-20260810 - Implemented Entry Points
+
+Source:
+- `server/src/controllers/classroomController.ts`
+- `server/src/routes/classroomRoute.ts`
+- `client/src/app/admin/trainers/TrainersManagementClient.js`
+
+Fact:
+Admin full-user creation is implemented on the existing `/admin/trainers` management surface. Single-user creation posts to `POST /classroom/admin/create-user`; CSV bulk creation posts to `POST /classroom/admin/create-users-bulk`; both are Hono admin-only handlers in `classroomController.ts` and reuse the existing `users` table without schema changes. The UI now has one full Create User dialog plus a CSV Import dialog with local header parsing, preview, template download, and server row-result feedback.
+
+Applies when:
+Maintaining admin account creation, CSV user imports, trainer/admin role setup, admin password management, `/admin/trainers`, or the `classroom/admin/users` payload.
+
+Do not overgeneralize:
+This does not add public invitations, email delivery, account deletion, `.xlsx` support, media upload handling, schema migrations, or classroom roster enrollment. Admin-created accounts remain login-capable `users` rows, not pre-enrolled placeholders.
+
+## 2026-08-09 - trainer-classroom-contests-20260809 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-classroom-contests-20260809-implementation-review.md`
+
+Fact:
+Trainer classroom contest reports are implemented as a classroom-private VJudge workflow. SQL lives in `docs/sql/trainer-classroom-contests-20260809.sql` with lowercase `classroom_contest_*` tables. Server logic lives in `server/src/controllers/classroomContestController.ts`; classroom routes are registered under `/classroom/:id/contests/*` in `server/src/routes/classroomRoute.ts`; shared VJudge rank parsing/fetching lives in `server/src/services/vjudgeContestService.ts` and is reused by global `server/src/routes/vjudgeRoute.ts`. Browser proxy routes live under `client/src/app/api/classroom/[id]/contests/`, and the classroom contest UI is `client/src/components/ClassroomContestPanel.jsx`, mounted as a trainer workbench plus student read-only Contests and Contest Progress tabs in `ClassroomLiveClient.js`.
+
+Applies when:
+Maintaining classroom contest rooms, classroom VJudge snapshots, classroom handle overrides, classroom contest demerits, private classroom report sharing, VJudge rank processing, trainer classroom contest management, or student classroom contest standings/progress tabs.
+
+Do not overgeneralize:
+This does not change global contest rooms, global demerits, public contest reports, saved standings, team-collection workflows, unauthenticated live report pages, or the BAPS/Toph standings system.
+
+## 2026-08-09 - trainer-existing-classroom-discord-binding-20260809 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-existing-classroom-discord-binding-20260809-implementation-review.md`
+
+Fact:
+Existing unbound classrooms can now be connected to Discord from the authenticated trainer classroom Settings Discord card. The UI lives in `client/src/components/ClassroomDiscordSettingsCard.jsx`; the authenticated Next.js proxy is `client/src/app/api/classroom/[id]/discord/route.js`; the Hono mutation is `POST /classroom/:id/discord` in `server/src/routes/classroomRoute.ts`; and the server implementation is `bindExistingClassroomDiscord` in `server/src/controllers/discordController.ts`. The endpoint revalidates MCC classroom manager access plus current Discord Manage Server permission, then reuses the existing binding/default-rules/provisioning-job helper.
+
+Applies when:
+Maintaining old-classroom Discord connection, classroom Settings Discord unbound state, shared-guild binding, trainer guild authorization, or post-create provisioning.
+
+Do not overgeneralize:
+This does not add a public connect page, unauthenticated route, one-classroom-to-many-guild support, schema migration, OAuth scope change, or live Discord smoke coverage.
+
+## 2026-08-09 - trainer-shared-discord-guild-classrooms-20260809 - Implemented Shared-Guild Entry Points
+
+Source:
+- `docs/reviews/trainer-shared-discord-guild-classrooms-20260809-implementation-review.md`
+- `docs/adr/0013-shared-discord-guild-classroom-bindings.md`
+
+Fact:
+One Discord guild installation can now back multiple `mcc_private.classroom_discord_bindings`, while `classroom_id` remains unique. Clean-install SQL is in `docs/sql/trainer-classroom-discord-integration-20260802.sql`; the applied follow-up is `docs/sql/trainer-shared-discord-guild-classrooms-20260809.sql`. Creation authorization and verified guild metadata live in `server/src/controllers/discordController.ts` and `classroomController.ts`; collision-aware staff/category naming plus overwrite reconciliation lives in `server/src/utils/discordProvisioning.ts`; binding-scoped dead-letter state lives in `server/src/utils/discordDeliveryQueue.ts`; shared-server copy lives in `CreateClassroomWizard.jsx` and `ClassroomDiscordSettingsCard.jsx`.
+
+Applies when:
+Maintaining classroom creation with Discord, guild installation/binding topology, shared-guild channel provisioning, Discord selection authorization, provisioning failures, or shared-server UI copy.
+
+Do not overgeneralize:
+One classroom still binds to at most one guild, channel IDs remain routing authority, Discord roles/guild membership alone do not authorize MCC access, and live shared-guild Discord smoke/capacity testing remains a rollout check.
+
+## 2026-08-09 - trainer-student-roster-apple-redesign-20260809 - Implemented Entry Points
+
+Source:
+- `docs/reviews/trainer-student-roster-apple-redesign-20260809-implementation-review.md`
+
+Fact:
+Classroom People roster redesign is implemented in `client/src/app/classroom/live/[id]/ClassroomLiveClient.js`. Trainer People now uses a full-width Students/Groups workspace with local search, separate show-more counts, Add Students Single/CSV dialog, pre-enrollment review preservation, link-pending attention lane, overflow removal confirmation, Create Group dialog, and Edit Members dialog. Student Group & Roster now uses a Groups/Classmates switcher, sorts the current student's groups first, and renders classmates through read-only scan rows.
+
+Applies when:
+Maintaining trainer People roster management, student Group & Roster presentation, classroom group member dialogs, roster batching/search, or People-tab motion.
+
+Do not overgeneralize:
+This implementation does not change server/API routes, auth, database schema, enrollment visibility semantics, global tokens, classroom tabs outside People, or Discord integration behavior.
+
+## 2026-08-02 - trainer-classroom-discord-integration-20260802 - Implemented Foundation Entry Points
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+
+Fact:
+Discord classroom integration foundation is implemented behind feature flags. Server entry points live in `server/src/controllers/discordController.ts`, `server/src/routes/authRoute.ts`, `server/src/routes/classroomRoute.ts`, `server/src/middleware/discordLinkMiddleware.ts`, and Discord utilities under `server/src/utils/discord*.ts`. The standalone worker is `server/src/workers/discordWorker.ts` and is launched with `bun run discord:worker`; it can register commands to `DISCORD_DEV_GUILD_ID` / `DISCORD_TEST_GUILD_ID` for local guild testing and uses `server/src/utils/discordCommandHandlers.ts` for mapped-channel `/mcc` read-only/status commands, trainer Repair queueing, student `/mcc checkin` modal submissions, student `/mcc submit` modal submissions into the existing pending-review flow, trainer `/mcc review` modal verdicts/feedback for pending submissions, and trainer `/mcc assign` live-class problem assignment through autocomplete/modal. Classroom-aware middleware forces active real students to connect Discord before entering a Discord-bound classroom, even while broad migration remains staged. The reusable creation UI is `client/src/components/CreateClassroomWizard.jsx`, the HTTP 428 recovery card is `client/src/components/DiscordConnectionRequiredCard.jsx`, both are used by trainer classroom entry points and classroom live recovery, the guild proxy is `client/src/app/api/classroom/discord/guilds/route.js`, the frontend OAuth callback bridge is `client/src/app/api/auth/callback/discord/route.js`, and the classroom Settings integration card is `client/src/components/ClassroomDiscordSettingsCard.jsx` with settings/rules/roster/reconcile/trusted-link proxies under `client/src/app/api/classroom/[id]/discord/`. SQL lives at `docs/sql/trainer-classroom-discord-integration-20260802.sql` and was applied through Supabase MCP as migration `20260802150430 trainer_classroom_discord_integration_20260802`; trusted/manual link follow-up SQL lives at `docs/sql/trainer-classroom-discord-manual-links-20260809.sql` and was applied on 2026-08-09 through direct Postgres because Supabase MCP was unavailable.
+
+Applies when:
+Maintaining Discord linking, classroom guild binding, provisioning jobs, private channel mapping, Discord-to-thread sync, Discord check-ins/rules/roster/trusted-link endpoints, the classroom creation wizard, or classroom Settings Discord controls.
+
+Do not overgeneralize:
+Topic assignment from Discord is not part of `/mcc assign` v1, Supabase advisors after the manual-link SQL are still pending, and live Discord guild verification with separate trainer/student accounts still requires a dedicated test guild.
+
+## 2026-08-02 - trainer-classroom-discord-integration-20260802 - Approved Technical Design
+
+Source:
+- `docs/decisions/trainer-classroom-discord-integration-20260802-technical-decisions.md`
+- `docs/adr/0012-classroom-discord-bridge.md`
+
+Fact:
+MCC/PostgreSQL remains authoritative for users, classrooms, threads, submissions, reviews, schedules, notification rules, and check-ins. Discord is an authenticated input and notification adapter. V1 uses one dedicated Discord guild per classroom and private student text channels. Discord-origin messages, attachments, edits, and deletions can mirror into website student threads; website-authored human message bodies must not post outward to Discord. Discord network calls run from a separate worker after commit through durable jobs.
+
+Applies when:
+Changing classroom Discord topology, source-of-truth boundaries, OAuth token handling, private channel permissions, message sync direction, delivery jobs, worker responsibilities, or command adapters.
+
+Do not overgeneralize:
+This decision does not authorize using Discord channel names as identity, storing plaintext OAuth tokens, requesting Administrator permission, logging message bodies, bypassing classroom authorization, or broad public-table RLS remediation outside a separate security RSD.
+
+## 2026-08-02 - trainer-classroom-discord-integration-20260802 - Approved Requirement Scope
+
+Source:
+- `docs/rsd/trainer-classroom-discord-integration-20260802-rsd.md`
+
+Fact:
+The Discord-first classroom integration is approved to require linked unique Discord accounts, create one-classroom/one-guild bindings, provision private student channels, sync Discord-origin messages to existing student threads, add durable notification/reminder/check-in infrastructure, add Discord OAuth/guild/status/rules/check-in APIs, and replace duplicate classroom creation forms with one Discord-aware wizard.
+
+Applies when:
+Implementing or reviewing Discord OAuth, trainer guild selection, classroom creation enforcement, provisioning, delivery queue, check-ins, reminders, Discord-origin thread events, and classroom creation UI.
+
+Do not overgeneralize:
+Bulk imports, destructive classroom deletion, arbitrary website navigation from Discord, live IDE/board control, full production rollout, and critical public classroom-table RLS remediation are outside this v1 scope.
+
 ## 2026-08-02 - trainer-student-thread-instant-realtime-20260802 - Approved Implementation Plan
 
 Source:

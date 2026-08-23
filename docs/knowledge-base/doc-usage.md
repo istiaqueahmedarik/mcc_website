@@ -1,5 +1,89 @@
 # Doc Usage
 
+## 2026-08-17 - trainer-student-context-menu-simplification-20260817 - Implementation Docs Used
+
+Source:
+- `docs/reviews/trainer-student-context-menu-simplification-20260817-implementation-review.md`
+
+Fact:
+Implementation used `AGENTS.md`, the required interface/Apple/Emil design skills, Radix Context Menu documentation through Context7, Vercel's interface baseline, current `ClassroomLiveClient.js` and shadcn primitives, and classroom navigation/roster/resource project memory. These inputs drove role-prioritized progressive disclosure, shared visible/context commands, motion restraint, focus return, and scoped preservation of native browser context behavior.
+
+Applies when:
+Auditing why the task uses visible overflow plus scoped context acceleration and remains UI-only.
+
+Do not overgeneralize:
+This documentation pass did not authorize server behavior, dependency, global design-system, or unrelated dirty-worktree changes. Authenticated multi-viewport browser QA remains a follow-up check.
+
+## 2026-08-10 - trainer-classroom-codeforces-contests-20260810 - Docs Used
+
+Source:
+- `docs/reviews/trainer-classroom-codeforces-contests-20260810-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the project knowledge base, the required `supabase`, `supabase-postgres-best-practices`, `interface-design`, `apple-design`, `emil-design-eng`, and `context7` skills, Context7 React form/accessibility docs, current Supabase changelog/RLS/privilege guidance, Vercel Web Interface Guidelines, official Codeforces API help/method docs for authentication/rate-limit/`contest.standings`, and current classroom contest controller/service/UI source.
+
+Applies when:
+Auditing classroom Codeforces provider behavior, trainer-owned Codeforces credential setup, signed Gym/group/mashup standings fetches, encrypted credential storage, full Codeforces snapshot retention, trainer map/ignore handling for unmatched rows, or why public standings remain anonymous-only.
+
+Do not overgeneralize:
+This docs pass did not run live Codeforces Gym/group smoke tests or apply SQL to production; rollout still requires configuring `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY`, applying expand SQL, and having trainers save credentials with Gym/group/mashup access.
+
+## 2026-08-10 - admin-full-user-csv-20260810 - Docs Used
+
+Source:
+- Current implementation pass
+
+Fact:
+This task used `AGENTS.md`, the project knowledge base, the required `interface-design`, `apple-design`, `emil-design-eng`, `context7`, and `supabase-postgres-best-practices` skills, Context7 Hono JSON handler docs, Context7 React controlled form docs, Context7 Next.js Server Actions docs, Postgres batch insert/short transaction/constraint references, read-only live `users` table column/index inspection, and current `/admin/trainers`, `classroomController.ts`, and `classroomRoute.ts` source.
+
+Applies when:
+Auditing why admin full-user creation reused `/admin/trainers`, why no schema migration was added, why CSV parsing is browser-local but validation is server-owned, or why password hashing is done before the batch insert.
+
+Do not overgeneralize:
+This docs pass did not run a live authenticated browser session or insert real users into production data.
+
+## 2026-08-09 - trainer-existing-classroom-discord-binding-20260809 - Docs Used
+
+Source:
+- `docs/reviews/trainer-existing-classroom-discord-binding-20260809-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, all relevant Discord and trainer knowledge-base entries, the required `interface-design`, `apple-design`, `emil-design-eng`, `context7`, `supabase`, and `supabase-postgres-best-practices` skills, Context7 Next.js 16.1.1 Route Handler docs, Context7 Hono JSON handler docs, the 2026-08-09 Supabase changelog, Postgres index/short-transaction/privilege references, and current Discord controller/route/proxy/settings-card source.
+
+Applies when:
+Auditing why existing-classroom Discord binding lives in Settings, why it reuses creation binding logic, or why direct Postgres verification used Bun's env loader without printing secrets.
+
+Do not overgeneralize:
+No live Discord channel smoke was run for this follow-up, and no new schema migration or Supabase advisor run was required.
+
+## 2026-08-09 - trainer-shared-discord-guild-classrooms-20260809 - Docs Used
+
+Source:
+- `docs/reviews/trainer-shared-discord-guild-classrooms-20260809-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the existing Discord RSD/technical decisions/ADR/task/review, current Discord SQL/controllers/provisioning/queue/command/thread/UI source, all relevant knowledge-base files, the `context7`, `supabase`, and `supabase-postgres-best-practices` skills, official Discord API documentation through Context7, the 2026-08-09 Supabase changelog, and Postgres constraint/index/lock/privilege best-practice references. The UI change was copy-only, so the new-interface design stack was not required.
+
+Applies when:
+Auditing the shared Discord guild topology, migration method, external permission revalidation, or why direct Postgres verification was used.
+
+Do not overgeneralize:
+Supabase MCP/advisors and a live two-classroom Discord guild smoke were unavailable; database schema behavior, bundles, lint, production client build, and exact-ID source routing were verified instead.
+
+## 2026-08-09 - trainer-student-roster-apple-redesign-20260809 - Docs Used
+
+Source:
+- `docs/reviews/trainer-student-roster-apple-redesign-20260809-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the required `interface-design`, `apple-design`, `emil-design-eng`, and `context7` skills, Motion for React docs through Context7, Apple Human Interface Guidelines, Vercel Web Interface Guidelines, `docs/knowledge-base/project-index.md`, `patterns.md`, `decisions.md`, `quality-rules.md`, `hci-rules.md`, `doc-usage.md`, `docs/rsd/trainer-pre-enrolled-students-20260727-rsd.md`, and `ClassroomLiveClient.js` source inspection to keep the redesign UI-only and preserve roster semantics.
+
+Applies when:
+Auditing future classroom People UI work, Apple-inspired roster decisions, or why authenticated browser visual QA remains a residual check.
+
+Do not overgeneralize:
+The docs pass did not authorize server/API/schema/auth changes, dependency additions, broad classroom redesign, or production data screenshots in this environment.
+
 ## 2026-08-02 - trainer-compact-ui-cleanup-20260802 - Implementation Review Docs Used
 
 Source:

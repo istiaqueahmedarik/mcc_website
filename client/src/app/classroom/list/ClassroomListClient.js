@@ -1,33 +1,23 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { get_with_token, post_with_token } from '@/lib/action';
+import { get_with_token } from '@/lib/action';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import ProgressLink from '@/components/ProgressLink';
-import { Users, Plus, BookOpen, AlertCircle, Radio, ArrowRight } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import CreateClassroomWizard from '@/components/CreateClassroomWizard';
+import DiscordConnectionRequiredCard from '@/components/DiscordConnectionRequiredCard';
+import { Users, Plus, BookOpen, Radio, ArrowRight } from 'lucide-react';
 
 export default function ClassroomListClient() {
   const [classrooms, setClassrooms] = useState([]);
   const [isTrainer, setIsTrainer] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [newClassName, setNewClassName] = useState('');
-  const [newClassDesc, setNewClassDesc] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [error, setError] = useState('');
+  const [discordRequired, setDiscordRequired] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
+    setDiscordRequired(false);
     // Fetch user profile to check if trainer/admin
     const profile = await get_with_token('auth/user/profile');
     if (profile && profile.result && profile.result[0]) {
@@ -38,6 +28,9 @@ export default function ClassroomListClient() {
     const res = await get_with_token('classroom/list');
     if (res && res.result) {
       setClassrooms(res.result);
+    } else if (res?.code === 'DISCORD_LINK_REQUIRED') {
+      setClassrooms([]);
+      setDiscordRequired(true);
     }
     setLoading(false);
   };
@@ -45,27 +38,6 @@ export default function ClassroomListClient() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const handleCreateClassroom = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!newClassName.trim()) {
-      setError('Classroom name is required');
-      return;
-    }
-    const res = await post_with_token('classroom/create', {
-      name: newClassName,
-      description: newClassDesc,
-    });
-    if (res && res.success) {
-      setNewClassName('');
-      setNewClassDesc('');
-      setModalOpen(false);
-      fetchData();
-    } else {
-      setError(res.error || 'Failed to create classroom');
-    }
-  };
 
   const liveCount = classrooms.filter((c) => c.live_url).length;
 
@@ -106,57 +78,24 @@ export default function ClassroomListClient() {
             )}
 
             {isTrainer && (
-              <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-                <DialogTrigger asChild>
+              <CreateClassroomWizard
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+                onCreated={fetchData}
+                trigger={
                   <Button className="gap-2 font-semibold">
                     <Plus className="h-4 w-4" />
                     Create classroom
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                  <DialogHeader>
-                    <DialogTitle>Create classroom</DialogTitle>
-                    <DialogDescription>
-                      Name the classroom. Description stays optional.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleCreateClassroom} className="space-y-4 py-4">
-                    {error && (
-                      <div className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
-                        <AlertCircle className="h-4 w-4" />
-                        {error}
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Classroom name</label>
-                      <Input
-                        placeholder="Advanced DP & Graphs"
-                        value={newClassName}
-                        onChange={(e) => setNewClassName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Description</label>
-                      <Textarea
-                        placeholder="Audience, topics, schedule"
-                        value={newClassDesc}
-                        onChange={(e) => setNewClassDesc(e.target.value)}
-                      />
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" className="w-full font-semibold sm:w-auto">
-                        Create classroom
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                }
+              />
             )}
           </div>
         </section>
 
-        {loading ? (
+        {discordRequired ? (
+          <DiscordConnectionRequiredCard />
+        ) : loading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => (
               <div key={i} className="animate-pulse rounded-lg border bg-card p-5">

@@ -1,12 +1,14 @@
 {
   "name": "server",
   "scripts": {
-    "dev": "bun run --hot src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "discord:worker": "bun run src/workers/discordWorker.ts"
   },
   "dependencies": {
     "@tldraw/sync-core": "5.2.5",
     "cheerio": "^1.0.0",
     "date-fns": "^4.1.0",
+    "discord.js": "14.26.2",
     "hono": "^4.5.11",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.15",

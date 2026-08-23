@@ -1,5 +1,215 @@
 # Quality Rules
 
+## 2026-08-17 - Context Menus Need A Visible Equivalent
+
+Source:
+- `docs/rsd/trainer-student-context-menu-simplification-20260817-rsd.md`
+- `docs/reviews/trainer-student-context-menu-simplification-20260817-implementation-review.md`
+
+Rule:
+Classroom context-menu commands must also be reachable from a visible keyboard-operable overflow control backed by the same command definitions. Context triggers stay scoped, destructive actions keep confirmation, hidden metadata remains searchable/recoverable through Details, and role filtering remains server-authoritative and client-visible.
+
+Applies when:
+Adding or changing contextual navigation or repeated-item commands in the trainer/student live classroom.
+
+Do not overgeneralize:
+This rule does not require context menus on read-only prose, inputs, editors, code, ordinary links, or every card in the application.
+
+## 2026-08-10 - Mixed Contest Reports Need Stable Provider Identities
+
+Source:
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ReportTable.js`
+
+Rule:
+Classroom contest reports that combine providers must key contests by provider-prefixed IDs and participants by canonical identities rather than display handles. Report rows should carry `identityKey`, `providers`, and `sourceHandles`; UI rows should use `identityKey || username` for keys/rank maps. Legacy VJudge reports may fall back to bare usernames and contest IDs.
+
+Applies when:
+Changing classroom contest report generation, TFC/TSC aggregation, demerits, progress calculations, row highlighting, report-table rendering, or future contest providers.
+
+Do not overgeneralize:
+Do not migrate unrelated global reports to this identity model without a separate compatibility plan, and do not break saved legacy classroom reports that lack the new fields.
+
+## 2026-08-10 - Provider Secrets Stay Server-Only
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/utils/codeforcesCredentialCrypto.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/app/api/classroom/[id]/contests/[...path]/route.js`
+
+Rule:
+External contest provider secrets must stay server-only. For classroom Codeforces Gym/group/mashup fetches, trainers save their own API key/secret through authorized Hono endpoints; the server stores AES-GCM ciphertext using `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY` and returns only status, key hint, and timestamps. Browser/Next proxy code may forward classroom auth and provider-specific browser session cookies only when already part of the existing workflow, but it must not log or return provider API secrets.
+
+Applies when:
+Changing Codeforces Gym fetches, external contest provider credentials, classroom contest proxies, deployment environment setup, or error handling around provider access.
+
+Do not overgeneralize:
+Do not add `NEXT_PUBLIC_` provider secrets, deployment-wide shared Codeforces API credentials for classroom Gym access, plaintext credential storage, reveal-secret endpoints, or diagnostic logging that prints env values or trainer-provided secrets.
+
+## 2026-08-10 - Unmapped Codeforces Rows Must Not Become Report Identities
+
+Source:
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Rule:
+Classroom Codeforces snapshots may contain every official standings row, including participants that are not in the classroom. Generated classroom reports must count only rows resolved to `student:<uuid>` or `group:<uuid>` identities. Unmapped Codeforces rows stay reviewable for trainers, and `ignore` overrides must keep `identityKey` null so ignored participants cannot affect totals, TFC/TSC references, demerits, highlighting, or report aggregation.
+
+Applies when:
+Changing Codeforces snapshot persistence, mapping resolution, report generation, TFC/TSC aggregation, demerits, row highlighting, or trainer handle-management UI.
+
+Do not overgeneralize:
+Do not filter full Codeforces snapshots back down to classroom rows, do not assign provider-prefixed unmatched identities to Codeforces rows, and do not treat ignore mappings as roster membership.
+
+## 2026-08-10 - Discord Channel Changes Must Preserve Exact-ID Authority
+
+Source:
+- `server/src/controllers/discordController.ts`
+- `server/src/utils/discordProvisioning.ts`
+
+Rule:
+Classroom Discord channel changes must reauthorize the actor against both MCC classroom management and the selected Discord guild, then mutate binding/mapping rows in a short transaction and queue worker provisioning. Keep old Discord names/IDs non-authoritative, archive stale mappings before new provisioning, clear archive markers when reusing student mapping rows, and count only active student channels in status payloads.
+
+Applies when:
+Changing Discord binding moves, channel recreation, provisioning upserts, roster/status payloads, or Discord repair logic.
+
+Do not overgeneralize:
+This rule does not require destructive Discord API cleanup; add that only as an explicit worker-backed feature with its own safety review.
+
+## 2026-08-10 - Admin User Imports Stay Server-Owned
+
+Source:
+- `server/src/controllers/classroomController.ts`
+- `client/src/app/admin/trainers/TrainersManagementClient.js`
+
+Rule:
+Admin user creation and imports must revalidate every client-provided field on the server before inserting `users` rows. Bulk imports should avoid per-row network loops, cap request size, hash passwords outside the insert transaction, check existing emails with the indexed lowercase email path, return row-numbered errors, and never create pre-enrolled placeholder accounts through the full-user endpoint.
+
+Applies when:
+Changing admin full-user creation, CSV imports, role flags, verified handle fields, or user import result handling.
+
+Do not overgeneralize:
+This does not replace classroom-specific roster validation, public signup validation, or future large-import background job design.
+
+## 2026-08-09 - Public-Schema Feature Tables Need RLS
+
+Source:
+- `docs/sql/trainer-classroom-contests-20260809.sql`
+- `docs/reviews/trainer-classroom-contests-20260809-implementation-review.md`
+
+Rule:
+Any new Supabase `public` schema table must explicitly enable row level security in the SQL artifact, even when all current app access goes through server-owned Hono routes. If direct Data API access is not part of the feature, do not add broad anon/authenticated policies; keep authorization in the server route and leave direct table access closed.
+
+Applies when:
+Adding public-schema classroom tables, report tables, integration tables, queues, snapshots, or future feature-owned persistence.
+
+Do not overgeneralize:
+This does not replace route-level authorization checks, database foreign keys, scoped indexes, or feature-specific share gates.
+
+## 2026-08-09 - Scoped Reports Must Not Reuse Public Share Sinks
+
+Source:
+- `docs/reviews/trainer-classroom-contests-20260809-implementation-review.md`
+
+Rule:
+Classroom-scoped reports must keep persistence and sharing in classroom-scoped tables/routes. Shared display components may accept injected controls, but classroom sharing must not call `public-contest-report` or write `Public_contest_report`. User-entered report annotations such as demerit reasons must render as text, never through `innerHTML`.
+
+Applies when:
+Changing `ReportTable`, classroom report sharing, contest demerits, live-share controls, or future private report surfaces.
+
+Do not overgeneralize:
+Global contest reports may keep their existing public live-share path until a separate migration changes that workflow.
+
+## 2026-08-09 - Post-Create Bind Paths Must Match Create Paths
+
+Source:
+- `docs/reviews/trainer-existing-classroom-discord-binding-20260809-implementation-review.md`
+
+Rule:
+When adding a way to attach an external integration to an existing classroom, reuse the same server helper and defaults used during classroom creation. The mutation must check both MCC object authorization and current external-resource permission, then write binding/rules/jobs in one short transaction. UI should call a protected object settings route and reload authoritative status instead of hand-assembling integration state.
+
+Applies when:
+Adding or changing existing-classroom Discord binding, future post-create integrations, repair/setup flows, or external-account attach workflows.
+
+Do not overgeneralize:
+Do not create public attach routes for private objects, do not duplicate provisioning defaults in the browser, and do not hold database locks while calling external APIs.
+
+## 2026-08-09 - Reauthorize Posted External Resource IDs
+
+Source:
+- `docs/reviews/trainer-shared-discord-guild-classrooms-20260809-implementation-review.md`
+- `docs/decisions/trainer-shared-discord-guild-classrooms-20260809-technical-decisions.md`
+
+Rule:
+When a client posts an external platform resource selected from an authorized list, the mutation endpoint must independently revalidate the actor's current permission for the exact immutable external ID. Store provider-returned identity metadata, not client labels. Shared external installations must keep tenant/classroom bindings and failure state scoped rather than treating installation membership as domain authorization.
+
+Applies when:
+Binding Discord guilds, repositories, drives, calendars, payment accounts, or other reusable external containers to MCC domain records.
+
+Do not overgeneralize:
+Do not make external network calls inside a database transaction or infer MCC access from external membership alone. Use a separate approved design for cached permission proofs if live provider validation becomes too slow or unavailable.
+
+## 2026-08-09 - Classroom People Redesign Must Preserve Roster Semantics
+
+Source:
+- `docs/reviews/trainer-student-roster-apple-redesign-20260809-implementation-review.md`
+- `docs/rsd/trainer-student-roster-apple-redesign-20260809-rsd.md`
+
+Rule:
+People tab UI redesigns must not change roster authority. Pre-enrolled and link-pending students can stay selectable for trainer workflows, student classroom access must remain active-only, endpoint strings and tour tab values must stay stable, and list batching/search should be local UI state unless a separate server-pagination decision exists.
+
+Applies when:
+Changing People roster rows, group membership dialogs, add/import/pre-enrollment UI, student Group & Roster, or classroom People motion.
+
+Do not overgeneralize:
+This is not approval for server/API/schema/auth edits, bulk enrollment semantic changes, new dependencies, or hidden polling.
+
+## 2026-08-02 - Discord Bridge Privacy and Delivery Rules
+
+Source:
+- `docs/adr/0012-classroom-discord-bridge.md`
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+
+Rule:
+Discord bridge code must keep OAuth tokens encrypted, avoid logging message bodies/tokens, disable automatic mentions on bot sends, resolve all Discord events by exact IDs, copy accepted attachments into the existing private storage flow, and enqueue Discord delivery work in the same transaction as the domain mutation while doing network calls after commit from the worker.
+
+Applies when:
+Changing Discord OAuth storage, inbound message handling, outbound notifications, delivery queue jobs, provisioning, check-ins, reminders, or command handlers.
+
+Do not overgeneralize:
+This does not remove the need for explicit classroom authorization checks, live guild smoke tests, or the separate public-table RLS remediation before production rollout.
+
+## 2026-08-09 - Manual Discord Links Must Not Trust Usernames
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `docs/sql/trainer-classroom-discord-manual-links-20260809.sql`
+
+Rule:
+Any admin/trainer manual Discord link must require a Discord user snowflake ID or @mention, record who verified it, and keep usernames/display names as non-authoritative labels. Manual links may satisfy classroom access and channel overwrite provisioning, but OAuth-backed tokens remain required for automatic guild joins and trainer guild listing.
+
+Applies when:
+Changing Discord roster overrides, imports, account-linking migrations, classroom gate checks, or Discord provisioning code.
+
+Do not overgeneralize:
+Do not fabricate encrypted OAuth tokens for manual records, do not use mutable display names as IDs, and do not relax the unique active Discord-account constraint.
+
+## 2026-08-09 - Discord Commands Need Stable Refs and Body-Free Audit
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `server/src/utils/discordCommandHandlers.ts`
+
+Rule:
+Discord command mutations must use stable server-resolved IDs or refs for classroom entities, validate all free-form modal inputs before mutation, and keep `discord_command_audit.metadata` limited to IDs, counts, booleans, status/reason codes, and safe workflow metadata. Use advisory/idempotency protection for mutation submits and queue Discord notifications in the same database transaction as the authoritative state change.
+
+Applies when:
+Changing `/mcc assign`, `/mcc submit`, `/mcc review`, future Discord trainer/student mutations, or command audit metadata.
+
+Do not overgeneralize:
+Do not store Discord message bodies, solution code, trainer notes, OAuth tokens, raw usernames, or mutable labels in audit metadata; do not trust autocomplete display labels as authority.
+
 ## 2026-08-02 - Use Design Skill Stack For New Interfaces
 
 Source:

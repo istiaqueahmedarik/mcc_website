@@ -1,5 +1,250 @@
 # Patterns
 
+## 2026-08-17 - Shared Visible And Contextual Commands
+
+Source:
+- `docs/decisions/trainer-student-context-menu-simplification-20260817-technical-decisions.md`
+- `docs/reviews/trainer-student-context-menu-simplification-20260817-implementation-review.md`
+
+Pattern:
+For dense operational repeaters, keep one visible overflow trigger and optionally add right-click/long-press acceleration over the same bounded surface. Render both menus from one command definition so labels, permissions, disabled/loading states, destructive treatment, and handlers cannot drift. Put static facts behind a Details command instead of writing facts into menu rows.
+
+Applies when:
+Implementing the approved classroom navigation, People rows, group rows, classmate rows, or resource cards.
+
+Do not overgeneralize:
+Do not wrap text editors, code, links, forms, or an entire page in a custom context-menu trigger; native browser commands remain important there.
+
+## 2026-08-10 - Classroom Contest Provider Adapter
+
+Source:
+- `server/src/services/classroomContestRankService.ts`
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Pattern:
+When adding contest providers to classroom reports, isolate provider-specific fetch/sign/parse/rate-limit behavior in a service adapter, then normalize rows before controller persistence. Keep global provider routes unchanged unless the feature explicitly scopes them in. Use provider-prefixed contest keys in reports, canonical classroom identities for row merging, and provider-aware manual overrides for aliases.
+
+Applies when:
+Adding or changing classroom contest providers, report aggregation, snapshot contracts, provider-specific aliases, or ranking-source fetch services.
+
+Do not overgeneralize:
+This pattern is for classroom-private reports. It does not authorize reworking global contest rooms, public live reports, saved standings, or public standings providers without a separate decision.
+
+## 2026-08-10 - Codeforces Classroom Fetching
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `docs/reviews/trainer-classroom-codeforces-contests-20260810-implementation-review.md`
+
+Pattern:
+Fetch Codeforces public contests anonymously with only `contestId`; retry with a signed server-only request only when Codeforces reports access/authentication is required. For classroom Gym/group/mashup contests, load the acting trainer's encrypted Codeforces API credentials lazily for that signed retry. Treat high-number "contest not found" responses as possibly hidden private/group contests and retry signed before failing. Throttle through a process-local queue, set a bounded timeout and response-size guard, filter to official contestants, and persist all official rows in Codeforces snapshots. Preserve native rank/full participant metadata separately from normalized classroom score.
+
+Applies when:
+Maintaining Codeforces standings fetches, Gym/group/mashup access, API credentials, rate-limit handling, or classroom snapshot filtering.
+
+Do not overgeneralize:
+Do not send API credentials to the browser, do not add optional filters to anonymous public regular contest requests, do not decrypt trainer credentials for public contests, and do not count unmapped or ignored Codeforces rows in generated classroom reports.
+
+## 2026-08-10 - Codeforces Unmapped Row Review
+
+Source:
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Pattern:
+After a Codeforces fetch, keep the full official snapshot and compute classroom mapping at report/read time. Expose latest unmapped Codeforces rows from room snapshots so trainers can either map a handle to a classroom student/group or save an `ignore` handle override. `ignore` overrides have no student/group target, no `identityKey`, and exclude matching rows from generated classroom rankings while leaving the fetched snapshot intact.
+
+Applies when:
+Changing classroom Codeforces snapshot persistence, handle override targets, report generation, trainer mapping UI, or unmapped standings review.
+
+Do not overgeneralize:
+Do not add `ignore` as a student/group status, do not delete rows from snapshots to ignore them, and do not apply Codeforces unmapped-row behavior to global reports without a separate compatibility plan.
+
+## 2026-08-10 - Discord Channel Moves Reprovision Mappings
+
+Source:
+- `server/src/controllers/discordController.ts`
+- `server/src/utils/discordProvisioning.ts`
+- `client/src/components/ClassroomDiscordSettingsCard.jsx`
+
+Pattern:
+When trainers need to change a classroom's Discord channel destination, revalidate current Discord Manage Server permission for the chosen guild, then update only MCC's binding/mapping rows in a short transaction and queue provisioning. Archive old active channel mappings, remove stale category mappings, clear `staff_channel_id`, and let the Discord worker create fresh exact-ID mappings. Do not accept typed channel names or IDs as routing authority.
+
+Applies when:
+Changing classroom Discord server/channel destination, recreating mapped channels, repair flows, or provisioning status counts.
+
+Do not overgeneralize:
+This pattern does not automatically delete Discord-side channels. Add deletion only through a separate explicit worker action with safe permission/capacity/error handling.
+
+## 2026-08-10 - Admin Full User Import
+
+Source:
+- `server/src/controllers/classroomController.ts`
+- `client/src/app/admin/trainers/TrainersManagementClient.js`
+
+Pattern:
+For admin-created platform users, keep CSV parsing and preview local, but treat the server as the authority for required fields, role flags, password length, URL shape, MIST ID shape, duplicate emails, and verified-handle consistency. Hash passwords before the insert statement, perform duplicate email checks in one indexed query, insert valid bulk rows with one batch insert, and return row-numbered errors for skipped rows.
+
+Applies when:
+Extending `/admin/trainers` account creation, adding user import columns, or building future admin batch mutations over `users`.
+
+Do not overgeneralize:
+Do not use this for classroom roster placeholder imports, large background migrations, invitation workflows, or imports that need file uploads. Do not trust client CSV preview as validation.
+
+## 2026-08-09 - Classroom-Scoped Contest Clone
+
+Source:
+- `docs/reviews/trainer-classroom-contests-20260809-implementation-review.md`
+
+Pattern:
+When cloning a global workflow into classroom scope, give it its own lowercase tables, classroom-prefixed routes, classroom manager checks for mutations, and classroom-private share state. Reuse pure processing helpers where the payload contract must stay compatible, but keep persistence, authorization, and share destinations separate from the global workflow.
+
+Applies when:
+Adding classroom-specific variants of global contest/report tools, VJudge snapshots, report generation, or private classroom sharing.
+
+Do not overgeneralize:
+Do not point classroom operations at global report, demerit, saved-standings, public-share, or team-collection tables merely because the display payload is compatible.
+
+Student-facing read paths:
+Students may list only classroom contest rooms with `visible_to_students = true` reports, and may read only those shared classroom-private reports. Keep student views read-only, pass classroom highlight metadata into the report table, and keep global live-share controls disabled for classroom reports.
+
+## 2026-08-09 - Post-Create External Binding Reuses Creation Invariants
+
+Source:
+- `docs/reviews/trainer-existing-classroom-discord-binding-20260809-implementation-review.md`
+
+Pattern:
+When an existing domain object gains an external integration after creation, expose the action from that object's authenticated settings surface, then call the same server-side binding/provisioning helper used by the creation flow. Reauthorize the actor for both the domain object and the exact external resource before the transaction; keep external provider calls outside the transaction; and queue asynchronous provisioning after the binding row is inserted.
+
+Applies when:
+Connecting existing classrooms to Discord or adding future post-create external integrations.
+
+Do not overgeneralize:
+Do not add public connect pages for private classroom mutations, do not duplicate creation defaults in the UI, and do not treat picker output as authorization.
+
+## 2026-08-09 - Shared External Installation, Scoped Classroom Bindings
+
+Source:
+- `docs/adr/0013-shared-discord-guild-classroom-bindings.md`
+- `docs/reviews/trainer-shared-discord-guild-classrooms-20260809-implementation-review.md`
+
+Pattern:
+Model an external platform installation once per external container and attach many domain-scoped bindings to it. Keep mutable rules, channel mappings, jobs, and failure state on the binding; route inbound work through exact external IDs; use stable domain-ID suffixes only when readable names would collide; and revalidate the actor's current external permission before accepting a posted installation/container ID.
+
+Applies when:
+Sharing a Discord guild across classrooms or designing another reusable external installation with tenant/classroom-scoped resources.
+
+Do not overgeneralize:
+Do not infer authorization from shared installation membership, labels, roles, or names. Do not merge domain data merely because bindings share an external container, and do not hold database locks across external network calls.
+
+## 2026-08-09 - Focused Classroom People Workspace
+
+Source:
+- `docs/reviews/trainer-student-roster-apple-redesign-20260809-implementation-review.md`
+- `docs/decisions/trainer-student-roster-apple-redesign-20260809-technical-decisions.md`
+
+Pattern:
+For classroom People surfaces, use a focused local switcher plus one quiet toolbar per view instead of parallel card columns. Put search, low-emphasis count, and one primary action in the toolbar; move dense add/import/create/edit forms into dialogs; render roster/group data as soft list rows with subtle separators; split show-more state by list; and keep destructive row actions behind overflow plus confirmation.
+
+Applies when:
+Refreshing trainer roster, student roster, group list, group member management, or similar classroom people-management surfaces.
+
+Do not overgeneralize:
+This does not replace comparison-heavy analytics matrices, thread panels, schedule cards, or global route navigation. Use this pattern for scan-and-manage people lists, not every classroom surface.
+
+## 2026-08-02 - Discord Adapter Over Authoritative Classroom Services
+
+Source:
+- `docs/decisions/trainer-classroom-discord-integration-20260802-technical-decisions.md`
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+
+Pattern:
+Treat Discord as an adapter over MCC classroom state, not a parallel classroom system. Resolve Discord events through durable ID mappings and linked user records, call the same authorization and domain paths that web handlers use, write delivery jobs inside the database transaction, and let the worker perform Discord network calls after commit.
+
+Applies when:
+Adding Discord command handlers, reminder producers, provisioning repairs, submission/review actions from Discord, or new Discord notification events.
+
+Do not overgeneralize:
+Do not trust Discord channel names, role names, or message contents as authority; do not send website human message bodies outward; do not perform Discord REST calls inside classroom domain transactions.
+
+## 2026-08-09 - Trusted Manual Discord Identity Uses Snowflakes
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `docs/sql/trainer-classroom-discord-manual-links-20260809.sql`
+- `server/src/controllers/discordController.ts`
+
+Pattern:
+When a classroom manager/admin manually verifies a student's Discord account, store the Discord user snowflake from an ID or @mention as the authority. Usernames, global display names, and notes are labels only. Manual/trusted rows use `connection_source = 'trusted_manual'`, `verified_at`, and `verified_by_user_id`; they do not store fake OAuth tokens and cannot power trainer guild selection or Discord Add Guild Member.
+
+Applies when:
+Changing Discord roster trusted-link UI, `discord_user_connections`, classroom access gating, provisioning, or future admin/import tooling that accepts Discord identities.
+
+Do not overgeneralize:
+Do not accept mutable Discord usernames as authorization identity. Do not treat a trusted/manual row as proof that MCC can auto-join the user to a guild; OAuth with `guilds.join` is still required for that.
+
+## 2026-08-02 - Discord Submit/Review Modal References
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `server/src/utils/discordCommandHandlers.ts`
+
+Pattern:
+Discord student submissions and trainer reviews should use short server-generated references shown by `/mcc problems` or `/mcc pending` instead of trusting titles or channel names. `/mcc submit` resolves `live:<uuid-prefix>` or `topic:<assignment-prefix>:<problem-prefix>` against the mapped classroom, linked Discord user, active private channel, and active assignment/enrollment state before writing the existing `pending_approval` submission rows and a student-thread system event. `/mcc review` resolves `live:<uuid-prefix>` or `topic:<progress-prefix>` against pending rows and trainer permissions before writing final verdict state plus a student-thread feedback event.
+
+Applies when:
+Changing Discord `/mcc submit`, Discord `/mcc review`, future Discord autocomplete, pending-review references, or website thread event mirroring for Discord-origin submissions/reviews.
+
+Do not overgeneralize:
+Do not store submitted code, notes, OAuth tokens, or message bodies in command audit metadata; audit only IDs, booleans, status/reason codes, and safe workflow metadata.
+
+## 2026-08-09 - Discord Assign Autocomplete Plus Modal
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `server/src/utils/discordCommandHandlers.ts`
+- `server/src/workers/discordWorker.ts`
+
+Pattern:
+Discord trainer mutations that need both target selection and structured details should split stable identity selection into slash-command autocomplete options and put free-form details into a modal. `/mcc assign` uses `class:<uuid-prefix>` and `student:<uuid-prefix>` / `team:<uuid-prefix>` values for identity, re-resolves those refs against the mapped classroom before mutation, and writes assignment rows, thread system events, delivery jobs, and command audit inside the database transaction.
+
+Applies when:
+Adding Discord assignment variants, trainer-side Discord mutations, or autocomplete-backed command flows.
+
+Do not overgeneralize:
+Do not use autocomplete labels as authority, do not parse arbitrary usernames/channel names for identity, do not put network calls inside the database transaction, and do not store problem bodies or private notes in audit metadata.
+
+## 2026-08-09 - Discord Classroom Channel Naming
+
+Source:
+- `server/src/utils/discordProvisioning.ts`
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+
+Pattern:
+Discord provisioning uses stable, human-recognizable but Discord-safe names. Student private channels follow the human convention `Student Name [Student ID]`, rendered as a lowercase slug such as `john-doe-2022001`; `users.mist_id` is the Student ID, and the first eight characters of the MCC user UUID are the fallback when `mist_id` is missing. Staff channels and student category shards use the classroom slug by default, for example `mcc-advanced-cp-staff` and `advanced-cp-students-01`; if another bound classroom in the same guild normalizes to the same classroom slug, append the first eight characters of the MCC classroom UUID before `staff`/`students-01`. Student categories hold up to 45 active student channels before creating `02`, `03`, etc.
+
+Applies when:
+Changing Discord provisioning, Repair/reconcile behavior, student channel creation, category sharding, or roster naming.
+
+Do not overgeneralize:
+Channel names remain display/recovery aids only. Authorization must continue to use exact Discord snowflakes, channel IDs, classroom bindings, and MCC user IDs rather than names.
+
+## 2026-08-02 - Single Classroom Creation Wizard
+
+Source:
+- `docs/reviews/trainer-classroom-discord-integration-20260802-implementation-review.md`
+- `client/src/components/CreateClassroomWizard.jsx`
+
+Pattern:
+When classroom creation needs feature-gated integration steps, centralize it in one reusable wizard and embed that wizard from every create entry point. Keep Details first, integration-specific setup second, automation/defaults last, and let feature-disabled mode collapse back to the simple details form.
+
+Applies when:
+Changing trainer dashboard classroom creation, classroom list creation, future onboarding banners, or additional classroom setup steps.
+
+Do not overgeneralize:
+Do not add separate top-level creation forms that bypass Discord enforcement or duplicate async validation logic.
+
 ## 2026-08-02 - Opaque Realtime Invalidation With Incremental Fetch
 
 Source:

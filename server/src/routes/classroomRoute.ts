@@ -45,6 +45,8 @@ import {
   getClassResources,
   createTrainerUser,
   createAdminUser,
+  createFullUser,
+  createUsersBulk,
   changeUserPassword,
   listClassroomTopics,
   startClassroomBoardSession,
@@ -82,6 +84,51 @@ import {
   postProblemThreadMessage,
   toggleProblemThreadReaction
 } from '../controllers/classroomController';
+import {
+  changeClassroomDiscordChannels,
+  createClassroomDailyCheckin,
+  bindExistingClassroomDiscord,
+  getClassroomDailyCheckins,
+  getClassroomDiscordRules,
+  getClassroomDiscordRoster,
+  getClassroomDiscordStatus,
+  listEligibleDiscordGuilds,
+  reconcileClassroomDiscord,
+  trustClassroomStudentDiscordConnection,
+  updateClassroomDiscordRules,
+  updateClassroomDiscordSettings,
+} from '../controllers/discordController';
+import {
+  createClassroomContestDemerit,
+  createClassroomContestHandleOverride,
+  createClassroomContestItem,
+  createClassroomContestRoom,
+  createClassroomContestSolveOverride,
+  deleteClassroomCodeforcesCredentials,
+  deleteClassroomContestDemerit,
+  deleteClassroomContestHandleOverride,
+  deleteClassroomContestItem,
+  deleteClassroomContestRoom,
+  deleteClassroomContestSolveOverride,
+  fetchClassroomContestItem,
+  generateClassroomContestReport,
+  getClassroomCodeforcesCredentials,
+  getClassroomContestReport,
+  listClassroomContestDemerits,
+  listClassroomContestHandleOverrides,
+  listClassroomContestSolveOverrides,
+  listClassroomContestUnmatchedRows,
+  listClassroomContestRooms,
+  saveClassroomCodeforcesCredentials,
+  shareClassroomContestReport,
+  updateClassroomContestDemerit,
+  updateClassroomContestHandleOverride,
+  updateClassroomContestItem,
+  updateClassroomContestItemOrder,
+  updateClassroomContestRoom,
+  updateClassroomContestSolveOverride,
+} from '../controllers/classroomContestController';
+import { requireDiscordLink } from '../middleware/discordLinkMiddleware';
 import { upgradeWebSocket } from '../utils/bunWebSocket';
 import {
   connectClassroomBoardSocket,
@@ -147,12 +194,15 @@ route.use(
     alg: 'HS256',
   })
 );
+route.use('/*', requireDiscordLink);
 
 // Admin-only endpoints
 route.post('/admin/toggle-trainer', toggleTrainerRole);
 route.post('/admin/create-trainer', createTrainerUser);
 route.post('/admin/toggle-admin', toggleAdminRole);
 route.post('/admin/create-admin', createAdminUser);
+route.post('/admin/create-user', createFullUser);
+route.post('/admin/create-users-bulk', createUsersBulk);
 route.post('/admin/change-password', changeUserPassword);
 route.get('/admin/users', listAllUsers);
 route.get('/admin/trainers-list', listTrainers);
@@ -160,6 +210,7 @@ route.get('/admin/trainers-list', listTrainers);
 // Classroom CRUD
 route.post('/create', createClassroom);
 route.get('/list', getClassrooms);
+route.get('/discord/guilds', listEligibleDiscordGuilds);
 route.get('/problem-tags/dictionary', getProblemTagDictionary);
 route.post('/problem-tags/dictionary', createProblemTag);
 route.get('/:id/resources/:resourceId', getClassResourceDetail);
@@ -231,6 +282,51 @@ route.get('/:id/student-threads/:studentId/attachments/:attachmentId', getClassr
 route.get('/:id/problem-thread/:problemId', getProblemThread);
 route.post('/:id/problem-thread/reaction', toggleProblemThreadReaction);
 route.post('/:id/problem-thread/:problemId', postProblemThreadMessage);
+
+// Discord integration
+route.get('/:id/discord', getClassroomDiscordStatus);
+route.post('/:id/discord', bindExistingClassroomDiscord);
+route.put('/:id/discord', updateClassroomDiscordSettings);
+route.post('/:id/discord/channels/change', changeClassroomDiscordChannels);
+route.post('/:id/discord/reconcile', reconcileClassroomDiscord);
+route.get('/:id/discord/rules', getClassroomDiscordRules);
+route.put('/:id/discord/rules', updateClassroomDiscordRules);
+route.get('/:id/discord/roster', getClassroomDiscordRoster);
+route.post('/:id/discord/roster/:studentId/trusted-link', trustClassroomStudentDiscordConnection);
+route.get('/:id/checkins', getClassroomDailyCheckins);
+route.post('/:id/checkins', createClassroomDailyCheckin);
+
+// Classroom-scoped contest reports
+route.get('/:id/contests/codeforces-credentials', getClassroomCodeforcesCredentials);
+route.put('/:id/contests/codeforces-credentials', saveClassroomCodeforcesCredentials);
+route.delete('/:id/contests/codeforces-credentials', deleteClassroomCodeforcesCredentials);
+route.get('/:id/contests/rooms', listClassroomContestRooms);
+route.post('/:id/contests/rooms', createClassroomContestRoom);
+route.patch('/:id/contests/rooms/:roomId', updateClassroomContestRoom);
+route.delete('/:id/contests/rooms/:roomId', deleteClassroomContestRoom);
+route.post('/:id/contests/rooms/:roomId/items', createClassroomContestItem);
+route.patch('/:id/contests/rooms/:roomId/items/order', updateClassroomContestItemOrder);
+route.patch('/:id/contests/rooms/:roomId/items', updateClassroomContestItem);
+route.patch('/:id/contests/rooms/:roomId/items/:contestItemId', updateClassroomContestItem);
+route.delete('/:id/contests/rooms/:roomId/items', deleteClassroomContestItem);
+route.delete('/:id/contests/rooms/:roomId/items/:contestItemId', deleteClassroomContestItem);
+route.post('/:id/contests/rooms/:roomId/items/:contestItemId/fetch', fetchClassroomContestItem);
+route.post('/:id/contests/rooms/:roomId/report', generateClassroomContestReport);
+route.get('/:id/contests/rooms/:roomId/report', getClassroomContestReport);
+route.post('/:id/contests/rooms/:roomId/share', shareClassroomContestReport);
+route.get('/:id/contests/rooms/:roomId/unmatched-rows', listClassroomContestUnmatchedRows);
+route.get('/:id/contests/handles', listClassroomContestHandleOverrides);
+route.post('/:id/contests/handles', createClassroomContestHandleOverride);
+route.patch('/:id/contests/handles/:handleId', updateClassroomContestHandleOverride);
+route.delete('/:id/contests/handles/:handleId', deleteClassroomContestHandleOverride);
+route.get('/:id/contests/rooms/:roomId/solve-overrides', listClassroomContestSolveOverrides);
+route.post('/:id/contests/rooms/:roomId/solve-overrides', createClassroomContestSolveOverride);
+route.patch('/:id/contests/rooms/:roomId/solve-overrides/:overrideId', updateClassroomContestSolveOverride);
+route.delete('/:id/contests/rooms/:roomId/solve-overrides/:overrideId', deleteClassroomContestSolveOverride);
+route.get('/:id/contests/rooms/:roomId/demerits', listClassroomContestDemerits);
+route.post('/:id/contests/rooms/:roomId/demerits', createClassroomContestDemerit);
+route.patch('/:id/contests/rooms/:roomId/demerits/:demeritId', updateClassroomContestDemerit);
+route.delete('/:id/contests/rooms/:roomId/demerits/:demeritId', deleteClassroomContestDemerit);
 
 // Ephemeral board broadcast
 route.get('/:id/board/session', getClassroomBoardSession);

@@ -7,14 +7,77 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from '@/lib/utils'
-import { AlertCircle, CheckCheck, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
+import { AlertCircle, CheckCheck, Download, FileText, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import LiveShareModal from "./LiveShareModal"
 import { ScrollArea } from "./ui/scroll-area"
 
-function ReportTable({ merged, liveReportId, name }) {
+function normalizeProvider(value) {
+  return String(value || "vjudge").toLowerCase() === "codeforces" ? "codeforces" : "vjudge"
+}
+
+function rowIdentity(user) {
+  return String(user?.identityKey || user?.username || "")
+}
+
+function sourceHandlesForUser(user) {
+  return [
+    ...(Array.isArray(user?.sourceHandles) ? user.sourceHandles : []),
+    user?.username,
+    user?.realName,
+  ].map((value) => String(value || "").trim()).filter(Boolean)
+}
+
+function hasProvider(user, provider) {
+  const normalized = normalizeProvider(provider)
+  const providers = Array.isArray(user?.providers) ? user.providers.map(normalizeProvider) : []
+  if (providers.includes(normalized)) return true
+  return Object.values(user?.contests || {}).some((contest) => normalizeProvider(contest?.provider) === normalized)
+}
+
+function vjudgeLookupIdForUser(user) {
+  const mappedVjudge = user?.classroomMapping?.student?.vjudgeId || user?.classroomMapping?.student?.vjudge_id
+  if (mappedVjudge) return String(mappedVjudge).trim().toLowerCase()
+
+  const hasExplicitProviders = Array.isArray(user?.providers) && user.providers.length > 0
+  if (hasExplicitProviders && !hasProvider(user, "vjudge")) return ""
+
+  const vjudgeContest = Object.values(user?.contests || {}).find((contest) => normalizeProvider(contest?.provider) === "vjudge")
+  const sourceHandle = Array.isArray(vjudgeContest?.sourceHandles) ? vjudgeContest.sourceHandles[0] : null
+  return String(sourceHandle || user?.username || "").trim().toLowerCase()
+}
+
+function ProviderBadge({ provider }) {
+  const normalized = normalizeProvider(provider)
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-border/70 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-normal",
+        normalized === "codeforces"
+          ? "border-sky-500/30 bg-sky-500/10 text-sky-700"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-700",
+      )}
+    >
+      {normalized === "codeforces" ? "CF" : "VJ"}
+    </Badge>
+  )
+}
+
+function ReportTable({
+  merged,
+  liveReportId,
+  name,
+  shareControl = null,
+  showLiveShare = true,
+  solveOnly = false,
+  contestOrder = [],
+  highlightStudentId = "",
+  highlightVjudgeId = "",
+  highlightGroupIds = [],
+}) {
   const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
   const clampPercentage = (value, fallback = 0) => {
     const numeric = Number(value)
@@ -26,7 +89,7 @@ function ReportTable({ merged, liveReportId, name }) {
     String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)),
   )
   const [searchText, setSearchText] = useState("")
-  const [removeWorstCount, setRemoveWorstCount] = useState(1)
+  const [removeWorstCount, setRemoveWorstCount] = useState(0)
   const [optOutContests, setOptOutContests] = useState({})
   const [advancedFilters] = useState({
     minSolved: 0,
@@ -54,6 +117,24 @@ function ReportTable({ merged, liveReportId, name }) {
     () => (isTscCombined ? 100 - tfcPercentage : 100),
     [isTscCombined, tfcPercentage],
   )
+  const normalizedHighlightStudentId = String(highlightStudentId || "")
+  const normalizedHighlightVjudgeId = String(highlightVjudgeId || "").trim().toLowerCase()
+  const highlightedGroupIdSet = useMemo(
+    () => new Set((highlightGroupIds || []).map((id) => String(id))),
+    [highlightGroupIds],
+  )
+  const mergedContestIds = useMemo(
+    () => (Array.isArray(merged?.contestIds) ? merged.contestIds : []),
+    [merged?.contestIds],
+  )
+  const orderedContestIds = useMemo(() => {
+    const existingIds = new Set(mergedContestIds)
+    const ordered = (Array.isArray(contestOrder) ? contestOrder : []).filter((contestId) => existingIds.has(contestId))
+    return [
+      ...ordered,
+      ...mergedContestIds.filter((contestId) => !ordered.includes(contestId)),
+    ]
+  }, [contestOrder, mergedContestIds])
 
   const computeStdDeviation = (values) => {
     if (!Array.isArray(values) || values.length === 0) return 0
@@ -65,6 +146,49 @@ function ReportTable({ merged, liveReportId, name }) {
   }
 
   const rankedUsers = useMemo(() => {
+    if (solveOnly) {
+      const processed = merged.users.map((u) => {
+        const activeContestIds = orderedContestIds.filter((cid) => !optOutContests[cid])
+        const attendedContests = activeContestIds.map((cid) => [cid, u.contests?.[cid]]).filter(([, perf]) => Boolean(perf))
+        const totalSolved = attendedContests.reduce((sum, [, perf]) => sum + Number(perf?.solved || 0), 0)
+        const totalContestsAttended = attendedContests.filter(([, perf]) => (
+          Number(perf?.solved || 0) > 0 ||
+          Boolean(perf?.manualSolveOverride) ||
+          (Array.isArray(perf?.submissions) && perf.submissions.length > 0)
+        )).length
+
+        return {
+          ...u,
+          totalContestsAttended,
+          worstContests: [],
+          optedOutContests: Object.keys(optOutContests).filter((contestId) => optOutContests[contestId] && u.contests?.[contestId]),
+          effectiveTotalSolved: totalSolved,
+          effectiveTotalPenalty: 0,
+          effectiveTotalScore: totalSolved,
+        }
+      })
+
+      processed.sort((a, b) => {
+        for (const contestId of orderedContestIds) {
+          if (optOutContests[contestId]) continue
+          const contestDelta = Number(b.contests?.[contestId]?.solved || 0) - Number(a.contests?.[contestId]?.solved || 0)
+          if (contestDelta !== 0) return contestDelta
+        }
+
+        if (a.effectiveTotalSolved !== b.effectiveTotalSolved) {
+          return b.effectiveTotalSolved - a.effectiveTotalSolved
+        }
+
+        if (a.totalContestsAttended !== b.totalContestsAttended) {
+          return b.totalContestsAttended - a.totalContestsAttended
+        }
+
+        return String(a.username || "").localeCompare(String(b.username || ""))
+      })
+
+      return processed
+    }
+
     let processed = merged.users.map((u) => {
       const allContestIds = Object.keys(u.contests).filter((cid) => !optOutContests[cid])
       const attendedContests = allContestIds.map((cid) => [cid, u.contests[cid]])
@@ -201,6 +325,8 @@ function ReportTable({ merged, liveReportId, name }) {
     isTscCombined,
     tfcPercentage,
     tscPercentage,
+    solveOnly,
+    orderedContestIds,
   ])
 
   const users = useMemo(() => {
@@ -228,6 +354,24 @@ function ReportTable({ merged, liveReportId, name }) {
     })
 
     filtered.sort((a, b) => {
+      if (solveOnly) {
+        for (const contestId of orderedContestIds) {
+          if (optOutContests[contestId]) continue
+          const contestDelta = Number(b.contests?.[contestId]?.solved || 0) - Number(a.contests?.[contestId]?.solved || 0)
+          if (contestDelta !== 0) return contestDelta
+        }
+
+        if (a.effectiveTotalSolved !== b.effectiveTotalSolved) {
+          return b.effectiveTotalSolved - a.effectiveTotalSolved
+        }
+
+        if (a.totalContestsAttended !== b.totalContestsAttended) {
+          return b.totalContestsAttended - a.totalContestsAttended
+        }
+
+        return String(a.username || "").localeCompare(String(b.username || ""))
+      }
+
       const direction = advancedFilters.sortDirection === "asc" ? 1 : -1
 
       switch (advancedFilters.sortBy) {
@@ -261,10 +405,13 @@ function ReportTable({ merged, liveReportId, name }) {
     rankedUsers,
     searchText,
     advancedFilters,
+    solveOnly,
+    orderedContestIds,
+    optOutContests,
   ])
 
   const profileIds = useMemo(() => {
-    const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
+    const ids = new Set(users.map(vjudgeLookupIdForUser).filter(Boolean))
     return Array.from(ids).sort()
   }, [users])
 
@@ -423,25 +570,26 @@ function ReportTable({ merged, liveReportId, name }) {
       const bPen = bPerf?.penalty ?? Number.POSITIVE_INFINITY
       return aPen - bPen
     }
-    merged.contestIds.forEach((cid) => {
+    orderedContestIds.forEach((cid) => {
       const participants = merged.users
         .filter((u) => u.contests && u.contests[cid])
         .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]))
       const rankMap = {}
       participants.forEach((u, idx) => {
-        rankMap[u.username] = idx + 1
+        rankMap[rowIdentity(u)] = idx + 1
       })
       contestRanks[cid] = rankMap
     })
-    const lastId = merged.contestIds[merged.contestIds.length - 1]
+    const lastId = orderedContestIds[orderedContestIds.length - 1]
     const progressByUser = {}
     merged.users.forEach((u) => {
-      const lastRank = contestRanks[lastId]?.[u.username]
+      const identity = rowIdentity(u)
+      const lastRank = contestRanks[lastId]?.[identity]
       let prevRank
-      for (let i = merged.contestIds.length - 2; i >= 0; i--) {
-        const cid = merged.contestIds[i]
+      for (let i = orderedContestIds.length - 2; i >= 0; i--) {
+        const cid = orderedContestIds[i]
         if (u.contests && u.contests[cid]) {
-          prevRank = contestRanks[cid]?.[u.username]
+          prevRank = contestRanks[cid]?.[identity]
           if (prevRank !== undefined) break
         }
       }
@@ -453,10 +601,10 @@ function ReportTable({ merged, liveReportId, name }) {
         else if (delta <= -1) status = 'down'
         else status = 'neutral'
       }
-      progressByUser[u.username] = { status, delta, lastRank, prevRank }
+      progressByUser[identity] = { status, delta, lastRank, prevRank }
     })
     return { contestRanks, progressByUser }
-  }, [merged.users, merged.contestIds])
+  }, [merged.users, orderedContestIds])
 
   const totalUsers = users.length
   const getNameColor = (rank) => {
@@ -488,6 +636,49 @@ function ReportTable({ merged, liveReportId, name }) {
   }
 
   const exportToCSV = () => {
+    if (solveOnly) {
+      const headers = [
+        "Rank",
+        "Name",
+        "Real Name",
+        "Total Solves",
+        "Contests",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+
+      const rows = users.map((u, idx) => {
+        const base = [
+          idx + 1,
+          u.username,
+          u.realName,
+          u.effectiveTotalSolved,
+          u.totalContestsAttended,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return optOutContests[cid] ? "Filtered" : Number(perf?.solved || 0)
+        })
+        return [...base, ...contestData]
+      })
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const filename = `report_${new Date().toISOString().slice(0, 10)}.csv`
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", filename)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      return
+    }
+
     const headers = [
       "Rank",
       "Username",
@@ -496,10 +687,10 @@ function ReportTable({ merged, liveReportId, name }) {
       "Effective Solved",
       "Effective Penalty",
       "Contests Attended",
-      ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
     ]
 
-    const rows = rankedUsers.map((u, idx) => {
+    const rows = (solveOnly ? users : rankedUsers).map((u, idx) => {
       const base = [
         idx + 1,
         u.username,
@@ -509,7 +700,7 @@ function ReportTable({ merged, liveReportId, name }) {
         u.effectiveTotalPenalty.toFixed(2),
         u.totalContestsAttended,
       ]
-      const contestData = merged.contestIds.map((cid) => {
+      const contestData = orderedContestIds.map((cid) => {
         const perf = u.contests[cid]
         const isWorst = u.worstContests.includes(cid)
         const isOptedOut = u.optedOutContests.includes(cid)
@@ -552,17 +743,41 @@ function ReportTable({ merged, liveReportId, name }) {
     // Dynamic import to reduce bundle size
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
 
-    const headers = [
-      "Rank",
-      "Username",
-      "Real Name",
-      "Effective Score",
-      "Effective Solved",
-      "Effective Penalty",
-      "Contests Attended",
-      ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
-    ]
-    const rows = rankedUsers.map((u, idx) => {
+    const headers = solveOnly
+      ? [
+        "Rank",
+        "Name",
+        "Real Name",
+        "Total Solves",
+        "Contests",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+      : [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Effective Score",
+        "Effective Solved",
+        "Effective Penalty",
+        "Contests Attended",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+    const rows = (solveOnly ? users : rankedUsers).map((u, idx) => {
+      if (solveOnly) {
+        const base = [
+          idx + 1,
+          u.username,
+          u.realName,
+          u.effectiveTotalSolved,
+          u.totalContestsAttended,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return optOutContests[cid] ? "Filtered" : Number(perf?.solved || 0)
+        })
+        return [...base, ...contestData]
+      }
+
       const base = [
         idx + 1,
         u.username,
@@ -572,7 +787,7 @@ function ReportTable({ merged, liveReportId, name }) {
         u.effectiveTotalPenalty.toFixed(2),
         u.totalContestsAttended,
       ]
-      const contestData = merged.contestIds.map((cid) => {
+      const contestData = orderedContestIds.map((cid) => {
         const perf = u.contests[cid]
         const isWorst = u.worstContests.includes(cid)
         const isOptedOut = u.optedOutContests.includes(cid)
@@ -645,6 +860,7 @@ function ReportTable({ merged, liveReportId, name }) {
   const liveReportData = useMemo(
     () => ({
       ...merged,
+      contestIds: orderedContestIds,
       tscConfig: isTscCombined
         ? {
           ...(merged?.tscConfig || {}),
@@ -655,7 +871,7 @@ function ReportTable({ merged, liveReportId, name }) {
       users: rankedUsers,
       name,
     }),
-    [merged, rankedUsers, name, isTscCombined, tfcPercentage, tscPercentage],
+    [merged, orderedContestIds, rankedUsers, name, isTscCombined, tfcPercentage, tscPercentage],
   )
 
   return (
@@ -664,68 +880,70 @@ function ReportTable({ merged, liveReportId, name }) {
         <div className="bg-card rounded-lg p-4 border shadow-sm">
           <div className="flex items-start justify-between">
             <h2 className="text-lg font-semibold mb-4">Report Settings</h2>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 ml-2" title="How ranking & effective score are calculated">
-                  <Info className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
-                  <DialogDescription asChild>
-                    <div className="space-y-4 text-sm leading-relaxed mt-2">
-                      <div>
-                        <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Solved</strong>: Number of accepted problems.</li>
-                          <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
-                          <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
-                          <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
-                          <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
-                        <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Score SD</strong>: SD of per-contest scores.</li>
-                          <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
-                        </ul>
-                        <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Effective Metrics</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
-                          <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
-                          <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Ranking Order</h4>
-                        <ol className="list-decimal list-inside space-y-1">
-                          <li>Higher <strong>Effective Solved / Score</strong></li>
-                          <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
-                          <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
-                        </ol>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
-                        <p>1 worst contest (generally) opt out. </p>
-                      </div>
+            {!solveOnly && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 ml-2" title="How ranking & effective score are calculated">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
+                    <DialogDescription asChild>
+                      <div className="space-y-4 text-sm leading-relaxed mt-2">
+                        <div>
+                          <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Solved</strong>: Number of accepted problems.</li>
+                            <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
+                            <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
+                            <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
+                            <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
+                          <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Score SD</strong>: SD of per-contest scores.</li>
+                            <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
+                          </ul>
+                          <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Effective Metrics</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
+                            <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
+                            <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Ranking Order</h4>
+                          <ol className="list-decimal list-inside space-y-1">
+                            <li>Higher <strong>Effective Solved / Score</strong></li>
+                            <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
+                            <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
+                          </ol>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
+                          <p>Default is 0. Increase it only when this report should ignore each participant&apos;s weakest contests.</p>
+                        </div>
 
-                    </div>
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
@@ -741,28 +959,30 @@ function ReportTable({ merged, liveReportId, name }) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Remove Worst Contests</label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={removeWorstCount.toString()}
-                  onValueChange={(value) => setRemoveWorstCount(Number(value))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select number" defaultValue={1} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: merged.contestIds.length }, (_, i) => (
-                      <SelectItem key={i} value={i.toString()}>
-                        {i}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {!solveOnly && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Remove Worst Contests</label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={removeWorstCount.toString()}
+                    onValueChange={(value) => setRemoveWorstCount(Number(value))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select number" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: orderedContestIds.length }, (_, i) => (
+                        <SelectItem key={i} value={i.toString()}>
+                          {i}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
 
-            {isTscCombined && (
+            {isTscCombined && !solveOnly && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">TFC Percentage</label>
                 <Input
@@ -785,47 +1005,13 @@ function ReportTable({ merged, liveReportId, name }) {
             <div className="space-y-2">
               <label className="text-sm font-medium">Actions</label>
               <div className="flex flex-wrap gap-2">
-                <LiveShareModal reportData={liveReportData} reportId={liveReportId} />
+                {shareControl || (showLiveShare ? <LiveShareModal reportData={liveReportData} reportId={liveReportId} /> : null)}
                 <Button size="sm" variant="outline" onClick={exportToCSV} className="flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="lucide lucide-file-text"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" x2="8" y1="13" y2="13" />
-                    <line x1="16" x2="8" y1="17" y2="17" />
-                    <line x1="10" x2="8" y1="9" y2="9" />
-                  </svg>
+                  <FileText className="h-4 w-4" />
                   CSV
                 </Button>
                 <Button size="sm" variant="outline" onClick={exportToPDF} className="flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="lucide lucide-file-type"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <path d="M9 13v-1h6v1" />
-                    <path d="M11 18h2" />
-                    <path d="M12 12v6" />
-                  </svg>
+                  <Download className="h-4 w-4" />
                   PDF
                 </Button>
               </div>
@@ -837,7 +1023,7 @@ function ReportTable({ merged, liveReportId, name }) {
       <div className="mb-4 bg-card rounded-lg p-4 border shadow-sm">
         <h3 className="text-sm font-medium mb-3">Exclude Specific Contests</h3>
         <div className="flex flex-wrap gap-2">
-          {merged.contestIds.map((cid) => (
+          {orderedContestIds.map((cid) => (
             <Button
               key={cid}
               variant={optOutContests[cid] ? "destructive" : "outline"}
@@ -850,6 +1036,7 @@ function ReportTable({ merged, liveReportId, name }) {
               ) : (
                 <CheckCheck className="h-3 w-3 mr-1" />
               )}
+              <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />
               <span className="text-xs">{merged.contestIdToTitle[cid]}</span>
             </Button>
           ))}
@@ -874,16 +1061,23 @@ function ReportTable({ merged, liveReportId, name }) {
           <TableHeader>
             <TableRow>
               <TableHead>Rank</TableHead>
-              <TableHead>Progress</TableHead>
+              {!solveOnly && <TableHead>Progress</TableHead>}
               <TableHead>Name</TableHead>
               <TableHead>Contests</TableHead>
-              <TableHead>Effective Score</TableHead>
-              <TableHead>Standard Deviation</TableHead>
-              <TableHead>Total Demerits</TableHead>
-              {merged.contestIds.map((cid) => (
+              {solveOnly ? (
+                <TableHead>Total Solves</TableHead>
+              ) : (
+                <>
+                  <TableHead>Effective Score</TableHead>
+                  <TableHead>Standard Deviation</TableHead>
+                  <TableHead>Total Demerits</TableHead>
+                </>
+              )}
+              {orderedContestIds.map((cid) => (
                 <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
-                  <div className="max-w-[120px] truncate">
-                    {merged.contestIdToTitle[cid]}
+                  <div className="flex max-w-[140px] items-center gap-1.5 truncate">
+                    <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />
+                    <span className="truncate">{merged.contestIdToTitle[cid]}</span>
                     {optOutContests[cid] && (
                       <span className="ml-1 text-destructive">
                         <AlertCircle className="inline h-3 w-3" />
@@ -897,16 +1091,20 @@ function ReportTable({ merged, liveReportId, name }) {
           <TableBody>
             {users.map((u, index) => {
               const isTop = index === 0
-              const profileKey = String(u.username || "").toLowerCase()
-              const hasResolvedLookup = Object.prototype.hasOwnProperty.call(publicProfilesByVjudge, profileKey)
+              const identity = rowIdentity(u)
+              const profileKey = vjudgeLookupIdForUser(u)
+              const hasResolvedLookup = Boolean(profileKey) && Object.prototype.hasOwnProperty.call(publicProfilesByVjudge, profileKey)
               const profile = hasResolvedLookup ? publicProfilesByVjudge[profileKey] : null
               const hasDbProfile = !!profile
               const shouldUseFallback = hasResolvedLookup && !hasDbProfile
-              const isResolving = isProfilesLoading && !hasResolvedLookup
+              const isResolving = Boolean(profileKey) && isProfilesLoading && !hasResolvedLookup
+              const mappedStudent = u.classroomMapping?.student || null
+              const mappedGroup = u.classroomMapping?.group || null
               const dbAvatar = hasDbProfile ? resolveAvatarUrl(profile.profile_pic) : null
               const fallbackAvatar = resolveAvatarUrl(u.avatarUrl)
-              const customAvatar = getCustomAvatar(u.username)
-              const hasFailedAvatar = failedAvatars.has(u.username)
+              const classroomMappingLabel = u.classroomMapping?.targetName || mappedStudent?.name || mappedGroup?.name || null
+              const customAvatar = getCustomAvatar(classroomMappingLabel || u.realName || u.username)
+              const hasFailedAvatar = failedAvatars.has(identity)
               const resolvedAvatar = hasFailedAvatar 
                 ? customAvatar
                 : (hasDbProfile && dbAvatar) 
@@ -916,17 +1114,54 @@ function ReportTable({ merged, liveReportId, name }) {
                     : isResolving
                       ? null
                       : customAvatar
-              const resolvedName = hasDbProfile
-                ? profile.full_name || u.realName || u.username
-                : shouldUseFallback
-                  ? u.username || "—"
-                  : "Loading..."
-              const resolvedBatch = hasDbProfile ? profile.batch_name || null : null
-              const resolvedVjudgeId = hasDbProfile ? profile.vjudge_id || u.username : u.username
-              const resolvedMistId = hasDbProfile ? profile.mist_id || null : u.mist_id || u.mistId || null
-              const resolvedCfId = hasDbProfile ? profile.cf_id || null : u.cf_id || u.cfId || null
+              const resolvedName = classroomMappingLabel
+                || (hasDbProfile ? profile.full_name || u.realName || u.username : null)
+                || (isResolving ? "Loading..." : u.realName || u.username || "—")
+              const resolvedBatch = mappedStudent?.batchName || mappedStudent?.batch_name || (hasDbProfile ? profile.batch_name || null : null)
+              const resolvedVjudgeId = mappedStudent?.vjudgeId
+                || mappedStudent?.vjudge_id
+                || (hasDbProfile ? profile.vjudge_id || null : null)
+                || (hasProvider(u, "vjudge") ? profileKey || u.username : null)
+              const codeforcesContest = Object.values(u.contests || {}).find((contest) => normalizeProvider(contest?.provider) === "codeforces")
+              const resolvedCfId = mappedStudent?.cfId
+                || mappedStudent?.cf_id
+                || (hasDbProfile ? profile.cf_id || null : null)
+                || (Array.isArray(codeforcesContest?.sourceHandles) ? codeforcesContest.sourceHandles[0] : null)
+                || (hasProvider(u, "codeforces") ? sourceHandlesForUser(u)[0] : null)
+              const resolvedMistId = mappedStudent?.mistId || mappedStudent?.mist_id || (hasDbProfile ? profile.mist_id || null : u.mist_id || u.mistId || null)
+              const isClassroomParticipant = Boolean(u.isClassroomParticipant || u.classroomMapping?.isClassroomParticipant)
+              const mappedStudentId = String(u.studentId || u.classroomMapping?.studentId || u.classroomMapping?.student?.id || "")
+              const mappedGroupId = String(u.groupId || u.classroomMapping?.groupId || u.classroomMapping?.group?.id || "")
+              const rowHandles = [
+                ...sourceHandlesForUser(u),
+                u.username,
+                u.realName,
+                resolvedVjudgeId,
+                resolvedCfId,
+                u.classroomMapping?.student?.vjudgeId,
+                u.classroomMapping?.student?.vjudge_id,
+                u.classroomMapping?.student?.cfId,
+                u.classroomMapping?.student?.cf_id,
+              ].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean)
+              const isHighlightedParticipant = Boolean(
+                (normalizedHighlightStudentId && mappedStudentId === normalizedHighlightStudentId) ||
+                (normalizedHighlightVjudgeId && rowHandles.includes(normalizedHighlightVjudgeId)) ||
+                (mappedGroupId && highlightedGroupIdSet.has(mappedGroupId)),
+              )
               return (
-                <TableRow key={u.username} className={cn(index % 2 === 0 ? "bg-muted/20" : "", isTop && 'top-rank-wrapper')}>
+                <TableRow
+                  key={identity || u.username}
+                  className={cn(
+                    isHighlightedParticipant
+                      ? "bg-primary/10 ring-1 ring-inset ring-primary/25"
+                      : isClassroomParticipant
+                        ? "bg-emerald-500/5"
+                        : index % 2 === 0
+                          ? "bg-muted/20"
+                          : "",
+                    isTop && 'top-rank-wrapper',
+                  )}
+                >
                   <TableCell>
                     <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
                       <Badge
@@ -947,31 +1182,33 @@ function ReportTable({ merged, liveReportId, name }) {
                     </div>
                   </TableCell>
                   {/* Progress */}
-                  <TableCell className="min-w-[90px]">
-                    {(() => {
-                      const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
-                      const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
-                      const improvement = p.delta > 0
-                      const decline = p.delta < 0
-                      const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
-                      return (
-                        <div className="flex items-center gap-1.5">
-                          <Icon className={`${improvement ? 'text-green-600' : decline ? 'text-red-600' : 'text-muted-foreground'} h-4 w-4`} />
-                          {hasComparison ? (
-                            improvement ? (
-                              <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
-                            ) : decline ? (
-                              <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                  {!solveOnly && (
+                    <TableCell className="min-w-[90px]">
+                      {(() => {
+                        const p = progressByUser[identity] || { status: 'neutral', delta: 0 }
+                        const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
+                        const improvement = p.delta > 0
+                        const decline = p.delta < 0
+                        const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <Icon className={`${improvement ? 'text-green-600' : decline ? 'text-red-600' : 'text-muted-foreground'} h-4 w-4`} />
+                            {hasComparison ? (
+                              improvement ? (
+                                <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
+                              ) : decline ? (
+                                <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                              ) : (
+                                <span className="text-[10px] font-medium text-muted-foreground">0</span>
+                              )
                             ) : (
-                              <span className="text-[10px] font-medium text-muted-foreground">0</span>
-                            )
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </TableCell>
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div
@@ -1005,7 +1242,7 @@ function ReportTable({ merged, liveReportId, name }) {
                             )}
                             quality={20}
                             onError={() => {
-                              setFailedAvatars(prev => new Set(prev).add(u.username))
+                              setFailedAvatars(prev => new Set(prev).add(identity))
                             }}
                           />
                         )}
@@ -1026,6 +1263,22 @@ function ReportTable({ merged, liveReportId, name }) {
                         </p>
                         {!isResolving && (
                           <div className="mt-1 flex items-center gap-2">
+                            {isClassroomParticipant && (
+                              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700">
+                                {classroomMappingLabel || "Classroom"}
+                              </Badge>
+                            )}
+                            {isHighlightedParticipant && (
+                              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] text-primary">
+                                You
+                              </Badge>
+                            )}
+                            {(Array.isArray(u.providers) && u.providers.length > 0 ? u.providers : Object.values(u.contests || {}).map((contest) => contest?.provider))
+                              .map(normalizeProvider)
+                              .filter((provider, providerIndex, providers) => provider && providers.indexOf(provider) === providerIndex)
+                              .map((provider) => (
+                                <ProviderBadge key={`${identity}-${provider}`} provider={provider} />
+                              ))}
                             {resolvedVjudgeId ? (
                               <Link
                                 href={`https://vjudge.net/user/${encodeURIComponent(resolvedVjudgeId)}`}
@@ -1067,64 +1320,74 @@ function ReportTable({ merged, liveReportId, name }) {
                     </div>
                   </TableCell>
                   
-                  <TableCell>{u.totalContestsAttended}</TableCell>
-                  <TableCell>
-                    <p>
-                      Solved: {u.effectiveTotalSolved.toFixed(2)}
-                      {u.effectiveTotalSolved !== u.totalSolved && (
-                        <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
-                      )}
-                    </p>
-                    <p>
-                      Penalty: {u.effectiveTotalPenalty.toFixed(2)}
-                      {u.effectiveTotalPenalty !== u.totalPenalty && (
-                        <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
-                      )}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
-                    <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
-                  </TableCell>
-                  <TableCell>
-                    {u.totalDemeritPoints > 0 ? (
-                      <div
-                        className="relative"
-                        onMouseEnter={(e) => {
-                          // Create tooltip showing all demerit reasons
-                          const allDemerits = Object.values(u.demerits).flat();
-                          if (allDemerits.length > 0) {
-                            const tooltip = document.createElement('div');
-                            tooltip.className = 'absolute z-50 p-2 bg-black text-white text-xs rounded shadow-lg max-w-xs';
-                            tooltip.style.left = '0px';
-                            tooltip.style.top = '-10px';
-                            tooltip.style.transform = 'translateY(-100%)';
-                            tooltip.innerHTML = allDemerits.map(d =>
-                              `<div class="mb-1"><strong>Contest ${d.contest_id}:</strong> -${d.demerit_point} points - ${d.reason}</div>`
-                            ).join('');
-                            e.target.appendChild(tooltip);
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          // Remove tooltip
-                          const tooltip = e.target.querySelector('.absolute.z-50');
-                          if (tooltip) {
-                            tooltip.remove();
-                          }
-                        }}
-                      >
-                        <Badge variant="destructive" className="cursor-help">
-                          -{u.totalDemeritPoints}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  {merged.contestIds.map((cid) => {
+                  <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>
+                  {solveOnly ? (
+                    <TableCell className="text-base font-semibold tabular-nums">{u.effectiveTotalSolved}</TableCell>
+                  ) : (
+                    <>
+                      <TableCell>
+                        <p>
+                          Solved: {u.effectiveTotalSolved.toFixed(2)}
+                          {u.effectiveTotalSolved !== u.totalSolved && (
+                            <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
+                          )}
+                        </p>
+                        <p>
+                          Penalty: {u.effectiveTotalPenalty.toFixed(2)}
+                          {u.effectiveTotalPenalty !== u.totalPenalty && (
+                            <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
+                          )}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
+                        <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
+                      </TableCell>
+                      <TableCell>
+                        {u.totalDemeritPoints > 0 ? (
+                          <div className="relative">
+                            <Badge
+                              variant="destructive"
+                              className="cursor-help"
+                              title={Object.values(u.demerits || {})
+                                .flat()
+                                .map((d) => `Contest ${d.contest_id}: -${d.demerit_point} points - ${d.reason}`)
+                                .join("\n")}
+                            >
+                              -{u.totalDemeritPoints}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
+                  {orderedContestIds.map((cid) => {
                     const perf = u.contests[cid]
                     const isWorst = u.worstContests.includes(cid)
                     const isOptedOut = u.optedOutContests.includes(cid)
+                    if (solveOnly) {
+                      const isManual = Boolean(perf?.manualSolveOverride)
+                      return (
+                        <TableCell
+                          key={cid}
+                          className={cn(
+                            "text-center tabular-nums",
+                            isOptedOut && "bg-destructive/10 text-muted-foreground",
+                          )}
+                        >
+                          <div className="flex min-w-[72px] flex-col items-center gap-1">
+                            <span className="text-base font-semibold">{isOptedOut ? 0 : Number(perf?.solved || 0)}</span>
+                            {isManual && !isOptedOut && (
+                              <Badge variant="outline" className="h-5 border-primary/25 bg-primary/10 px-1.5 text-[10px] text-primary">
+                                Manual
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                      )
+                    }
                     if (!perf || isWorst || isOptedOut) {
                       let cellClassName = ""
                       let statusText = null

@@ -1,5 +1,49 @@
 # HCI Rules
 
+## 2026-08-17 - Prioritize Classroom Destinations Before Hiding Them
+
+Source:
+- `docs/rsd/trainer-student-context-menu-simplification-20260817-rsd.md`
+- `docs/reviews/trainer-student-context-menu-simplification-20260817-implementation-review.md`
+
+Rule:
+Role-based classroom navigation should keep the four most frequent destinations visible, indicate when a secondary destination is active, and place the complete secondary set behind a clearly labeled More control. Right-click/long-press is an accelerator, never the only discovery path.
+
+Applies when:
+Designing trainer/student classroom navigation or other repeated-use operational navigation with too many equal-weight destinations.
+
+Do not overgeneralize:
+Do not hide decision-critical actions, urgent states, or the current location merely to reduce visible controls.
+
+## 2026-08-09 - Integration Setup Belongs Beside Integration Health
+
+Source:
+- `docs/reviews/trainer-existing-classroom-discord-binding-20260809-implementation-review.md`
+
+Rule:
+For private classroom integrations, show post-create setup actions in the existing Settings health card with clear loading, empty, error, linked, and success states. Keep non-managers read-only, keep the primary action close to the selected resource, and avoid a separate public page unless the workflow needs shareable unauthenticated access.
+
+Applies when:
+Designing classroom Discord setup, repair/setup cards, or future trainer-managed classroom integrations.
+
+Do not overgeneralize:
+This does not make Settings the right home for first-run classroom creation or public OAuth callback pages.
+
+## 2026-08-09 - People Lists Prefer Progressive Disclosure
+
+Source:
+- `docs/reviews/trainer-student-roster-apple-redesign-20260809-implementation-review.md`
+- Apple Human Interface Guidelines: lists and tables, disclosure controls, materials, UI design tips
+
+Rule:
+Classroom People views should lead with the list the user is currently scanning and disclose secondary tools only when requested. Trainer views should show Students or Groups one at a time; student views should show Groups or Classmates one at a time; Add/CSV/Create/Edit flows belong in focused dialogs; and destructive actions should sit behind overflow plus confirmation rather than visible red row controls.
+
+Applies when:
+Designing classroom roster, group, member-selection, or account-link review interfaces.
+
+Do not overgeneralize:
+Urgent account-link review can still be surfaced as an attention lane, and dense analytics dashboards may need simultaneous comparison views.
+
 ## 2026-08-01 - Thread Events Belong Behind a Compact Control
 
 Source:

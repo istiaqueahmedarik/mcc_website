@@ -24,7 +24,7 @@ export default function Footer() {
   return (
     <footer className="relative w-full border-t border-border/60 bg-background/70 backdrop-blur-md">
       <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_50%_0%,black,transparent_70%)] bg-gradient-to-b from-primary/10 via-background to-background" />
-      <div className="relative mx-auto max-w-7xl px-6 py-16 grid gap-12 md:grid-cols-4">
+      <div className="relative grid w-full gap-12 px-6 py-16 md:grid-cols-4">
         <div className="flex flex-col gap-4">
           <MccLogo w={120} h={120} />
           <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
@@ -56,7 +56,7 @@ export default function Footer() {
         </div>
       </div>
       <div className="relative border-t border-border/60">
-        <div className="mx-auto max-w-7xl px-6 py-6 text-[11px] md:text-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex w-full flex-col items-center justify-between gap-4 px-6 py-6 text-[11px] md:flex-row md:text-xs">
           <span className="text-muted-foreground">© {new Date().getFullYear()} MIST Computer Club. All rights reserved.</span>
           <div className="flex gap-4 text-muted-foreground/70">
             <Link href="#" className="hover:text-primary transition-colors">Privacy</Link>
