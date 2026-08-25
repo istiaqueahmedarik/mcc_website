@@ -69,7 +69,7 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#1e40af" />
       </head>
       <body
-        className={`${inter.variable} ${geistMono.variable} font-sans`}
+        className={`${inter.variable} ${inter.className} ${geistMono.variable} font-sans`}
         cz-shortcut-listen="true"
       >
         <Toaster />

@@ -59,7 +59,7 @@ import {
   GraduationCap, Calendar, Target, ArrowLeft, ExternalLink,
   Check, ChevronsUpDown, X,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
-  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive, Bell, SlidersHorizontal
+  Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive, Bell, SlidersHorizontal, VideoOff
 } from 'lucide-react';
 import {
   Dialog,
@@ -952,8 +952,8 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <nav aria-label={navigationLabel} className="grid w-full grid-cols-5 gap-1 rounded-lg border bg-background p-1 sm:flex">
-          <TabsList id={tabsId} className="col-span-4 grid h-auto w-full grid-cols-4 gap-1 bg-transparent p-0 text-muted-foreground sm:flex sm:flex-1 sm:justify-start">
+        <nav aria-label={navigationLabel} className="flex min-h-12 w-full items-end gap-3 border-b border-border/70">
+          <TabsList id={tabsId} className="flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground">
             {primaryItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -961,7 +961,7 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                   key={item.value}
                   id={item.tourId}
                   value={item.value}
-                  className="min-h-11 min-w-0 flex-col gap-1 rounded-md px-1 py-1.5 text-[10px] data-[state=active]:bg-foreground data-[state=active]:text-background sm:min-h-10 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
+                  className="h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -975,10 +975,10 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
               <button
                 id={moreId}
                 type="button"
-                className={`inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 text-[10px] font-medium outline-none ring-offset-background transition-[background-color,color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:min-h-10 sm:flex-row sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm ${
+                className={`inline-flex h-12 min-w-0 shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 text-sm font-medium outline-none ring-offset-background transition-[border-color,color,background-color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:px-3 ${
                   activeSecondaryItem
-                    ? 'bg-foreground text-background shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
                 aria-label={moreLabel}
                 aria-current={activeSecondaryItem ? 'page' : undefined}
@@ -997,6 +997,39 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
       </ContextMenuTrigger>
       <ContextActionContent actions={actions} label="More classroom sections" />
     </ContextMenu>
+  );
+}
+
+function ClassroomOverviewCard({ icon: Icon, title, description, badge, actionLabel, actionIcon: ActionIcon = Info, onAction }) {
+  return (
+    <article className="flex min-h-24 items-start justify-between gap-4 rounded-lg border border-border/80 bg-card/70 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.14),0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="flex min-w-0 items-start gap-3">
+        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold leading-5 text-foreground">{title}</h3>
+            {badge && (
+              <Badge variant="secondary" className="h-5 rounded-md px-2 text-[11px] font-medium">
+                {badge}
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      {onAction && (
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          className="h-10 w-10 shrink-0 rounded-md border-border/80 bg-background/70 text-foreground shadow-none active:scale-[0.97]"
+          onClick={onAction}
+          aria-label={actionLabel}
+        >
+          <ActionIcon className="h-4 w-4" />
+        </Button>
+      )}
+    </article>
   );
 }
 
@@ -3136,6 +3169,8 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [resourceUrl, setResourceUrl] = useState('');
   const [resourceContent, setResourceContent] = useState('');
   const [resourceScope, setResourceScope] = useState('active');
+  const [historyDetailsOpen, setHistoryDetailsOpen] = useState(false);
+  const [resourcesDetailsOpen, setResourcesDetailsOpen] = useState(false);
   const [visibleResourceCount, setVisibleResourceCount] = useState(RESOURCE_BATCH_SIZE);
   const [visibleProblemCount, setVisibleProblemCount] = useState(PROBLEM_BATCH_SIZE);
   const [visibleHistoryCount, setVisibleHistoryCount] = useState(HISTORY_BATCH_SIZE);
@@ -3205,6 +3240,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [editingTopicProblem, setEditingTopicProblem] = useState(null);
   const [assignTeamModalOpen, setAssignTeamModalOpen] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [topicDetailsOpen, setTopicDetailsOpen] = useState(false);
   const [topicSearchQuery, setTopicSearchQuery] = useState('');
   const [activeStudioTab, setActiveStudioTab] = useState('overview');
   const [inTopicResourceSearch, setInTopicResourceSearch] = useState('');
@@ -3494,6 +3530,16 @@ export default function ClassroomLiveClient({ classroomId }) {
   const topicAssignmentsList = (topicAssignments || []).filter(
     (a) => (a.topic_id === selectedTopic?.id || !selectedTopic) && (a.status || 'active') === 'active'
   );
+  const topicPeopleAssignments = topicAssignmentsList.filter((assignment) => Boolean(assignment.student_id));
+  const topicGroupAssignments = topicAssignmentsList.filter((assignment) => !assignment.student_id);
+  const topicStudioTabs = [
+    { value: 'overview', label: 'Overview', icon: Layers3 },
+    { value: 'resources', label: 'Resources', icon: BookOpen, count: topicResourcesList.length },
+    { value: 'problems', label: 'Problems', icon: Award, count: topicProblemsList.length },
+    { value: 'peoples', label: 'People', icon: UserCheck, count: topicPeopleAssignments.length },
+    { value: 'groups', label: 'Groups', icon: Users, count: topicGroupAssignments.length },
+    { value: 'submissions', label: 'Review', icon: ShieldCheck, count: pendingSubmissionsList.length },
+  ];
 
   const filteredTopicResources = topicResourcesList.filter((r) => {
     if (!inTopicResourceSearch.trim()) return true;
@@ -5091,83 +5137,86 @@ export default function ClassroomLiveClient({ classroomId }) {
     );
   }
   return (
-    <div className="min-h-screen bg-background">
-      <main className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <ProgressLink href="/classroom/list" className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> All classrooms
+    <div className="dark min-h-screen bg-[#111111] text-foreground">
+      <main className="mx-auto flex w-full max-w-[1060px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8">
+      <ProgressLink href="/classroom/list" className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
+        <ArrowLeft className="h-4 w-4" /> Classrooms
       </ProgressLink>
 
-      <section id="classroom-tour-header" className="grid gap-5 border-b pb-6 lg:grid-cols-[1fr_320px] lg:items-end">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold uppercase text-muted-foreground">
-              {isTrainer ? 'Trainer classroom' : 'Student classroom'}
-            </p>
-            {isTrainer ? (
-              <Badge variant="outline" className="gap-1 text-xs">
-                <ShieldCheck className="h-3 w-3" /> Trainer view
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
-                <GraduationCap className="h-3 w-3" /> Student view
-              </Badge>
-            )}
-            {isTrainer && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 gap-1.5 text-xs"
-                onClick={openClassroomEditDialog}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit classroom
-              </Button>
-            )}
-          </div>
-          <h1 className="mt-2 truncate text-3xl font-bold leading-tight sm:text-4xl">{classroom.name}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+      <section id="classroom-tour-header" className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-3">
+          <h1 className="truncate text-3xl font-semibold leading-tight text-foreground">{classroom.name}</h1>
+          <p className="max-w-2xl text-base leading-6 text-muted-foreground">
             {classroom.description || 'No description provided.'}
           </p>
-          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
-            <span>Trainer <span className="font-semibold text-foreground">{classroom.trainer_name}</span></span>
-            <span>Created {new Date(classroom.created_at).toLocaleDateString()}</span>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Trainer <span className="font-semibold text-foreground">{classroom.trainer_name || 'Trainer'}</span>
+          </p>
         </div>
 
-        <div className={`border-l pl-4 ${activeClass ? 'border-red-600' : 'border-muted-foreground/30'}`}>
+        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
           {activeClass ? (
-            <>
-              <p className="flex items-center gap-2 text-sm font-bold text-red-600">
-                <span className="relative flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600"></span>
-                </span>
-                Live: {activeClass.name}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">Started {new Date(activeClass.started_at).toLocaleTimeString()}</p>
-            </>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-10 max-w-full gap-2 border-border/80 bg-card/70 px-3 text-sm font-medium shadow-sm active:scale-[0.98]"
+              onClick={() => (isTrainer ? handleTrainerTabChange('live') : handleStudentTabChange('live'))}
+            >
+              <Radio className="h-4 w-4 text-red-500" />
+              <span className="truncate">Live: {activeClass.name}</span>
+            </Button>
           ) : (
-            <>
-              <p className="text-sm font-semibold text-muted-foreground">No live session</p>
-              <p className="mt-1 text-xs text-muted-foreground">Start a scheduled class to begin practice.</p>
-            </>
+            <span className="inline-flex h-10 items-center gap-2 rounded-md border border-border/80 bg-card/70 px-3 text-sm font-medium text-muted-foreground shadow-sm">
+              <VideoOff className="h-4 w-4" />
+              No live session
+            </span>
+          )}
+          {isTrainer && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-10 gap-2 border-border/80 bg-card/70 px-3 text-sm font-semibold shadow-sm active:scale-[0.98]"
+              onClick={openClassroomEditDialog}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Manage
+            </Button>
           )}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-7">
         {/* Main interactive panel */}
         <div id="live-board" className="min-w-0 space-y-6">
           {isTrainer ? (
             /* ========================================================= */
             /* TRAINER BOARD PANELS                                      */
             /* ========================================================= */
-            <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className="space-y-5">
+            <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className="space-y-7">
               <ClassroomRoleNavigation role="trainer" value={trainerTab} onSelect={handleTrainerTabChange} />
 
-            <TabsContent value="updates" className="mt-4 space-y-4">
+            <TabsContent value="updates" className="space-y-7">
               <UpdatesTab classroomId={classroomId} isTrainer={true} token={token} currentUser={currentUser} active={trainerTab === 'updates'} />
+              <div className="grid gap-4 md:grid-cols-2">
+                <ClassroomOverviewCard
+                  icon={Clock}
+                  title="History"
+                  badge={`${completedClasses.length} completed`}
+                  description="Completed sessions and progress."
+                  actionLabel="Open history details"
+                  onAction={() => setHistoryDetailsOpen(true)}
+                />
+                <ClassroomOverviewCard
+                  icon={Library}
+                  title="Resources"
+                  description="Study material and reader pages."
+                  actionLabel="Open resources"
+                  actionIcon={Plus}
+                  onAction={() => setResourcesDetailsOpen(true)}
+                />
+              </div>
             </TabsContent>
 
               <TabsContent value="threads" className="mt-4">
@@ -5688,35 +5737,46 @@ export default function ClassroomLiveClient({ classroomId }) {
               </TabsContent>
 
               {/* TOPIC UNIT / GROUP ASSIGNMENT TAB */}
-              <TabsContent value="topics" className="space-y-4">
-                {/* WORKSPACE HEADER & TOPIC METRICS */}
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between rounded-xl border bg-card p-4 sm:p-5 shadow-sm">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <div className="flex items-center gap-2">
-                        <Layers3 className="h-5 w-5 text-primary shrink-0" />
-                        <h2 className="text-xl font-bold tracking-tight">Topic Studio &amp; Group Assignments</h2>
+              <TabsContent value="topics" className="space-y-5">
+                <section className="overflow-hidden rounded-lg border border-border/80 bg-card/70 p-5 shadow-[0_22px_70px_rgba(0,0,0,0.24),0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-xl">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="flex min-w-0 gap-4">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                        <Layers3 className="h-5 w-5" />
                       </div>
-                      <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-1 text-xs font-semibold">
-                        <span className="text-muted-foreground">Topics:</span>
-                        <Badge variant="secondary">{topics.length}</Badge>
-                        <span className="ml-1 text-muted-foreground">Problems:</span>
-                        <Badge variant="secondary">{topicTotals.problems}</Badge>
-                        <span className="ml-1 text-muted-foreground">Assigned:</span>
-                        <Badge variant="secondary">{topicTotals.assignments}</Badge>
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-xl font-semibold leading-6 tracking-normal text-foreground">Topic Studio</h2>
+                          <Badge variant="outline" className="h-6 rounded-md border-primary/25 bg-primary/10 px-2 text-[11px] font-semibold text-primary">
+                            Group assignments
+                          </Badge>
+                        </div>
+                        <p className="max-w-2xl text-sm leading-5 text-muted-foreground">
+                          Build learning packages, attach practice, and assign them without leaving the classroom flow.
+                        </p>
                       </div>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Build structured learning units with resources and problems, then assign them to student groups.
-                    </p>
+
+                    <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border/70 bg-background/45 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:min-w-[20rem]">
+                      {[
+                        ['Topics', topics.length],
+                        ['Problems', topicTotals.problems],
+                        ['Assigned', topicTotals.assignments],
+                      ].map(([label, value], index) => (
+                        <div key={label} className={`px-4 py-3 ${index > 0 ? 'border-l border-border/60' : ''}`}>
+                          <p className="text-lg font-semibold tabular-nums leading-none text-foreground">{value}</p>
+                          <p className="mt-1 text-[11px] font-medium text-muted-foreground">{label}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="mt-5 flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="gap-2"
+                      className="h-10 gap-2 border-border/80 bg-background/60 px-3 text-sm font-semibold active:scale-[0.97]"
                       onClick={fetchTopicData}
                       disabled={topicDataLoading}
                     >
@@ -5727,7 +5787,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     <Button
                       type="button"
                       size="sm"
-                      className="gap-2 font-semibold shadow-sm"
+                      className="h-10 gap-2 px-3 text-sm font-semibold shadow-[0_12px_24px_rgba(10,132,255,0.22)] active:scale-[0.97]"
                       onClick={() => {
                         setTopicForm({ title: '', module: '', description: '' });
                         setCreateTopicModalOpen(true);
@@ -5737,22 +5797,23 @@ export default function ClassroomLiveClient({ classroomId }) {
                       Build Topic
                     </Button>
                   </div>
-                </div>
+                </section>
 
-                {/* MASTER-DETAIL STUDIO CONTAINER */}
                 {topics.length === 0 ? (
-                  <Card className="rounded-xl border border-dashed p-12 text-center">
-                    <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center space-y-3">
-                      <div className="rounded-full bg-muted p-4">
-                        <Layers3 className="h-8 w-8 text-muted-foreground" />
+                  <Card className="overflow-hidden rounded-lg border border-dashed border-border/80 bg-card/55 p-12 text-center shadow-[0_18px_50px_rgba(0,0,0,0.18)]">
+                    <div className="mx-auto flex max-w-[430px] flex-col items-center justify-center space-y-4">
+                      <div className="grid h-14 w-14 place-items-center rounded-lg border border-border/80 bg-background/60 text-muted-foreground">
+                        <Layers3 className="h-7 w-7" />
                       </div>
-                      <h3 className="text-lg font-bold">No topic units built yet</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Create topic units containing learning resources and problem sets to assign to classroom groups.
-                      </p>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-semibold">No topic units built yet</h3>
+                        <p className="text-sm leading-5 text-muted-foreground">
+                          Start with one topic package, then add reading material, practice problems, and target groups.
+                        </p>
+                      </div>
                       <Button
                         type="button"
-                        className="mt-2 gap-2 font-semibold"
+                        className="mt-2 h-10 gap-2 font-semibold active:scale-[0.97]"
                         onClick={() => {
                           setTopicForm({ title: '', module: '', description: '' });
                           setCreateTopicModalOpen(true);
@@ -5764,367 +5825,321 @@ export default function ClassroomLiveClient({ classroomId }) {
                     </div>
                   </Card>
                 ) : (
-                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-                    {/* LEFT MASTER SIDEBAR: TOPIC SELECTOR */}
-                    <div className="space-y-3">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card/45 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="relative min-w-0 flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                          placeholder="Search topics..."
+                          placeholder="Search topics"
                           value={topicSearchQuery}
                           onChange={(e) => setTopicSearchQuery(e.target.value)}
-                          className="pl-9 text-xs h-9"
+                          className="h-10 rounded-md border-border/80 bg-background/60 pl-9 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
                         />
                       </div>
+                      <p className="shrink-0 text-xs font-medium text-muted-foreground">
+                        {filteredTopics.length} of {topics.length} topic{topics.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
 
-                      <div className="space-y-2 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
+                    {filteredTopics.length === 0 ? (
+                      <Card className="rounded-lg border border-dashed border-border/80 bg-card/55 p-10 text-center text-sm text-muted-foreground">
+                        No topics match this search.
+                      </Card>
+                    ) : (
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         {filteredTopics.map((topic) => {
-                          const isSelected = (selectedTopicId || topics[0]?.id) === topic.id;
-                          const activeAssignmentsCount = (topic.assignments || []).filter((a) => a.status === 'active').length;
+                          const activeAssignmentsCount = (topic.assignments || []).filter((assignment) => assignment.status === 'active').length;
+                          const isSelected = selectedTopicId === topic.id && topicDetailsOpen;
                           return (
                             <button
                               key={topic.id}
                               type="button"
-                              onClick={() => setSelectedTopicId(topic.id)}
-                              className={`w-full text-left rounded-xl border p-3.5 transition-all ${
+                              aria-haspopup="dialog"
+                              aria-expanded={isSelected}
+                              aria-label={`Open details for ${topic.title}`}
+                              onClick={() => {
+                                setSelectedTopicId(topic.id);
+                                setActiveStudioTab('overview');
+                                setTopicDetailsOpen(true);
+                              }}
+                              className={`group flex min-h-[13.5rem] flex-col rounded-lg border p-4 text-left shadow-[0_16px_36px_rgba(0,0,0,0.16),0_0_0_1px_rgba(255,255,255,0.02)] transition-[border-color,background-color,transform,color,box-shadow] hover:-translate-y-0.5 active:scale-[0.985] ${
                                 isSelected
-                                  ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/20'
-                                  : 'bg-card hover:bg-muted/30 hover:border-muted-foreground/30'
+                                  ? 'border-primary/70 bg-primary/10 text-foreground shadow-[0_18px_42px_rgba(10,132,255,0.18)]'
+                                  : 'border-border/70 bg-card/60 text-muted-foreground hover:border-primary/45 hover:bg-card/80 hover:text-foreground'
                               }`}
                             >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0 space-y-1">
-                                  <p className={`truncate text-sm font-bold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 space-y-1.5">
+                                  <Badge variant="secondary" className="h-6 max-w-full rounded-md px-2 text-[11px] font-semibold">
+                                    <span className="truncate">{topic.module || 'Topic package'}</span>
+                                  </Badge>
+                                  <h3 className="line-clamp-2 text-lg font-semibold leading-6 text-foreground">
                                     {topic.title}
-                                  </p>
-                                  {topic.module && (
-                                    <p className="text-[11px] text-muted-foreground truncate">{topic.module}</p>
-                                  )}
+                                  </h3>
                                 </div>
-                                <Badge variant={isSelected ? "default" : "outline"} className="shrink-0 text-[10px] uppercase">
+                                <Badge variant="outline" className={`h-6 shrink-0 rounded-md px-2 text-[10px] font-semibold uppercase ${
+                                  topic.status === 'archived' ? 'border-amber-500/25 bg-amber-500/10 text-amber-300' : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+                                }`}>
                                   {topic.status}
                                 </Badge>
                               </div>
 
-                              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <BookOpen className="h-3 w-3" />
-                                  {topic.resources?.length || 0}
-                                </span>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Award className="h-3 w-3" />
-                                  {topic.problems?.length || 0}
-                                </span>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Users className="h-3 w-3" />
-                                  {activeAssignmentsCount} groups
+                              <p className="mt-3 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
+                                {topic.description || 'No description yet. Open details to add resources, problems, and assignments.'}
+                              </p>
+
+                              <div className="mt-auto pt-4">
+                                <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-border/70 bg-background/40 text-center">
+                                  {[
+                                    ['Resources', BookOpen, topic.resources?.length || 0],
+                                    ['Problems', Award, topic.problems?.length || 0],
+                                    ['Targets', Users, activeAssignmentsCount],
+                                  ].map(([label, Icon, value], itemIndex) => (
+                                    <span key={label} className={`px-2 py-2 ${itemIndex > 0 ? 'border-l border-border/60' : ''}`}>
+                                      <Icon className="mx-auto h-3.5 w-3.5 text-primary" />
+                                      <span className="mt-1 block text-sm font-semibold leading-none tabular-nums text-foreground">{value}</span>
+                                      <span className="mt-1 block text-[10px] font-medium text-muted-foreground">{label}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                                <span className="mt-3 inline-flex h-8 items-center gap-1.5 text-xs font-semibold text-primary">
+                                  Open details
+                                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                                 </span>
                               </div>
                             </button>
                           );
                         })}
                       </div>
-                    </div>
+                    )}
 
-                    {/* RIGHT DETAIL STUDIO: SELECTED TOPIC WORKSPACE */}
-                    {selectedTopic ? (
-                      <Card className="rounded-xl border bg-card p-5 sm:p-6 shadow-xs">
-                        {/* HEADER & TOPIC ACTIONS */}
-                        <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="space-y-1.5 min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-xl font-bold tracking-tight text-foreground">{selectedTopic.title}</h3>
-                              {selectedTopic.module && (
-                                <Badge variant="secondary" className="text-xs font-semibold">
-                                  {selectedTopic.module}
+                    {selectedTopic && (
+                      <Dialog open={topicDetailsOpen} onOpenChange={setTopicDetailsOpen}>
+                        <DialogContent className="max-h-[92vh] w-[96vw] max-w-[1180px] overflow-hidden border-border/80 bg-card/90 p-0 shadow-[0_28px_90px_rgba(0,0,0,0.42)] backdrop-blur-xl sm:max-w-[1180px]">
+                          <DialogHeader className="sr-only">
+                            <DialogTitle>{selectedTopic.title}</DialogTitle>
+                            <DialogDescription>
+                              Topic details, resources, problems, assignments, and pending review.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="flex max-h-[92vh] min-h-0 flex-col">
+                        <div className="border-b border-border/70 bg-background/35 p-5 pr-12">
+                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0 space-y-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="secondary" className="h-6 rounded-md px-2 text-[11px] font-semibold">
+                                  {selectedTopic.module || 'Topic package'}
                                 </Badge>
-                              )}
-                              <Badge variant="outline" className="text-xs uppercase">{selectedTopic.status}</Badge>
+                                <Badge variant="outline" className="h-6 rounded-md px-2 text-[11px] font-semibold uppercase">
+                                  {selectedTopic.status}
+                                </Badge>
+                              </div>
+                              <div className="space-y-2">
+                                <h3 className="text-2xl font-semibold leading-7 tracking-normal text-foreground">{selectedTopic.title}</h3>
+                                <p className="max-w-3xl text-sm leading-5 text-muted-foreground">
+                                  {selectedTopic.description || 'No description yet. Add a short teaching note so trainers and students understand the goal.'}
+                                </p>
+                              </div>
                             </div>
-                            {selectedTopic.description && (
-                              <p className="text-sm text-muted-foreground leading-relaxed">{selectedTopic.description}</p>
-                            )}
+
+                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 border-border/80 bg-card/70 text-xs font-semibold active:scale-[0.97]" onClick={() => openTopicEditDialog(selectedTopic)}>
+                                <Pencil className="h-3.5 w-3.5 text-primary" />
+                                Edit
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 border-border/80 bg-card/70 text-xs font-semibold text-amber-300 active:scale-[0.97]" onClick={() => handleArchiveTopic(selectedTopic)}>
+                                <Archive className="h-3.5 w-3.5" />
+                                {selectedTopic.status === 'archived' ? 'Restore' : 'Archive'}
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 border-border/80 bg-card/70 text-xs font-semibold active:scale-[0.97]" onClick={() => openTopicResourceDialog(selectedTopic)}>
+                                <BookOpen className="h-3.5 w-3.5 text-primary" />
+                                Resource
+                              </Button>
+                              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 border-border/80 bg-card/70 text-xs font-semibold active:scale-[0.97]" onClick={() => openTopicProblemDialog(selectedTopic)}>
+                                <Award className="h-3.5 w-3.5 text-primary" />
+                                Problem
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-9 gap-1.5 text-xs font-semibold shadow-[0_12px_24px_rgba(10,132,255,0.22)] active:scale-[0.97]"
+                                onClick={() => {
+                                  setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'group', teamIds: [], studentIds: [] });
+                                  setAssignTeamModalOpen(true);
+                                }}
+                              >
+                                <Target className="h-3.5 w-3.5" />
+                                Assign
+                              </Button>
+                            </div>
                           </div>
 
-                          {/* ACTION TOOLBAR */}
-                          <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs font-medium"
-                              onClick={() => openTopicEditDialog(selectedTopic)}
-                            >
-                              <Pencil className="h-3.5 w-3.5 text-primary" />
-                              Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-800"
-                              onClick={() => handleArchiveTopic(selectedTopic)}
-                            >
-                              <Archive className="h-3.5 w-3.5" />
-                              {selectedTopic.status === 'archived' ? 'Restore' : 'Archive'}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs font-medium"
-                              onClick={() => {
-                                openTopicResourceDialog(selectedTopic);
-                              }}
-                            >
-                              <BookOpen className="h-3.5 w-3.5 text-primary" />
-                              + Resource
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs font-medium"
-                              onClick={() => {
-                                openTopicProblemDialog(selectedTopic);
-                              }}
-                            >
-                              <Award className="h-3.5 w-3.5 text-primary" />
-                              + Problem
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              className="h-8 gap-1.5 text-xs font-semibold shadow-xs"
-                              onClick={() => {
-                                setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'group', teamIds: [], studentIds: [] });
-                                setAssignTeamModalOpen(true);
-                              }}
-                            >
-                              <Target className="h-3.5 w-3.5" />
-                              Assign Topic
-                            </Button>
+                          <div className="mt-5 grid overflow-hidden rounded-lg border border-border/70 bg-card/45 text-center sm:grid-cols-3">
+                            {[
+                              ['Resources', topicResourcesList.length],
+                              ['Problems', topicProblemsList.length],
+                              ['Targets', topicAssignmentsList.length],
+                            ].map(([label, value], index) => (
+                              <div key={label} className={`px-4 py-3 ${index > 0 ? 'border-t border-border/60 sm:border-l sm:border-t-0' : ''}`}>
+                                <p className="text-xl font-semibold leading-none tabular-nums text-foreground">{value}</p>
+                                <p className="mt-1 text-[11px] font-medium text-muted-foreground">{label}</p>
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        {/* SUB-TABBED STUDIO NAVIGATION BAR */}
-                        <div className="mt-5 border-b pb-3">
-                          <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-muted/40 p-1">
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('overview')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                                activeStudioTab === 'overview'
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              Overview
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('resources')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                activeStudioTab === 'resources'
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <BookOpen className="h-3.5 w-3.5" />
-                              Resources
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">{topicResourcesList.length}</Badge>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('problems')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                activeStudioTab === 'problems'
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <Award className="h-3.5 w-3.5" />
-                              Problems
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">{topicProblemsList.length}</Badge>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('peoples')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                activeStudioTab === 'peoples'
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <UserCheck className="h-3.5 w-3.5" />
-                              People
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">
-                                {topicAssignmentsList.filter(a => Boolean(a.student_id)).length}
-                              </Badge>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('groups')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                (activeStudioTab === 'groups' || activeStudioTab === 'teams')
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <Users className="h-3.5 w-3.5" />
-                              Groups
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-bold">
-                                {topicAssignmentsList.filter(a => !a.student_id).length}
-                              </Badge>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setActiveStudioTab('submissions')}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1.5 ${
-                                activeStudioTab === 'submissions'
-                                  ? 'bg-background text-foreground shadow-xs'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
-                              Pending Submissions
-                            </button>
+                        <div className="border-b border-border/70 px-4 py-3">
+                          <div className="flex gap-1 overflow-x-auto rounded-lg bg-background/45 p-1">
+                            {topicStudioTabs.map((tab) => {
+                              const Icon = tab.icon;
+                              const isCurrent = activeStudioTab === tab.value || (tab.value === 'groups' && activeStudioTab === 'teams');
+                              return (
+                                <button
+                                  key={tab.value}
+                                  type="button"
+                                  aria-pressed={isCurrent}
+                                  onClick={() => setActiveStudioTab(tab.value)}
+                                  className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-[background-color,color,transform] active:scale-[0.97] ${
+                                    isCurrent
+                                      ? 'bg-card text-foreground shadow-[0_1px_0_rgba(255,255,255,0.06),0_8px_20px_rgba(0,0,0,0.18)]'
+                                      : 'text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  <Icon className={`h-3.5 w-3.5 ${tab.value === 'submissions' ? 'text-amber-400' : ''}`} />
+                                  {tab.label}
+                                  {tab.count !== undefined && (
+                                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                                      {tab.count}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
-                        {/* SUB-TAB CONTENT WORKSPACE */}
-                        <div className="mt-5 space-y-6">
-                          {/* 1. OVERVIEW SUB-TAB */}
+                        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
                           {activeStudioTab === 'overview' && (
-                            <div className="space-y-6">
-                              {/* Quick Stats Banner */}
-                              <div className="grid grid-cols-3 gap-3 rounded-xl border bg-muted/20 p-3 text-center">
-                                <div>
-                                  <p className="text-base font-bold text-foreground">{topicResourcesList.length}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium">Resources</p>
-                                </div>
-                                <div className="border-x">
-                                  <p className="text-base font-bold text-foreground">{topicProblemsList.length}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium">Problems</p>
-                                </div>
-                                <div>
-                                  <p className="text-base font-bold text-foreground">{topicAssignmentsList.length}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium">Assigned Targets</p>
-                                </div>
+                            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_17rem]">
+                              <div className="space-y-4">
+                                <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                      <BookOpen className="h-4 w-4 text-primary" />
+                                      Resource path
+                                    </h4>
+                                    {topicResourcesList.length > 0 && (
+                                      <Button type="button" variant="ghost" size="sm" className="h-8 text-xs font-semibold text-primary" onClick={() => setActiveStudioTab('resources')}>
+                                        View all
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {topicResourcesList.length === 0 ? (
+                                      <p className="rounded-md border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
+                                        Add the first resource to give this package a reading path.
+                                      </p>
+                                    ) : (
+                                      [...topicResourcesList].sort(byPositionThenTime).slice(0, 3).map((resource) => (
+                                        <div key={resource.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/70 bg-card/55 p-3 text-xs">
+                                          <div className="min-w-0 space-y-1">
+                                            <p className="truncate font-semibold text-foreground">{resource.title}</p>
+                                            {resource.url && (
+                                              <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-[11px] text-primary hover:underline">
+                                                <ExternalLink className="h-3 w-3 shrink-0" />
+                                                <span className="truncate">{resource.url}</span>
+                                              </a>
+                                            )}
+                                          </div>
+                                          <ProgressLink href={`/classroom/live/${classroomId}/resources/${resource.id}`} className="shrink-0">
+                                            <Button variant="outline" size="sm" className="h-8 text-[11px] font-semibold active:scale-[0.97]">Read</Button>
+                                          </ProgressLink>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </section>
+
+                                <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                      <Award className="h-4 w-4 text-primary" />
+                                      Practice set
+                                    </h4>
+                                    {topicProblemsList.length > 0 && (
+                                      <Button type="button" variant="ghost" size="sm" className="h-8 text-xs font-semibold text-primary" onClick={() => setActiveStudioTab('problems')}>
+                                        View all
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {topicProblemsList.length === 0 ? (
+                                      <p className="rounded-md border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
+                                        Attach problems when the reading path is ready.
+                                      </p>
+                                    ) : (
+                                      [...topicProblemsList].sort(byPositionThenTime).slice(0, 3).map((problem) => (
+                                        <div key={problem.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border/70 bg-card/55 p-3 text-xs">
+                                          <div className="min-w-0 space-y-1">
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                              <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[10px]">{platformName(problem.platform)}</Badge>
+                                              {problem.difficulty && <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[10px]">{problem.difficulty}</Badge>}
+                                            </div>
+                                            <a href={problem.problem_link} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 font-semibold text-primary hover:underline">
+                                              <span className="truncate">{problem.title}</span>
+                                              <ExternalLink className="h-3 w-3 shrink-0" />
+                                            </a>
+                                          </div>
+                                          <TopicProblemThreadPicker
+                                            classroomId={classroomId}
+                                            problem={problem}
+                                            selectedTopic={selectedTopic}
+                                            topicAssignments={topicAssignmentsList}
+                                            teams={teams}
+                                            currentUser={currentUser}
+                                            onOpenThread={openThreadBubble}
+                                            buttonClassName="h-8 gap-1 text-[11px] font-semibold"
+                                          />
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </section>
                               </div>
 
-                              {/* Resources Preview */}
-                              <section className="space-y-3">
-                                <div className="flex items-center justify-between border-b pb-2">
-                                  <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                    <BookOpen className="h-3.5 w-3.5 text-primary" />
-                                    Resources ({topicResourcesList.length})
-                                  </h4>
-                                  {topicResourcesList.length > 0 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 text-xs text-primary font-semibold hover:underline"
-                                      onClick={() => setActiveStudioTab('resources')}
-                                    >
-                                      View All ({topicResourcesList.length})
-                                    </Button>
+                              <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                  <Target className="h-4 w-4 text-primary" />
+                                  Assignment map
+                                </h4>
+                                <div className="mt-3 space-y-2">
+                                  {topicAssignmentsList.length === 0 ? (
+                                    <p className="rounded-md border border-dashed border-border/70 p-4 text-center text-xs text-muted-foreground">
+                                      Assign this topic to a group or student when it is ready.
+                                    </p>
+                                  ) : (
+                                    topicAssignmentsList.slice(0, 5).map((assignment) => (
+                                      <div key={assignment.id} className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card/55 p-3 text-xs">
+                                        <div className="min-w-0">
+                                          <p className="truncate font-semibold text-foreground">{assignment.student_name || assignment.team_name || 'Target'}</p>
+                                          <p className="text-[11px] text-muted-foreground">{assignment.student_id ? 'Individual student' : 'Group'}</p>
+                                        </div>
+                                        <Badge variant="outline" className="h-5 rounded-md px-1.5 text-[10px] uppercase">{assignment.status || 'active'}</Badge>
+                                      </div>
+                                    ))
                                   )}
                                 </div>
-
-                                {topicResourcesList.length === 0 ? (
-                                  <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
-                                    No resources added yet. Click <strong>+ Resource</strong> above to add notes or links.
-                                  </p>
-                                ) : (
-                                  <div className="grid gap-2.5">
-                                    {[...topicResourcesList].sort(byPositionThenTime).slice(0, 3).map((resource) => (
-                                      <div key={resource.id} className="flex items-center justify-between rounded-xl border bg-card p-3 text-xs">
-                                        <div className="min-w-0 space-y-0.5">
-                                          <p className="font-bold text-foreground truncate">{resource.title}</p>
-                                          {resource.url && (
-                                            <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1 text-[11px] text-primary hover:underline">
-                                              <ExternalLink className="h-3 w-3 shrink-0" />
-                                              <span className="truncate">{resource.url}</span>
-                                            </a>
-                                          )}
-                                        </div>
-                                        <ProgressLink href={`/classroom/live/${classroomId}/resources/${resource.id}`} className="shrink-0">
-                                          <Button variant="outline" size="sm" className="h-7 text-[11px]">Read</Button>
-                                        </ProgressLink>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </section>
-
-                              {/* Problems Preview */}
-                              <section className="space-y-3">
-                                <div className="flex items-center justify-between border-b pb-2">
-                                  <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                    <Award className="h-3.5 w-3.5 text-primary" />
-                                    Practice Problems ({topicProblemsList.length})
-                                  </h4>
-                                  {topicProblemsList.length > 0 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-7 text-xs text-primary font-semibold hover:underline"
-                                      onClick={() => setActiveStudioTab('problems')}
-                                    >
-                                      View All ({topicProblemsList.length})
-                                    </Button>
-                                  )}
-                                </div>
-
-                                {topicProblemsList.length === 0 ? (
-                                  <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
-                                    No practice problems added yet. Click <strong>+ Problem</strong> above to attach problems.
-                                  </p>
-                                ) : (
-                                  <div className="grid gap-2.5">
-                                    {[...topicProblemsList].sort(byPositionThenTime).slice(0, 3).map((problem) => (
-                                      <div key={problem.id} className="flex items-center justify-between rounded-xl border bg-card p-3 text-xs">
-                                        <div className="min-w-0 space-y-1">
-                                          <div className="flex items-center gap-1.5">
-                                            <Badge variant="outline" className="text-[10px]">{platformName(problem.platform)}</Badge>
-                                            {problem.difficulty && <Badge variant="secondary" className="text-[10px]">{problem.difficulty}</Badge>}
-                                          </div>
-                                          <a href={problem.problem_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
-                                            <span className="truncate">{problem.title}</span>
-                                            <ExternalLink className="h-3 w-3 shrink-0" />
-                                          </a>
-                                        </div>
-                                        <TopicProblemThreadPicker
-                                          classroomId={classroomId}
-                                          problem={problem}
-                                          selectedTopic={selectedTopic}
-                                          topicAssignments={topicAssignmentsList}
-                                          teams={teams}
-                                          currentUser={currentUser}
-                                          onOpenThread={openThreadBubble}
-                                          buttonClassName="h-7 gap-1 text-[11px] font-semibold"
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                               </section>
                             </div>
                           )}
 
                           {/* 2. RESOURCES SUB-TAB */}
                           {activeStudioTab === 'resources' && (
-                            <section className="space-y-4">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
-                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                              <div className="flex flex-col gap-3 border-b border-border/70 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <BookOpen className="h-4 w-4 text-primary" />
-                                  Topic Resources ({filteredTopicResources.length})
+                                  Resources ({filteredTopicResources.length})
                                 </h4>
                                 <div className="flex items-center gap-2">
                                   <div className="relative">
@@ -6133,13 +6148,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       placeholder="Search resources..."
                                       value={inTopicResourceSearch}
                                       onChange={(e) => setInTopicResourceSearch(e.target.value)}
-                                      className="h-8 w-[200px] pl-8 text-xs"
+                                      className="h-8 w-[200px] rounded-md border-border/80 bg-card/70 pl-8 text-xs"
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 gap-1.5 text-xs font-semibold"
+                                    className="h-8 gap-1.5 text-xs font-semibold active:scale-[0.97]"
                                     onClick={() => {
                                       openTopicResourceDialog(selectedTopic);
                                     }}
@@ -6151,16 +6166,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
 
                               {filteredTopicResources.length === 0 ? (
-                                <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                                <div className="mt-4 rounded-md border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
                                   {inTopicResourceSearch ? 'No resources match your search filter.' : 'No resources added to this topic unit yet.'}
                                 </div>
                               ) : (
-                                <div className="space-y-3">
+                                <div className="mt-4 space-y-3">
                                   {visibleTopicResources.map((resource) => (
-                                    <div key={resource.id} className="rounded-xl border bg-card p-4 transition-all hover:shadow-xs">
+                                    <div key={resource.id} className="rounded-md border border-border/70 bg-card/55 p-4 transition-colors hover:border-primary/30">
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0 space-y-1">
-                                          <p className="text-base font-bold text-foreground">{resource.title}</p>
+                                          <p className="text-base font-semibold text-foreground">{resource.title}</p>
                                           {resource.url && (
                                             <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex max-w-full items-center gap-1.5 text-xs text-primary hover:underline font-medium">
                                               <ExternalLink className="h-3.5 w-3.5 shrink-0" />
@@ -6169,16 +6184,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                                           )}
                                         </div>
                                         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openTopicResourceDialog(selectedTopic, resource)}>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs active:scale-[0.97]" onClick={() => openTopicResourceDialog(selectedTopic, resource)}>
                                             <Pencil className="h-3.5 w-3.5" />
                                             Edit
                                           </Button>
-                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-600 hover:text-red-700" onClick={() => handleDeleteTopicResource(selectedTopic.id, resource)}>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-400 active:scale-[0.97]" onClick={() => handleDeleteTopicResource(selectedTopic.id, resource)}>
                                             <Trash2 className="h-3.5 w-3.5" />
                                             Remove
                                           </Button>
                                           <ProgressLink href={`/classroom/live/${classroomId}/resources/${resource.id}`}>
-                                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                                            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs active:scale-[0.97]">
                                               <BookOpen className="h-3.5 w-3.5" />
                                               Read
                                             </Button>
@@ -6186,7 +6201,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                         </div>
                                       </div>
                                       {resource.content && (
-                                        <div className="mt-3 max-h-36 overflow-y-auto rounded-lg bg-muted/30 p-3 text-xs border">
+                                        <div className="mt-3 max-h-36 overflow-y-auto rounded-md border border-border/70 bg-background/40 p-3 text-xs">
                                           <MarkdownRender content={resource.content} allowRawHtml={false} />
                                         </div>
                                       )}
@@ -6212,9 +6227,9 @@ export default function ClassroomLiveClient({ classroomId }) {
 
                           {/* 3. PROBLEMS SUB-TAB */}
                           {activeStudioTab === 'problems' && (
-                            <section className="space-y-4">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-3">
-                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                              <div className="flex flex-col gap-3 border-b border-border/70 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <Award className="h-4 w-4 text-primary" />
                                   Practice Problems ({filteredTopicProblems.length})
                                 </h4>
@@ -6225,13 +6240,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       placeholder="Search problems or tags..."
                                       value={inTopicProblemSearch}
                                       onChange={(e) => setInTopicProblemSearch(e.target.value)}
-                                      className="h-8 w-[220px] pl-8 text-xs"
+                                      className="h-8 w-[220px] rounded-md border-border/80 bg-card/70 pl-8 text-xs"
                                     />
                                   </div>
                                   <Button
                                     type="button"
                                     size="sm"
-                                    className="h-8 gap-1.5 text-xs font-semibold"
+                                    className="h-8 gap-1.5 text-xs font-semibold active:scale-[0.97]"
                                     onClick={() => {
                                       openTopicProblemDialog(selectedTopic);
                                     }}
@@ -6243,13 +6258,13 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
 
                               {filteredTopicProblems.length === 0 ? (
-                                <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                                <div className="mt-4 rounded-md border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
                                   {inTopicProblemSearch ? 'No problems match your search filter.' : 'No practice problems added to this topic unit yet.'}
                                 </div>
                               ) : (
-                                <div className="space-y-3">
+                                <div className="mt-4 space-y-3">
                                   {visibleTopicProblems.map((problem) => (
-                                    <div key={problem.id} className="rounded-xl border bg-card p-4 transition-all hover:shadow-xs">
+                                    <div key={problem.id} className="rounded-md border border-border/70 bg-card/55 p-4 transition-colors hover:border-primary/30">
                                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div className="space-y-2 min-w-0">
                                           <div className="flex flex-wrap items-center gap-2">
@@ -6267,9 +6282,9 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             href={problem.problem_link}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-base font-bold text-primary hover:underline"
+                                            className="inline-flex max-w-full items-center gap-1.5 text-base font-semibold text-primary hover:underline"
                                           >
-                                            <span>{problem.title}</span>
+                                            <span className="truncate">{problem.title}</span>
                                             <ExternalLink className="h-3.5 w-3.5" />
                                           </a>
 
@@ -6293,11 +6308,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             currentUser={currentUser}
                                             onOpenThread={openThreadBubble}
                                           />
-                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => openTopicProblemDialog(selectedTopic, problem)}>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs active:scale-[0.97]" onClick={() => openTopicProblemDialog(selectedTopic, problem)}>
                                             <Pencil className="h-3.5 w-3.5" />
                                             Edit
                                           </Button>
-                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-600 hover:text-red-700" onClick={() => handleDeleteTopicProblem(selectedTopic.id, problem)}>
+                                          <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-400 active:scale-[0.97]" onClick={() => handleDeleteTopicProblem(selectedTopic.id, problem)}>
                                             <Trash2 className="h-3.5 w-3.5" />
                                             Remove
                                           </Button>
@@ -6325,16 +6340,16 @@ export default function ClassroomLiveClient({ classroomId }) {
 
                           {/* 4. PEOPLE (INDIVIDUAL STUDENTS) SUB-TAB */}
                           {activeStudioTab === 'peoples' && (
-                            <section className="space-y-4">
-                              <div className="flex items-center justify-between border-b pb-3">
-                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                              <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-3">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <UserCheck className="h-4 w-4 text-blue-600" />
-                                  Assigned Individual Students ({topicAssignmentsList.filter(a => Boolean(a.student_id)).length})
+                                  Assigned students ({topicPeopleAssignments.length})
                                 </h4>
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="h-8 gap-1.5 text-xs font-semibold"
+                                  className="h-8 gap-1.5 text-xs font-semibold active:scale-[0.97]"
                                   onClick={() => {
                                     setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'student', teamIds: [], studentIds: [] });
                                     setAssignTeamModalOpen(true);
@@ -6345,28 +6360,28 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 </Button>
                               </div>
 
-                              {topicAssignmentsList.filter(a => Boolean(a.student_id)).length === 0 ? (
-                                <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                              {topicPeopleAssignments.length === 0 ? (
+                                <div className="mt-4 rounded-md border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
                                   No individual students assigned to this topic unit yet. Click <strong>Assign Student</strong> to assign directly to students.
                                 </div>
                               ) : (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  {topicAssignmentsList.filter(a => Boolean(a.student_id)).map((a) => (
-                                    <div key={a.id} className="flex items-center justify-between rounded-xl border bg-card p-4 text-xs font-semibold shadow-xs">
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                  {topicPeopleAssignments.map((a) => (
+                                    <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card/55 p-4 text-xs font-semibold">
                                       <div className="flex items-center gap-2.5">
-                                        <div className="rounded-lg bg-blue-500/10 p-2 text-blue-600">
+                                        <div className="rounded-md bg-blue-500/10 p-2 text-blue-500">
                                           <UserCheck className="h-4 w-4" />
                                         </div>
                                         <div>
-                                          <p className="text-sm font-bold text-foreground">{a.student_name || 'Individual Student'}</p>
+                                          <p className="text-sm font-semibold text-foreground">{a.student_name || 'Individual Student'}</p>
                                           <p className="text-[11px] text-muted-foreground font-normal">
                                             {a.student_mist_id ? `ID: ${a.student_mist_id}` : a.student_email || 'Direct Assignment'}
                                           </p>
                                         </div>
                                       </div>
                                       <div className="flex shrink-0 items-center gap-1.5">
-                                        <Badge variant="secondary" className="text-[10px]">Student</Badge>
-                                        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700" onClick={() => handleUnassignTopicTeam(a)}>
+                                        <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[10px]">Student</Badge>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-500 hover:text-red-400 active:scale-[0.97]" onClick={() => handleUnassignTopicTeam(a)}>
                                           <X className="h-3 w-3" />
                                           Unassign
                                         </Button>
@@ -6380,16 +6395,16 @@ export default function ClassroomLiveClient({ classroomId }) {
 
                           {/* 5. GROUPS SUB-TAB */}
                           {(activeStudioTab === 'groups' || activeStudioTab === 'teams') && (
-                            <section className="space-y-4">
-                              <div className="flex items-center justify-between border-b pb-3">
-                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            <section className="rounded-lg border border-border/70 bg-background/35 p-4">
+                              <div className="flex items-center justify-between gap-3 border-b border-border/70 pb-3">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <Users className="h-4 w-4 text-primary" />
-                                  Assigned Groups ({topicAssignmentsList.filter(a => !a.student_id).length})
+                                  Assigned groups ({topicGroupAssignments.length})
                                 </h4>
                                 <Button
                                   type="button"
                                   size="sm"
-                                  className="h-8 gap-1.5 text-xs font-semibold"
+                                  className="h-8 gap-1.5 text-xs font-semibold active:scale-[0.97]"
                                   onClick={() => {
                                     setTopicAssignmentForm({ topicId: selectedTopic.id, targetType: 'group', teamIds: [], studentIds: [] });
                                     setAssignTeamModalOpen(true);
@@ -6400,28 +6415,28 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 </Button>
                               </div>
 
-                              {topicAssignmentsList.filter(a => !a.student_id).length === 0 ? (
-                                <div className="rounded-xl border border-dashed p-8 text-center text-xs text-muted-foreground">
+                              {topicGroupAssignments.length === 0 ? (
+                                <div className="mt-4 rounded-md border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
                                   No groups currently assigned to this topic unit. Click <strong>Assign Group</strong> to assign classroom groups.
                                 </div>
                               ) : (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  {topicAssignmentsList.filter(a => !a.student_id).map((a) => {
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                  {topicGroupAssignments.map((a) => {
                                     const teamObj = teams.find((t) => t.id === a.team_id);
                                     return (
-                                      <div key={a.id} className="flex items-center justify-between rounded-xl border bg-card p-4 text-xs font-semibold shadow-xs">
+                                      <div key={a.id} className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card/55 p-4 text-xs font-semibold">
                                         <div className="flex items-center gap-2.5">
-                                          <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                                          <div className="rounded-md bg-primary/10 p-2 text-primary">
                                             <Users className="h-4 w-4" />
                                           </div>
                                           <div>
-                                            <p className="text-sm font-bold text-foreground">{teamObj ? teamObj.name : (a.team_name || 'Group')}</p>
+                                            <p className="text-sm font-semibold text-foreground">{teamObj ? teamObj.name : (a.team_name || 'Group')}</p>
                                             <p className="text-[11px] text-muted-foreground font-normal">Group Assignment</p>
                                           </div>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">
-                                          <Badge variant="secondary" className="text-[10px]">Group</Badge>
-                                          <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-600 hover:text-red-700" onClick={() => handleUnassignTopicTeam(a)}>
+                                          <Badge variant="secondary" className="h-5 rounded-md px-1.5 text-[10px]">Group</Badge>
+                                          <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-[11px] text-red-500 hover:text-red-400 active:scale-[0.97]" onClick={() => handleUnassignTopicTeam(a)}>
                                             <X className="h-3 w-3" />
                                             Unassign
                                           </Button>
@@ -6436,11 +6451,11 @@ export default function ClassroomLiveClient({ classroomId }) {
 
                           {/* 6. PENDING SUBMISSIONS SUB-TAB */}
                           {activeStudioTab === 'submissions' && (
-                            <section id="topic-studio-submissions" className="space-y-4">
-                              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-                                <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                            <section id="topic-studio-submissions" className="rounded-lg border border-border/70 bg-background/35 p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
+                                <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                                   <ShieldCheck className="h-4 w-4 text-amber-500" />
-                                  Student Topic Submissions Pending Review
+                                  Pending review
                                 </h4>
                                 {pendingSubmissionsList.length > 0 && (
                                   <div className="relative min-w-[220px]">
@@ -6456,11 +6471,11 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
 
                               {filteredPendingSubmissions.length === 0 ? (
-                                <div className="rounded-xl border border-dashed p-10 text-center text-xs text-muted-foreground">
-                                  {submissionSearchQuery ? 'No pending submissions match your search query.' : '🎉 No student submissions pending trainer review right now!'}
+                                <div className="mt-4 rounded-md border border-dashed border-border/70 p-10 text-center text-xs text-muted-foreground">
+                                  {submissionSearchQuery ? 'No pending submissions match your search query.' : 'No student submissions need trainer review right now.'}
                                 </div>
                               ) : (
-                                <div className="space-y-4">
+                                <div className="mt-4 space-y-4">
                                   <ScrollArea className="max-h-[560px] pr-3">
                                     <div className="space-y-4">
                                       {visiblePendingSubmissions.map((item) => (
@@ -6548,11 +6563,9 @@ export default function ClassroomLiveClient({ classroomId }) {
                             </section>
                           )}
                         </div>
-                      </Card>
-                    ) : (
-                      <Card className="rounded-xl border border-dashed p-12 text-center text-muted-foreground">
-                        Select a topic unit from the sidebar to open its workspace.
-                      </Card>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     )}
                   </div>
                 )}
@@ -8671,21 +8684,18 @@ export default function ClassroomLiveClient({ classroomId }) {
             </Tabs>
           )}
 
-          {/* CLASS HISTORY SECTION */}
-          <Card id="history" className="rounded-lg border">
-            <CollapsibleSectionHeader
-              open={sectionOpen.history}
-              onToggle={() => toggleSection('history')}
-              title="Class history"
-              description="Completed sessions, progress, and class materials."
-              Icon={Clock}
-            >
-              <Badge variant="outline" className="w-fit text-xs">
-                {completedClasses.length} completed
-              </Badge>
-            </CollapsibleSectionHeader>
-            {sectionOpen.history && (
-            <CardContent>
+          <Dialog open={historyDetailsOpen} onOpenChange={setHistoryDetailsOpen}>
+            <DialogContent className="max-h-[92vh] w-[96vw] max-w-[1280px] overflow-y-auto sm:max-w-[1280px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  Class history
+                </DialogTitle>
+                <DialogDescription>
+                  Completed sessions, progress, and class materials.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="pt-2">
               {completedClasses.length === 0 ? (
                 <div className="rounded-lg border border-dashed bg-muted/20 p-6 text-center">
                   <p className="text-sm font-semibold">No completed classes yet.</p>
@@ -8905,19 +8915,22 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </div>
                 </div>
               )}
-            </CardContent>
-            )}
-          </Card>
+              </div>
+            </DialogContent>
+          </Dialog>
 
-          {/* CLASSROOM LEVEL RESOURCES SECTION */}
-          <Card id="resources" className="rounded-lg border">
-            <CollapsibleSectionHeader
-              open={sectionOpen.resources}
-              onToggle={() => toggleSection('resources')}
-              title="Resources"
-              description="Study material with focused reader pages."
-              Icon={Library}
-            >
+          <Dialog open={resourcesDetailsOpen} onOpenChange={setResourcesDetailsOpen}>
+            <DialogContent className="max-h-[92vh] w-[96vw] max-w-[1280px] overflow-y-auto sm:max-w-[1280px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
+                  <Library className="h-5 w-5 text-muted-foreground" />
+                  Resources
+                </DialogTitle>
+                <DialogDescription>
+                  Study material with focused reader pages.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-end">
               {isTrainer && (
                 <Dialog>
                   <DialogTrigger asChild>
@@ -9025,9 +9038,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </DialogContent>
                 </Dialog>
               )}
-            </CollapsibleSectionHeader>
-            {sectionOpen.resources && (
-            <CardContent className="space-y-5">
+              </div>
+              <div className="space-y-5 pt-2">
               {activeClass && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -9091,9 +9103,9 @@ export default function ClassroomLiveClient({ classroomId }) {
                   Show more resources
                 </Button>
               )}
-            </CardContent>
-            )}
-          </Card>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <PeopleDetailsDialog

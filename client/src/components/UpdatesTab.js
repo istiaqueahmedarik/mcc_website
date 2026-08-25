@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Bell, Check, CheckCheck, Clock, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Check, CheckCheck, Clock, Inbox, RefreshCw } from "lucide-react";
 import { get_with_token, post_with_token } from "@/lib/action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const UPDATE_PAGE_SIZE = 30;
@@ -63,7 +63,10 @@ function mergeUpdates(currentUpdates, nextUpdates) {
   return merged;
 }
 
-export function UpdatesTab({ classroomId, isTrainer, active = true }) {
+export function UpdatesTab({ classroomId, active = true }) {
+  const scrollViewportRef = useRef(null);
+  const loadMoreSentinelRef = useRef(null);
+  const loadInFlightRef = useRef(false);
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -76,6 +79,8 @@ export function UpdatesTab({ classroomId, isTrainer, active = true }) {
 
   const loadUpdates = useCallback(async ({ append = false } = {}) => {
     if (!classroomId) return;
+    if (loadInFlightRef.current) return;
+    loadInFlightRef.current = true;
     if (append) setLoadingMore(true);
     else setLoading(true);
     setError("");
@@ -103,6 +108,7 @@ export function UpdatesTab({ classroomId, isTrainer, active = true }) {
       setError(err?.message || "Failed to load updates");
       if (!append) setUpdates([]);
     } finally {
+      loadInFlightRef.current = false;
       setLoading(false);
       setLoadingMore(false);
     }
@@ -112,6 +118,28 @@ export function UpdatesTab({ classroomId, isTrainer, active = true }) {
     if (!active || hasLoaded) return;
     loadUpdates();
   }, [active, hasLoaded, loadUpdates]);
+
+  useEffect(() => {
+    if (!active || !page.hasMore || loading || loadingMore || updates.length === 0) return;
+    const viewport = scrollViewportRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!viewport || !sentinel || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        loadUpdates({ append: true });
+      },
+      {
+        root: viewport,
+        rootMargin: "160px 0px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [active, loadUpdates, loading, loadingMore, page.hasMore, updates.length]);
 
   const unreadCount = useMemo(() => updates.filter((update) => !update.is_read).length, [updates]);
 
@@ -162,111 +190,142 @@ export function UpdatesTab({ classroomId, isTrainer, active = true }) {
   }, [classroomId, markLocalRead, updates]);
 
   return (
-    <Card className="flex h-[calc(100vh-14rem)] min-h-[24rem] max-h-[44rem] flex-col rounded-lg border">
-        <CardHeader className="shrink-0 flex flex-col gap-3 border-b sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Bell className="h-4 w-4" />
-              Updates
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              {isTrainer ? "Student activity that needs trainer attention." : "Classroom changes that matter to you."}
-              {lastLoadedAt ? ` Last checked ${lastLoadedAt.toLocaleTimeString()}.` : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" className="gap-2" onClick={markAllRead} disabled={markingAll || unreadCount === 0}>
-              <CheckCheck className="h-4 w-4" />
-              {markingAll ? "Marking..." : "Mark all as read"}
-            </Button>
-            <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => loadUpdates()} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 overflow-hidden p-4">
-          <ScrollArea className="h-full pr-3">
-            <div className="space-y-4">
+    <section className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold leading-6 text-foreground">Updates</h2>
+          <p className="text-sm text-muted-foreground">
+            {lastLoadedAt ? `Last checked ${lastLoadedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Last checked when updates load."}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 gap-2 border-border/80 bg-card/70 px-3 font-semibold text-foreground shadow-sm active:scale-[0.98]"
+            onClick={markAllRead}
+            disabled={markingAll || unreadCount === 0}
+          >
+            <CheckCheck className="h-4 w-4" />
+            {markingAll ? "Marking" : "Mark Read"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 border-border/80 bg-card/70 text-foreground shadow-sm active:scale-[0.98]"
+            onClick={() => loadUpdates()}
+            disabled={loading}
+            aria-label="Refresh updates"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden rounded-lg border border-border/80 bg-card/70 shadow-[0_18px_45px_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.02)]">
+        <CardContent className="min-h-[10.25rem] p-0">
           {error && updates.length > 0 && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+            <div className="mx-4 mt-4 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
           {loading ? (
-            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">Loading updates...</div>
+            <div className="grid min-h-[10.25rem] place-items-center px-6 py-8 text-center text-sm text-muted-foreground">
+              <div className="space-y-3">
+                <RefreshCw className="mx-auto h-5 w-5 animate-spin" />
+                <p>Loading updates...</p>
+              </div>
+            </div>
           ) : error && updates.length === 0 ? (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{error}</span>
+            <div className="grid min-h-[10.25rem] place-items-center px-6 py-8 text-center">
+              <div className="max-w-sm space-y-2 text-sm text-amber-700 dark:text-amber-300">
+                <AlertCircle className="mx-auto h-5 w-5" />
+                <p>{error}</p>
+              </div>
             </div>
           ) : updates.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">No updates right now.</div>
+            <div className="grid min-h-[10.25rem] place-items-center px-6 py-8 text-center">
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <Inbox className="mx-auto h-7 w-7 opacity-60" />
+                <p>No updates right now</p>
+              </div>
+            </div>
           ) : (
-            <div className="space-y-3">
-              {updates.map((update, index) => {
-                const type = update.type || "other";
-                const title = update.title || update.problem_title || update.topic_title || update.message || "Classroom update";
-                const actor = update.student_name || update.sender_name || update.trainer_name || update.actor_name || "";
-                return (
-                  <div key={update.update_key || update.id || `${type}-${index}`} className={`rounded-lg border bg-card p-4 ${update.is_read ? "opacity-75" : "border-foreground/25"}`}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className={updateTone[type] || ""}>
-                            {updateLabels[type] || type}
-                          </Badge>
-                          {!update.is_read && <Badge variant="secondary">Unread</Badge>}
+            <ScrollArea
+              className="min-h-0"
+              viewportRef={scrollViewportRef}
+              style={{ height: "clamp(18rem, calc(100vh - 26rem), 34rem)" }}
+            >
+              <div className="space-y-3 p-4">
+                {updates.map((update, index) => {
+                  const type = update.type || "other";
+                  const title = update.title || update.problem_title || update.topic_title || update.message || "Classroom update";
+                  const actor = update.student_name || update.sender_name || update.trainer_name || update.actor_name || "";
+                  return (
+                    <div
+                      key={update.update_key || update.id || `${type}-${index}`}
+                      className={`rounded-lg border bg-background/60 p-4 transition-colors ${update.is_read ? "border-border/60 opacity-75" : "border-primary/35 bg-primary/[0.03]"}`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={updateTone[type] || ""}>
+                              {updateLabels[type] || type}
+                            </Badge>
+                            {!update.is_read && <Badge variant="secondary">Unread</Badge>}
+                          </div>
+                          <div>
+                            <p className="break-words text-sm font-semibold text-foreground">{title}</p>
+                            {actor && <p className="text-xs text-muted-foreground">{actor}</p>}
+                          </div>
                         </div>
-                        <div>
-                          <p className="break-words text-sm font-semibold text-foreground">{title}</p>
-                          {actor && <p className="text-xs text-muted-foreground">{actor}</p>}
-                        </div>
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3.5 w-3.5" />
+                          {formatTime(getUpdateTimestamp(update))}
+                        </span>
                       </div>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        {formatTime(getUpdateTimestamp(update))}
-                      </span>
+                      {update.message && update.message !== title && (
+                        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{update.message}</p>
+                      )}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-10 gap-1.5 text-xs"
+                          onClick={() => markRead(update)}
+                          disabled={update.is_read || markingKey === update.update_key}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {update.is_read ? "Read" : markingKey === update.update_key ? "Marking..." : "Mark as read"}
+                        </Button>
+                      </div>
                     </div>
-                    {update.message && update.message !== title && (
-                      <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{update.message}</p>
-                    )}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs"
-                        onClick={() => markRead(update)}
-                        disabled={update.is_read || markingKey === update.update_key}
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        {update.is_read ? "Read" : markingKey === update.update_key ? "Marking..." : "Mark as read"}
-                      </Button>
-                    </div>
+                  );
+                })}
+                {page.hasMore && (
+                  <div ref={loadMoreSentinelRef} className="flex min-h-14 justify-center pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10"
+                      onClick={() => loadUpdates({ append: true })}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? "Loading..." : "Load more updates"}
+                    </Button>
                   </div>
-                );
-              })}
-              {page.hasMore && (
-                <div className="flex justify-center pt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => loadUpdates({ append: true })}
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? "Loading..." : "Load more updates"}
-                  </Button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
-            </div>
-          </ScrollArea>
         </CardContent>
-    </Card>
+      </Card>
+    </section>
   );
 }

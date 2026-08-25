@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { MotionConfig, motion } from "framer-motion";
 import { ApiClientError, apiDelete, apiGet, apiPost } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +17,11 @@ import {
   ClipboardList,
   HelpCircle,
   Layers,
+  MoreHorizontal,
   Plus,
   Radio,
   ShieldCheck,
+  UserCircle,
   UserCheck,
   UserPlus,
   Users,
@@ -32,6 +35,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useTour } from "@/hooks/useTour";
 
 const trainerDashboardSteps = [
@@ -261,6 +270,44 @@ export default function TrainerDashboardClient() {
   const totalLive = liveClassrooms.length;
   const quietClassrooms = classrooms.length - totalLive;
   const roleLabel = profile?.admin ? "Admin + Trainer" : "Trainer";
+  const railActions = [
+    ...(profile?.admin
+      ? [
+          {
+            label: "Admin tools",
+            icon: ShieldCheck,
+            href: "/admin/trainers",
+          },
+        ]
+      : []),
+    {
+      label: "New classroom",
+      icon: Plus,
+      onClick: () => setModalOpen(true),
+      id: "trainer-tour-new-classroom-btn",
+    },
+    {
+      label: "Forms",
+      icon: ClipboardList,
+      href: "/trainer/forms",
+      id: "trainer-tour-form-btn",
+    },
+    {
+      label: "All classrooms",
+      icon: BookOpen,
+      href: "/classroom/list",
+      id: "trainer-tour-all-classrooms",
+    },
+    ...(!profile?.admin
+      ? [
+          {
+            label: "Trainer profile",
+            icon: UserCircle,
+            href: "/trainer/profile",
+          },
+        ]
+      : []),
+  ];
 
   const summaryCards = [
     {
@@ -268,28 +315,28 @@ export default function TrainerDashboardClient() {
       value: classrooms.length,
       detail: `${quietClassrooms} ready`,
       icon: BookOpen,
-      tone: "text-sky-600",
+      tone: "text-sky-300",
     },
     {
       label: "Live now",
       value: totalLive,
       detail: totalLive ? "Instructor action" : "No live room",
       icon: Radio,
-      tone: "text-red-600",
+      tone: "text-red-300",
     },
     {
       label: "Role",
       value: roleLabel,
       detail: profile?.admin ? "Trainer controls unlocked" : "Trainer access",
       icon: ShieldCheck,
-      tone: "text-emerald-600",
+      tone: "text-emerald-300",
     },
     {
       label: "Forms",
       value: "Builder",
       detail: "Create and manage",
       icon: ClipboardList,
-      tone: "text-cyan-600",
+      tone: "text-cyan-300",
     },
   ];
 
@@ -302,7 +349,7 @@ export default function TrainerDashboardClient() {
       .join("");
 
   return (
-    <div className="trainer-page relative">
+    <div className="trainer-page trainer-dashboard-page relative">
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <section id="trainer-tour-header" className="space-y-4 pb-2">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
@@ -320,33 +367,12 @@ export default function TrainerDashboardClient() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-              {profile?.admin && (
-                <ProgressLink href="/admin/trainers">
-                  <Button variant="outline" size="sm" className="gap-2 font-semibold">
-                    <ShieldCheck className="h-4 w-4" />
-                    Admin tools
-                  </Button>
-                </ProgressLink>
-              )}
-
-              <ProgressLink href="/trainer/forms" id="trainer-tour-form-btn">
-                <Button variant="outline" size="sm" className="gap-2 font-semibold">
-                  <ClipboardList className="h-4 w-4" />
-                  Forms
-                </Button>
-              </ProgressLink>
-
+            <div className="flex items-start justify-start lg:justify-end">
+              <TrainerActionRail actions={railActions} />
               <CreateClassroomWizard
                 open={modalOpen}
                 onOpenChange={setModalOpen}
                 onCreated={() => queryClient.invalidateQueries({ queryKey: dashboardQueryKeys.classrooms })}
-                trigger={
-                  <Button id="trainer-tour-new-classroom-btn" size="sm" className="gap-2 font-semibold">
-                    <Plus className="h-4 w-4" />
-                    New classroom
-                  </Button>
-                }
               />
             </div>
           </div>
@@ -368,7 +394,7 @@ export default function TrainerDashboardClient() {
               <div className="flex min-w-0 items-center gap-3">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600" />
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">Live sessions</h2>
+                  <h2 className="text-sm font-semibold text-red-300">Live sessions</h2>
                   <p className="truncate text-xs text-muted-foreground">
                     {totalLive} active room{totalLive === 1 ? "" : "s"} ready to join
                   </p>
@@ -684,12 +710,143 @@ function DashboardMetric({ item, index }) {
   );
 }
 
+function TrainerActionRail({ actions }) {
+  const [open, setOpen] = useState(false);
+  const midpoint = Math.ceil(actions.length / 2);
+  const leftActions = actions.slice(0, midpoint);
+  const rightActions = actions.slice(midpoint);
+  const sideCount = Math.max(leftActions.length, rightActions.length);
+  const openWidth = sideCount * 108 + 72;
+  const shellScale = 64 / openWidth;
+
+  const closeOnBlur = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setOpen(false);
+    }
+  };
+
+  return (
+    <TooltipProvider delayDuration={180}>
+      <MotionConfig reducedMotion="user">
+        <motion.nav
+          aria-label="Trainer dashboard options"
+          className="trainer-action-rail"
+          initial={false}
+          style={{ "--trainer-rail-width": `${openWidth}px` }}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={closeOnBlur}
+        >
+          <motion.span
+            className="trainer-action-rail-shell"
+            aria-hidden="true"
+            initial={false}
+            animate={{
+              opacity: open ? 1 : 0,
+              transform: open
+                ? "translate3d(-50%, -50%, 0) scaleX(1)"
+                : `translate3d(-50%, -50%, 0) scaleX(${shellScale})`,
+            }}
+            transition={{ type: "spring", stiffness: 420, damping: 34 }}
+          />
+          <span
+            className="trainer-action-rail-hitbox"
+            aria-hidden="true"
+            style={{ pointerEvents: open ? "auto" : "none" }}
+          />
+          <button
+            type="button"
+            className="trainer-rail-more"
+            aria-label="Reveal dashboard options"
+            aria-expanded={open}
+            onClick={() => setOpen(true)}
+          >
+            <MoreHorizontal className="h-5 w-5" />
+          </button>
+          {leftActions.map((action, index) => (
+            <RailAction
+              key={action.label}
+              action={action}
+              open={open}
+              side="left"
+              distance={leftActions.length - index}
+            />
+          ))}
+          {rightActions.map((action, index) => (
+            <RailAction
+              key={action.label}
+              action={action}
+              open={open}
+              side="right"
+              distance={index + 1}
+            />
+          ))}
+        </motion.nav>
+      </MotionConfig>
+    </TooltipProvider>
+  );
+}
+
+function RailAction({ action, open, side, distance }) {
+  const Icon = action.icon;
+  const direction = side === "left" ? -1 : 1;
+  const x = direction * distance * 52;
+  const y = distance === 1 ? 0 : distance === 2 ? -4 : -9;
+  const transformOpen = `translate3d(${x}px, calc(-50% + ${y}px), 0) scale(1)`;
+  const transformClosed = "translate3d(0px, -50%, 0) scale(0.95)";
+  const commonProps = {
+    id: action.id,
+    className: "trainer-rail-button",
+    "aria-label": action.label,
+    tabIndex: open ? 0 : -1,
+  };
+
+  const control = action.href ? (
+    <ProgressLink href={action.href} {...commonProps}>
+      <Icon className="h-4 w-4" />
+    </ProgressLink>
+  ) : (
+    <button
+      type="button"
+      {...commonProps}
+      onClick={action.onClick}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+
+  return (
+    <motion.div
+      className="trainer-rail-action"
+      aria-hidden={!open}
+      initial={false}
+      animate={{
+        opacity: open ? 1 : 0,
+        transform: open ? transformOpen : transformClosed,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 520,
+        damping: 36,
+        delay: open ? distance * 0.025 : 0,
+      }}
+      style={{ pointerEvents: open ? "auto" : "none" }}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>{control}</TooltipTrigger>
+        <TooltipContent side="bottom">{action.label}</TooltipContent>
+      </Tooltip>
+    </motion.div>
+  );
+}
+
 function StatusPill({ icon: Icon, label, live = false, tone = "muted" }) {
   const toneClass =
     live
       ? "trainer-status-danger"
       : tone === "sky"
-        ? "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300"
+        ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
         : tone === "amber"
           ? "trainer-status-warning"
           : "";
