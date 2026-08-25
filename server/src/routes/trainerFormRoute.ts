@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   createTrainerForm,
   getPublicTrainerForm,
@@ -21,10 +22,7 @@ route.post("/public/:slug/submit", submitPublicTrainerForm);
 
 route.use(
   "/manage/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 route.get("/manage/user-fields", listUserFormFields);

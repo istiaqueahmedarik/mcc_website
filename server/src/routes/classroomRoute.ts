@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { jwt } from 'hono/jwt';
+import { jwtAuthOptions } from '../utils/jwtAuthOptions';
 import {
   addClassroomTopicProblem,
   addClassroomTopicResource,
@@ -189,10 +190,7 @@ route.get('/:id/ide/ws', upgradeWebSocket(async (c) => {
 // Apply JWT middleware to secure all classroom endpoints
 route.use(
   '/*',
-  jwt({
-    secret: process.env.SECRET || '',
-    alg: 'HS256',
-  })
+  jwt(jwtAuthOptions())
 );
 route.use('/*', requireDiscordLink);
 

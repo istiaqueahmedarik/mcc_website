@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "../utils/supabase/server";
+import { clearAuthCookies, setAuthCookies } from "./auth-cookies";
 
 const serverBase =
   (process.env.SERVER_URL || process.env.NEXT_PUBLIC_SERVER_URL || "").replace(
@@ -439,14 +440,12 @@ export async function login(prevState, formData) {
       success: false,
       message: response.error,
     };
-  const cookieStore = await cookies();
-  cookieStore.set("token", response.token);
-  cookieStore.set("admin", response.admin);
+  await setAuthCookies(response.token, response.admin);
   redirect("/");
 }
 
 export async function logout() {
-  (await cookies()).delete("token");
+  await clearAuthCookies();
   redirect("/");
 }
 

@@ -1,4 +1,5 @@
 import { sign as JwtSign } from "hono/jwt";
+import { deleteCookie } from "hono/cookie";
 import sql from "../db";
 import { sendEmail } from "../sendEmail";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
@@ -127,6 +128,18 @@ export const login = async (c: any) => {
 
     return c.json({ error: "Login failed. Please try again." }, 500);
   }
+};
+
+export const logout = async (c: any) => {
+  const cookieOptions = { path: "/" };
+  const secureCookieOptions = { ...cookieOptions, secure: true };
+
+  deleteCookie(c, "token", cookieOptions);
+  deleteCookie(c, "token", secureCookieOptions);
+  deleteCookie(c, "admin", cookieOptions);
+  deleteCookie(c, "admin", secureCookieOptions);
+
+  return c.json({ success: true });
 };
 
 export const getProfile = async (c: any) => {

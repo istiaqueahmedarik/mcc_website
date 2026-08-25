@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   addBatchMembers,
   deleteBatch,
@@ -17,10 +18,7 @@ const route = new Hono();
 
 route.use(
   "/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 route.post("/insert", insertBatch);

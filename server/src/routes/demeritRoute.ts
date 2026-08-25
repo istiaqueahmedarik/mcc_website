@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   createDemerit,
   deleteDemerit,
@@ -13,10 +14,7 @@ const demeritRoute = new Hono();
 
 demeritRoute.use(
   "/admin/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 // Public routes (no JWT required)

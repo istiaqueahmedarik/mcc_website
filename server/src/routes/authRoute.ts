@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   acceptUser,
   getProfile,
@@ -7,6 +8,7 @@ import {
   getPublicProfileByVjudge,
   listPublicVjudgeIds,
   login,
+  logout,
   pendingUser,
   rejectUser,
   resetPassword,
@@ -25,10 +27,7 @@ const route = new Hono();
 
 route.use(
   "/user/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 // route.use('/user/*', async (c, next) => {
@@ -60,21 +59,16 @@ route.use(
 
 route.post("/signup", signup);
 route.post("/login", login);
+route.post("/logout", logout);
 route.post(
   "/discord/authorize",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
   beginDiscordAuthorizeHandler,
 );
 route.get("/discord/callback", handleDiscordCallbackHandler);
 route.get(
   "/discord/status",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
   getDiscordStatusHandler,
 );
 
