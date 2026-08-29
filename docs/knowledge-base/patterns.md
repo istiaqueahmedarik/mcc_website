@@ -794,3 +794,52 @@ Building private chat/activity delivery where the UI must feel instant but Broad
 
 Do not overgeneralize:
 Do not put secrets, private Storage paths, or fields outside the recipient's normal API projection into the Broadcast payload; use an authorized API for those values.
+
+## 2026-08-29 - Contest Report Scoring Pipeline
+
+Source:
+- `server/src/services/contestFormula.ts`
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+
+Pattern:
+Keep contest report scoring server-owned. Store complete scoring configs with formula, precision, sort ladder, exclusions, drop-worst, and merge groups; preview and saved reports must run through the same `buildScoredContestReport` path. Persist `scoring_config_version` on generated snapshots and mark existing snapshots stale when a config changes. UI may edit configs and preview traces, but it must not recalculate authoritative ranks independently.
+
+Applies when:
+Adding formula variables, merge/composite result units, rank tie-breakers, public report publication, or classroom contest report generation.
+
+Do not overgeneralize:
+Renderer-only formatting, search, export, highlighting, and profile enrichment can stay in the client. Score-changing filters belong in the persisted scoring config, not in report display components.
+
+## 2026-08-29 - Composite Formula Display Outside Editor
+
+Source:
+- `client/src/components/ContestMergeOverview.jsx`
+- `client/src/components/ContestScoringDialog.jsx`
+- `server/src/services/contestScoringService.ts`
+
+Pattern:
+Keep merge configuration editing in `ContestScoringDialog`, but show saved composite group membership and formulas on the surrounding manager page with a read-only overview. Use the composite's result key for identity/display, while formulas use sheet-style row metrics such as `sum(raw_score)`, `raw_score(0)`, and `sum(demerits where title contains "TFC")`.
+Make the overview collapsible and let the group cards auto-fit available width, so a room with many composites stays scannable and a room with one composite does not leave a large empty column.
+
+Applies when:
+Adding merge-group scan views, formula editors, scoring previews, or classroom/global contest management UI.
+
+Do not overgeneralize:
+Do not duplicate the scoring engine in the overview or report renderers. The overview should explain saved state only; score previews and rank changes must come from the server scoring endpoint.
+
+## 2026-08-29 - Sheet Formula Snippets and Explainers
+
+Source:
+- `client/src/components/ContestScoringDialog.jsx`
+- `client/src/components/ContestFormulaExplainer.jsx`
+- `server/src/services/contestFormula.ts`
+
+Pattern:
+Formula editors should provide pasteable sheet-style snippets, metric chips, filter-field chips, and a compact visual explainer for aggregate behavior. Use Framer Motion only for explanatory client-side motion and keep authoritative scoring in the server evaluator.
+
+Applies when:
+Changing scoring formula UX, formula examples, formula preview affordances, or manager-facing scoring dialogs.
+
+Do not overgeneralize:
+Do not make the explainer calculate live ranks, and do not make browser-side formula preview authoritative.

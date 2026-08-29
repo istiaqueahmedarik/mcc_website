@@ -708,3 +708,50 @@ Changing student-thread message writes, Broadcast envelopes, subscription lifecy
 
 Do not overgeneralize:
 Direct canonical Broadcast is appropriate only for fields already authorized for every topic recipient; sensitive or separately authorized data must stay behind the API.
+
+## 2026-08-29 - Contest Report Renderers Must Not Change Scores
+
+Source:
+- `client/src/components/ReportTable.js`
+- `client/src/components/LiveReportTable.js`
+- `server/src/services/contestFormula.ts`
+
+Rule:
+Contest report renderers may search, export, enrich profile display, and show breakdown dialogs, but must not apply score-changing filters or rerank V2 scored snapshots. Formula execution must stay in the safe parser/interpreter; do not use `eval`, `Function`, property access, dynamic imports, or browser-side formula execution for authoritative contest scores.
+
+Applies when:
+Changing `ReportTable`, `LiveReportTable`, scoring config UI, formula variables, public contest publication, or classroom contest report displays.
+
+Do not overgeneralize:
+Legacy snapshots can keep legacy display fallbacks until they are regenerated. New score-changing behavior belongs in persisted scoring configs and server previews.
+
+## 2026-08-29 - Composite Formula Variables Need Clear Scope
+
+Source:
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+- `client/src/components/ContestMergeOverview.jsx`
+
+Rule:
+Composite formulas must be evaluated only inside the server scoring service and only against that composite's member contest rows. Formula UI should use row metrics and filters, not generated per-contest variables. The composite key is a result key for display, exclusion, sorting metadata, and report column identity.
+
+Applies when:
+Changing composite scoring, formula variable lists, merge-group UI, preview traces, or generated scored snapshots.
+
+Do not overgeneralize:
+Do not expose hidden member contest variables as final result units after they are merged, and do not let client displays recalculate composite scores.
+
+## 2026-08-29 - Sheet Formula Evaluation Must Stay Restricted
+
+Source:
+- `server/src/services/contestFormula.ts`
+- `server/src/services/contestScoringService.ts`
+
+Rule:
+Sheet-style scoring formulas may support string filters and aggregate functions, but must still use the restricted parser/interpreter. Bare metric names like `demerits` are invalid; indexed metrics such as `demerits(0)` and aggregate selectors such as `sum(demerits where index == 0)` are valid. Do not allow property access, arbitrary functions, regex execution, dynamic imports, `eval`, or `Function`.
+
+Applies when:
+Changing the formula grammar, metric filter fields, scoring previews, saved formulas, or formula editor snippets.
+
+Do not overgeneralize:
+Formula filters are row selectors for contest/result-unit metrics, not a general scripting language.

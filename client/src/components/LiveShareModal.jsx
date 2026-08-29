@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Clock, Share2, Users, Info } from "lucide-react"
+import { Share2, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -12,27 +12,40 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import Image from "next/image"
 
-import { get, get_with_token, post, post_with_token } from "@/lib/action"
+import { post, post_with_token } from "@/lib/action"
 import Link from "next/link"
 
-export default function LiveShareModal({ reportData, reportId }) {
-  console.log(typeof reportData)
+export default function LiveShareModal({ reportData, reportId, publishEndpoint = null }) {
     const [isOpen, setIsOpen] = useState(false)
     const [isSharing, setIsSharing] = useState(false)
     const [existingReport, setExistingReport] = useState(null)
     const [apiLoading, setApiLoading] = useState(false)
     const [lastUpdated, setLastUpdated] = useState("")
     const bodyString = JSON.stringify(reportData)
+    const publishFromServer = async () => {
+      if (!publishEndpoint) return null
+      const response = await fetch(publishEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to publish report")
+      }
+      return data
+    }
     const handleStart = async () => {
       setApiLoading(true)
       try {
-        const result = await post_with_token('public-contest-report/admin/insert', { Shared_contest_id: reportId, JSON_string: bodyString })
-        setExistingReport({ report_id: result.report_id, Shared_contest_id: reportId, JSON_string: bodyString })
+        const result = publishEndpoint
+          ? await publishFromServer()
+          : await post_with_token('public-contest-report/admin/insert', { Shared_contest_id: reportId, JSON_string: bodyString })
+        setExistingReport(result?.report || { report_id: result?.report_id, Shared_contest_id: reportId, JSON_string: bodyString })
         setIsSharing(true)
         setLastUpdated(new Date().toLocaleString())
       } catch (e) {
@@ -59,8 +72,10 @@ export default function LiveShareModal({ reportData, reportId }) {
       if (!existingReport) return
       setApiLoading(true)
       try {
-          await post_with_token('public-contest-report/admin/update', {  Shared_contest_id: reportId, JSON_string: bodyString })
-        setExistingReport(prev => ({ ...prev, JSON_string: bodyString }))
+        const result = publishEndpoint
+          ? await publishFromServer()
+          : await post_with_token('public-contest-report/admin/update', {  Shared_contest_id: reportId, JSON_string: bodyString })
+        setExistingReport(prev => ({ ...prev, ...(result?.report || {}), JSON_string: publishEndpoint ? prev?.JSON_string : bodyString }))
         setLastUpdated(new Date().toLocaleString())
       } catch (e) {
         console.error(e)
@@ -74,9 +89,8 @@ export default function LiveShareModal({ reportData, reportId }) {
             setApiLoading(true)
             post('public-contest-report/get', { report_id : reportId })
                 .then(data => {
-                console.log(data)
                 const found = data?.success && data.result.length>0
-                  if (found) { setExistingReport(found); setIsSharing(true); setLastUpdated(new Date(data.result[0].Updated_at).toLocaleDateString()) }
+                  if (found) { setExistingReport(data.result[0]); setIsSharing(true); setLastUpdated(new Date(data.result[0].Updated_at).toLocaleDateString()) }
                 else { setExistingReport(null); setIsSharing(false) }
             })
             .catch(console.error)

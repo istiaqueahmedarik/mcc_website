@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   getContestRoomContestById,
+  getContestRoomScoring,
   insertContestRoomContest,
   updateContestRoomContestWithWeight,
 } from "@/actions/contest_details";
@@ -20,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import DeleteRoomButton from "@/components/DeleteRoomButton";
 import DeleteContestButton from "@/components/DeleteContestButton";
+import ContestScoringDialog from "@/components/ContestScoringDialog";
+import ContestMergeOverview from "@/components/ContestMergeOverview";
 
 async function handleAddContest(formData, paramsBox) {
   "use server";
@@ -71,6 +74,8 @@ async function page({ params, searchParams }) {
   const res = await getContestRoomContestById(id);
   const roomMeta = res?.room || null;
   const roomType = String(roomMeta?.contest_type || "TFC").toUpperCase();
+  const scoringRes = await getContestRoomScoring(id);
+  const scoringConfig = scoringRes?.config || null;
   /**
        * {
     result: [
@@ -135,8 +140,8 @@ async function page({ params, searchParams }) {
         </div>
       )}
 
-      <div className="mb-6 flex items-center justify-between">
-        <Button variant="secondary" size="sm" className="rounded-lg w-full">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <Button variant="secondary" size="sm" className="rounded-lg sm:flex-1">
           <Link
             href={`/contests_report/details/${paramsBox.id}/generate_report`}
             className="flex items-center"
@@ -145,7 +150,18 @@ async function page({ params, searchParams }) {
             Generate Full Report
           </Link>
         </Button>
+        <ContestScoringDialog
+          apiBasePath={`contest-room/${paramsBox.id}`}
+          contests={res.result || []}
+          roomName={roomMeta?.["Room Name"] || "Contest room"}
+        />
       </div>
+
+      <ContestMergeOverview
+        className="mb-6"
+        contests={res.result || []}
+        groups={scoringConfig?.groups || []}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {res.result && res.result.length > 0 ? (

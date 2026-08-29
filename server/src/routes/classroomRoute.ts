@@ -115,11 +115,13 @@ import {
   generateClassroomContestReport,
   getClassroomCodeforcesCredentials,
   getClassroomContestReport,
+  getClassroomContestScoring,
   listClassroomContestDemerits,
   listClassroomContestHandleOverrides,
   listClassroomContestSolveOverrides,
   listClassroomContestUnmatchedRows,
   listClassroomContestRooms,
+  previewClassroomContestScoring,
   saveClassroomCodeforcesCredentials,
   shareClassroomContestReport,
   updateClassroomContestDemerit,
@@ -127,6 +129,7 @@ import {
   updateClassroomContestItem,
   updateClassroomContestItemOrder,
   updateClassroomContestRoom,
+  updateClassroomContestScoring,
   updateClassroomContestSolveOverride,
 } from '../controllers/classroomContestController';
 import { requireDiscordLink } from '../middleware/discordLinkMiddleware';
@@ -309,6 +312,9 @@ route.patch('/:id/contests/rooms/:roomId/items/:contestItemId', updateClassroomC
 route.delete('/:id/contests/rooms/:roomId/items', deleteClassroomContestItem);
 route.delete('/:id/contests/rooms/:roomId/items/:contestItemId', deleteClassroomContestItem);
 route.post('/:id/contests/rooms/:roomId/items/:contestItemId/fetch', fetchClassroomContestItem);
+route.get('/:id/contests/rooms/:roomId/scoring', getClassroomContestScoring);
+route.post('/:id/contests/rooms/:roomId/scoring/preview', previewClassroomContestScoring);
+route.put('/:id/contests/rooms/:roomId/scoring', updateClassroomContestScoring);
 route.post('/:id/contests/rooms/:roomId/report', generateClassroomContestReport);
 route.get('/:id/contests/rooms/:roomId/report', getClassroomContestReport);
 route.post('/:id/contests/rooms/:roomId/share', shareClassroomContestReport);

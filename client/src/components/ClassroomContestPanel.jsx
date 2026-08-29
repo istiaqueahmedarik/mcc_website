@@ -7,6 +7,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   BarChart3,
+  Calculator,
   Check,
   Eye,
   EyeOff,
@@ -30,6 +31,8 @@ import {
 import { toast } from "sonner";
 
 import ReportTable from "@/components/ReportTable";
+import ContestScoringDialog from "@/components/ContestScoringDialog";
+import ContestMergeOverview from "@/components/ContestMergeOverview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -492,6 +495,8 @@ export function ClassroomContestPanel({
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [report, setReport] = useState(null);
+  const [scoringConfig, setScoringConfig] = useState(null);
+  const [scoringLoading, setScoringLoading] = useState(false);
   const [vjSession, setVjSession] = useState({ connected: false, username: "" });
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
@@ -672,6 +677,25 @@ export function ClassroomContestPanel({
     }
   }, [classroomId, selectedRoomId]);
 
+  const refreshScoring = useCallback(async () => {
+    if (!selectedRoomId || !isTrainer) {
+      setScoringConfig(null);
+      return;
+    }
+    setScoringLoading(true);
+    try {
+      const res = await apiGet(contestApi(classroomId, `rooms/${selectedRoomId}/scoring`));
+      setScoringConfig(res?.config || null);
+    } catch (error) {
+      setScoringConfig(null);
+      if (error?.status !== 404 && error?.status !== 403) {
+        toast.error(error?.message || "Failed to load scoring config");
+      }
+    } finally {
+      setScoringLoading(false);
+    }
+  }, [classroomId, isTrainer, selectedRoomId]);
+
   useEffect(() => {
     refreshWorkspace();
   }, [refreshWorkspace]);
@@ -679,6 +703,10 @@ export function ClassroomContestPanel({
   useEffect(() => {
     refreshReport();
   }, [refreshReport]);
+
+  useEffect(() => {
+    refreshScoring();
+  }, [refreshScoring]);
 
   const openCreateRoom = () => {
     setEditingRoomId("");
@@ -802,6 +830,7 @@ export function ClassroomContestPanel({
       await apiRequest(contestApi(classroomId, `rooms/${selectedRoom.id}/items/${contest.id}`), { method: "DELETE" });
       toast.success("Contest removed");
       await refreshWorkspace();
+      await refreshScoring();
       await refreshReport();
     } catch (error) {
       toast.error(error?.message || "Failed to remove contest");
@@ -838,6 +867,7 @@ export function ClassroomContestPanel({
       toast.success("Contest serial saved");
       setOrderDialogOpen(false);
       await refreshWorkspace();
+      await refreshScoring();
     } catch (error) {
       toast.error(error?.message || "Failed to save contest serial");
     } finally {
@@ -1366,7 +1396,7 @@ export function ClassroomContestPanel({
                       liveReportId={`classroom_${classroomId}_${selectedRoom?.id || selectedRoomId}`}
                       name={selectedRoom?.name || "Classroom contests"}
                       showLiveShare={false}
-                      solveOnly
+                      solveOnly={!reportData?.scoring}
                       contestOrder={selectedRoomContestOrder}
                       highlightStudentId={currentStudent?.id || ""}
                       highlightVjudgeId={currentStudentVjudgeId}
@@ -1525,6 +1555,27 @@ export function ClassroomContestPanel({
                         <ArrowUpDown className="h-4 w-4" />
                         Sort
                       </Button>
+                      <ContestScoringDialog
+                        apiBasePath={contestApi(classroomId, `rooms/${selectedRoom.id}`)}
+                        contests={selectedRoom.contests || []}
+                        roomName={selectedRoom.name}
+                        onSaved={async () => {
+                          await refreshWorkspace();
+                          await refreshScoring();
+                          await refreshReport();
+                        }}
+                        trigger={
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5"
+                            disabled={selectedRoom.contests.length === 0}
+                          >
+                            <Calculator className="h-4 w-4" />
+                            Scoring & Merge
+                          </Button>
+                        }
+                      />
                       <Button
                         size="sm"
                         className="gap-1.5"
@@ -1557,6 +1608,12 @@ export function ClassroomContestPanel({
                       </Button>
                     </div>
                   )}
+
+                  <ContestMergeOverview
+                    contests={selectedRoom.contests || []}
+                    groups={scoringConfig?.groups || []}
+                    title={scoringLoading ? "Loading merge groups" : "Merge groups"}
+                  />
 
                   <div className="overflow-hidden rounded-lg border">
                     <Table>
@@ -1652,7 +1709,7 @@ export function ClassroomContestPanel({
                 liveReportId={`classroom_${classroomId}_${selectedRoom.id}`}
                 name={selectedRoom.name}
                 showLiveShare={false}
-                solveOnly
+                solveOnly={!reportData?.scoring}
                 contestOrder={selectedRoomContestOrder}
                 shareControl={
                   <ClassroomShareControl

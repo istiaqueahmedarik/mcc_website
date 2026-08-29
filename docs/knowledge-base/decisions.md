@@ -850,3 +850,62 @@ Changing classroom thread Realtime, Supabase Auth integration, message persisten
 
 Do not overgeneralize:
 This supersedes ADR-0008's opaque-invalidation/refetch transport decision, but not its one-thread-per-active-student product model or server-owned attachment/access policy.
+
+## 2026-08-29 - contest-report-scoring-merge-v1 - Server-Owned Contest Ranking
+
+Source:
+- `docs/sql/contest-report-scoring-v1-20260828.sql`
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Decision:
+1. Global/admin and classroom/trainer contest rooms use the same formula-safe scoring service for ranked snapshots.
+2. Composite result units are configured as named merge groups with scoped formula keys; a contest item may belong to at most one merge group.
+3. Scoring config mutations are complete replacements and use optimistic `expectedVersion` checks; stale saves return 409.
+4. Generated reports store the scoring config version and are marked stale after config changes.
+5. Public global contest report publication is server-owned through `POST /contest-room/:roomId/publish`; browser-supplied ranked JSON through the legacy public-report mutation routes is rejected.
+
+Applies when:
+Changing contest scoring, merge groups, global public report sharing, classroom report sharing, or downstream team collection score lookup.
+
+Do not overgeneralize:
+Public report read routes still serve published snapshots. Classroom reports remain private until the classroom manager shares them with students.
+
+## 2026-08-29 - contest-report-composite-formulas-v1 - Per-Composite Formula Scope
+
+Source:
+- `docs/sql/contest-report-composite-formulas-v1-20260829.sql`
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+
+Decision:
+1. Each composite merge group can define one formula over its member contest rows.
+2. Composite formulas default to `sum(raw_score)`, so existing composites remain simple sums under the sheet-style engine.
+3. A composite's key is a result key for the merged output column; formulas use row metrics such as `sum(raw_score)`, `raw_score(0)`, and `sum(demerits where title contains "TFC")` instead of generated per-contest variable prefixes.
+4. Saved merge groups are shown outside the scoring dialog on manager-facing room pages for quick scanning.
+
+Applies when:
+Changing composite formulas, result-key naming, merge-group displays, scoring previews, or report generation.
+
+Do not overgeneralize:
+This does not allow client-side authoritative score calculation. Managers still preview, save, and regenerate reports through server-owned scoring endpoints.
+
+## 2026-08-29 - contest-report-sheet-formulas-v1 - Row-Based Formula Syntax
+
+Source:
+- `server/src/services/contestFormula.ts`
+- `server/src/services/contestScoringService.ts`
+- `docs/sql/contest-report-sheet-formulas-v1-20260829.sql`
+- `client/src/components/ContestFormulaExplainer.jsx`
+
+Decision:
+1. Scoring formulas use sheet-style row metrics instead of generated contest-key variables.
+2. Bare metric names such as `demerits` are invalid by themselves; use `demerits(0)` for an indexed row or `sum(demerits)` for an aggregate.
+3. `where` filters are available in both composite formulas and final room formulas, with fields such as `index`, `title`, `provider`, `key`, `weight`, `solved`, `raw_score`, `demerits`, and `attended`.
+4. Known saved defaults are migrated to `sum(raw_score)`, `sum(solved)`, or `sum(raw_score) - stddev(raw_score)`. TSC component variables remain available because they are cross-room scalar components, not contest-row metrics.
+
+Applies when:
+Changing formula parser syntax, scoring defaults, formula editor snippets, composite formulas, final room formulas, or scoring migrations.
+
+Do not overgeneralize:
+Do not reintroduce per-contest formula variables in the editor. Keep formula execution server-side through the restricted AST evaluator.

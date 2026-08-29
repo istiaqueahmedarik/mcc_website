@@ -1,6 +1,6 @@
 "use server";
 
-import { get, get_with_token, post_with_token } from "@/lib/action";
+import { get, get_uncached_with_token, get_with_token, post_with_token } from "@/lib/action";
 import { cookies } from "next/headers";
 
 const API_URL = process.env.NEXT_PUBLIC_SERVER_URL || process.env.SERVER_URL;
@@ -301,6 +301,10 @@ export async function getContestRoomContestById(contestRoomContestId) {
   return ret;
 }
 
+export async function getContestRoomScoring(roomId) {
+  return await get_uncached_with_token(`contest-room/${encodeURIComponent(roomId)}/scoring`);
+}
+
 export async function updateContestRoomContest(
   contestRoomContestId,
   roomId,
@@ -331,6 +335,47 @@ export async function updateContestRoomContestWithWeight(
     contest_id: contestId,
     weight: weight,
   });
+}
+
+async function contestRoomBackendPost(roomId, path, body = {}) {
+  const token = (await cookies()).get("token")?.value;
+  const vjSession = (await cookies()).get("vj_session")?.value;
+  if (!token) {
+    return { success: false, error: "Unauthorized" };
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+  if (vjSession) {
+    headers["X-VJudge-Session"] = vjSession;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/contest-room/${encodeURIComponent(roomId)}/${path.replace(/^\/+/, "")}`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body || {}),
+        cache: "no-store",
+      }
+    );
+    const data = await response.json().catch(() => ({}));
+    return { statusCode: response.status, ...data };
+  } catch (error) {
+    console.error("Error calling contest-room backend:", error);
+    return { success: false, error: "Failed to reach contest-room service" };
+  }
+}
+
+export async function generateContestRoomReport(roomId, options = {}) {
+  return contestRoomBackendPost(roomId, "report", options);
+}
+
+export async function publishContestRoomReport(roomId) {
+  return contestRoomBackendPost(roomId, "publish", {});
 }
 
 // Demerit management functions

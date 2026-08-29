@@ -71,6 +71,7 @@ function ReportTable({
   liveReportId,
   name,
   shareControl = null,
+  publishEndpoint = null,
   showLiveShare = true,
   solveOnly = false,
   contestOrder = [],
@@ -79,6 +80,14 @@ function ReportTable({
   highlightGroupIds = [],
 }) {
   const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
+  const isScoredSnapshot = Boolean(merged?.snapshotVersion === 2 || merged?.scoring)
+  const scorePrecision = Number.isFinite(Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision))
+    ? Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision)
+    : 2
+  const formatScore = (value, precision = scorePrecision) => {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric.toFixed(precision) : "0"
+  }
   const clampPercentage = (value, fallback = 0) => {
     const numeric = Number(value)
     if (!Number.isFinite(numeric)) return fallback
@@ -146,6 +155,18 @@ function ReportTable({
   }
 
   const rankedUsers = useMemo(() => {
+    if (isScoredSnapshot) {
+      return (Array.isArray(merged.users) ? merged.users : []).map((u) => ({
+        ...u,
+        totalContestsAttended: Number(u.totalContestsAttended ?? u.attended ?? 0),
+        worstContests: [],
+        optedOutContests: [],
+        effectiveTotalSolved: Number(u.effectiveTotalSolved ?? u.effectiveSolved ?? u.score ?? 0),
+        effectiveTotalPenalty: Number(u.effectiveTotalPenalty ?? u.effectivePenalty ?? 0),
+        effectiveTotalScore: Number(u.effectiveTotalScore ?? u.score ?? 0),
+      }))
+    }
+
     if (solveOnly) {
       const processed = merged.users.map((u) => {
         const activeContestIds = orderedContestIds.filter((cid) => !optOutContests[cid])
@@ -327,6 +348,7 @@ function ReportTable({
     tscPercentage,
     solveOnly,
     orderedContestIds,
+    isScoredSnapshot,
   ])
 
   const users = useMemo(() => {
@@ -352,6 +374,8 @@ function ReportTable({
 
       return true
     })
+
+    if (isScoredSnapshot) return filtered
 
     filtered.sort((a, b) => {
       if (solveOnly) {
@@ -408,6 +432,7 @@ function ReportTable({
     solveOnly,
     orderedContestIds,
     optOutContests,
+    isScoredSnapshot,
   ])
 
   const profileIds = useMemo(() => {
@@ -636,6 +661,53 @@ function ReportTable({
   }
 
   const exportToCSV = () => {
+    if (isScoredSnapshot) {
+      const headers = [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Score",
+        "Penalty",
+        "Contests",
+        "Demerits",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+
+      const rows = users.map((u, idx) => {
+        const base = [
+          u.rank || idx + 1,
+          u.username,
+          u.realName,
+          formatScore(u.displayScore ?? u.score),
+          formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty),
+          u.totalContestsAttended,
+          u.totalDemeritPoints || 0,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+        })
+        return [...base, ...contestData]
+      })
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const filename = `report_${new Date().toISOString().slice(0, 10)}.csv`
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", filename)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      return
+    }
+
     if (solveOnly) {
       const headers = [
         "Rank",
@@ -743,7 +815,18 @@ function ReportTable({
     // Dynamic import to reduce bundle size
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
 
-    const headers = solveOnly
+    const headers = isScoredSnapshot
+      ? [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Score",
+        "Penalty",
+        "Contests",
+        "Demerits",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+      : solveOnly
       ? [
         "Rank",
         "Name",
@@ -762,7 +845,24 @@ function ReportTable({
         "Contests Attended",
         ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
       ]
-    const rows = (solveOnly ? users : rankedUsers).map((u, idx) => {
+    const rows = (solveOnly || isScoredSnapshot ? users : rankedUsers).map((u, idx) => {
+      if (isScoredSnapshot) {
+        const base = [
+          u.rank || idx + 1,
+          u.username,
+          u.realName,
+          formatScore(u.displayScore ?? u.score),
+          formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty),
+          u.totalContestsAttended,
+          u.totalDemeritPoints || 0,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+        })
+        return [...base, ...contestData]
+      }
+
       if (solveOnly) {
         const base = [
           idx + 1,
@@ -889,9 +989,40 @@ function ReportTable({
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
-                    <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
+                    <DialogTitle>{isScoredSnapshot ? "Scoring Rules" : "Ranking & Effective Score Calculation"}</DialogTitle>
                     <DialogDescription asChild>
                       <div className="space-y-4 text-sm leading-relaxed mt-2">
+                        {isScoredSnapshot ? (
+                          <>
+                            <div>
+                              <h4 className="font-semibold mb-1">Formula</h4>
+                              <code className="block rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                                {merged?.scoring?.formula || "score"}
+                              </code>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-1">Rank Order</h4>
+                              <ol className="list-decimal list-inside space-y-1">
+                                {(merged?.scoring?.sortRules || []).map((rule, ruleIndex) => (
+                                  <li key={`${rule.key}-${ruleIndex}`}>
+                                    {rule.key} {rule.direction === "asc" ? "ascending" : "descending"}
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-1">Result Units</h4>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(merged?.scoring?.resultUnits || []).map((unit) => (
+                                  <Badge key={unit.key} variant={unit.isComposite ? "secondary" : "outline"}>
+                                    {unit.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
                         <div>
                           <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
                           <ul className="list-disc list-inside space-y-1">
@@ -937,6 +1068,8 @@ function ReportTable({
                           <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
                           <p>Default is 0. Increase it only when this report should ignore each participant&apos;s weakest contests.</p>
                         </div>
+                          </>
+                        )}
 
                       </div>
                     </DialogDescription>
@@ -959,7 +1092,7 @@ function ReportTable({
               </div>
             </div>
 
-            {!solveOnly && (
+            {!solveOnly && !isScoredSnapshot && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Remove Worst Contests</label>
                 <div className="flex items-center gap-2">
@@ -982,7 +1115,7 @@ function ReportTable({
               </div>
             )}
 
-            {isTscCombined && !solveOnly && (
+            {isTscCombined && !solveOnly && !isScoredSnapshot && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">TFC Percentage</label>
                 <Input
@@ -1005,7 +1138,7 @@ function ReportTable({
             <div className="space-y-2">
               <label className="text-sm font-medium">Actions</label>
               <div className="flex flex-wrap gap-2">
-                {shareControl || (showLiveShare ? <LiveShareModal reportData={liveReportData} reportId={liveReportId} /> : null)}
+                {shareControl || (showLiveShare ? <LiveShareModal reportData={liveReportData} reportId={liveReportId} publishEndpoint={publishEndpoint} /> : null)}
                 <Button size="sm" variant="outline" onClick={exportToCSV} className="flex items-center gap-1">
                   <FileText className="h-4 w-4" />
                   CSV
@@ -1020,6 +1153,7 @@ function ReportTable({
         </div>
       </div>
 
+      {!isScoredSnapshot && (
       <div className="mb-4 bg-card rounded-lg p-4 border shadow-sm">
         <h3 className="text-sm font-medium mb-3">Exclude Specific Contests</h3>
         <div className="flex flex-wrap gap-2">
@@ -1042,6 +1176,7 @@ function ReportTable({
           ))}
         </div>
       </div>
+      )}
 
       <div>
         <div className="flex items-center gap-2 bg-card p-3 rounded-lg border shadow-sm">
@@ -1061,11 +1196,17 @@ function ReportTable({
           <TableHeader>
             <TableRow>
               <TableHead>Rank</TableHead>
-              {!solveOnly && <TableHead>Progress</TableHead>}
+              {!solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
               <TableHead>Name</TableHead>
               <TableHead>Contests</TableHead>
               {solveOnly ? (
                 <TableHead>Total Solves</TableHead>
+              ) : isScoredSnapshot ? (
+                <>
+                  <TableHead>Score</TableHead>
+                  <TableHead>Penalty</TableHead>
+                  <TableHead>Demerits</TableHead>
+                </>
               ) : (
                 <>
                   <TableHead>Effective Score</TableHead>
@@ -1177,12 +1318,12 @@ function ReportTable({
                             : ""
                           } ${isTop ? 'bg-transparent text-[hsl(var(--alumni-gold))] font-bold shadow-none' : ''}`}
                       >
-                        {index + 1}
+                        {u.rank || index + 1}
                       </Badge>
                     </div>
                   </TableCell>
                   {/* Progress */}
-                  {!solveOnly && (
+                  {!solveOnly && !isScoredSnapshot && (
                     <TableCell className="min-w-[90px]">
                       {(() => {
                         const p = progressByUser[identity] || { status: 'neutral', delta: 0 }
@@ -1323,6 +1464,27 @@ function ReportTable({
                   <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>
                   {solveOnly ? (
                     <TableCell className="text-base font-semibold tabular-nums">{u.effectiveTotalSolved}</TableCell>
+                  ) : isScoredSnapshot ? (
+                    <>
+                      <TableCell>
+                        <p className="text-base font-semibold tabular-nums">
+                          {formatScore(u.displayScore ?? u.score)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          raw {formatScore(u.totalScore, 2)}
+                        </p>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty, 2)}
+                      </TableCell>
+                      <TableCell>
+                        {Number(u.totalDemeritPoints || 0) > 0 ? (
+                          <Badge variant="destructive">-{u.totalDemeritPoints}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </>
                   ) : (
                     <>
                       <TableCell>
@@ -1365,8 +1527,10 @@ function ReportTable({
                   )}
                   {orderedContestIds.map((cid) => {
                     const perf = u.contests[cid]
-                    const isWorst = u.worstContests.includes(cid)
-                    const isOptedOut = u.optedOutContests.includes(cid)
+                    const worstContests = Array.isArray(u.worstContests) ? u.worstContests : []
+                    const optedOutContests = Array.isArray(u.optedOutContests) ? u.optedOutContests : []
+                    const isWorst = worstContests.includes(cid)
+                    const isOptedOut = optedOutContests.includes(cid)
                     if (solveOnly) {
                       const isManual = Boolean(perf?.manualSolveOverride)
                       return (
@@ -1383,6 +1547,56 @@ function ReportTable({
                               <Badge variant="outline" className="h-5 border-primary/25 bg-primary/10 px-1.5 text-[10px] text-primary">
                                 Manual
                               </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                      )
+                    }
+                    if (isScoredSnapshot) {
+                      const sourceBreakdown = perf?.sourceBreakdown && typeof perf.sourceBreakdown === "object"
+                        ? Object.entries(perf.sourceBreakdown)
+                        : []
+                      return (
+                        <TableCell key={cid} className={cn((perf?.excluded || perf?.dropped) && "bg-muted/50 text-muted-foreground")}>
+                          <div className="min-w-[120px] space-y-1 text-sm">
+                            <div className="flex items-center gap-1.5">
+                              {perf?.isComposite && (
+                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Composite</Badge>
+                              )}
+                              {perf?.dropped && (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Dropped</Badge>
+                              )}
+                              {perf?.excluded && (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Excluded</Badge>
+                              )}
+                            </div>
+                            <div>Solved: {Number(perf?.solved || 0)}</div>
+                            <div>Penalty: {formatScore(perf?.penalty, 2)}</div>
+                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
+                            {sourceBreakdown.length > 1 && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                                    Breakdown
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-lg">
+                                  <DialogHeader>
+                                    <DialogTitle>{merged.contestIdToTitle[cid]} Breakdown</DialogTitle>
+                                    <DialogDescription>Source contest metrics used in this result unit.</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+                                    {sourceBreakdown.map(([sourceId, source]) => (
+                                      <div key={sourceId} className="rounded-md border p-3 text-sm">
+                                        <p className="font-medium">{source?.contestTitle || sourceId}</p>
+                                        <p className="text-muted-foreground">
+                                          Solved {Number(source?.solved || 0)} - Penalty {formatScore(source?.penalty, 2)} - Score {formatScore(source?.finalScore ?? source?.rawScore, 2)}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
                             )}
                           </div>
                         </TableCell>

@@ -997,3 +997,53 @@ Changing student-thread delivery, Realtime authorization, message ordering, reco
 
 Do not overgeneralize:
 The canonical Broadcast is a fast delivery path, not the durable source of truth. PostgreSQL messages/revisions and authorized catch-up remain authoritative.
+
+## 2026-08-29 - contest-report-scoring-merge-v1 - Contest Scoring Entry Points
+
+Source:
+- `docs/sql/contest-report-scoring-v1-20260828.sql`
+- `server/src/services/contestFormula.ts`
+- `server/src/services/contestScoringService.ts`
+
+Fact:
+Global/admin contest rooms and classroom/trainer contest rooms now share a server-owned scoring engine. Formula parsing/evaluation lives in `server/src/services/contestFormula.ts`; result-unit merge, formula variables, drop-worst, sort ladder, competition ranking, and `ResultSnapshotV2` generation live in `server/src/services/contestScoringService.ts`. Classroom routes are `GET/POST preview/PUT /classroom/:id/contests/rooms/:roomId/scoring` plus report generation under `classroomContestController.ts`. Global/admin routes are `GET/POST preview/PUT /contest-room/:roomId/scoring`, `POST /contest-room/:roomId/report`, and `POST /contest-room/:roomId/publish`.
+
+Applies when:
+Changing contest report generation, public report publication, classroom contest reports, composite result units, formula keys, report rendering, or team-collection score consumption.
+
+Do not overgeneralize:
+The scoring engine owns contest ranking snapshots only. It does not replace contest fetch credentials, classroom roster mapping, demerit entry, manual solve overrides, or team-collection approval workflows.
+
+## 2026-08-29 - contest-report-composite-formulas-v1 - Composite Formula Entry Points
+
+Source:
+- `docs/sql/contest-report-composite-formulas-v1-20260829.sql`
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestMergeOverview.jsx`
+
+Fact:
+Composite contest merge groups now store their own `formula` in `contest_report_merge_groups` and `classroom_contest_merge_groups`. The default `sum(raw_score)` preserves summed composite behavior under the sheet-style formula engine. The scoring engine evaluates a composite formula against member contest rows before the room-level formula evaluates final result-unit rows. The saved merge layout is shown outside the editor through `ContestMergeOverview` on the global/admin room details page and the classroom trainer contest workbench.
+
+Applies when:
+Changing composite merge-group storage, formula variables, scoring previews, generated contest reports, global room details, or classroom contest workbench merge visibility.
+
+Do not overgeneralize:
+The overview component is read-only display. It must not evaluate formulas, mutate scoring configs, or replace the scoring dialog's manager-controlled preview/save flow.
+
+## 2026-08-29 - contest-report-sheet-formulas-v1 - Sheet Formula Entry Points
+
+Source:
+- `server/src/services/contestFormula.ts`
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+- `client/src/components/ContestFormulaExplainer.jsx`
+- `docs/sql/contest-report-sheet-formulas-v1-20260829.sql`
+
+Fact:
+Contest scoring formulas now use row metrics and filters. Examples are `sum(raw_score)`, `sum(solved)`, `demerits(0)`, `sum(demerits where index == 0)`, and `sum(raw_score where title contains "TFC")`. The same syntax is used for composite formulas and final room formulas, with the active row set scoped to member contests for composites and final result units for room scoring. Formula editor snippets, metric chips, filter-field chips, and the demerits flow explainer live in `ContestScoringDialog.jsx` and `ContestFormulaExplainer.jsx`.
+
+Applies when:
+Maintaining formula parsing, scoring defaults, formula editor UX, composite formulas, report generation, scoring preview traces, or SQL defaults for scoring configs.
+
+Do not overgeneralize:
+TSC scalar variables remain valid for cross-room score composition. Do not expose generated per-contest variables as the primary formula model.

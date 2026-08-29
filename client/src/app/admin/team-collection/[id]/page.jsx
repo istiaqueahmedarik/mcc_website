@@ -25,8 +25,16 @@ import {
   Clock,
   FastForward,
   LinkIcon,
-  Settings
+  Settings,
+  UserPlus,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import Image from "next/image";
@@ -80,13 +88,17 @@ async function fetchLatestRoomUserScores(roomId) {
       const username = String(u?.username || "").trim();
       if (!username) continue;
       const score =
-        typeof u?.effectiveSolved === "number"
-          ? u.effectiveSolved
-          : typeof u?.totalSolved === "number"
-            ? u.totalSolved
-            : typeof u?.solved === "number"
-              ? u.solved
-              : null;
+        typeof u?.score === "number"
+          ? u.score
+          : typeof u?.effectiveTotalScore === "number"
+            ? u.effectiveTotalScore
+            : typeof u?.effectiveSolved === "number"
+              ? u.effectiveSolved
+              : typeof u?.totalSolved === "number"
+                ? u.totalSolved
+                : typeof u?.solved === "number"
+                  ? u.solved
+                  : null;
       if (typeof score === "number") scoreMap.set(username, score);
     }
     return scoreMap;

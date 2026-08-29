@@ -12,6 +12,17 @@ import {
   decryptCodeforcesCredential,
   encryptCodeforcesCredential,
 } from '../utils/codeforcesCredentialCrypto';
+import {
+  BASE_SCORING_VARIABLES,
+  buildScoredContestReport,
+  DEFAULT_COMPOSITE_FORMULA,
+  defaultScoringConfigForScope,
+  normalizeScoringConfig,
+  SORTABLE_SCORING_KEYS,
+  type ContestScoringConfigInput,
+  type ContestSourceInput,
+} from '../services/contestScoringService';
+import { isValidFormulaIdentifier, parseFormula } from '../services/contestFormula';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONTEST_TYPES = new Set(['TFC', 'TSC', 'TPC']);
@@ -73,6 +84,42 @@ function normalizeSortOrder(value: unknown): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) return null;
   return Math.floor(numeric);
+}
+
+function normalizeScorePrecision(value: unknown, fallback = 0): number {
+  const numeric = Math.floor(Number(value));
+  if (!Number.isFinite(numeric)) return fallback;
+  if (numeric < 0) return 0;
+  if (numeric > 4) return 4;
+  return numeric;
+}
+
+function normalizeDropWorstCount(value: unknown, fallback = 0): number {
+  const numeric = Math.floor(Number(value));
+  if (!Number.isFinite(numeric) || numeric < 0) return fallback;
+  return numeric;
+}
+
+function normalizeFormulaKey(value: unknown): string | null {
+  const key = normalizeText(value, 48).toLowerCase();
+  return isValidFormulaIdentifier(key) ? key : null;
+}
+
+function formulaKeyForContest(provider: ClassroomContestProvider, externalContestId: string) {
+  const prefix = provider === 'codeforces' ? 'cf' : 'vj';
+  const normalized = `${prefix}_${externalContestId}`.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 48);
+  return isValidFormulaIdentifier(normalized) ? normalized : `${prefix}_contest`;
+}
+
+function parseJsonArray(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function normalizeHandle(value: unknown, maxLength = 160): string {
@@ -230,6 +277,31 @@ async function loadContestItem(classroomId: string, roomId: string, contestItemI
   return rows[0] || null;
 }
 
+async function nextClassroomContestFormulaKey(classroomId: string, roomId: string, provider: ClassroomContestProvider, externalContestId: string) {
+  const base = formulaKeyForContest(provider, externalContestId);
+  const rows = await sql`
+    SELECT formula_key
+    FROM public.classroom_contests
+    WHERE classroom_id = ${classroomId}
+      AND room_id = ${roomId}
+      AND formula_key LIKE ${`${base}%`}
+    UNION
+    SELECT formula_key
+    FROM public.classroom_contest_merge_groups
+    WHERE classroom_id = ${classroomId}
+      AND room_id = ${roomId}
+      AND formula_key LIKE ${`${base}%`}
+  `;
+  const used = new Set(rows.map((row: any) => String(row.formula_key)));
+  if (!used.has(base)) return base;
+  for (let index = 2; index < 1000; index += 1) {
+    const suffix = `_${index}`;
+    const candidate = `${base.slice(0, 48 - suffix.length)}${suffix}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  throw new Error('Unable to allocate a contest formula key');
+}
+
 async function loadTrainerCodeforcesCredentialRow(trainerId: string) {
   const rows = await sql`
     SELECT *
@@ -291,6 +363,8 @@ function contestToApi(row: any) {
     title: row.title,
     weight: Number(row.weight || 1),
     problemWeights: Array.isArray(row.problem_weights) ? row.problem_weights : [],
+    formulaKey: row.formula_key || null,
+    mergeGroupId: row.merge_group_id || null,
     sortOrder: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : null,
     lastFetchedAt: row.last_fetched_at,
     latestSnapshotAt: row.latest_snapshot_at || null,
@@ -388,6 +462,8 @@ function reportToApi(row: any) {
     roomId: row.room_id,
     data: row.data,
     visibleToStudents: Boolean(row.visible_to_students),
+    isStale: Boolean(row.is_stale),
+    scoringConfigVersion: Number(row.scoring_config_version || row.data?.scoring?.version || 0),
     sharedAt: row.shared_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -471,7 +547,7 @@ async function listRoomContests(classroomId: string) {
 
 async function listReportsByClassroom(classroomId: string) {
   const rows = await sql`
-    SELECT id, room_id, visible_to_students, shared_at, updated_at
+    SELECT id, room_id, visible_to_students, shared_at, updated_at, is_stale, scoring_config_version
     FROM public.classroom_contest_reports
     WHERE classroom_id = ${classroomId}
   `;
@@ -772,6 +848,7 @@ export const createClassroomContestItem = async (c: any) => {
     const weight = normalizeWeight(body?.weight, 1);
     const problemWeights = normalizeProblemWeights(body?.problemWeights ?? body?.problem_weights);
     if (!problemWeights.ok) return c.json({ error: problemWeights.error }, 400);
+    const formulaKey = await nextClassroomContestFormulaKey(classroomId, roomId, provider, externalContestId);
 
     const rows = await sql`
       INSERT INTO public.classroom_contests (
@@ -782,6 +859,7 @@ export const createClassroomContestItem = async (c: any) => {
         title,
         weight,
         problem_weights,
+        formula_key,
         sort_order,
         created_by,
         updated_by
@@ -794,6 +872,7 @@ export const createClassroomContestItem = async (c: any) => {
         ${title},
         ${weight},
         ${sql.json(problemWeights.weights)},
+        ${formulaKey},
         (
           SELECT COALESCE(MAX(sort_order) + 1, COUNT(*)::integer)
           FROM public.classroom_contests
@@ -808,6 +887,7 @@ export const createClassroomContestItem = async (c: any) => {
         title = EXCLUDED.title,
         weight = EXCLUDED.weight,
         problem_weights = EXCLUDED.problem_weights,
+        formula_key = COALESCE(classroom_contests.formula_key, EXCLUDED.formula_key),
         updated_by = EXCLUDED.updated_by,
         updated_at = now()
       RETURNING *
@@ -2127,6 +2207,8 @@ async function loadLatestSnapshotsForRoom(classroomId: string, roomId: string) {
         contest.external_contest_id,
         contest.title,
         contest.weight,
+        contest.formula_key,
+        contest.merge_group_id,
         contest.sort_order,
         contest.created_at AS contest_created_at
       FROM public.classroom_contest_snapshots snapshot
@@ -2209,7 +2291,391 @@ async function loadRoomSolveOverrides(classroomId: string, roomId: string, conte
   return rows;
 }
 
+function classroomItemsToScoringSources(items: any[], merged: any = null): ContestSourceInput[] {
+  return items.map((item: any) => {
+    const provider = normalizeContestProvider(item.provider);
+    const externalContestId = String(item.external_contest_id || '');
+    const contestKey = buildContestKey(provider, externalContestId);
+    const rankData = merged
+      ? {
+        contestInfo: {
+          id: contestKey,
+          provider,
+          externalContestId,
+          title: item.title || merged?.contestIdToTitle?.[contestKey] || `Contest ${externalContestId}`,
+        },
+        teams: (Array.isArray(merged.users) ? merged.users : []).map((user: any) => {
+          const performance = user.contests?.[contestKey] || defaultContestPerformance(contestKey, merged);
+          return {
+            identityKey: user.identityKey,
+            username: user.username,
+            realName: user.realName || user.username,
+            avatarUrl: user.avatarUrl,
+            sourceHandles: Array.isArray(performance.sourceHandles) && performance.sourceHandles.length > 0
+              ? performance.sourceHandles
+              : user.sourceHandles,
+            targetType: user.targetType || null,
+            studentId: user.studentId || null,
+            groupId: user.groupId || null,
+            matchedBy: user.matchedBy || null,
+            isClassroomParticipant: Boolean(user.isClassroomParticipant || user.classroomMapping?.isClassroomParticipant),
+            classroomMapping: user.classroomMapping || null,
+            solvedCount: Number(performance.solved || 0),
+            penalty: Number(performance.penalty || 0),
+            finalScore: Number(performance.finalScore ?? performance.rawScore ?? 0),
+            submissions: Array.isArray(performance.submissions) ? performance.submissions : [],
+            demeritPoints: Number(performance.demeritPoints || 0),
+            demerits: Array.isArray(performance.demerits) ? performance.demerits : [],
+            manualSolveOverride: performance.manualSolveOverride || null,
+            nativeRank: performance.nativeRank,
+            nativePoints: performance.nativePoints,
+          };
+        }),
+      }
+      : {
+        contestInfo: {
+          id: contestKey,
+          provider,
+          externalContestId,
+          title: item.title || `Contest ${externalContestId}`,
+        },
+        teams: [],
+      };
+
+    return {
+      itemId: String(item.id),
+      contestKey,
+      formulaKey: item.formula_key || formulaKeyForContest(provider, externalContestId),
+      title: item.title || `Contest ${externalContestId}`,
+      provider,
+      externalContestId,
+      weight: merged ? 1 : Number(item.weight || 1),
+      sortOrder: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : null,
+      rankData,
+      demerits: [],
+    };
+  });
+}
+
+async function loadClassroomScoringGroups(classroomId: string, roomId: string) {
+  const rows = await sql`
+    SELECT merge_group.*,
+           COALESCE(
+             jsonb_agg(contest.id ORDER BY contest.sort_order ASC NULLS LAST, contest.created_at ASC, contest.id ASC)
+               FILTER (WHERE contest.id IS NOT NULL),
+             '[]'::jsonb
+           ) AS contest_item_ids
+    FROM public.classroom_contest_merge_groups merge_group
+    LEFT JOIN public.classroom_contests contest
+      ON contest.merge_group_id = merge_group.id
+     AND contest.classroom_id = merge_group.classroom_id
+     AND contest.room_id = merge_group.room_id
+    WHERE merge_group.classroom_id = ${classroomId}
+      AND merge_group.room_id = ${roomId}
+    GROUP BY merge_group.id
+    ORDER BY MIN(contest.sort_order) ASC NULLS LAST, merge_group.created_at ASC, merge_group.id ASC
+  `;
+
+  return rows.map((row: any) => ({
+    id: String(row.id),
+    name: row.name,
+    formulaKey: row.formula_key,
+    formula: row.formula || DEFAULT_COMPOSITE_FORMULA,
+    contestItemIds: parseJsonArray(row.contest_item_ids).map(String),
+  }));
+}
+
+async function loadClassroomRoomItemsForScoring(classroomId: string, roomId: string) {
+  return sql`
+    SELECT id, provider, external_contest_id, title, weight, formula_key, merge_group_id, sort_order, created_at
+    FROM public.classroom_contests
+    WHERE classroom_id = ${classroomId}
+      AND room_id = ${roomId}
+    ORDER BY sort_order ASC NULLS LAST, created_at ASC, id ASC
+  `;
+}
+
+function rowToScoringConfig(row: any, groups: any[], fallback: ContestScoringConfigInput): Required<ContestScoringConfigInput> {
+  if (!row) {
+    return normalizeScoringConfig({ ...fallback, groups, version: 0 }, fallback);
+  }
+
+  return normalizeScoringConfig({
+    groups,
+    formula: row.formula,
+    scorePrecision: Number(row.score_precision),
+    sortRules: parseJsonArray(row.sort_rules),
+    excludedUnitKeys: parseJsonArray(row.excluded_unit_keys),
+    dropWorstCount: Number(row.drop_worst_count || 0),
+    version: Number(row.version || 0),
+  }, fallback);
+}
+
+async function loadClassroomScoringConfig(classroomId: string, roomId: string, roomType: string, items: any[]) {
+  const [groups, configRows] = await Promise.all([
+    loadClassroomScoringGroups(classroomId, roomId),
+    sql`
+      SELECT *
+      FROM public.classroom_contest_scoring_configs
+      WHERE classroom_id = ${classroomId}
+        AND room_id = ${roomId}
+      LIMIT 1
+    `,
+  ]);
+  const unitKeys = items.map((item: any) => item.formula_key || formulaKeyForContest(normalizeContestProvider(item.provider), String(item.external_contest_id || '')));
+  const fallback = defaultScoringConfigForScope('classroom', roomType, unitKeys);
+  const config = rowToScoringConfig(configRows[0] || null, groups, fallback);
+  return { config, groups, version: Number(configRows[0]?.version || 0), exists: configRows.length > 0 };
+}
+
+function normalizeScoringGroupPayload(group: any) {
+  const name = normalizeText(group?.name, 160);
+  const formulaKey = normalizeFormulaKey(group?.formulaKey ?? group?.formula_key);
+  const formula = normalizeText(group?.formula, 1000) || DEFAULT_COMPOSITE_FORMULA;
+  const contestItemIds = parseJsonArray(group?.contestItemIds ?? group?.contest_item_ids)
+    .map((item) => normalizeUuid(item))
+    .filter(Boolean) as string[];
+
+  if (!name) throw new Error('Composite name is required');
+  if (!formulaKey) throw new Error('Composite key must match ^[a-z][a-z0-9_]{0,47}$');
+  parseFormula(formula);
+  if (contestItemIds.length < 2) throw new Error(`Composite "${name}" must include at least two contests`);
+
+  return {
+    name,
+    formulaKey,
+    formula,
+    contestItemIds: Array.from(new Set(contestItemIds)),
+  };
+}
+
+function normalizeScoringPayload(body: any, fallback: ContestScoringConfigInput): ContestScoringConfigInput {
+  const source = body?.config && typeof body.config === 'object' ? body.config : body || {};
+  const groups = parseJsonArray(source.groups).map(normalizeScoringGroupPayload);
+  const formula = normalizeText(source.formula ?? fallback.formula, 1000);
+  parseFormula(formula);
+
+  return {
+    groups,
+    formula,
+    scorePrecision: normalizeScorePrecision(source.scorePrecision ?? source.score_precision, fallback.scorePrecision),
+    sortRules: parseJsonArray(source.sortRules ?? source.sort_rules).slice(0, 8).map((rule) => ({
+      key: normalizeText(rule?.key, 80),
+      direction: rule?.direction === 'asc' ? 'asc' : 'desc',
+    })).filter((rule) => rule.key),
+    excludedUnitKeys: parseJsonArray(source.excludedUnitKeys ?? source.excluded_unit_keys)
+      .map((key) => normalizeFormulaKey(key))
+      .filter(Boolean) as string[],
+    dropWorstCount: normalizeDropWorstCount(source.dropWorstCount ?? source.drop_worst_count, fallback.dropWorstCount),
+  };
+}
+
+async function buildClassroomScoredReportSnapshot(
+  classroomId: string,
+  roomId: string,
+  configOverride: ContestScoringConfigInput | null = null,
+) {
+  const room = await loadRoom(classroomId, roomId);
+  if (!room) throw Object.assign(new Error('Contest room not found'), { statusCode: 404 });
+
+  const [items, latestSnapshots, demerits, rosterMaps, solveOverrides] = await Promise.all([
+    loadClassroomRoomItemsForScoring(classroomId, roomId),
+    loadLatestSnapshotsForRoom(classroomId, roomId),
+    loadRoomDemerits(classroomId, roomId),
+    getClassroomRosterMaps(classroomId),
+    loadRoomSolveOverrides(classroomId, roomId),
+  ]);
+  const overrideMaps = await getClassroomHandleOverrideMaps(classroomId, rosterMaps);
+  const maps = { ...rosterMaps, ...overrideMaps };
+
+  const snapshotByContestItem = new Map<string, any>();
+  latestSnapshots.forEach((snapshot: any) => snapshotByContestItem.set(String(snapshot.contest_item_id), snapshot));
+
+  const contestIdToWeight: Record<string, number> = {};
+  const allDemerits: Record<string, any[]> = {};
+  const results: any[] = [];
+  const missingContests: any[] = [];
+
+  items.forEach((item: any) => {
+    const snapshot = snapshotByContestItem.get(String(item.id));
+    if (!snapshot) {
+      missingContests.push({
+        id: item.id,
+        provider: normalizeContestProvider(item.provider),
+        externalContestId: item.external_contest_id,
+        title: item.title,
+      });
+      return;
+    }
+
+    const provider = normalizeContestProvider(item.provider);
+    const externalContestId = String(item.external_contest_id);
+    const contestKey = buildContestKey(provider, externalContestId);
+    const contestDemerits = demerits.filter((demerit: any) => String(demerit.contest_item_id) === String(item.id));
+    allDemerits[contestKey] = contestDemerits;
+    contestIdToWeight[contestKey] = Number(item.weight || 1);
+
+    const rankData = applyDemeritsToRankData(
+      applyRankDataClassroomMappings({
+        ...(snapshot.rank_data || {}),
+        provider,
+        fullParticipantCount: snapshot.rank_data?.fullParticipantCount ?? snapshot.rank_data?.providerMeta?.fullParticipantCount,
+        contestInfo: {
+          ...(snapshot.rank_data?.contestInfo || {}),
+          id: contestKey,
+          provider,
+          externalContestId,
+          title: item.title || snapshot.rank_data?.contestInfo?.title || `Contest ${externalContestId}`,
+        },
+      }, maps, provider, false),
+      contestDemerits,
+    );
+    results.push(rankData);
+  });
+
+  if (results.length === 0) {
+    throw Object.assign(new Error('Fetch at least one contest before generating a report'), {
+      statusCode: 400,
+      missingContests,
+    });
+  }
+
+  const roomType = normalizeContestType(room.contest_type);
+  let legacyTsc: {
+    tfcScoreByParticipant?: Map<string, number>;
+    tfcPercentage?: number;
+    tscPercentage?: number;
+  } | null = null;
+  let merged: any;
+  if (roomType === 'TSC') {
+    const referenceReportRows = room.tfc_reference_room_id
+      ? await sql`
+          SELECT data
+          FROM public.classroom_contest_reports
+          WHERE classroom_id = ${classroomId}
+            AND room_id = ${room.tfc_reference_room_id}
+          LIMIT 1
+        `
+      : [];
+    const tfcScoreByTeam = buildTfcScoreMap(referenceReportRows[0] || null);
+    const tfcPercentage = clampPercentage(room.tfc_percentage, 0);
+    const tscPercentage = clampPercentage(room.tsc_percentage, 100 - tfcPercentage);
+
+    legacyTsc = {
+      tfcScoreByParticipant: tfcScoreByTeam,
+      tfcPercentage,
+      tscPercentage,
+    };
+    merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
+    merged.tscConfig = {
+      tfcRoomId: room.tfc_reference_room_id,
+      tfcPercentage,
+      tscPercentage,
+    };
+  } else {
+    merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
+  }
+
+  merged.name = room.name;
+  merged.roomType = roomType;
+  merged.classroomId = classroomId;
+  merged.classroomContestRoomId = roomId;
+  merged.generatedAt = new Date().toISOString();
+  merged.missingContests = missingContests;
+  merged.snapshotIds = latestSnapshots.map((snapshot: any) => snapshot.snapshot_id);
+  merged.rankingMode = 'solve_count';
+  applyClassroomMappings(merged, maps);
+  applySolveOverridesToMergedReport(merged, solveOverrides, rosterMaps);
+
+  const scoringSources = classroomItemsToScoringSources(items, merged);
+  const savedScoring = await loadClassroomScoringConfig(classroomId, roomId, roomType, items);
+  const config = configOverride
+    ? normalizeScoringConfig(configOverride, savedScoring.config)
+    : savedScoring.config;
+  const scored = buildScoredContestReport({
+    classroomId,
+    roomId,
+    roomName: room.name,
+    roomType,
+    scope: 'classroom',
+    sources: scoringSources,
+    config,
+    defaultConfig: defaultScoringConfigForScope(
+      'classroom',
+      roomType,
+      scoringSources.map((source) => String(source.formulaKey || '')),
+    ),
+    legacyTsc,
+    missingContests,
+    snapshotIds: latestSnapshots.map((snapshot: any) => String(snapshot.snapshot_id)),
+    generatedAt: merged.generatedAt,
+  });
+
+  return {
+    room,
+    items,
+    config,
+    configVersion: savedScoring.version,
+    merged,
+    scored: {
+      ...scored,
+      mappingSummary: merged.mappingSummary,
+      manualSolveOverrideCount: merged.manualSolveOverrideCount || 0,
+      tscConfig: merged.tscConfig || null,
+    },
+    missingContests,
+  };
+}
+
 export const generateClassroomContestReport = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const roomId = c.req.param('roomId');
+  try {
+    const actor = await getManagedActor(c, classroomId);
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+
+    const snapshot = await buildClassroomScoredReportSnapshot(classroomId, roomId);
+
+    const reportRows = await sql`
+      INSERT INTO public.classroom_contest_reports (
+        classroom_id,
+        room_id,
+        data,
+        visible_to_students,
+        generated_by,
+        scoring_config_version,
+        is_stale
+      )
+      VALUES (
+        ${classroomId},
+        ${roomId},
+        ${sql.json(snapshot.scored)},
+        false,
+        ${actor.userId},
+        ${snapshot.configVersion},
+        false
+      )
+      ON CONFLICT (room_id)
+      DO UPDATE SET
+        data = EXCLUDED.data,
+        generated_by = EXCLUDED.generated_by,
+        scoring_config_version = EXCLUDED.scoring_config_version,
+        is_stale = false,
+        updated_at = now()
+      RETURNING *
+    `;
+
+    return c.json({ success: true, report: reportToApi(reportRows[0]), merged: snapshot.scored });
+  } catch (error: any) {
+    console.error('Error generating classroom contest report:', error);
+    return c.json({
+      error: error?.message || 'Failed to generate classroom contest report',
+      missingContests: error?.missingContests,
+    }, error?.statusCode || 500);
+  }
+};
+
+export const getClassroomContestScoring = async (c: any) => {
   const classroomId = c.req.param('id');
   const roomId = c.req.param('roomId');
   try {
@@ -2219,141 +2685,234 @@ export const generateClassroomContestReport = async (c: any) => {
     const room = await loadRoom(classroomId, roomId);
     if (!room) return c.json({ error: 'Contest room not found' }, 404);
 
-    const [items, latestSnapshots, demerits, rosterMaps, solveOverrides] = await Promise.all([
-      sql`
-        SELECT id, provider, external_contest_id, title, weight, sort_order
-        FROM public.classroom_contests
-        WHERE classroom_id = ${classroomId}
-          AND room_id = ${roomId}
-        ORDER BY sort_order ASC NULLS LAST, created_at ASC, id ASC
-      `,
-      loadLatestSnapshotsForRoom(classroomId, roomId),
-      loadRoomDemerits(classroomId, roomId),
-      getClassroomRosterMaps(classroomId),
-      loadRoomSolveOverrides(classroomId, roomId),
-    ]);
-    const overrideMaps = await getClassroomHandleOverrideMaps(classroomId, rosterMaps);
-    const maps = { ...rosterMaps, ...overrideMaps };
+    const items = await loadClassroomRoomItemsForScoring(classroomId, roomId);
+    const scoring = await loadClassroomScoringConfig(classroomId, roomId, normalizeContestType(room.contest_type), items);
+    const previewSources = classroomItemsToScoringSources(items);
+    const scaffold = previewSources.length > 0
+      ? buildScoredContestReport({
+        classroomId,
+        roomId,
+        roomName: room.name,
+        roomType: normalizeContestType(room.contest_type),
+        scope: 'classroom',
+        sources: previewSources,
+        config: scoring.config,
+        defaultConfig: defaultScoringConfigForScope(
+          'classroom',
+          normalizeContestType(room.contest_type),
+          previewSources.map((source) => String(source.formulaKey || '')),
+        ),
+      })
+      : null;
 
-    const snapshotByContestItem = new Map<string, any>();
-    latestSnapshots.forEach((snapshot: any) => snapshotByContestItem.set(String(snapshot.contest_item_id), snapshot));
+    return c.json({
+      success: true,
+      config: scoring.config,
+      expectedVersion: scoring.version,
+      variables: scaffold?.scoring?.variables || BASE_SCORING_VARIABLES,
+      sortKeys: scaffold?.scoring?.sortKeys || SORTABLE_SCORING_KEYS,
+      metrics: scaffold?.scoring?.metrics || [],
+      filterFields: scaffold?.scoring?.filterFields || [],
+      functions: scaffold?.scoring?.functions || [],
+      resultUnits: scaffold?.scoring?.resultUnits || [],
+    });
+  } catch (error: any) {
+    console.error('Error reading classroom contest scoring config:', error);
+    return c.json({ error: error?.message || 'Failed to read scoring config' }, 500);
+  }
+};
 
-    const contestIdToWeight: Record<string, number> = {};
-    const allDemerits: Record<string, any[]> = {};
-    const results: any[] = [];
-    const missingContests: any[] = [];
+export const previewClassroomContestScoring = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const roomId = c.req.param('roomId');
+  try {
+    const actor = await getManagedActor(c, classroomId);
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
 
-    items.forEach((item: any) => {
-      const snapshot = snapshotByContestItem.get(String(item.id));
-      if (!snapshot) {
-        missingContests.push({
-          id: item.id,
-          provider: normalizeContestProvider(item.provider),
-          externalContestId: item.external_contest_id,
-          title: item.title,
-        });
-        return;
-      }
+    const room = await loadRoom(classroomId, roomId);
+    if (!room) return c.json({ error: 'Contest room not found' }, 404);
+    const items = await loadClassroomRoomItemsForScoring(classroomId, roomId);
+    if (items.length === 0) return c.json({ error: 'Add at least one contest before previewing scoring' }, 400);
 
-      const provider = normalizeContestProvider(item.provider);
-      const externalContestId = String(item.external_contest_id);
-      const contestKey = buildContestKey(provider, externalContestId);
-      const contestDemerits = demerits.filter((demerit: any) => String(demerit.contest_item_id) === String(item.id));
-      allDemerits[contestKey] = contestDemerits;
-      contestIdToWeight[contestKey] = Number(item.weight || 1);
-
-      const rankData = applyDemeritsToRankData(
-        applyRankDataClassroomMappings({
-          ...(snapshot.rank_data || {}),
-          provider,
-          fullParticipantCount: snapshot.rank_data?.fullParticipantCount ?? snapshot.rank_data?.providerMeta?.fullParticipantCount,
-          contestInfo: {
-            ...(snapshot.rank_data?.contestInfo || {}),
-            id: contestKey,
-            provider,
-            externalContestId,
-            title: item.title || snapshot.rank_data?.contestInfo?.title || `Contest ${externalContestId}`,
-          },
-        }, maps, provider, false),
-        contestDemerits,
-      );
-      results.push(rankData);
+    const saved = await loadClassroomScoringConfig(classroomId, roomId, normalizeContestType(room.contest_type), items);
+    const body = await readJsonBody(c);
+    const requestedConfig = normalizeScoringPayload(body?.config ? body : { config: body }, saved.config);
+    const snapshot = await buildClassroomScoredReportSnapshot(classroomId, roomId, {
+      ...requestedConfig,
+      version: saved.version,
     });
 
-    if (results.length === 0) {
-      return c.json({ error: 'Fetch at least one contest before generating a report', missingContests }, 400);
-    }
-
-    const roomType = normalizeContestType(room.contest_type);
-    let merged: any;
-    if (roomType === 'TSC') {
-      const referenceReportRows = room.tfc_reference_room_id
-        ? await sql`
-            SELECT data
-            FROM public.classroom_contest_reports
-            WHERE classroom_id = ${classroomId}
-              AND room_id = ${room.tfc_reference_room_id}
-            LIMIT 1
-          `
-        : [];
-      const tfcScoreByTeam = buildTfcScoreMap(referenceReportRows[0] || null);
-      const tfcPercentage = clampPercentage(room.tfc_percentage, 0);
-      const tscPercentage = clampPercentage(room.tsc_percentage, 100 - tfcPercentage);
-
-      merged = mergeResultsForTsc(
-        results,
-        contestIdToWeight,
-        allDemerits,
-        tfcScoreByTeam,
-        tfcPercentage,
-        tscPercentage,
-      );
-      merged.tscConfig = {
-        ...(merged.tscConfig || {}),
-        tfcRoomId: room.tfc_reference_room_id,
-      };
-    } else {
-      merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
-    }
-
-    merged.name = room.name;
-    merged.roomType = roomType;
-    merged.classroomId = classroomId;
-    merged.classroomContestRoomId = roomId;
-    merged.generatedAt = new Date().toISOString();
-    merged.missingContests = missingContests;
-    merged.snapshotIds = latestSnapshots.map((snapshot: any) => snapshot.snapshot_id);
-    merged.rankingMode = 'solve_count';
-    applyClassroomMappings(merged, maps);
-    applySolveOverridesToMergedReport(merged, solveOverrides, rosterMaps);
-
-    const reportRows = await sql`
-      INSERT INTO public.classroom_contest_reports (
-        classroom_id,
-        room_id,
-        data,
-        visible_to_students,
-        generated_by
-      )
-      VALUES (
-        ${classroomId},
-        ${roomId},
-        ${sql.json(merged)},
-        false,
-        ${actor.userId}
-      )
-      ON CONFLICT (room_id)
-      DO UPDATE SET
-        data = EXCLUDED.data,
-        generated_by = EXCLUDED.generated_by,
-        updated_at = now()
-      RETURNING *
-    `;
-
-    return c.json({ success: true, report: reportToApi(reportRows[0]), merged });
+    return c.json({
+      success: true,
+      preview: snapshot.scored,
+      before: snapshot.merged,
+      config: snapshot.config,
+      expectedVersion: saved.version,
+    });
   } catch (error: any) {
-    console.error('Error generating classroom contest report:', error);
-    return c.json({ error: error?.message || 'Failed to generate classroom contest report' }, 500);
+    console.error('Error previewing classroom contest scoring:', error);
+    return c.json({
+      error: error?.message || 'Failed to preview scoring config',
+      missingContests: error?.missingContests,
+    }, error?.statusCode || 400);
+  }
+};
+
+export const updateClassroomContestScoring = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const roomId = c.req.param('roomId');
+  try {
+    const actor = await getManagedActor(c, classroomId);
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+
+    const room = await loadRoom(classroomId, roomId);
+    if (!room) return c.json({ error: 'Contest room not found' }, 404);
+
+    const items = await loadClassroomRoomItemsForScoring(classroomId, roomId);
+    if (items.length === 0) return c.json({ error: 'Add at least one contest before configuring scoring' }, 400);
+
+    const saved = await loadClassroomScoringConfig(classroomId, roomId, normalizeContestType(room.contest_type), items);
+    const body = await readJsonBody(c);
+    const expectedVersion = Number(body?.expectedVersion ?? body?.expected_version ?? saved.version);
+    const requestedConfig = normalizeScoringPayload(body?.config ? body : { config: body }, saved.config);
+
+    buildScoredContestReport({
+      classroomId,
+      roomId,
+      roomName: room.name,
+      roomType: normalizeContestType(room.contest_type),
+      scope: 'classroom',
+      sources: classroomItemsToScoringSources(items),
+      config: requestedConfig,
+      defaultConfig: saved.config,
+    });
+
+    const result = await sql.begin(async (tx) => {
+      const lockedRows = await tx`
+        SELECT version
+        FROM public.classroom_contest_scoring_configs
+        WHERE classroom_id = ${classroomId}
+          AND room_id = ${roomId}
+        FOR UPDATE
+      `;
+      const currentVersion = Number(lockedRows[0]?.version || 0);
+      if (expectedVersion !== currentVersion) {
+        return { conflict: true, currentVersion };
+      }
+
+      const nextVersion = currentVersion + 1;
+      await tx`
+        UPDATE public.classroom_contests
+        SET merge_group_id = null,
+            updated_by = ${actor.userId},
+            updated_at = now()
+        WHERE classroom_id = ${classroomId}
+          AND room_id = ${roomId}
+      `;
+      await tx`
+        DELETE FROM public.classroom_contest_merge_groups
+        WHERE classroom_id = ${classroomId}
+          AND room_id = ${roomId}
+      `;
+
+      for (const group of requestedConfig.groups || []) {
+        const inserted = await tx`
+          INSERT INTO public.classroom_contest_merge_groups (
+            classroom_id,
+            room_id,
+            name,
+            formula_key,
+            formula,
+            created_by,
+            updated_by
+          )
+          VALUES (
+            ${classroomId},
+            ${roomId},
+            ${group.name},
+            ${group.formulaKey},
+            ${group.formula || DEFAULT_COMPOSITE_FORMULA},
+            ${actor.userId},
+            ${actor.userId}
+          )
+          RETURNING id
+        `;
+        await tx`
+          UPDATE public.classroom_contests
+          SET merge_group_id = ${inserted[0].id},
+              updated_by = ${actor.userId},
+              updated_at = now()
+          WHERE classroom_id = ${classroomId}
+            AND room_id = ${roomId}
+            AND id = ANY(${group.contestItemIds})
+        `;
+      }
+
+      await tx`
+        INSERT INTO public.classroom_contest_scoring_configs (
+          classroom_id,
+          room_id,
+          formula,
+          score_precision,
+          sort_rules,
+          excluded_unit_keys,
+          drop_worst_count,
+          version,
+          created_by,
+          updated_by
+        )
+        VALUES (
+          ${classroomId},
+          ${roomId},
+          ${requestedConfig.formula},
+          ${requestedConfig.scorePrecision},
+          ${tx.json(requestedConfig.sortRules || [])},
+          ${tx.json(requestedConfig.excludedUnitKeys || [])},
+          ${requestedConfig.dropWorstCount || 0},
+          ${nextVersion},
+          ${actor.userId},
+          ${actor.userId}
+        )
+        ON CONFLICT (room_id)
+        DO UPDATE SET
+          formula = EXCLUDED.formula,
+          score_precision = EXCLUDED.score_precision,
+          sort_rules = EXCLUDED.sort_rules,
+          excluded_unit_keys = EXCLUDED.excluded_unit_keys,
+          drop_worst_count = EXCLUDED.drop_worst_count,
+          version = EXCLUDED.version,
+          updated_by = EXCLUDED.updated_by,
+          updated_at = now()
+      `;
+      await tx`
+        UPDATE public.classroom_contest_reports
+        SET is_stale = true,
+            updated_at = now()
+        WHERE classroom_id = ${classroomId}
+          AND room_id = ${roomId}
+      `;
+
+      return { conflict: false, version: nextVersion };
+    });
+
+    if (result.conflict) {
+      return c.json({
+        error: 'Scoring config changed while you were editing',
+        expectedVersion,
+        currentVersion: result.currentVersion,
+      }, 409);
+    }
+
+    const refreshedItems = await loadClassroomRoomItemsForScoring(classroomId, roomId);
+    const refreshed = await loadClassroomScoringConfig(classroomId, roomId, normalizeContestType(room.contest_type), refreshedItems);
+    return c.json({
+      success: true,
+      config: refreshed.config,
+      expectedVersion: refreshed.version,
+    });
+  } catch (error: any) {
+    console.error('Error saving classroom contest scoring config:', error);
+    return c.json({ error: error?.message || 'Failed to save scoring config' }, 400);
   }
 };
 
