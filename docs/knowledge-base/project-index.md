@@ -1066,4 +1066,4 @@ Applies when:
 Maintaining contest scoring APIs, database migrations, rank sorting, report snapshots, manager previews, public rule explanations, or exports.
 
 Do not overgeneralize:
-Apply `contest-report-score-pair-v2-20260829.sql` before deploying controllers that write the new columns.
+Supabase migration `20260829171842` (`contest_report_score_pair_v2_20260829`) was applied and verified on 2026-08-29. Keep the migration in deployment history before deploying controllers that write the new columns to any other environment.
