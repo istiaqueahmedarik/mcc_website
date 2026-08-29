@@ -24,6 +24,7 @@ import {
   type ContestSourceInput,
 } from '../services/contestScoringService';
 import { isValidFormulaIdentifier, parseFormula } from '../services/contestFormula';
+import { getVjudgeSession } from '../utils/vjudgeSession';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONTEST_TYPES = new Set(['TFC', 'TSC', 'TPC']);
@@ -1080,7 +1081,7 @@ export const fetchClassroomContestItem = async (c: any) => {
     const savedWeights = normalizeProblemWeights(contest.problem_weights);
     const problemWeights = bodyWeights?.weights ?? savedWeights.weights;
     const provider = normalizeContestProvider(contest.provider);
-    const session = provider === 'vjudge' ? c.req.header('X-VJudge-Session') : undefined;
+    const session = provider === 'vjudge' ? getVjudgeSession(c) : undefined;
     const result = await fetchClassroomContestRank({
       provider,
       externalContestId: String(contest.external_contest_id),

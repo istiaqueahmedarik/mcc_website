@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-08-29 - Provider Sessions Must Support Both Production Routes
+
+Source:
+- `server/src/utils/vjudgeSession.ts`
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Rule:
+Protected server endpoints that fetch VJudge data must resolve the session from the explicit `X-VJudge-Session` header first and then the root-scoped `vj_session` cookie. The header supports requests forwarded by Next route handlers; the cookie fallback supports production nginx configurations that route `/api/*` directly to Hono. Never log or return either credential.
+
+Applies when:
+Changing global or classroom contest preview, generation, publication, provider fetching, or `/api/*` reverse-proxy behavior.
+
+Do not overgeneralize:
+The cookie fallback does not replace JWT authorization or manager/admin checks, and it must not make an otherwise public endpoint credential-bearing by default.
+
 ## 2026-08-17 - Context Menus Need A Visible Equivalent
 
 Source:

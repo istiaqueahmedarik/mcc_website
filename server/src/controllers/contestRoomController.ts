@@ -12,6 +12,7 @@ import {
     type ContestSourceInput,
 } from '../services/contestScoringService'
 import { isValidFormulaIdentifier, parseFormula } from '../services/contestFormula'
+import { getVjudgeSession } from '../utils/vjudgeSession'
 
 function normalizeText(value: unknown, maxLength = 500) {
     return String(value ?? '').trim().slice(0, maxLength)
@@ -745,7 +746,7 @@ export const previewContestRoomScoring = async (c: any) => {
 
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            c.req.header('X-VJudge-Session'),
+            getVjudgeSession(c),
             { ...requestedConfig, version: saved.version },
         )
         return c.json({
@@ -926,7 +927,7 @@ export const generateContestRoomReport = async (c: any) => {
         const body = await readJsonBody(c)
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            c.req.header('X-VJudge-Session'),
+            getVjudgeSession(c),
             null,
             { contestId: body?.contestId ?? body?.contest_id },
         )
@@ -953,7 +954,7 @@ export const publishContestRoomReport = async (c: any) => {
         const roomId = c.req.param('roomId')
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            c.req.header('X-VJudge-Session'),
+            getVjudgeSession(c),
         )
         const jsonString = JSON.stringify(snapshot.scored)
         const result = await sql.begin(async (tx) => {
