@@ -71,7 +71,8 @@ describe('buildScoredContestReport', () => {
         groups: [{
           name: 'Combo',
           formulaKey: 'combo',
-          formula: 'raw_score(0) * 2 + solved(1)',
+          solvedScoreFormula: 'raw_score(0) * 2 + solved(1)',
+          penaltyScoreFormula: 'max(penalty)',
           contestItemIds: ['item-1', 'item-2'],
         }],
         sortRules: [{ key: 'score', direction: 'desc' }],
@@ -82,7 +83,42 @@ describe('buildScoredContestReport', () => {
     expect(report.users[0].contests.combo.rawScore).toBe(7);
     expect(report.users[0].contests.combo.solved).toBe(5);
     expect(report.users[0].scoringVariables.total_raw_score).toBe(7);
+    expect(report.users[0].contests.combo.penalty).toBe(30);
     expect(report.scoring.resultUnits[0].formula).toBe('raw_score(0) * 2 + solved(1)');
+    expect(report.scoring.resultUnits[0].penaltyScoreFormula).toBe('max(penalty)');
+  });
+
+  test('calculates solved and penalty scores independently and uses penalty to break ties', () => {
+    const report = buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [
+        source({
+          itemId: 'item-1',
+          contestKey: 'c101',
+          formulaKey: 'alpha',
+          teams: [
+            team('alice', 3, 3, 90),
+            team('bob', 3, 3, 40),
+          ],
+        }),
+      ],
+      config: {
+        solvedScoreFormula: 'sum(solved) * 10',
+        penaltyScoreFormula: 'sum(penalty) + sum(demerits)',
+        scorePrecision: 2,
+        sortRules: [
+          { key: 'solved_score', direction: 'desc' },
+          { key: 'penalty_score', direction: 'asc' },
+        ],
+      },
+    });
+
+    expect(report.users.map((user: any) => user.username)).toEqual(['bob', 'alice']);
+    expect(report.users.map((user: any) => user.solvedScore)).toEqual([30, 30]);
+    expect(report.users.map((user: any) => user.penaltyScore)).toEqual([40, 90]);
+    expect(report.users[0].scoreTrace.solvedScoreFormula).toBe('sum(solved) * 10');
+    expect(report.users[0].scoreTrace.penaltyScoreFormula).toBe('sum(penalty) + sum(demerits)');
   });
 
   test('supplies zero metrics and attendance flag for missing participation', () => {
@@ -171,6 +207,7 @@ describe('buildScoredContestReport', () => {
     });
 
     expect(report.scoring.formula).toBe('sum(solved)');
+    expect(report.scoring.penaltyScoreFormula).toBe('sum(penalty) + stddev(penalty)');
     expect(report.users.map((user: any) => user.username)).toEqual(['alice', 'bob']);
     expect(report.users.map((user: any) => user.score)).toEqual([11, 2]);
   });

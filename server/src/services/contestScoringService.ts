@@ -16,12 +16,16 @@ export type ContestScoringGroupInput = {
   name: string;
   formulaKey: string;
   formula?: string | null;
+  solvedScoreFormula?: string | null;
+  penaltyScoreFormula?: string | null;
   contestItemIds: string[];
 };
 
 export type ContestScoringConfigInput = {
   groups?: ContestScoringGroupInput[];
   formula?: string;
+  solvedScoreFormula?: string;
+  penaltyScoreFormula?: string;
   scorePrecision?: number;
   sortRules?: Array<{ key: string; direction: SortDirection }>;
   excludedUnitKeys?: string[];
@@ -88,6 +92,8 @@ type ResultUnitDefinition = {
   name: string;
   isComposite: boolean;
   formula: string | null;
+  solvedScoreFormula: string | null;
+  penaltyScoreFormula: string | null;
   order: number;
   sourceContestIds: string[];
   sourceItemIds: string[];
@@ -120,8 +126,11 @@ type UnitMetrics = {
 
 const FORMULA_KEY_FALLBACK_PREFIX = 'contest';
 export const DEFAULT_COMPOSITE_FORMULA = 'sum(raw_score)';
+export const DEFAULT_COMPOSITE_PENALTY_FORMULA = 'sum(penalty)';
 const DEFAULT_GLOBAL_FORMULA = 'sum(raw_score) - stddev(raw_score)';
+const DEFAULT_GLOBAL_PENALTY_FORMULA = 'sum(penalty) + stddev(penalty)';
 const DEFAULT_CLASSROOM_FORMULA = 'sum(solved)';
+const DEFAULT_CLASSROOM_PENALTY_FORMULA = 'sum(penalty) + stddev(penalty)';
 
 export const BASE_SCORING_VARIABLES = [
   'sum(solved)',
@@ -143,6 +152,8 @@ export const BASE_SCORING_VARIABLES = [
 ];
 
 export const SORTABLE_SCORING_KEYS = [
+  'solved_score',
+  'penalty_score',
   'score',
   'total_solved',
   'total_penalty',
@@ -174,8 +185,8 @@ export const SORTABLE_SCORING_KEYS = [
 ];
 
 export const DEFAULT_SCORING_SORT_RULES: Array<{ key: string; direction: SortDirection }> = [
-  { key: 'score', direction: 'desc' },
-  { key: 'effective_penalty', direction: 'asc' },
+  { key: 'solved_score', direction: 'desc' },
+  { key: 'penalty_score', direction: 'asc' },
   { key: 'attended_count', direction: 'desc' },
 ];
 
@@ -257,7 +268,14 @@ export function normalizeScoringConfig(
   fallback: ContestScoringConfigInput = {},
 ): Required<ContestScoringConfigInput> {
   const source = rawConfig || {};
-  const formula = normalizeText(source.formula ?? fallback.formula ?? DEFAULT_GLOBAL_FORMULA, 1000) || DEFAULT_GLOBAL_FORMULA;
+  const solvedScoreFormula = normalizeText(
+    source.solvedScoreFormula ?? source.formula ?? fallback.solvedScoreFormula ?? fallback.formula ?? DEFAULT_GLOBAL_FORMULA,
+    1000,
+  ) || DEFAULT_GLOBAL_FORMULA;
+  const penaltyScoreFormula = normalizeText(
+    source.penaltyScoreFormula ?? fallback.penaltyScoreFormula ?? DEFAULT_GLOBAL_PENALTY_FORMULA,
+    1000,
+  ) || DEFAULT_GLOBAL_PENALTY_FORMULA;
   const scorePrecision = clampInteger(source.scorePrecision ?? fallback.scorePrecision, 0, 4, 2);
   const dropWorstCount = clampInteger(source.dropWorstCount ?? fallback.dropWorstCount, 0, 100, 0);
 
@@ -269,7 +287,9 @@ export function normalizeScoringConfig(
 
   return {
     groups: Array.isArray(source.groups) ? source.groups : Array.isArray(fallback.groups) ? fallback.groups : [],
-    formula,
+    formula: solvedScoreFormula,
+    solvedScoreFormula,
+    penaltyScoreFormula,
     scorePrecision,
     sortRules: sortRules.slice(0, 8).map((rule) => ({
       key: normalizeText(rule?.key, 80),
@@ -287,16 +307,20 @@ export function normalizeScoringConfig(
 export function defaultScoringConfigForScope(scope: 'global' | 'classroom', roomType?: string | null, _unitKeys: string[] = []): Required<ContestScoringConfigInput> {
   const normalizedRoomType = normalizeText(roomType, 20).toUpperCase();
   const classroomSortRules = [
-    { key: 'score', direction: 'desc' as SortDirection },
+    { key: 'solved_score', direction: 'desc' as SortDirection },
+    { key: 'penalty_score', direction: 'asc' as SortDirection },
     { key: 'attended_count', direction: 'desc' as SortDirection },
   ].slice(0, 8);
 
   return normalizeScoringConfig({
-    formula: scope === 'classroom'
+    solvedScoreFormula: scope === 'classroom'
       ? DEFAULT_CLASSROOM_FORMULA
       : normalizedRoomType === 'TSC'
         ? 'tfc_component + tsc_component'
         : DEFAULT_GLOBAL_FORMULA,
+    penaltyScoreFormula: scope === 'classroom'
+      ? DEFAULT_CLASSROOM_PENALTY_FORMULA
+      : DEFAULT_GLOBAL_PENALTY_FORMULA,
     scorePrecision: scope === 'classroom' ? 0 : 2,
     sortRules: scope === 'classroom' ? classroomSortRules : DEFAULT_SCORING_SORT_RULES,
     excludedUnitKeys: [],
@@ -311,14 +335,16 @@ function validateGroups(groups: ContestScoringGroupInput[], sourcesByItemId: Map
   const normalizedGroups = groups.map((group) => {
     const name = normalizeText(group.name, 160);
     const formulaKey = normalizeText(group.formulaKey, 48).toLowerCase();
-    const formula = normalizeText(group.formula, 1000) || DEFAULT_COMPOSITE_FORMULA;
+    const solvedScoreFormula = normalizeText(group.solvedScoreFormula ?? group.formula, 1000) || DEFAULT_COMPOSITE_FORMULA;
+    const penaltyScoreFormula = normalizeText(group.penaltyScoreFormula, 1000) || DEFAULT_COMPOSITE_PENALTY_FORMULA;
     const contestItemIds = uniqueStrings(Array.isArray(group.contestItemIds) ? group.contestItemIds : [], 80);
 
     if (!name) throw new Error('Composite name is required');
     if (!isValidFormulaIdentifier(formulaKey)) {
       throw new Error(`Composite key "${formulaKey}" must match ^[a-z][a-z0-9_]{0,47}$`);
     }
-    parseFormula(formula);
+    parseFormula(solvedScoreFormula);
+    parseFormula(penaltyScoreFormula);
     if (seenKeys.has(formulaKey)) throw new Error(`Duplicate composite key "${formulaKey}"`);
     seenKeys.add(formulaKey);
     if (contestItemIds.length < 2) throw new Error(`Composite "${name}" must include at least two contests`);
@@ -333,7 +359,9 @@ function validateGroups(groups: ContestScoringGroupInput[], sourcesByItemId: Map
       id: normalizeText(group.id, 80) || formulaKey,
       name,
       formulaKey,
-      formula,
+      formula: solvedScoreFormula,
+      solvedScoreFormula,
+      penaltyScoreFormula,
       contestItemIds,
     };
   });
@@ -373,7 +401,9 @@ function buildResultUnitDefinitions(sources: ContestSourceInput[], config: Requi
       key: group.formulaKey,
       name: group.name,
       isComposite: true,
-      formula: group.formula,
+      formula: group.solvedScoreFormula,
+      solvedScoreFormula: group.solvedScoreFormula,
+      penaltyScoreFormula: group.penaltyScoreFormula,
       order: Number.isFinite(Number(earliest?.sortOrder)) ? Number(earliest.sortOrder) : sources.indexOf(earliest),
       sourceContestIds: groupSources.map((source) => source.contestKey),
       sourceItemIds: groupSources.map((source) => source.itemId),
@@ -389,6 +419,8 @@ function buildResultUnitDefinitions(sources: ContestSourceInput[], config: Requi
       name: source.title,
       isComposite: false,
       formula: null,
+      solvedScoreFormula: null,
+      penaltyScoreFormula: null,
       order: Number.isFinite(Number(source.sortOrder)) ? Number(source.sortOrder) : sources.indexOf(source),
       sourceContestIds: [source.contestKey],
       sourceItemIds: [source.itemId],
@@ -644,14 +676,20 @@ function buildUnitMetrics(
       }));
     const sourceBreakdown = Object.fromEntries(sourceMetrics.map((metric) => [metric.contestId, metric]));
     const solved = sourceMetrics.reduce((sum, metric) => sum + metric.solved, 0);
-    const penalty = sourceMetrics.reduce((sum, metric) => sum + metric.penalty, 0);
+    const summedPenalty = sourceMetrics.reduce((sum, metric) => sum + metric.penalty, 0);
     const summedRawScore = sourceMetrics.reduce((sum, metric) => sum + metric.rawScore, 0);
     const rawScore = unit.isComposite
-      ? evaluateFormula(unit.formula || DEFAULT_COMPOSITE_FORMULA, {
+      ? evaluateFormula(unit.solvedScoreFormula || DEFAULT_COMPOSITE_FORMULA, {
         variables: aggregateMetricVariables(sourceMetrics),
         rows: sourceMetricRows(sourceMetrics),
       }).value
       : summedRawScore;
+    const penalty = unit.isComposite
+      ? evaluateFormula(unit.penaltyScoreFormula || DEFAULT_COMPOSITE_PENALTY_FORMULA, {
+        variables: aggregateMetricVariables(sourceMetrics),
+        rows: sourceMetricRows(sourceMetrics),
+      }).value
+      : summedPenalty;
     const demerits = sourceMetrics.reduce((sum, metric) => sum + metric.demeritPoints, 0);
     const attended = sourceMetrics.some((metric) => metric.attended > 0) ? 1 : 0;
     const excluded = excludedUnitKeys.has(unit.key);
@@ -772,11 +810,18 @@ function buildVariables(
     highest_tsc_score: tscHighest.highestTscScore,
   };
 
-  const formulaResult = evaluateFormula(config.formula, {
+  const solvedScoreResult = evaluateFormula(config.solvedScoreFormula, {
     variables,
     rows: unitMetricRows(unitMetrics),
   });
-  variables.score = formulaResult.value;
+  variables.solved_score = solvedScoreResult.value;
+  variables.score = solvedScoreResult.value;
+  const penaltyScoreResult = evaluateFormula(config.penaltyScoreFormula, {
+    variables,
+    rows: unitMetricRows(unitMetrics),
+  });
+  variables.penalty_score = penaltyScoreResult.value;
+  variables.effective_penalty = penaltyScoreResult.value;
   return variables;
 }
 
@@ -848,7 +893,8 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
   config.excludedUnitKeys.forEach((key) => {
     if (!unitKeySet.has(key)) throw new Error(`Cannot exclude unknown result unit "${key}"`);
   });
-  parseFormula(config.formula);
+  parseFormula(config.solvedScoreFormula);
+  parseFormula(config.penaltyScoreFormula);
   config.sortRules.forEach((rule) => {
     if (!availableSortKeys.has(rule.key) && !['name', 'username', 'rank'].includes(rule.key)) {
       throw new Error(`Cannot sort by unknown variable "${rule.key}"`);
@@ -868,9 +914,14 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
   const users = participants.map((participant) => {
     const unitMetrics = unitMetricsByParticipant.get(participant.identityKey) || [];
     const variables = buildVariables(unitMetrics, config, options.legacyTsc || null, participant, tscHighest);
-    const score = variables.score;
+    const solvedScore = variables.solved_score;
+    const penaltyScore = variables.penalty_score;
     const contests = Object.fromEntries(unitMetrics.map((unit) => [unit.key, {
-      ...(unitDefinitionByKey.get(unit.key)?.formula ? { formula: unitDefinitionByKey.get(unit.key)?.formula } : {}),
+      ...(unitDefinitionByKey.get(unit.key)?.solvedScoreFormula ? {
+        formula: unitDefinitionByKey.get(unit.key)?.solvedScoreFormula,
+        solvedScoreFormula: unitDefinitionByKey.get(unit.key)?.solvedScoreFormula,
+        penaltyScoreFormula: unitDefinitionByKey.get(unit.key)?.penaltyScoreFormula,
+      } : {}),
       solved: unit.solved,
       penalty: unit.penalty,
       finalScore: unit.rawScore,
@@ -901,19 +952,25 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
       totalDemeritPoints: variables.total_demerits,
       stdDeviationScore: variables.raw_score_deviation,
       stdDeviationPen: variables.penalty_deviation,
-      effectivePenalty: variables.effective_penalty,
-      effectiveSolved: score,
-      effectiveTotalScore: score,
-      effectiveTotalSolved: score,
-      effectiveTotalPenalty: variables.effective_penalty,
-      score,
-      displayScore: scorePrecisionNumber(score, config.scorePrecision),
+      effectivePenalty: penaltyScore,
+      effectiveSolved: solvedScore,
+      effectiveTotalScore: solvedScore,
+      effectiveTotalSolved: solvedScore,
+      effectiveTotalPenalty: penaltyScore,
+      solvedScore,
+      penaltyScore,
+      score: solvedScore,
+      displaySolvedScore: scorePrecisionNumber(solvedScore, config.scorePrecision),
+      displayPenaltyScore: scorePrecisionNumber(penaltyScore, config.scorePrecision),
+      displayScore: scorePrecisionNumber(solvedScore, config.scorePrecision),
       scoringVariables: variables,
       scoreTrace: {
         sourceContests: unitMetrics.flatMap((unit) => unit.sourceContestIds),
         resultUnits: unitMetrics.map((unit) => ({
           key: unit.key,
-          formula: unitDefinitionByKey.get(unit.key)?.formula || null,
+          formula: unitDefinitionByKey.get(unit.key)?.solvedScoreFormula || null,
+          solvedScoreFormula: unitDefinitionByKey.get(unit.key)?.solvedScoreFormula || null,
+          penaltyScoreFormula: unitDefinitionByKey.get(unit.key)?.penaltyScoreFormula || null,
           solved: unit.solved,
           penalty: unit.penalty,
           rawScore: unit.rawScore,
@@ -925,8 +982,12 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
           sourceBreakdown: unit.sourceBreakdown,
         })),
         variables,
-        formula: config.formula,
-        score,
+        formula: config.solvedScoreFormula,
+        solvedScoreFormula: config.solvedScoreFormula,
+        penaltyScoreFormula: config.penaltyScoreFormula,
+        solvedScore,
+        penaltyScore,
+        score: solvedScore,
       },
     };
   });
@@ -955,7 +1016,7 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
   }]));
 
   return {
-    snapshotVersion: 2,
+    snapshotVersion: 3,
     users,
     contestIds,
     contestIdToTitle,
@@ -973,7 +1034,9 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
     scorePrecision: config.scorePrecision,
     scoring: {
       version: config.version,
-      formula: config.formula,
+      formula: config.solvedScoreFormula,
+      solvedScoreFormula: config.solvedScoreFormula,
+      penaltyScoreFormula: config.penaltyScoreFormula,
       scorePrecision: config.scorePrecision,
       sortRules: config.sortRules,
       excludedUnitKeys: config.excludedUnitKeys,

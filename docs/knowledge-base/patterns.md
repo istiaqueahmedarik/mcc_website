@@ -819,7 +819,7 @@ Source:
 - `server/src/services/contestScoringService.ts`
 
 Pattern:
-Keep merge configuration editing in `ContestScoringDialog`, but show saved composite group membership and formulas on the surrounding manager page with a read-only overview. Use the composite's result key for identity/display, while formulas use sheet-style row metrics such as `sum(raw_score)`, `raw_score(0)`, and `sum(demerits where title contains "TFC")`.
+Keep merge configuration editing in `ContestScoringDialog`, but show saved composite group membership plus solved-score and penalty-score formulas on the surrounding manager page with a read-only overview. Use the composite's result key for identity/display, while formulas use sheet-style row metrics such as `sum(raw_score)`, `sum(penalty)`, `raw_score(0)`, and `sum(demerits where title contains "TFC")`.
 Make the overview collapsible and let the group cards auto-fit available width, so a room with many composites stays scannable and a room with one composite does not leave a large empty column.
 
 Applies when:
@@ -843,3 +843,18 @@ Changing scoring formula UX, formula examples, formula preview affordances, or m
 
 Do not overgeneralize:
 Do not make the explainer calculate live ranks, and do not make browser-side formula preview authoritative.
+
+## 2026-08-29 - Paired Ranking Outputs With Compatibility Aliases
+
+Source:
+- `server/src/services/contestScoringService.ts`
+- `docs/sql/contest-report-score-pair-v2-20260829.sql`
+
+Pattern:
+When evolving one persisted ranking value into a primary value plus tie-breaker, store and evaluate both explicitly, rank on unrounded outputs, and keep old field names as read/write aliases during migration. Backfill the primary formula from the legacy formula and give the new tie-breaker a behavior-preserving default.
+
+Applies when:
+Splitting an existing score contract, adding formula-driven tie-breakers, or evolving generated snapshots without breaking older readers.
+
+Do not overgeneralize:
+Compatibility aliases are transitional API support, not permission to maintain two independent sources of truth.

@@ -879,8 +879,8 @@ Source:
 - `client/src/components/ContestScoringDialog.jsx`
 
 Decision:
-1. Each composite merge group can define one formula over its member contest rows.
-2. Composite formulas default to `sum(raw_score)`, so existing composites remain simple sums under the sheet-style engine.
+1. Each composite merge group defines solved-score and penalty-score formulas over its member contest rows; this was extended by `contest-report-score-pair-v2`.
+2. Solved-score formulas default to `sum(raw_score)` and penalty formulas default to `sum(penalty)`, preserving summed composite behavior under the sheet-style engine.
 3. A composite's key is a result key for the merged output column; formulas use row metrics such as `sum(raw_score)`, `raw_score(0)`, and `sum(demerits where title contains "TFC")` instead of generated per-contest variable prefixes.
 4. Saved merge groups are shown outside the scoring dialog on manager-facing room pages for quick scanning.
 
@@ -909,3 +909,23 @@ Changing formula parser syntax, scoring defaults, formula editor snippets, compo
 
 Do not overgeneralize:
 Do not reintroduce per-contest formula variables in the editor. Keep formula execution server-side through the restricted AST evaluator.
+
+## 2026-08-29 - contest-report-score-pair-v2 - Solved Score Plus Penalty Score
+
+Source:
+- `docs/sql/contest-report-score-pair-v2-20260829.sql`
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+
+Decision:
+1. A scored contest result has two independently configurable formula outputs: solved score and penalty score.
+2. The default rank ladder compares solved score descending, then penalty score ascending, then attendance; exact equality across saved sort rules keeps competition ranks.
+3. Composite result units also calculate solved score and penalty score separately from the same member-contest rows.
+4. The legacy `formula`, `score`, and `effective_penalty` fields remain compatibility aliases while saved configs and new snapshots expose explicit score-pair fields.
+5. Report tables, exports, previews, and read-only rule dialogs label both outputs explicitly.
+
+Applies when:
+Changing contest ranking formulas, tie-breakers, composite scoring, scored snapshots, report renderers, exports, or scoring persistence.
+
+Do not overgeneralize:
+Penalty score is formula-driven and need not be raw contest penalty. Ranking direction remains an explicit saved sort-rule choice.

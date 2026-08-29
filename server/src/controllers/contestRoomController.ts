@@ -4,6 +4,7 @@ import {
     BASE_SCORING_VARIABLES,
     buildScoredContestReport,
     DEFAULT_COMPOSITE_FORMULA,
+    DEFAULT_COMPOSITE_PENALTY_FORMULA,
     defaultScoringConfigForScope,
     normalizeScoringConfig,
     SORTABLE_SCORING_KEYS,
@@ -319,7 +320,9 @@ async function loadGlobalScoringGroups(roomId: string) {
         id: String(row.id),
         name: row.name,
         formulaKey: row.formula_key,
-        formula: row.formula || DEFAULT_COMPOSITE_FORMULA,
+        formula: row.formula || row.solved_score_formula || DEFAULT_COMPOSITE_FORMULA,
+        solvedScoreFormula: row.formula || row.solved_score_formula || DEFAULT_COMPOSITE_FORMULA,
+        penaltyScoreFormula: row.penalty_score_formula || DEFAULT_COMPOSITE_PENALTY_FORMULA,
         contestItemIds: parseJsonArray(row.contest_item_ids).map(String),
     }))
 }
@@ -330,7 +333,9 @@ function rowToGlobalScoringConfig(row: any, groups: any[], fallback: ContestScor
     }
     return normalizeScoringConfig({
         groups,
-        formula: row.formula,
+        formula: row.formula || row.solved_score_formula,
+        solvedScoreFormula: row.formula || row.solved_score_formula,
+        penaltyScoreFormula: row.penalty_score_formula,
         scorePrecision: Number(row.score_precision),
         sortRules: parseJsonArray(row.sort_rules),
         excludedUnitKeys: parseJsonArray(row.excluded_unit_keys),
@@ -358,20 +363,24 @@ async function loadGlobalScoringConfig(roomId: string, roomType: string, items: 
 function normalizeGlobalScoringGroupPayload(group: any) {
     const name = normalizeText(group?.name, 160)
     const formulaKey = normalizeFormulaKey(group?.formulaKey ?? group?.formula_key)
-    const formula = normalizeText(group?.formula, 1000) || DEFAULT_COMPOSITE_FORMULA
+    const solvedScoreFormula = normalizeText(group?.solvedScoreFormula ?? group?.solved_score_formula ?? group?.formula, 1000) || DEFAULT_COMPOSITE_FORMULA
+    const penaltyScoreFormula = normalizeText(group?.penaltyScoreFormula ?? group?.penalty_score_formula, 1000) || DEFAULT_COMPOSITE_PENALTY_FORMULA
     const contestItemIds = parseJsonArray(group?.contestItemIds ?? group?.contest_item_ids)
         .map((item) => normalizeText(item, 80))
         .filter(Boolean)
 
     if (!name) throw new Error('Composite name is required')
     if (!formulaKey) throw new Error('Composite key must match ^[a-z][a-z0-9_]{0,47}$')
-    parseFormula(formula)
+    parseFormula(solvedScoreFormula)
+    parseFormula(penaltyScoreFormula)
     if (contestItemIds.length < 2) throw new Error(`Composite "${name}" must include at least two contests`)
 
     return {
         name,
         formulaKey,
-        formula,
+        formula: solvedScoreFormula,
+        solvedScoreFormula,
+        penaltyScoreFormula,
         contestItemIds: Array.from(new Set(contestItemIds)),
     }
 }
@@ -379,12 +388,16 @@ function normalizeGlobalScoringGroupPayload(group: any) {
 function normalizeGlobalScoringPayload(body: any, fallback: ContestScoringConfigInput): ContestScoringConfigInput {
     const source = body?.config && typeof body.config === 'object' ? body.config : body || {}
     const groups = parseJsonArray(source.groups).map(normalizeGlobalScoringGroupPayload)
-    const formula = normalizeText(source.formula ?? fallback.formula, 1000)
-    parseFormula(formula)
+    const solvedScoreFormula = normalizeText(source.solvedScoreFormula ?? source.solved_score_formula ?? source.formula ?? fallback.solvedScoreFormula ?? fallback.formula, 1000)
+    const penaltyScoreFormula = normalizeText(source.penaltyScoreFormula ?? source.penalty_score_formula ?? fallback.penaltyScoreFormula, 1000)
+    parseFormula(solvedScoreFormula)
+    parseFormula(penaltyScoreFormula)
 
     return {
         groups,
-        formula,
+        formula: solvedScoreFormula,
+        solvedScoreFormula,
+        penaltyScoreFormula,
         scorePrecision: normalizeScorePrecision(source.scorePrecision ?? source.score_precision, fallback.scorePrecision),
         sortRules: normalizeSortRules(source.sortRules ?? source.sort_rules, fallback.sortRules || []),
         excludedUnitKeys: parseJsonArray(source.excludedUnitKeys ?? source.excluded_unit_keys)
@@ -808,6 +821,8 @@ export const updateContestRoomScoring = async (c: any) => {
                         name,
                         formula_key,
                         formula,
+                        solved_score_formula,
+                        penalty_score_formula,
                         created_by,
                         updated_by
                     )
@@ -815,7 +830,9 @@ export const updateContestRoomScoring = async (c: any) => {
                         ${roomId},
                         ${group.name},
                         ${group.formulaKey},
-                        ${group.formula || DEFAULT_COMPOSITE_FORMULA},
+                        ${group.solvedScoreFormula || group.formula || DEFAULT_COMPOSITE_FORMULA},
+                        ${group.solvedScoreFormula || group.formula || DEFAULT_COMPOSITE_FORMULA},
+                        ${group.penaltyScoreFormula || DEFAULT_COMPOSITE_PENALTY_FORMULA},
                         ${actor.id},
                         ${actor.id}
                     )
@@ -833,6 +850,8 @@ export const updateContestRoomScoring = async (c: any) => {
                 INSERT INTO public.contest_report_scoring_configs (
                     room_id,
                     formula,
+                    solved_score_formula,
+                    penalty_score_formula,
                     score_precision,
                     sort_rules,
                     excluded_unit_keys,
@@ -844,6 +863,8 @@ export const updateContestRoomScoring = async (c: any) => {
                 VALUES (
                     ${roomId},
                     ${requestedConfig.formula},
+                    ${requestedConfig.solvedScoreFormula},
+                    ${requestedConfig.penaltyScoreFormula},
                     ${requestedConfig.scorePrecision},
                     ${tx.json(requestedConfig.sortRules || [])},
                     ${tx.json(requestedConfig.excludedUnitKeys || [])},
@@ -855,6 +876,8 @@ export const updateContestRoomScoring = async (c: any) => {
                 ON CONFLICT (room_id)
                 DO UPDATE SET
                     formula = EXCLUDED.formula,
+                    solved_score_formula = EXCLUDED.solved_score_formula,
+                    penalty_score_formula = EXCLUDED.penalty_score_formula,
                     score_precision = EXCLUDED.score_precision,
                     sort_rules = EXCLUDED.sort_rules,
                     excluded_unit_keys = EXCLUDED.excluded_unit_keys,

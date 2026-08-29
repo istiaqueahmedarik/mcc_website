@@ -333,6 +333,33 @@ function ReportTable({ merged, lastUpdated }) {
                 <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
                 <DialogDescription asChild>
                   <div className="space-y-4 text-sm leading-relaxed mt-2">
+                    {isScoredSnapshot ? (
+                      <>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Solved score formula</h4>
+                          <code className="block rounded-md bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--foreground))]">
+                            {merged?.scoring?.solvedScoreFormula || merged?.scoring?.formula || "sum(solved)"}
+                          </code>
+                        </div>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Penalty formula</h4>
+                          <code className="block rounded-md bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--foreground))]">
+                            {merged?.scoring?.penaltyScoreFormula || "sum(penalty)"}
+                          </code>
+                        </div>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Ranking order</h4>
+                          <ol className="list-inside list-decimal space-y-1">
+                            {(merged?.scoring?.sortRules || []).map((rule, index) => (
+                              <li key={`${rule.key}-${index}`}>
+                                {rule.key} {rule.direction === "asc" ? "ascending" : "descending"}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div>
                       <h4 className="font-semibold mb-1">
                         Per-Contest Metrics
@@ -437,6 +464,8 @@ function ReportTable({ merged, lastUpdated }) {
                       </h4>
                       <p>1 worst contest (generally) opt out.</p>
                     </div>
+                      </>
+                    )}
                   </div>
                 </DialogDescription>
               </DialogHeader>
@@ -465,10 +494,10 @@ function ReportTable({ merged, lastUpdated }) {
                   Contests
                 </TableHead>
                 <TableHead className="text-[hsl(var(--foreground))]">
-                  {isScoredSnapshot ? "Score" : "Effective Score"}
+                  {isScoredSnapshot ? "Solved Score" : "Effective Score"}
                 </TableHead>
                 <TableHead className="text-[hsl(var(--foreground))]">
-                  {isScoredSnapshot ? "Penalty" : "Standard Deviation"}
+                  {isScoredSnapshot ? "Penalty Score" : "Standard Deviation"}
                 </TableHead>
                 <TableHead className="text-[hsl(var(--foreground))]">
                   Total Demerits
@@ -749,10 +778,10 @@ function ReportTable({ merged, lastUpdated }) {
                           <>
                             <p className="flex items-center gap-1 text-sm">
                               <span className="font-medium text-[hsl(var(--foreground))]">
-                                Score:
+                                Solved:
                               </span>
                               <span className="font-semibold text-[hsl(var(--primary))]">
-                                {formatScore(u.displayScore ?? u.score)}
+                                {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
                               </span>
                             </p>
                             <p className="text-xs text-[hsl(var(--muted-foreground))]">
@@ -795,7 +824,7 @@ function ReportTable({ merged, lastUpdated }) {
                       <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
                         {isScoredSnapshot ? (
                           <p className="text-sm font-semibold tabular-nums">
-                            {formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty, 2)}
+                            {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
                           </p>
                         ) : (
                           <>
@@ -884,8 +913,8 @@ function ReportTable({ merged, lastUpdated }) {
                             )}
                             <div className="space-y-0.5 rounded-md bg-[hsl(var(--background)/0.7)] p-1 opacity-70">
                               <p className="text-xs">Solved: 0</p>
-                              <p className="text-xs">Penalty: 0.00</p>
-                              <p className="text-xs">Score: 0.00</p>
+                              <p className="text-xs">{isScoredSnapshot ? "Penalty Score" : "Penalty"}: 0.00</p>
+                              <p className="text-xs">{isScoredSnapshot ? "Solved Score" : "Score"}: 0.00</p>
                             </div>
                           </TableCell>
                         );
@@ -920,7 +949,7 @@ function ReportTable({ merged, lastUpdated }) {
                             </p>
                             <p className="text-xs">
                               <span className="font-medium text-[hsl(var(--foreground))]">
-                                Penalty:
+                                {isScoredSnapshot ? "Penalty Score:" : "Penalty:"}
                               </span>{" "}
                               <span className="font-semibold">
                                 {perf.penalty.toFixed(2)}
@@ -928,7 +957,7 @@ function ReportTable({ merged, lastUpdated }) {
                             </p>
                             <p className="text-xs">
                               <span className="font-medium text-[hsl(var(--foreground))]">
-                                Score:
+                                {isScoredSnapshot ? "Solved Score:" : "Score:"}
                               </span>{" "}
                               <span className="font-semibold">
                                 {formatScore(perf.finalScore ?? perf.rawScore, 2)}

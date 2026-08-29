@@ -666,8 +666,8 @@ function ReportTable({
         "Rank",
         "Username",
         "Real Name",
-        "Score",
-        "Penalty",
+        "Solved Score",
+        "Penalty Score",
         "Contests",
         "Demerits",
         ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
@@ -678,14 +678,14 @@ function ReportTable({
           u.rank || idx + 1,
           u.username,
           u.realName,
-          formatScore(u.displayScore ?? u.score),
-          formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
+          formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
           u.totalContestsAttended,
           u.totalDemeritPoints || 0,
         ]
         const contestData = orderedContestIds.map((cid) => {
           const perf = u.contests?.[cid]
-          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty Score: ${formatScore(perf?.penalty, 2)}, Solved Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
         })
         return [...base, ...contestData]
       })
@@ -820,8 +820,8 @@ function ReportTable({
         "Rank",
         "Username",
         "Real Name",
-        "Score",
-        "Penalty",
+        "Solved Score",
+        "Penalty Score",
         "Contests",
         "Demerits",
         ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
@@ -851,14 +851,14 @@ function ReportTable({
           u.rank || idx + 1,
           u.username,
           u.realName,
-          formatScore(u.displayScore ?? u.score),
-          formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
+          formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
           u.totalContestsAttended,
           u.totalDemeritPoints || 0,
         ]
         const contestData = orderedContestIds.map((cid) => {
           const perf = u.contests?.[cid]
-          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty Score: ${formatScore(perf?.penalty, 2)}, Solved Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
         })
         return [...base, ...contestData]
       }
@@ -995,9 +995,13 @@ function ReportTable({
                         {isScoredSnapshot ? (
                           <>
                             <div>
-                              <h4 className="font-semibold mb-1">Formula</h4>
+                              <h4 className="font-semibold mb-1">Solved score formula</h4>
                               <code className="block rounded-md bg-muted px-3 py-2 text-xs text-foreground">
-                                {merged?.scoring?.formula || "score"}
+                                {merged?.scoring?.solvedScoreFormula || merged?.scoring?.formula || "sum(solved)"}
+                              </code>
+                              <h4 className="mb-1 mt-3 font-semibold">Penalty formula</h4>
+                              <code className="block rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                                {merged?.scoring?.penaltyScoreFormula || "sum(penalty)"}
                               </code>
                             </div>
                             <div>
@@ -1203,8 +1207,8 @@ function ReportTable({
                 <TableHead>Total Solves</TableHead>
               ) : isScoredSnapshot ? (
                 <>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Penalty</TableHead>
+                  <TableHead>Solved Score</TableHead>
+                  <TableHead>Penalty Score</TableHead>
                   <TableHead>Demerits</TableHead>
                 </>
               ) : (
@@ -1468,14 +1472,14 @@ function ReportTable({
                     <>
                       <TableCell>
                         <p className="text-base font-semibold tabular-nums">
-                          {formatScore(u.displayScore ?? u.score)}
+                          {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           raw {formatScore(u.totalScore, 2)}
                         </p>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {formatScore(u.effectiveTotalPenalty ?? u.effectivePenalty, 2)}
+                        {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
                       </TableCell>
                       <TableCell>
                         {Number(u.totalDemeritPoints || 0) > 0 ? (
@@ -1571,8 +1575,8 @@ function ReportTable({
                               )}
                             </div>
                             <div>Solved: {Number(perf?.solved || 0)}</div>
-                            <div>Penalty: {formatScore(perf?.penalty, 2)}</div>
-                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
+                            <div>Penalty Score: {formatScore(perf?.penalty, 2)}</div>
+                            <div>Solved Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
                             {sourceBreakdown.length > 1 && (
                               <Dialog>
                                 <DialogTrigger asChild>
@@ -1590,7 +1594,7 @@ function ReportTable({
                                       <div key={sourceId} className="rounded-md border p-3 text-sm">
                                         <p className="font-medium">{source?.contestTitle || sourceId}</p>
                                         <p className="text-muted-foreground">
-                                          Solved {Number(source?.solved || 0)} - Penalty {formatScore(source?.penalty, 2)} - Score {formatScore(source?.finalScore ?? source?.rawScore, 2)}
+                                          Solved {Number(source?.solved || 0)} - Penalty {formatScore(source?.penalty, 2)} - Source score {formatScore(source?.finalScore ?? source?.rawScore, 2)}
                                         </p>
                                       </div>
                                     ))}

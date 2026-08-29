@@ -1022,7 +1022,7 @@ Source:
 - `client/src/components/ContestMergeOverview.jsx`
 
 Fact:
-Composite contest merge groups now store their own `formula` in `contest_report_merge_groups` and `classroom_contest_merge_groups`. The default `sum(raw_score)` preserves summed composite behavior under the sheet-style formula engine. The scoring engine evaluates a composite formula against member contest rows before the room-level formula evaluates final result-unit rows. The saved merge layout is shown outside the editor through `ContestMergeOverview` on the global/admin room details page and the classroom trainer contest workbench.
+Composite contest merge groups store solved-score and penalty-score formulas in `contest_report_merge_groups` and `classroom_contest_merge_groups`, with `formula` retained as the solved-score compatibility alias. Defaults of `sum(raw_score)` and `sum(penalty)` preserve summed composite behavior. The scoring engine evaluates both against member contest rows before the room-level formulas evaluate final result-unit rows. The saved merge layout is shown outside the editor through `ContestMergeOverview` on the global/admin room details page and the classroom trainer contest workbench.
 
 Applies when:
 Changing composite merge-group storage, formula variables, scoring previews, generated contest reports, global room details, or classroom contest workbench merge visibility.
@@ -1047,3 +1047,23 @@ Maintaining formula parsing, scoring defaults, formula editor UX, composite form
 
 Do not overgeneralize:
 TSC scalar variables remain valid for cross-room score composition. Do not expose generated per-contest variables as the primary formula model.
+
+## 2026-08-29 - contest-report-score-pair-v2 - Score Pair Entry Points
+
+Source:
+- `docs/sql/contest-report-score-pair-v2-20260829.sql`
+- `server/src/services/contestScoringService.ts`
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+- `client/src/components/ReportTable.js`
+- `client/src/components/LiveReportTable.js`
+
+Fact:
+Contest scoring configs and merge groups now persist `solved_score_formula` and `penalty_score_formula`. The shared scoring service emits `solvedScore`, `penaltyScore`, display variants, trace formulas, and compatibility aliases. Manager configuration and preview live in `ContestScoringDialog`; private/global and live/public report renderers show and export the pair explicitly.
+
+Applies when:
+Maintaining contest scoring APIs, database migrations, rank sorting, report snapshots, manager previews, public rule explanations, or exports.
+
+Do not overgeneralize:
+Apply `contest-report-score-pair-v2-20260829.sql` before deploying controllers that write the new columns.

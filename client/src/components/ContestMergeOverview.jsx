@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_COMPOSITE_FORMULA = "sum(raw_score)";
+const DEFAULT_COMPOSITE_PENALTY_FORMULA = "sum(penalty)";
 
 function contestItemId(contest) {
   return String(contest?.id || contest?.contestRoomContestId || "");
@@ -106,11 +107,20 @@ export default function ContestMergeOverview({
                     {groupKey(group)}
                   </Badge>
                 </div>
-                <div className="mt-2 flex min-w-0 items-start gap-2 rounded-md bg-background px-2.5 py-2">
-                  <FunctionSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <code className="min-w-0 break-words text-xs text-muted-foreground">
-                    {group.formula || DEFAULT_COMPOSITE_FORMULA}
-                  </code>
+                <div className="mt-2 grid gap-1.5 rounded-md bg-background px-2.5 py-2 text-xs">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <FunctionSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="shrink-0 font-medium">Solved</span>
+                    <code className="min-w-0 break-words text-muted-foreground">
+                      {group.solvedScoreFormula || group.formula || DEFAULT_COMPOSITE_FORMULA}
+                    </code>
+                  </div>
+                  <div className="flex min-w-0 items-start gap-2 pl-[1.375rem]">
+                    <span className="shrink-0 font-medium">Penalty</span>
+                    <code className="min-w-0 break-words text-muted-foreground">
+                      {group.penaltyScoreFormula || DEFAULT_COMPOSITE_PENALTY_FORMULA}
+                    </code>
+                  </div>
                 </div>
                 <div className="mt-3 space-y-1.5 border-l pl-3">
                   {members.map((member, index) => (
