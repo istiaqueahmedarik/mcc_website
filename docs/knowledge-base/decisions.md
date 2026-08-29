@@ -922,7 +922,8 @@ Decision:
 2. The default rank ladder compares solved score descending, then penalty score ascending, then attendance; exact equality across saved sort rules keeps competition ranks.
 3. Composite result units also calculate solved score and penalty score separately from the same member-contest rows.
 4. The legacy `formula`, `score`, and `effective_penalty` fields remain compatibility aliases while saved configs and new snapshots expose explicit score-pair fields.
-5. Report tables, exports, previews, and read-only rule dialogs label both outputs explicitly.
+5. Generated and public report tables group both outputs in one `Effective Score` column: solved score first and penalty score second, with the corresponding raw totals shown in parentheses when formulas change them.
+6. The adjacent `Standard Deviation` column groups score and penalty deviations, while each contest column keeps the compact `Solved`, `Penalty`, and `Score` breakdown. CSV and PDF exports preserve the same four aggregate values as separate machine-readable columns.
 
 Applies when:
 Changing contest ranking formulas, tie-breakers, composite scoring, scored snapshots, report renderers, exports, or scoring persistence.

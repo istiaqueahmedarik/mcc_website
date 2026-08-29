@@ -666,8 +666,10 @@ function ReportTable({
         "Rank",
         "Username",
         "Real Name",
-        "Solved Score",
-        "Penalty Score",
+        "Effective Solved",
+        "Effective Penalty",
+        "Score Deviation",
+        "Penalty Deviation",
         "Contests",
         "Demerits",
         ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
@@ -680,12 +682,14 @@ function ReportTable({
           u.realName,
           formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
           formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.stdDeviationScore, 2),
+          formatScore(u.stdDeviationPen, 2),
           u.totalContestsAttended,
           u.totalDemeritPoints || 0,
         ]
         const contestData = orderedContestIds.map((cid) => {
           const perf = u.contests?.[cid]
-          return `Solved: ${Number(perf?.solved || 0)}, Penalty Score: ${formatScore(perf?.penalty, 2)}, Solved Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
         })
         return [...base, ...contestData]
       })
@@ -820,8 +824,10 @@ function ReportTable({
         "Rank",
         "Username",
         "Real Name",
-        "Solved Score",
-        "Penalty Score",
+        "Effective Solved",
+        "Effective Penalty",
+        "Score Deviation",
+        "Penalty Deviation",
         "Contests",
         "Demerits",
         ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
@@ -853,12 +859,14 @@ function ReportTable({
           u.realName,
           formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
           formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.stdDeviationScore, 2),
+          formatScore(u.stdDeviationPen, 2),
           u.totalContestsAttended,
           u.totalDemeritPoints || 0,
         ]
         const contestData = orderedContestIds.map((cid) => {
           const perf = u.contests?.[cid]
-          return `Solved: ${Number(perf?.solved || 0)}, Penalty Score: ${formatScore(perf?.penalty, 2)}, Solved Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
         })
         return [...base, ...contestData]
       }
@@ -1207,9 +1215,9 @@ function ReportTable({
                 <TableHead>Total Solves</TableHead>
               ) : isScoredSnapshot ? (
                 <>
-                  <TableHead>Solved Score</TableHead>
-                  <TableHead>Penalty Score</TableHead>
-                  <TableHead>Demerits</TableHead>
+                  <TableHead>Effective Score</TableHead>
+                  <TableHead>Standard Deviation</TableHead>
+                  <TableHead>Total Demerits</TableHead>
                 </>
               ) : (
                 <>
@@ -1471,15 +1479,32 @@ function ReportTable({
                   ) : isScoredSnapshot ? (
                     <>
                       <TableCell>
-                        <p className="text-base font-semibold tabular-nums">
-                          {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
+                        <p className="tabular-nums">
+                          <span className="font-medium">Solved:</span>{" "}
+                          <span className="font-semibold text-primary">
+                            {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
+                          </span>
+                          {Number(u.solvedScore ?? u.score ?? 0) !== Number(u.totalScore ?? 0) && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({formatScore(u.totalScore, 2)})
+                            </span>
+                          )}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          raw {formatScore(u.totalScore, 2)}
+                        <p className="tabular-nums">
+                          <span className="font-medium">Penalty:</span>{" "}
+                          <span className="font-semibold">
+                            {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
+                          </span>
+                          {Number(u.penaltyScore ?? u.effectivePenalty ?? 0) !== Number(u.totalPenalty ?? 0) && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({formatScore(u.totalPenalty, 2)})
+                            </span>
+                          )}
                         </p>
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
+                        <p><span className="font-medium">Score:</span> {formatScore(u.stdDeviationScore, 2)}</p>
+                        <p><span className="font-medium">Penalty:</span> {formatScore(u.stdDeviationPen, 2)}</p>
                       </TableCell>
                       <TableCell>
                         {Number(u.totalDemeritPoints || 0) > 0 ? (
@@ -1575,8 +1600,8 @@ function ReportTable({
                               )}
                             </div>
                             <div>Solved: {Number(perf?.solved || 0)}</div>
-                            <div>Penalty Score: {formatScore(perf?.penalty, 2)}</div>
-                            <div>Solved Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
+                            <div>Penalty: {formatScore(perf?.penalty, 2)}</div>
+                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
                             {sourceBreakdown.length > 1 && (
                               <Dialog>
                                 <DialogTrigger asChild>
