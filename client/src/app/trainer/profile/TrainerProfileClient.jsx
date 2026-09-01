@@ -13,6 +13,7 @@ import {
   Briefcase,
   Camera,
   Check,
+  Clock3,
   Github,
   Globe,
   Key,
@@ -70,6 +71,10 @@ export default function TrainerProfileClient({ user }) {
   const [previewPic, setPreviewPic] = useState(user.profile_pic || null);
   const fileInputRef = useRef(null);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const [savedFullName, setSavedFullName] = useState(user.full_name || "");
+  const [verificationPending, setVerificationPending] = useState(!user.granted);
+  const nameChanged = fullName.trim() !== savedFullName.trim();
 
   const saveProfileMutation = useMutation({
     mutationFn: saveTrainerProfile,
@@ -155,6 +160,10 @@ export default function TrainerProfileClient({ user }) {
     const formData = new FormData(form);
     try {
       await saveProfileMutation.mutateAsync({ formData, tags });
+      if (nameChanged) {
+        setVerificationPending(true);
+      }
+      setSavedFullName(fullName.trim());
     } catch (error) {
       setSaveError(error?.message || "Failed to save trainer profile");
     }
@@ -234,6 +243,12 @@ export default function TrainerProfileClient({ user }) {
                     <ShieldCheck className="h-3 w-3" />
                     {roleLabel}
                   </span>
+                  {verificationPending && (
+                    <Badge variant="outline" className="gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                      <Clock3 className="h-3 w-3" />
+                      Pending verification
+                    </Badge>
+                  )}
                 </div>
 
                 <div className="mt-4 space-y-2 text-left">
@@ -345,9 +360,23 @@ export default function TrainerProfileClient({ user }) {
                     <Input
                       id="full-name-input"
                       name="full_name"
-                      defaultValue={user.full_name || ""}
+                      value={fullName}
+                      onChange={(event) => setFullName(event.target.value)}
                       placeholder="Your full name"
+                      autoComplete="name"
+                      maxLength={160}
+                      required
+                      aria-describedby="trainer-full-name-verification-note"
                     />
+                    <p
+                      id="trainer-full-name-verification-note"
+                      className="flex gap-1.5 text-xs leading-5 text-amber-600 dark:text-amber-400"
+                    >
+                      <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      {nameChanged
+                        ? "Saving this name will send your account to admin verification again."
+                        : "Changing your full name will send your account to admin verification again."}
+                    </p>
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="trainer-title-input" className="text-xs font-semibold">
@@ -491,7 +520,7 @@ export default function TrainerProfileClient({ user }) {
                   ) : (
                     <>
                       <Save className="h-4 w-4" />
-                      Save Profile
+                      {nameChanged ? "Save and request verification" : "Save Profile"}
                     </>
                   )}
                 </Button>

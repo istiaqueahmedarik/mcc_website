@@ -4,6 +4,19 @@ import sql from "../db";
 import { sendEmail } from "../sendEmail";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 
+async function isAdminUser(c: any) {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return false;
+
+  const rows = await sql`
+    select id
+    from users
+    where id = ${id} and email = ${email} and admin = true
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
 export const signup = async (c: any) => {
   const {
     full_name,
@@ -263,6 +276,10 @@ export const listPublicVjudgeIds = async (c: any) => {
 
 export const pendingUser = async (c: any) => {
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result = await sql`select * from users where granted = false`;
     return c.json({ result });
   } catch (error) {
@@ -273,11 +290,14 @@ export const pendingUser = async (c: any) => {
 
 export const rejectUser = async (c: any) => {
   const { userId } = await c.req.json();
-  console.log(userId);
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result =
       await sql`delete from users where id = ${userId} returning *`;
-    console.log(result[0].email);
+    if (result.length === 0) return c.json({ error: "User not found" }, 404);
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Account Registration Status",
@@ -366,11 +386,14 @@ Military Institute of Science and Technology`,
 
 export const acceptUser = async (c: any) => {
   const { userId } = await c.req.json();
-  console.log(userId);
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result =
       await sql`update users set granted = true where id = ${userId} returning *`;
-    console.log(result[0].email);
+    if (result.length === 0) return c.json({ error: "User not found" }, 404);
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Welcome! Account Approved",

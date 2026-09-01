@@ -1,4 +1,5 @@
 import sql from "../db";
+import { normalizeFullNameUpdate } from "../utils/basicProfile";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 import {
   CLASSROOM_UPDATE_PRIORITIES,
@@ -407,8 +408,8 @@ export const setBasicProfile = async (c: any) => {
 
   try {
     const { full_name, phone, batch_name } = await c.req.json();
-    const shouldUpdateName =
-      typeof full_name === "string" && full_name.trim().length > 0;
+    const fullNameUpdate = normalizeFullNameUpdate(full_name);
+    const { shouldUpdate: shouldUpdateName, name } = fullNameUpdate;
     const shouldUpdatePhone = phone !== undefined;
     const shouldUpdateBatch = batch_name !== undefined;
 
@@ -416,7 +417,10 @@ export const setBasicProfile = async (c: any) => {
       return c.json({ error: "No profile fields provided" }, 400);
     }
 
-    const name = shouldUpdateName ? full_name.trim() : null;
+    if (fullNameUpdate.error) {
+      return c.json({ error: fullNameUpdate.error }, 400);
+    }
+
     const sanitizedPhone =
       typeof phone === "string" ? phone.trim() || null : null;
     const sanitizedBatch =
@@ -427,9 +431,13 @@ export const setBasicProfile = async (c: any) => {
       set
         full_name = case when ${shouldUpdateName} then ${name} else full_name end,
         phone = case when ${shouldUpdatePhone} then ${sanitizedPhone} else phone end,
-        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end
+        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end,
+        granted = case
+          when ${shouldUpdateName} and full_name is distinct from ${name} then false
+          else granted
+        end
       where id = ${id}
-      returning id, full_name, phone, batch_name
+      returning id, full_name, phone, batch_name, granted
     `;
 
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);

@@ -20,6 +20,7 @@ import ChangePasswordModal from "@/components/ChangePasswordModal";
 import {
   Award,
   CheckCircle2,
+  Clock3,
   Edit3,
   IdCard,
   Key,
@@ -30,6 +31,7 @@ import {
   Save,
   Shield,
   Shirt,
+  UserRound,
   ZoomIn
 } from "lucide-react";
 import Image from "next/image";
@@ -39,6 +41,8 @@ import { useFormStatus } from "react-dom";
 export default function ProfileSidebarEditor({ user, saveAction, logoutAction }) {
   const [isEditing, setIsEditing] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const nameChanged = fullName.trim() !== (user.full_name || "").trim();
 
   return (
     <div className="profile-card space-y-2" aria-label="Profile Summary">
@@ -101,6 +105,18 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
                 Verified
               </span>
             )}
+            {!user.granted && (
+              <span
+                className="profile-badge"
+                style={{
+                  background: "hsl(var(--profile-warning) / 0.16)",
+                  color: "hsl(var(--profile-warning))",
+                }}
+              >
+                <Clock3 className="h-3.5 w-3.5" />
+                Pending verification
+              </span>
+            )}
           </div>
           {(user.admin || user.trainer) && (
             <div className="flex flex-col gap-1.5 mt-3">
@@ -132,6 +148,42 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
         </div>
 
         <div className="space-y-2">
+          <div>
+            <div className="relative">
+              <UserRound
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                style={{ color: "hsl(var(--profile-text-muted))" }}
+                aria-hidden="true"
+              />
+              <Input
+                id="full-name-input"
+                name="full_name"
+                type="text"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Enter your full name"
+                autoComplete="name"
+                maxLength={160}
+                required
+                disabled={!isEditing}
+                aria-describedby={isEditing ? "full-name-verification-note" : undefined}
+                className="h-9 pl-9 text-sm profile-focus-ring"
+                style={{ borderRadius: "var(--profile-radius-sm)" }}
+              />
+            </div>
+            {isEditing && (
+              <p
+                id="full-name-verification-note"
+                className="mt-1.5 flex gap-1.5 text-xs leading-5"
+                style={{ color: "hsl(var(--profile-warning))" }}
+              >
+                <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {nameChanged
+                  ? "Saving this name will send your account to admin verification again."
+                  : "Changing your full name will send your account to admin verification again."}
+              </p>
+            )}
+          </div>
           <div>
             <div className="relative">
               <Mail
@@ -347,7 +399,7 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
               Edit
             </Button>
           ) : (
-            <SaveSubmitButton />
+            <SaveSubmitButton nameChanged={nameChanged} />
           )}
         </div>
       </form>
@@ -391,7 +443,7 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
   );
 }
 
-function SaveSubmitButton() {
+function SaveSubmitButton({ nameChanged }) {
   const { pending } = useFormStatus();
 
   return (
@@ -406,7 +458,11 @@ function SaveSubmitButton() {
       }}
     >
       <Save className="h-4 w-4 mr-2" />
-      {pending ? "Saving..." : "Save"}
+      {pending
+        ? "Saving..."
+        : nameChanged
+          ? "Save and request verification"
+          : "Save"}
     </Button>
   );
 }

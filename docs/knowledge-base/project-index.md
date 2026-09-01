@@ -1,5 +1,22 @@
 # Project Index
 
+## 2026-09-01 - user-full-name-reverification - Implemented Entry Points
+
+Source:
+- `client/src/components/ProfileSidebarEditor.jsx`
+- `client/src/app/trainer/profile/TrainerProfileClient.jsx`
+- `server/src/controllers/userController.ts`
+- `server/src/controllers/authController.ts`
+
+Fact:
+Members, trainers, and admins can edit their full name from their existing profile editor. A normalized name change atomically sets `users.granted` to `false`, which returns the account to the existing admin pending-user queue; resubmitting the same name preserves the current verification state. Both profile surfaces explain this before save and show pending status afterward. Pending-user listing, acceptance, and rejection now revalidate the caller against the stored admin role.
+
+Applies when:
+Maintaining profile identity edits, `POST /user/basic/set`, verification status presentation, or the `/auth/user/pendings`, `/auth/user/accept`, and `/auth/user/reject` admin workflow.
+
+Do not overgeneralize:
+Changing phone, batch, profile picture, trainer biography, or social links does not reset account verification. This feature does not add a separate verification table, verification history, or notification email when a name change enters review.
+
 ## 2026-08-17 - trainer-student-context-menu-simplification-20260817 - Implemented Entry Points
 
 Source:
