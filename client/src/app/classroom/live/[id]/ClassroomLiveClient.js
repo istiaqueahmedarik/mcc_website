@@ -5138,7 +5138,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   }
   return (
     <div className="dark min-h-screen bg-[#111111] text-foreground">
-      <main className="mx-auto flex w-full max-w-[1060px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8">
       <ProgressLink href="/classroom/list" className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
         <ArrowLeft className="h-4 w-4" /> Classrooms
       </ProgressLink>

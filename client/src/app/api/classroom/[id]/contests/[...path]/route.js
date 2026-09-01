@@ -22,6 +22,10 @@ function shouldForwardVjudgeSession(params, method) {
   return path.includes("items") && path[path.length - 1] === "fetch";
 }
 
+function shouldForwardCodeforcesSession(params, method) {
+  return shouldForwardVjudgeSession(params, method);
+}
+
 async function readJsonResponse(response) {
   const text = await response.text();
   if (!text) return {};
@@ -53,6 +57,13 @@ async function forward(request, context, method) {
     const session = (await cookies()).get("vj_session");
     if (session?.value) {
       headers["X-VJudge-Session"] = session.value;
+    }
+  }
+
+  if (shouldForwardCodeforcesSession(params, method)) {
+    const session = (await cookies()).get("cf_session");
+    if (session?.value) {
+      headers["X-Codeforces-Session"] = session.value;
     }
   }
 

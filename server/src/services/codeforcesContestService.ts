@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'crypto';
+import * as cheerio from 'cheerio';
 
 export type CodeforcesServiceResult = {
   statusCode: number;
@@ -21,6 +22,10 @@ export type CodeforcesFetchOptions = {
   rateLimitMs?: number;
   timeoutMs?: number;
   maxResponseBytes?: number;
+  webSession?: string;
+  targetHandles?: string[];
+  eduConcurrency?: number;
+  eduMaxPages?: number;
 };
 
 const CODEFORCES_API_BASE = 'https://codeforces.com/api';
@@ -29,6 +34,10 @@ const DEFAULT_RATE_LIMIT_MS = 2100;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
 const CONTESTANT_TYPE = 'CONTESTANT';
+const CODEFORCES_WEB_BASE = 'https://codeforces.com';
+const EDU_SOURCE_REGEX = /^edu:(\d+):(\d+)(?::(friends)|:list:([A-Za-z0-9]+))?$/i;
+const DEFAULT_EDU_CONCURRENCY = 6;
+const DEFAULT_EDU_MAX_PAGES = 250;
 
 let lastCodeforcesRequestAt = 0;
 let requestQueue: Promise<unknown> = Promise.resolve();
@@ -63,6 +72,70 @@ function roundScore(value: number): number {
 
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
+}
+
+export type CodeforcesContestSource =
+  | { kind: 'contest'; contestId: string }
+  | { kind: 'edu'; courseId: string; lessonId: string; filter: 'all' | 'friends' | 'list'; listKey?: string };
+
+export function parseCodeforcesContestSource(value: unknown): CodeforcesContestSource | null {
+  const text = normalizeText(value, 300);
+  if (/^\d+$/.test(text)) return { kind: 'contest', contestId: text };
+
+  const eduMatch = text.match(EDU_SOURCE_REGEX);
+  if (!eduMatch) return null;
+  return {
+    kind: 'edu',
+    courseId: eduMatch[1],
+    lessonId: eduMatch[2],
+    filter: eduMatch[3] ? 'friends' : eduMatch[4] ? 'list' : 'all',
+    ...(eduMatch[4] ? { listKey: eduMatch[4] } : {}),
+  };
+}
+
+export function normalizeCodeforcesContestSource(value: unknown): string {
+  const text = normalizeText(value, 300);
+  const urlMatch = text.match(/codeforces\.com\/edu\/course\/(\d+)\/lesson\/(\d+)\/standings(?:\?([^#\s]*))?/i)
+    || text.match(/^\/?edu\/course\/(\d+)\/lesson\/(\d+)\/standings(?:\?([^#\s]*))?/i);
+  if (!urlMatch) return text;
+
+  const params = new URLSearchParams(urlMatch[3] || '');
+  const listKey = normalizeText(params.get('list'), 120);
+  if (listKey && /^[A-Za-z0-9]+$/.test(listKey)) {
+    return `edu:${urlMatch[1]}:${urlMatch[2]}:list:${listKey}`;
+  }
+  if (params.get('friends') === 'true') return `edu:${urlMatch[1]}:${urlMatch[2]}:friends`;
+  return `edu:${urlMatch[1]}:${urlMatch[2]}`;
+}
+
+export async function validateCodeforcesEduSession(
+  webSession: string,
+  options: Pick<CodeforcesFetchOptions, 'fetchImpl' | 'timeoutMs' | 'maxResponseBytes'> = {},
+) {
+  const session = normalizeText(webSession, 1000);
+  if (!session) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl || fetch)(`${CODEFORCES_WEB_BASE}/edu/courses?locale=en&mobile=true`, {
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        Cookie: `JSESSIONID=${session}`,
+        'User-Agent': 'MCC Classroom EDU Session Validator',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (!response.ok) return false;
+    const html = await readTextWithLimit(response, Math.min(options.maxResponseBytes ?? 1024 * 1024, 1024 * 1024));
+    const $ = cheerio.load(html);
+    return $('a[href^="/profile/"]').length > 0 && $('a[href^="/enter"]').length === 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function sortedQuery(params: Record<string, string | number | boolean>) {
@@ -432,6 +505,267 @@ export function normalizeCodeforcesStandings(raw: any, problemWeights?: number[]
   };
 }
 
+type EduPageParseResult = {
+  title: string;
+  problems: any[];
+  teams: any[];
+  pageCount: number;
+};
+
+function parseAttemptCount(text: string) {
+  const match = text.match(/[+-](\d+)?/);
+  return match?.[1] ? Number(match[1]) : 0;
+}
+
+export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: string[]): EduPageParseResult {
+  const $ = cheerio.load(html);
+  const table = $('table.standings').first();
+  const title = normalizeText($('.contest-name').first().text(), 300);
+  if (!table.length || !title) {
+    throw new CodeforcesApiError(
+      'CODEFORCES_EDU_SESSION_INVALID',
+      'Codeforces EDU session is expired or cannot access this course. Reconnect the JSESSIONID and try again.',
+      428,
+    );
+  }
+
+  const targetSet = targetHandles
+    ? new Set(targetHandles.map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean))
+    : null;
+  const problems = table.find('tr').first().find('th').slice(3).map((index, element) => {
+    const header = $(element);
+    const link = header.find('a').first();
+    const href = normalizeText(link.attr('href'), 500);
+    const pathMatch = href.match(/\/lesson\/(\d+)\/(\d+)\/practice\/contest\/(\d+)\/problem\/([^/?#]+)/i);
+    const label = normalizeText(link.text() || header.text() || String(index + 1), 20);
+    const fullTitle = normalizeText(link.attr('title') || label, 300);
+    return {
+      contestId: pathMatch?.[3] ? Number(pathMatch[3]) : null,
+      problemId: null,
+      index: label,
+      name: fullTitle.replace(new RegExp(`^${label}\\s*-\\s*`, 'i'), '') || fullTitle,
+      type: 'PROGRAMMING',
+      points: 1,
+      eduStep: pathMatch?.[2] ? Number(pathMatch[2]) : null,
+      href,
+    };
+  }).get();
+
+  const teams = table.find('tr').slice(1).not('.standingsStatisticsRow').map((rowIndex, element) => {
+    const cells = $(element).find('td');
+    const handle = normalizeText(cells.eq(1).find('a[href^="/profile/"]').first().text(), 120);
+    if (!handle || (targetSet && !targetSet.has(handle.toLowerCase()))) return null;
+
+    const rank = toFiniteNumber(cells.eq(0).text().replace(/[^0-9.]/g, ''), rowIndex + 1);
+    const declaredSolved = toFiniteNumber(cells.eq(2).text(), 0);
+    const submissions = cells.slice(3).map((problemIndex, cellElement) => {
+      const cell = $(cellElement);
+      const text = normalizeText(cell.text(), 80);
+      const accepted = cell.find('.cell-accepted').length > 0 || text.startsWith('+');
+      const rejected = cell.find('.cell-rejected').length > 0 || text.startsWith('-');
+      const rejectedAttemptCount = (accepted || rejected) ? parseAttemptCount(text) : 0;
+      const problem = problems[problemIndex];
+      const problemId = normalizeText(cell.attr('problemid'), 40);
+      if (problem && problemId && !problem.problemId) problem.problemId = Number(problemId) || problemId;
+      return {
+        problemIndex,
+        problemLabel: problem?.index || String(problemIndex + 1),
+        status: accepted ? 1 : 0,
+        points: accepted ? 1 : 0,
+        maxPoints: 1,
+        penalty: rejectedAttemptCount,
+        rejectedAttemptCount,
+        acceptedSubmissionId: normalizeText(cell.attr('acceptedsubmissionid'), 40) || null,
+        type: accepted ? 'FINAL' : rejected ? 'REJECTED' : null,
+      };
+    }).get();
+    const solvedCount = submissions.filter((submission: any) => submission.status === 1).length;
+    const penalty = submissions.reduce((sum: number, submission: any) => sum + submission.rejectedAttemptCount, 0);
+
+    return {
+      teamId: null,
+      username: handle,
+      realName: handle,
+      avatarUrl: null,
+      submissions,
+      solvedCount: Math.max(declaredSolved, solvedCount),
+      penalty,
+      finalScore: solvedCount,
+      nativeRank: rank,
+      nativePoints: solvedCount,
+      successfulHackCount: 0,
+      unsuccessfulHackCount: 0,
+      sourceHandles: [handle],
+      provider: 'codeforces',
+      providerMeta: {
+        nativeRank: rank,
+        nativePoints: solvedCount,
+        rejectedAttemptCount: penalty,
+        sourceType: 'edu',
+      },
+    };
+  }).get().filter(Boolean);
+
+  const pageCount = Math.max(1, ...$('a[href*="page="]').map((_, element) => {
+    const href = $(element).attr('href') || '';
+    return toFiniteNumber(new URL(href, CODEFORCES_WEB_BASE).searchParams.get('page'), 1);
+  }).get());
+
+  return { title, problems, teams, pageCount };
+}
+
+function buildEduStandingsUrl(source: Extract<CodeforcesContestSource, { kind: 'edu' }>, page: number) {
+  const url = new URL(`/edu/course/${source.courseId}/lesson/${source.lessonId}/standings`, CODEFORCES_WEB_BASE);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('locale', 'en');
+  url.searchParams.set('mobile', 'true');
+  if (source.filter === 'friends') url.searchParams.set('friends', 'true');
+  if (source.filter === 'list' && source.listKey) url.searchParams.set('list', source.listKey);
+  return url.toString();
+}
+
+async function requestCodeforcesEduPage(
+  source: Extract<CodeforcesContestSource, { kind: 'edu' }>,
+  page: number,
+  options: CodeforcesFetchOptions,
+) {
+  const webSession = normalizeText(options.webSession, 1000);
+  if (!webSession) {
+    throw new CodeforcesApiError(
+      'CODEFORCES_EDU_SESSION_MISSING',
+      'A Codeforces JSESSIONID is required to fetch EDU course standings.',
+      428,
+    );
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  try {
+    const response = await (options.fetchImpl || fetch)(buildEduStandingsUrl(source, page), {
+      method: 'GET',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        Cookie: `JSESSIONID=${webSession}`,
+        'User-Agent': 'MCC Classroom EDU Standings Fetcher',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new CodeforcesApiError(
+        response.status === 403 ? 'CODEFORCES_EDU_BLOCKED' : 'CODEFORCES_EDU_HTTP_ERROR',
+        response.status === 403
+          ? 'Codeforces blocked the EDU standings request. Wait briefly, then reconnect the session.'
+          : `Codeforces EDU standings returned HTTP ${response.status}.`,
+        response.status === 403 ? 503 : 502,
+      );
+    }
+    return readTextWithLimit(response, Math.min(options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES, 4 * 1024 * 1024));
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new CodeforcesApiError('CODEFORCES_EDU_TIMEOUT', 'Codeforces EDU standings request timed out.', 504);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchCodeforcesEduLessonRank(
+  source: Extract<CodeforcesContestSource, { kind: 'edu' }>,
+  problemWeights: number[] | undefined,
+  options: CodeforcesFetchOptions,
+): Promise<CodeforcesServiceResult> {
+  try {
+    const firstHtml = await requestCodeforcesEduPage(source, 1, options);
+    const firstPage = parseCodeforcesEduStandingsPage(firstHtml, options.targetHandles);
+    const maxPages = options.eduMaxPages ?? DEFAULT_EDU_MAX_PAGES;
+    if (firstPage.pageCount > maxPages) {
+      throw new CodeforcesApiError(
+        'CODEFORCES_EDU_TOO_MANY_PAGES',
+        `This EDU standings source has ${firstPage.pageCount} pages; use a Codeforces list or friends standings URL limited to ${maxPages} pages.`,
+        422,
+      );
+    }
+
+    const pageNumbers = Array.isArray(options.targetHandles) && options.targetHandles.length === 0
+      ? []
+      : Array.from({ length: Math.max(0, firstPage.pageCount - 1) }, (_, index) => index + 2);
+    const concurrency = Math.max(1, Math.min(8, options.eduConcurrency ?? DEFAULT_EDU_CONCURRENCY));
+    const parsedPages: EduPageParseResult[] = [firstPage];
+    const remainingHandles = Array.isArray(options.targetHandles)
+      ? new Set(options.targetHandles.map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean))
+      : null;
+    firstPage.teams.forEach((team: any) => remainingHandles?.delete(String(team.username).toLowerCase()));
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(concurrency, pageNumbers.length) }, async () => {
+      while (cursor < pageNumbers.length && (!remainingHandles || remainingHandles.size > 0)) {
+        const current = cursor;
+        cursor += 1;
+        const html = await requestCodeforcesEduPage(source, pageNumbers[current], options);
+        const parsed = parseCodeforcesEduStandingsPage(html, options.targetHandles);
+        parsed.teams.forEach((team: any) => remainingHandles?.delete(String(team.username).toLowerCase()));
+        parsedPages.push(parsed);
+      }
+    });
+    await Promise.all(workers);
+
+    const problems = firstPage.problems;
+    const hasCustomWeights = Array.isArray(problemWeights)
+      && problemWeights.length === problems.length
+      && problemWeights.every((weight) => Number.isFinite(Number(weight)) && Number(weight) >= 0);
+    const weights = hasCustomWeights ? problemWeights!.map(Number) : Array(problems.length).fill(1);
+    const teamByHandle = new Map<string, any>();
+    parsedPages.flatMap((page) => page.teams).forEach((team: any) => {
+      teamByHandle.set(String(team.username).toLowerCase(), {
+        ...team,
+        finalScore: roundScore(team.submissions.reduce(
+          (sum: number, submission: any, index: number) => sum + (submission.status ? weights[index] || 0 : 0),
+          0,
+        )),
+      });
+    });
+    const teams = Array.from(teamByHandle.values()).sort(
+      (left: any, right: any) => left.nativeRank - right.nativeRank || left.username.localeCompare(right.username),
+    );
+    const sourceId = `edu:${source.courseId}:${source.lessonId}`;
+
+    return {
+      statusCode: 200,
+      body: {
+        contestInfo: {
+          id: sourceId,
+          title: firstPage.title,
+          begin: null,
+          length: null,
+          end: null,
+          provider: 'codeforces',
+          type: 'EDU_COURSE',
+          phase: 'FINISHED',
+          frozen: false,
+        },
+        provider: 'codeforces',
+        totalTeams: teams.length,
+        fullParticipantCount: teams.length,
+        totalProblems: problems.length,
+        problemWeights: weights,
+        problems,
+        teams,
+        providerMeta: {
+          sourceType: 'edu',
+          courseId: source.courseId,
+          lessonId: source.lessonId,
+          filter: source.filter,
+          crawledPages: parsedPages.length,
+          fullParticipantCount: teams.length,
+        },
+      },
+    };
+  } catch (error: any) {
+    return serviceErrorToResult(error);
+  }
+}
+
 function serviceErrorToResult(error: any): CodeforcesServiceResult {
   if (error instanceof CodeforcesApiError) {
     return {
@@ -460,31 +794,37 @@ export async function fetchCodeforcesContestRank(
   problemWeights?: number[],
   options: CodeforcesFetchOptions = {},
 ): Promise<CodeforcesServiceResult> {
-  if (!/^\d+$/.test(String(contestId))) {
+  const source = parseCodeforcesContestSource(contestId);
+  if (!source) {
     return {
       statusCode: 400,
       body: {
         status: 'error',
         code: 'CODEFORCES_INVALID_CONTEST_ID',
-        message: 'Codeforces contest id must be numeric.',
+        message: 'Codeforces source must be a numeric contest id or an EDU lesson standings URL.',
       },
     };
   }
+  if (source.kind === 'edu') {
+    return fetchCodeforcesEduLessonRank(source, problemWeights, options);
+  }
+
+  const numericContestId = source.contestId;
 
   try {
     const fetchRawStandings = async () => {
       try {
-        return await requestCodeforcesJson({ contestId }, false, options);
+        return await requestCodeforcesJson({ contestId: numericContestId }, false, options);
       } catch (error: any) {
         const comment = error?.comment || error?.message || '';
         if (
           !(error instanceof CodeforcesApiError)
-          || (!isAuthenticationRequired(comment) && !isPossiblyPrivateContestNotFound(comment, String(contestId)))
+          || (!isAuthenticationRequired(comment) && !isPossiblyPrivateContestNotFound(comment, numericContestId))
         ) {
           throw error;
         }
         return requestCodeforcesJson(
-          { contestId, showUnofficial: false },
+          { contestId: numericContestId, showUnofficial: false },
           true,
           options,
         );

@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-09-01 - EDU Crawls Must Fail Closed And Filter Before Persistence
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/utils/codeforcesSession.ts`
+
+Rule:
+Codeforces EDU crawling must construct URLs only from validated course/lesson/list identifiers on `codeforces.com`, enforce timeout/response/page/concurrency limits, identify an accessible standings table before accepting data, and retain only classroom target handles. Resolve JSESSIONID from the explicit forwarded header first and root-scoped cookie second. Missing, expired, redirected, or challenged sessions must fail before writing a snapshot.
+
+Applies when:
+Changing EDU URL parsing, pagination, HTML selectors, session transport, classroom mapping, or snapshot insertion.
+
+Do not overgeneralize:
+Never add arbitrary URL inputs, browser-visible session storage, session logging, unbounded pagination, or full global standings persistence.
+
 ## 2026-08-29 - Provider Sessions Must Support Both Production Routes
 
 Source:

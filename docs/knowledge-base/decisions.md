@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-09-01 - classroom-codeforces-edu-lesson-standings - Ephemeral EDU Crawl Adapter
+
+Source:
+- `docs/decisions/classroom-codeforces-edu-lesson-standings-20260901-technical-decisions.md`
+- `docs/reviews/classroom-codeforces-edu-lesson-standings-20260901-implementation-review.md`
+
+Decision:
+Represent Codeforces EDU lessons as explicit nonnumeric Codeforces source keys and crawl their authenticated standings HTML with a trainer-provided JSESSIONID stored only in a 12-hour HTTP-only browser cookie. Parse solve count and rejected-attempt penalty into the existing snapshot/scoring contract, retaining only verified or explicitly overridden classroom handles. Keep numeric contest API behavior unchanged.
+
+Applies when:
+Changing classroom Codeforces sources, session transport, EDU parsing, snapshot filtering, report keys, or scoring.
+
+Do not overgeneralize:
+Do not interpret course/lesson numbers as contest IDs, store web sessions in Postgres, crawl arbitrary origins, or route this behavior into global reports.
+
 ## 2026-08-17 - trainer-student-context-menu-simplification-20260817 - Progressive Classroom Navigation
 
 Source:

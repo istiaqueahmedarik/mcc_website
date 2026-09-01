@@ -1,5 +1,21 @@
 # Patterns
 
+## 2026-09-01 - Authenticated Provider HTML As A Bounded Adapter
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/utils/codeforcesSession.ts`
+- `docs/reviews/classroom-codeforces-edu-lesson-standings-20260901-implementation-review.md`
+
+Pattern:
+When an existing provider lacks an API for a classroom-only source, keep crawling inside the provider adapter: validate a fixed-origin source identity, require an ephemeral HTTP-only session, bound timeout/response bytes/concurrency/page count, reject login/challenge HTML, parse provider markup into the existing normalized contract, and discard rows outside explicit classroom target handles before persistence. Preserve header-first and root-cookie-second session transport for Next-proxy and direct-Hono production routes.
+
+Applies when:
+Maintaining Codeforces EDU crawling or adding a similarly constrained authenticated provider source to classroom snapshots.
+
+Do not overgeneralize:
+Do not accept arbitrary URLs, persist full third-party standings, log session values, silently convert access failures to empty snapshots, or use crawling when a stable official API exists.
+
 ## 2026-08-17 - Shared Visible And Contextual Commands
 
 Source:

@@ -1,4 +1,5 @@
 import sql from '../db';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import {
   buildContestKey,
   contestProviderLabel,
@@ -6,12 +7,18 @@ import {
   normalizeContestProvider,
   type ClassroomContestProvider,
 } from '../services/classroomContestRankService';
+import {
+  normalizeCodeforcesContestSource,
+  parseCodeforcesContestSource,
+  validateCodeforcesEduSession,
+} from '../services/codeforcesContestService';
 import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from '../utils/classroomPreEnrollment';
 import {
   codeforcesApiKeyHint,
   decryptCodeforcesCredential,
   encryptCodeforcesCredential,
 } from '../utils/codeforcesCredentialCrypto';
+import { getCodeforcesSession, normalizeCodeforcesSession } from '../utils/codeforcesSession';
 import {
   BASE_SCORING_VARIABLES,
   buildScoredContestReport,
@@ -28,6 +35,13 @@ import { getVjudgeSession } from '../utils/vjudgeSession';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONTEST_TYPES = new Set(['TFC', 'TSC', 'TPC']);
+const PROVIDER_SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'Lax' as const,
+  path: '/',
+  maxAge: 60 * 60 * 12,
+};
 
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
@@ -47,6 +61,9 @@ function normalizeExternalContestIdForProvider(provider: ClassroomContestProvide
   const text = normalizeText(value, 300);
   if (provider !== 'codeforces') return normalizeText(text, 40);
 
+  const normalizedSource = normalizeCodeforcesContestSource(text);
+  if (parseCodeforcesContestSource(normalizedSource)) return normalizeText(normalizedSource, 300);
+
   const urlMatch = text.match(/codeforces\.com\/(?:group\/[A-Za-z0-9]+\/contest|contest|gym)\/(\d+)/i);
   if (urlMatch?.[1]) return urlMatch[1];
 
@@ -54,6 +71,12 @@ function normalizeExternalContestIdForProvider(provider: ClassroomContestProvide
   if (pathMatch?.[1]) return pathMatch[1];
 
   return normalizeText(text, 40);
+}
+
+function isValidExternalContestId(provider: ClassroomContestProvider, externalContestId: string) {
+  return provider === 'codeforces'
+    ? Boolean(parseCodeforcesContestSource(externalContestId))
+    : /^\d+$/.test(externalContestId);
 }
 
 function clampPercentage(value: unknown, fallback: number): number {
@@ -719,6 +742,35 @@ function codeforcesCredentialStorageError(error: any) {
   return null;
 }
 
+export const getClassroomCodeforcesSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  return c.json({ success: true, connected: Boolean(getCodeforcesSession(c)) });
+};
+
+export const saveClassroomCodeforcesSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  const body = await readJsonBody(c);
+  const session = normalizeCodeforcesSession(body?.session ?? body?.jsessionid);
+  if (!session) return c.json({ error: 'Codeforces JSESSIONID is required' }, 400);
+  if (!(await validateCodeforcesEduSession(session))) {
+    return c.json({ error: 'Codeforces rejected this JSESSIONID. Sign in again and copy the current cookie.' }, 401);
+  }
+  setCookie(c, 'cf_session', session, PROVIDER_SESSION_COOKIE_OPTIONS);
+  return c.json({ success: true, connected: true });
+};
+
+export const deleteClassroomCodeforcesSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  deleteCookie(c, 'cf_session', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  return c.json({ success: true, connected: false });
+};
+
 export const getClassroomCodeforcesCredentials = async (c: any) => {
   const classroomId = c.req.param('id');
   try {
@@ -842,8 +894,8 @@ export const createClassroomContestItem = async (c: any) => {
       provider,
       body?.externalContestId ?? body?.contestId ?? body?.contest_id,
     );
-    if (!/^\d+$/.test(externalContestId)) {
-      return c.json({ error: `${contestProviderLabel(provider)} contest id must be numeric${provider === 'codeforces' ? ' or a Codeforces contest URL' : ''}` }, 400);
+    if (!isValidExternalContestId(provider, externalContestId)) {
+      return c.json({ error: `${contestProviderLabel(provider)} source must be a numeric contest id${provider === 'codeforces' ? ', contest URL, or EDU lesson standings URL' : ''}` }, 400);
     }
 
     const title = normalizeText(body?.title ?? body?.name ?? body?.contestName, 180) || `${contestProviderLabel(provider)} ${externalContestId}`;
@@ -921,8 +973,8 @@ export const updateClassroomContestItem = async (c: any) => {
       nextProvider,
       body?.externalContestId ?? body?.contestId ?? body?.contest_id ?? current.external_contest_id,
     );
-    if (!/^\d+$/.test(nextExternalContestId)) {
-      return c.json({ error: `${contestProviderLabel(nextProvider)} contest id must be numeric${nextProvider === 'codeforces' ? ' or a Codeforces contest URL' : ''}` }, 400);
+    if (!isValidExternalContestId(nextProvider, nextExternalContestId)) {
+      return c.json({ error: `${contestProviderLabel(nextProvider)} source must be a numeric contest id${nextProvider === 'codeforces' ? ', contest URL, or EDU lesson standings URL' : ''}` }, 400);
     }
     const nextTitle = normalizeText(body?.title ?? body?.name ?? body?.contestName ?? current.title, 180) || `${contestProviderLabel(nextProvider)} ${nextExternalContestId}`;
     const nextWeight = normalizeWeight(body?.weight ?? current.weight, Number(current.weight || 1));
@@ -1082,11 +1134,16 @@ export const fetchClassroomContestItem = async (c: any) => {
     const problemWeights = bodyWeights?.weights ?? savedWeights.weights;
     const provider = normalizeContestProvider(contest.provider);
     const session = provider === 'vjudge' ? getVjudgeSession(c) : undefined;
+    const rosterMaps = provider === 'codeforces' ? await getClassroomRosterMaps(classroomId) : null;
+    const overrideMaps = rosterMaps ? await getClassroomHandleOverrideMaps(classroomId, rosterMaps) : null;
+    const classroomMaps = rosterMaps && overrideMaps ? { ...rosterMaps, ...overrideMaps } : null;
     const result = await fetchClassroomContestRank({
       provider,
       externalContestId: String(contest.external_contest_id),
       problemWeights,
       vjudgeSession: session,
+      codeforcesSession: provider === 'codeforces' ? getCodeforcesSession(c) : undefined,
+      codeforcesTargetHandles: classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
       codeforcesCredentialProvider: provider === 'codeforces'
         ? () => loadTrainerCodeforcesCredentials(actor.userId)
         : undefined,
@@ -1109,11 +1166,8 @@ export const fetchClassroomContestItem = async (c: any) => {
     };
     let rankData = baseRankData;
 
-    if (provider === 'codeforces') {
-      const rosterMaps = await getClassroomRosterMaps(classroomId);
-      const overrideMaps = await getClassroomHandleOverrideMaps(classroomId, rosterMaps);
-      const maps = { ...rosterMaps, ...overrideMaps };
-      rankData = applyRankDataClassroomMappings(baseRankData, maps, provider, false);
+    if (provider === 'codeforces' && classroomMaps) {
+      rankData = applyRankDataClassroomMappings(baseRankData, classroomMaps, provider, false);
     }
 
     const rows = await sql`
@@ -1447,6 +1501,19 @@ function findGroupByCodeforcesMembers(sourceHandles: string[], maps: any) {
     student: null,
     group,
   });
+}
+
+function codeforcesTargetHandles(maps: any) {
+  const handles = new Set<string>();
+  for (const key of maps?.verifiedStudentByProviderHandle?.keys?.() || []) {
+    const match = String(key).match(/^codeforces:(.+)$/);
+    if (match?.[1]) handles.add(match[1]);
+  }
+  for (const key of maps?.overrideByProviderHandle?.keys?.() || []) {
+    const match = String(key).match(/^codeforces:(.+)$/);
+    if (match?.[1]) handles.add(match[1]);
+  }
+  return Array.from(handles);
 }
 
 function resolveVjudgeMapping(user: any, maps: any) {

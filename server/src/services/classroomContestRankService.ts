@@ -10,6 +10,8 @@ export type ClassroomContestRankRequest = {
   problemWeights?: number[];
   vjudgeSession?: string;
   codeforcesCredentialProvider?: () => Promise<CodeforcesApiCredentials | null>;
+  codeforcesSession?: string;
+  codeforcesTargetHandles?: string[];
 };
 
 export function normalizeContestProvider(value: unknown): ClassroomContestProvider {
@@ -43,6 +45,8 @@ export async function fetchClassroomContestRank(request: ClassroomContestRankReq
   if (request.provider === 'codeforces') {
     return fetchCodeforcesContestRank(request.externalContestId, request.problemWeights, {
       credentialProvider: request.codeforcesCredentialProvider,
+      webSession: request.codeforcesSession,
+      targetHandles: request.codeforcesTargetHandles,
     });
   }
 

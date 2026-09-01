@@ -115,6 +115,7 @@ import {
   fetchClassroomContestItem,
   generateClassroomContestReport,
   getClassroomCodeforcesCredentials,
+  getClassroomCodeforcesSession,
   getClassroomContestReport,
   getClassroomContestScoring,
   listClassroomContestDemerits,
@@ -124,6 +125,8 @@ import {
   listClassroomContestRooms,
   previewClassroomContestScoring,
   saveClassroomCodeforcesCredentials,
+  saveClassroomCodeforcesSession,
+  deleteClassroomCodeforcesSession,
   shareClassroomContestReport,
   updateClassroomContestDemerit,
   updateClassroomContestHandleOverride,
@@ -303,6 +306,9 @@ route.post('/:id/checkins', createClassroomDailyCheckin);
 route.get('/:id/contests/codeforces-credentials', getClassroomCodeforcesCredentials);
 route.put('/:id/contests/codeforces-credentials', saveClassroomCodeforcesCredentials);
 route.delete('/:id/contests/codeforces-credentials', deleteClassroomCodeforcesCredentials);
+route.get('/:id/contests/codeforces-session', getClassroomCodeforcesSession);
+route.post('/:id/contests/codeforces-session', saveClassroomCodeforcesSession);
+route.delete('/:id/contests/codeforces-session', deleteClassroomCodeforcesSession);
 route.get('/:id/contests/rooms', listClassroomContestRooms);
 route.post('/:id/contests/rooms', createClassroomContestRoom);
 route.patch('/:id/contests/rooms/:roomId', updateClassroomContestRoom);
