@@ -35,6 +35,7 @@ import ContestScoringDialog from "@/components/ContestScoringDialog";
 import ContestMergeOverview from "@/components/ContestMergeOverview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,7 @@ const EMPTY_CONTEST_FORM = {
   title: "",
   weight: "1",
   problemWeights: "",
+  includeUpsolves: false,
 };
 
 const EMPTY_SESSION_FORM = {
@@ -799,6 +801,7 @@ export function ClassroomContestPanel({
       title: contest.title || "",
       weight: String(contest.weight ?? 1),
       problemWeights: weightsToInput(contest.problemWeights),
+      includeUpsolves: Boolean(contest.includeUpsolves),
     });
     setContestDialogOpen(true);
   };
@@ -821,6 +824,7 @@ export function ClassroomContestPanel({
       title: contestForm.title.trim(),
       weight: Number(contestForm.weight || 1),
       problemWeights,
+      includeUpsolves: Boolean(contestForm.includeUpsolves),
     };
     const path = editingContestId
       ? `rooms/${selectedRoom.id}/items/${editingContestId}`
@@ -1708,6 +1712,9 @@ export function ClassroomContestPanel({
                               <div className="min-w-0">
                                 <div className="truncate font-semibold">{contest.title}</div>
                                 <div className="font-mono text-xs text-muted-foreground">{providerLabel(contest.provider)} {contest.externalContestId}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {contest.includeUpsolves ? "Contest time + upsolves" : "Contest time only"}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1982,6 +1989,23 @@ export function ClassroomContestPanel({
                       : "For VJudge, weights replace each solved problem's unit score when the count matches."}
                   </p>
                 </div>
+                <label
+                  htmlFor="contest-include-upsolves"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border bg-muted/20 p-3"
+                >
+                  <Checkbox
+                    id="contest-include-upsolves"
+                    checked={Boolean(contestForm.includeUpsolves)}
+                    onCheckedChange={(checked) => setContestForm((form) => ({ ...form, includeUpsolves: checked === true }))}
+                    className="mt-0.5"
+                  />
+                  <span className="space-y-1">
+                    <span className="block text-sm font-medium">Include upsolves</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Count accepted submissions made after the contest ends. Leave unchecked to use contest-time submissions only.
+                    </span>
+                  </span>
+                </label>
                 </div>
               </div>
               <DialogFooter className="border-t bg-muted/20 px-5 py-4 sm:px-6">

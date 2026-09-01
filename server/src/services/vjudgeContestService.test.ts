@@ -27,4 +27,27 @@ describe('processVjudgeRankData', () => {
     expect(result.teams.find((team: any) => team.username === 'alice')?.penalty).toBe(55);
     expect(result.teams.find((team: any) => team.username === 'bob')?.finalScore).toBe(2);
   });
+
+  test('excludes late submissions by default and includes them when upsolves are enabled', () => {
+    const rawData = {
+      id: 456,
+      title: 'VJudge Timed Contest',
+      begin: 0,
+      length: 3_600_000,
+      participants: {
+        1: ['alice', 'Alice', null],
+      },
+      submissions: [
+        [1, 0, 1, 1_800, 0],
+        [1, 1, 1, 4_200, 0],
+      ],
+    };
+
+    const contestTimeOnly = processVjudgeRankData(rawData, undefined);
+    const withUpsolves = processVjudgeRankData(rawData, undefined, true);
+
+    expect(contestTimeOnly.teams[0].solvedCount).toBe(1);
+    expect(withUpsolves.teams[0].solvedCount).toBe(2);
+    expect(withUpsolves.teams[0].submissions[1].timeSeconds).toBe(4_200);
+  });
 });

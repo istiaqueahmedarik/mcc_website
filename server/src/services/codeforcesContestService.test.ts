@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  applyCodeforcesUpsolves,
   buildCodeforcesApiSignature,
   fetchCodeforcesContestRank,
   normalizeCodeforcesContestSource,
@@ -198,6 +199,64 @@ describe('normalizeCodeforcesStandings', () => {
     expect(normalized.teams[0].providerMeta.hackAdjustment).toBe(50);
     expect(normalized.teams[0].finalScore).toBe(4.1667);
   });
+
+  test('adds accepted post-contest submissions only for classroom handles', () => {
+    const normalized = normalizeCodeforcesStandings({
+      ...baseContest,
+      rows: [{
+        party: { participantType: 'CONTESTANT', members: [{ handle: 'alice' }] },
+        rank: 1,
+        points: 1,
+        penalty: 30,
+        problemResults: [{ points: 1 }, { points: 0 }],
+      }],
+    });
+    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
+
+    applyCodeforcesUpsolves(normalized, [
+      {
+        creationTimeSeconds: contestEnd + 60,
+        verdict: 'WRONG_ANSWER',
+        problem: { index: 'B' },
+        author: { members: [{ handle: 'alice' }] },
+      },
+      {
+        creationTimeSeconds: contestEnd + 120,
+        verdict: 'OK',
+        problem: { index: 'B' },
+        author: { members: [{ handle: 'alice' }] },
+      },
+      {
+        creationTimeSeconds: contestEnd + 120,
+        verdict: 'OK',
+        problem: { index: 'A' },
+        author: { members: [{ handle: 'not-in-classroom' }] },
+      },
+    ], ['alice']);
+
+    expect(normalized.teams).toHaveLength(1);
+    expect(normalized.teams[0].solvedCount).toBe(2);
+    expect(normalized.teams[0].submissions[1].type).toBe('UPSOLVE');
+    expect(normalized.teams[0].submissions[1].rejectedAttemptCount).toBe(1);
+    expect(normalized.teams[0].providerMeta.upsolveSolvedCount).toBe(1);
+  });
+
+  test('creates a practice-only row when a classroom handle upsolves without competing', () => {
+    const normalized = normalizeCodeforcesStandings({ ...baseContest, rows: [] });
+    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
+
+    applyCodeforcesUpsolves(normalized, [{
+      creationTimeSeconds: contestEnd + 60,
+      verdict: 'OK',
+      problem: { index: 'A' },
+      author: { members: [{ handle: 'bob' }] },
+    }], ['bob']);
+
+    expect(normalized.teams).toHaveLength(1);
+    expect(normalized.teams[0].username).toBe('bob');
+    expect(normalized.teams[0].solvedCount).toBe(1);
+    expect(normalized.teams[0].providerMeta.party.participantType).toBe('PRACTICE');
+  });
 });
 
 describe('fetchCodeforcesContestRank', () => {
@@ -223,6 +282,52 @@ describe('fetchCodeforcesContestRank', () => {
     expect(Array.from(searchParams.keys())).toEqual(['contestId']);
     expect(searchParams.get('contestId')).toBe('2');
     expect(credentialProviderCalls).toBe(0);
+  });
+
+  test('fetches post-contest submissions only when upsolves are enabled', async () => {
+    const urls: string[] = [];
+    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
+    const fetchImpl = async (url: RequestInfo | URL) => {
+      urls.push(String(url));
+      return urls.length === 1
+        ? okResponse({
+          ...baseContest,
+          rows: [{
+            party: { participantType: 'CONTESTANT', members: [{ handle: 'alice' }] },
+            rank: 1,
+            points: 1,
+            penalty: 10,
+            problemResults: [{ points: 1 }, { points: 0 }],
+          }],
+        })
+        : okResponse([
+          {
+            creationTimeSeconds: contestEnd + 60,
+            verdict: 'OK',
+            problem: { index: 'B' },
+            author: { members: [{ handle: 'alice' }] },
+          },
+          {
+            creationTimeSeconds: contestEnd,
+            verdict: 'WRONG_ANSWER',
+            problem: { index: 'B' },
+            author: { members: [{ handle: 'alice' }] },
+          },
+        ]);
+    };
+
+    const result = await fetchCodeforcesContestRank('2', undefined, {
+      fetchImpl: fetchImpl as any,
+      includeUpsolves: true,
+      targetHandles: ['alice'],
+      rateLimitMs: 0,
+      upsolvePageSize: 10,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(urls).toHaveLength(2);
+    expect(new URL(urls[1]).pathname).toEndWith('/contest.status');
+    expect(result.body.teams[0].solvedCount).toBe(2);
   });
 
   test('retries with signed credentials when access requires authentication', async () => {

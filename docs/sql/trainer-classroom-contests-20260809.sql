@@ -52,6 +52,7 @@ create table if not exists public.classroom_contests (
   title text not null,
   weight numeric not null default 1,
   problem_weights jsonb not null default '[]'::jsonb,
+  include_upsolves boolean not null default false,
   last_fetched_at timestamptz null,
   created_by uuid null references public.users(id) on delete set null,
   updated_by uuid null references public.users(id) on delete set null,

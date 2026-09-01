@@ -151,6 +151,16 @@ function normalizeHandle(value: unknown, maxLength = 160): string {
   return normalizeText(value, maxLength).toLowerCase();
 }
 
+function normalizeBoolean(value: unknown, fallback = false): boolean {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const normalized = normalizeText(value, 10).toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
 function providerHandleKey(provider: ClassroomContestProvider, handle: unknown): string {
   const normalized = normalizeHandle(handle, 160);
   return normalized ? `${provider}:${normalized}` : '';
@@ -388,6 +398,7 @@ function contestToApi(row: any) {
     title: row.title,
     weight: Number(row.weight || 1),
     problemWeights: Array.isArray(row.problem_weights) ? row.problem_weights : [],
+    includeUpsolves: Boolean(row.include_upsolves),
     formulaKey: row.formula_key || null,
     mergeGroupId: row.merge_group_id || null,
     sortOrder: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : null,
@@ -902,6 +913,7 @@ export const createClassroomContestItem = async (c: any) => {
     const weight = normalizeWeight(body?.weight, 1);
     const problemWeights = normalizeProblemWeights(body?.problemWeights ?? body?.problem_weights);
     if (!problemWeights.ok) return c.json({ error: problemWeights.error }, 400);
+    const includeUpsolves = normalizeBoolean(body?.includeUpsolves ?? body?.include_upsolves, false);
     const formulaKey = await nextClassroomContestFormulaKey(classroomId, roomId, provider, externalContestId);
 
     const rows = await sql`
@@ -913,6 +925,7 @@ export const createClassroomContestItem = async (c: any) => {
         title,
         weight,
         problem_weights,
+        include_upsolves,
         formula_key,
         sort_order,
         created_by,
@@ -926,6 +939,7 @@ export const createClassroomContestItem = async (c: any) => {
         ${title},
         ${weight},
         ${sql.json(problemWeights.weights)},
+        ${includeUpsolves},
         ${formulaKey},
         (
           SELECT COALESCE(MAX(sort_order) + 1, COUNT(*)::integer)
@@ -941,6 +955,7 @@ export const createClassroomContestItem = async (c: any) => {
         title = EXCLUDED.title,
         weight = EXCLUDED.weight,
         problem_weights = EXCLUDED.problem_weights,
+        include_upsolves = EXCLUDED.include_upsolves,
         formula_key = COALESCE(classroom_contests.formula_key, EXCLUDED.formula_key),
         updated_by = EXCLUDED.updated_by,
         updated_at = now()
@@ -980,19 +995,32 @@ export const updateClassroomContestItem = async (c: any) => {
     const nextWeight = normalizeWeight(body?.weight ?? current.weight, Number(current.weight || 1));
     const nextProblemWeights = normalizeProblemWeights(body?.problemWeights ?? body?.problem_weights ?? current.problem_weights);
     if (!nextProblemWeights.ok) return c.json({ error: nextProblemWeights.error }, 400);
+    const nextIncludeUpsolves = normalizeBoolean(
+      body?.includeUpsolves ?? body?.include_upsolves,
+      Boolean(current.include_upsolves),
+    );
     const nextSortOrder = body?.sortOrder === undefined && body?.sort_order === undefined
       ? current.sort_order
       : normalizeSortOrder(body?.sortOrder ?? body?.sort_order);
     const identityChanged = nextProvider !== normalizeContestProvider(current.provider)
       || nextExternalContestId !== String(current.external_contest_id);
+    const fetchBehaviorChanged = identityChanged
+      || nextIncludeUpsolves !== Boolean(current.include_upsolves);
 
     const rows = await sql.begin(async (tx) => {
-      if (identityChanged) {
+      if (fetchBehaviorChanged) {
         await tx`
           DELETE FROM public.classroom_contest_snapshots
           WHERE classroom_id = ${classroomId}
             AND room_id = ${roomId}
             AND contest_id = ${contestItemId}
+        `;
+        await tx`
+          UPDATE public.classroom_contest_reports
+          SET is_stale = true,
+              updated_at = now()
+          WHERE classroom_id = ${classroomId}
+            AND room_id = ${roomId}
         `;
       }
 
@@ -1003,8 +1031,9 @@ export const updateClassroomContestItem = async (c: any) => {
             title = ${nextTitle},
             weight = ${nextWeight},
             problem_weights = ${tx.json(nextProblemWeights.weights)},
+            include_upsolves = ${nextIncludeUpsolves},
             sort_order = ${nextSortOrder},
-            last_fetched_at = ${identityChanged ? null : current.last_fetched_at},
+            last_fetched_at = ${fetchBehaviorChanged ? null : current.last_fetched_at},
             updated_by = ${actor.userId},
             updated_at = now()
         WHERE classroom_id = ${classroomId}
@@ -1144,6 +1173,7 @@ export const fetchClassroomContestItem = async (c: any) => {
       vjudgeSession: session,
       codeforcesSession: provider === 'codeforces' ? getCodeforcesSession(c) : undefined,
       codeforcesTargetHandles: classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
+      includeUpsolves: Boolean(contest.include_upsolves),
       codeforcesCredentialProvider: provider === 'codeforces'
         ? () => loadTrainerCodeforcesCredentials(actor.userId)
         : undefined,
@@ -1162,6 +1192,7 @@ export const fetchClassroomContestItem = async (c: any) => {
         provider,
         externalContestId: String(contest.external_contest_id),
         title: contest.title || result.body?.contestInfo?.title || `Contest ${contest.external_contest_id}`,
+        includeUpsolves: Boolean(contest.include_upsolves),
       },
     };
     let rankData = baseRankData;

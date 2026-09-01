@@ -6,6 +6,7 @@ export type VjudgeRankServiceResult = {
 export function processVjudgeRankData(
   rawData: any,
   problemWeights: number[] | undefined,
+  includeUpsolves = false,
 ) {
   if (!rawData || typeof rawData !== "object") {
     return {
@@ -51,7 +52,7 @@ export function processVjudgeRankData(
     submissions.sort((a, b) => a[3] - b[3]);
     for (const sub of submissions) {
       const [teamId, problemIndex, status, timeSeconds, cumulativeScore] = sub;
-      if (timeSeconds > contestInfo.length / 1000) continue;
+      if (!includeUpsolves && timeSeconds > contestInfo.length / 1000) continue;
       if (participantMap.has(teamId)) {
         const team = participantMap.get(teamId);
         team.submissions.push({
@@ -133,6 +134,7 @@ export async function fetchVjudgeContestRank(
   contestId: string,
   jsessionid: string | undefined,
   problemWeights?: number[],
+  includeUpsolves = false,
 ): Promise<VjudgeRankServiceResult> {
   if (!jsessionid) {
     return {
@@ -202,7 +204,7 @@ export async function fetchVjudgeContestRank(
       throw new Error("Failed to parse VJudge JSON response");
     }
 
-    const structuredData = processVjudgeRankData(rawData, problemWeights);
+    const structuredData = processVjudgeRankData(rawData, problemWeights, includeUpsolves);
 
     if (structuredData.error) {
       return {

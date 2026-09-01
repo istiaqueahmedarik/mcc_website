@@ -1,5 +1,24 @@
 # Project Index
 
+## 2026-09-01 - classroom-contest-upsolves - Implemented Entry Points
+
+Source:
+- `client/src/components/ClassroomContestPanel.jsx`
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/services/classroomContestRankService.ts`
+- `server/src/services/vjudgeContestService.ts`
+- `server/src/services/codeforcesContestService.ts`
+- `docs/sql/classroom-contest-upsolves-20260901.sql`
+
+Fact:
+Each classroom Codeforces or VJudge contest item now stores an `include_upsolves` flag. It defaults to false, so snapshots use contest-time submissions only. Trainers can opt in from the contest form; changing the flag invalidates old snapshots and marks the generated report stale. VJudge then retains late rank submissions, while numeric Codeforces contests scan bounded post-contest status pages and apply only submissions belonging to classroom-mapped handles. EDU lesson standings keep their existing practice-course behavior.
+
+Applies when:
+Maintaining classroom contest item configuration, snapshot refresh behavior, VJudge duration filtering, Codeforces post-contest submission fetching, or report solve/penalty inputs.
+
+Do not overgeneralize:
+This does not change global contest reports, enable upsolves by default, include unrelated Codeforces participants, or alter already generated reports without a new fetch and regeneration.
+
 ## 2026-09-01 - classroom-codeforces-edu-lesson-standings - Implemented Entry Points
 
 Source:

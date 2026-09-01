@@ -1,5 +1,22 @@
 # Quality Rules
 
+## 2026-09-01 - Classroom Upsolves Must Be Explicit and Snapshot-Safe
+
+Source:
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/vjudgeContestService.ts`
+- `docs/sql/classroom-contest-upsolves-20260901.sql`
+
+Rule:
+Classroom contest snapshots must remain contest-time-only unless the saved contest item explicitly enables `include_upsolves`. Changing that flag invalidates the prior snapshots and marks the generated report stale. VJudge may retain late submissions from its rank payload; Codeforces upsolve scans must be bounded, stop once they reach the official contest window, and persist only submissions matching classroom target handles.
+
+Applies when:
+Changing classroom contest fetch options, provider adapters, snapshot reuse, or post-contest solve calculations.
+
+Do not overgeneralize:
+Do not silently enable upsolves for existing rows, scan unbounded Codeforces status history, persist unrelated participant submissions, or reuse a snapshot created under the opposite setting.
+
 ## 2026-09-01 - EDU Crawls Must Fail Closed And Filter Before Persistence
 
 Source:

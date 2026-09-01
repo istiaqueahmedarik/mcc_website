@@ -12,6 +12,7 @@ export type ClassroomContestRankRequest = {
   codeforcesCredentialProvider?: () => Promise<CodeforcesApiCredentials | null>;
   codeforcesSession?: string;
   codeforcesTargetHandles?: string[];
+  includeUpsolves?: boolean;
 };
 
 export function normalizeContestProvider(value: unknown): ClassroomContestProvider {
@@ -47,8 +48,14 @@ export async function fetchClassroomContestRank(request: ClassroomContestRankReq
       credentialProvider: request.codeforcesCredentialProvider,
       webSession: request.codeforcesSession,
       targetHandles: request.codeforcesTargetHandles,
+      includeUpsolves: request.includeUpsolves,
     });
   }
 
-  return fetchVjudgeContestRank(request.externalContestId, request.vjudgeSession, request.problemWeights);
+  return fetchVjudgeContestRank(
+    request.externalContestId,
+    request.vjudgeSession,
+    request.problemWeights,
+    request.includeUpsolves,
+  );
 }
