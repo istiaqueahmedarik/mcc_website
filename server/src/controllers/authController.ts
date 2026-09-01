@@ -9,27 +9,35 @@ export const signup = async (c: any) => {
     full_name,
     profile_pic,
     mist_id,
-    batch_details,
+    batch_name,
     mist_id_card,
     email,
     phone,
     password,
   } = await c.req.json();
-  console.log(
-    full_name,
-    profile_pic,
-    mist_id,
-    batch_details,
-    mist_id_card,
-    email,
-    phone,
-    password,
-  );
   try {
     // Validate password length
     if (!password || password.length < 8) {
       return c.json(
         { error: "Password must be at least 8 characters long" },
+        400,
+      );
+    }
+
+    const normalizedMistId = String(mist_id || "").trim();
+    const normalizedBatchName = String(batch_name || "").trim();
+    if (!/^\d+$/.test(normalizedMistId)) {
+      return c.json({ error: "MIST Student ID must contain numbers only" }, 400);
+    }
+    if (!normalizedBatchName) {
+      return c.json({ error: "Batch details are required" }, 400);
+    }
+    if (normalizedBatchName.length > 120) {
+      return c.json({ error: "Batch details must be 120 characters or fewer" }, 400);
+    }
+    if (!profile_pic || !mist_id_card) {
+      return c.json(
+        { error: "Profile picture and MIST ID card are required" },
         400,
       );
     }
@@ -40,10 +48,8 @@ export const signup = async (c: any) => {
     }
     const hash = await Bun.password.hash(password);
     const result =
-      await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
-        VALUES (${full_name}, ${profile_pic}, ${Number(
-          mist_id,
-        )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
+      await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name)
+        VALUES (${full_name}, ${profile_pic}, ${normalizedMistId}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName})
         RETURNING *`;
     if (result[0]?.id) {
       await markPreEnrollmentClaimsForUser(result[0].id);

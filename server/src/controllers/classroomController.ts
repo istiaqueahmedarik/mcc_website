@@ -598,6 +598,131 @@ export const listAllUsers = async (c: Context) => {
   }
 };
 
+const DEFAULT_PROFILE_BATCH_FROM = 22;
+const DEFAULT_PROFILE_BATCH_TO = 26;
+
+function normalizeProfileBatchRange(fromValue: unknown, toValue: unknown) {
+  const parseBatch = (value: unknown, fallback: number) => {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 99) return fallback;
+    return parsed;
+  };
+
+  const requestedFrom = parseBatch(fromValue, DEFAULT_PROFILE_BATCH_FROM);
+  const requestedTo = parseBatch(toValue, DEFAULT_PROFILE_BATCH_TO);
+  return {
+    from: Math.min(requestedFrom, requestedTo),
+    to: Math.max(requestedFrom, requestedTo),
+  };
+}
+
+// Admin-only readiness analytics and export data for registered student profiles.
+export const getStudentProfileReadiness = async (c: Context) => {
+  try {
+    const admin = await requireAdminUser(c);
+    if (!admin) return c.json({ error: 'Unauthorized: Admins only' }, 403);
+
+    const range = normalizeProfileBatchRange(c.req.query('from'), c.req.query('to'));
+    const rows = await sql`
+      WITH classified AS (
+        SELECT
+          CASE
+            WHEN length(mist_id::text) = 9
+              THEN substring(mist_id::text FROM 3 FOR 2)
+            WHEN length(mist_id::text) BETWEEN 2 AND 8
+              THEN substring(mist_id::text FROM 1 FOR 2)
+            ELSE NULL
+          END AS batch,
+          nullif(btrim(full_name), '') AS full_name,
+          mist_id::text AS student_id,
+          nullif(btrim(cf_id), '') AS cf_handle,
+          nullif(btrim(vjudge_id), '') AS vjudge_username
+        FROM public.users
+        WHERE coalesce(admin, false) IS FALSE
+          AND coalesce(trainer, false) IS FALSE
+          AND is_pre_enrolled IS NOT TRUE
+      )
+      SELECT batch, full_name, student_id, cf_handle, vjudge_username
+      FROM classified
+      WHERE batch IS NOT NULL
+        AND batch::integer BETWEEN ${range.from} AND ${range.to}
+      ORDER BY batch::integer, student_id::numeric NULLS LAST, lower(full_name) NULLS LAST
+    `;
+
+    const batches = Array.from({ length: range.to - range.from + 1 }, (_, index) => {
+      const batch = String(range.from + index).padStart(2, '0');
+      return {
+        batch,
+        total: 0,
+        complete: 0,
+        incomplete: 0,
+        completenessRate: 0,
+        missing: {
+          fullName: 0,
+          studentId: 0,
+          cfHandle: 0,
+          vjudgeUsername: 0,
+        },
+      };
+    });
+    const batchByValue = new Map(batches.map((batch) => [batch.batch, batch]));
+
+    const profiles = rows.map((row: any) => {
+      const missingFields: string[] = [];
+      if (!row.full_name) missingFields.push('full_name');
+      if (!row.student_id) missingFields.push('student_id');
+      if (!row.cf_handle) missingFields.push('cf_handle');
+      if (!row.vjudge_username) missingFields.push('vjudge_username');
+
+      const batchSummary = batchByValue.get(String(row.batch));
+      if (batchSummary) {
+        batchSummary.total += 1;
+        if (missingFields.length === 0) batchSummary.complete += 1;
+        else batchSummary.incomplete += 1;
+        if (!row.full_name) batchSummary.missing.fullName += 1;
+        if (!row.student_id) batchSummary.missing.studentId += 1;
+        if (!row.cf_handle) batchSummary.missing.cfHandle += 1;
+        if (!row.vjudge_username) batchSummary.missing.vjudgeUsername += 1;
+      }
+
+      return {
+        batch: String(row.batch),
+        full_name: row.full_name,
+        student_id: row.student_id,
+        cf_handle: row.cf_handle,
+        vjudge_username: row.vjudge_username,
+        complete: missingFields.length === 0,
+        missing_fields: missingFields,
+      };
+    });
+
+    for (const batch of batches) {
+      batch.completenessRate = batch.total > 0
+        ? Math.round((batch.complete / batch.total) * 1000) / 10
+        : 0;
+    }
+
+    const total = batches.reduce((sum, batch) => sum + batch.total, 0);
+    const complete = batches.reduce((sum, batch) => sum + batch.complete, 0);
+
+    return c.json({
+      range,
+      summary: {
+        total,
+        complete,
+        incomplete: total - complete,
+        completenessRate: total > 0 ? Math.round((complete / total) * 1000) / 10 : 0,
+      },
+      batches,
+      profiles,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('Failed to load student profile readiness:', error?.message || error);
+    return c.json({ error: 'Failed to load student profile readiness' }, 500);
+  }
+};
+
 // List all trainers and admins
 export const listTrainers = async (c: Context) => {
   try {

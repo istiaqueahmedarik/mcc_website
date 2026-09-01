@@ -930,3 +930,18 @@ Changing contest ranking formulas, tie-breakers, composite scoring, scored snaps
 
 Do not overgeneralize:
 Penalty score is formula-driven and need not be raw contest penalty. Ranking direction remains an explicit saved sort-rule choice.
+# 2026-09-01 - admin-student-profile-readiness-20260901 - Protected Profile Readiness Tool
+
+Source:
+- `docs/rsd/admin-student-profile-readiness-20260901-rsd.md`
+- `docs/decisions/admin-student-profile-readiness-20260901-technical-decisions.md`
+- `docs/tasks/admin-student-profile-readiness-20260901-task-plan.md`
+
+Decision:
+Student profile readiness is an admin-only read tool at `/admin/student-profiles`, backed by one server-authoritative query over registered non-trainer/non-admin users. Complete means full name, student ID, Codeforces handle, and VJudge username are all present. Student ID is the batch authority: exactly 9 digits uses characters 3–4, 2–8 digits uses the first 2 characters, and `batch_name` is ignored even when it is department-specific, `N/A`, or blank. The browser proxy keeps the bearer token server-side, and CSV export reflects the current filtered view with spreadsheet-formula protection.
+
+Applies when:
+Changing admin student-profile analytics, batch completeness rules, or the batches 22–26 CSV export.
+
+Do not overgeneralize:
+This does not authorize profile edits, handle verification, public access, schema/RLS changes, Storage exports, or exposing email/phone/internal user IDs.

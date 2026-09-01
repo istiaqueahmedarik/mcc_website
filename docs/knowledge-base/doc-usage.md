@@ -366,3 +366,9 @@ Auditing student-thread realtime, private classroom attachments, Updates/Threads
 
 Do not overgeneralize:
 The implementation review did not prove live Supabase upload/download or two-browser realtime delivery; it verified code paths, build/lint, route shape, and safety constraints.
+# 2026-09-01 - admin-student-profile-readiness-20260901 - Docs Used
+
+This task used `AGENTS.md`, the repository knowledge base, the required `interface-design`, `apple-design`, `emil-design-eng`, `context7`, and `supabase` skills, current Motion accessibility documentation, current Vercel Web Interface Guidelines, current Supabase changelog, and the existing admin authorization/proxy/UI patterns. These inputs drove the server-owned completeness rule, minimal admin response, URL-backed range/status state, focusable overflow table, purposeful transform/opacity motion, and reduced-motion behavior.
+
+Applies when:
+Auditing why this tool uses installed `framer-motion`, avoids a new chart dependency, keeps the token in the server proxy, or treats CSV safety and visual accessibility as part of the export contract.

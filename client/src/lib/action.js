@@ -327,7 +327,7 @@ export async function createAchievement(prevState, formData) {
   if (error) {
     return {
       success: false,
-      message: "Problem uploading image",
+      message: "Problem uploading MIST ID card",
     };
   }
   raw.image = url;
@@ -393,7 +393,6 @@ export async function updateAchievement(prevState, formData) {
 export async function signUp(prevState, formData) {
 
   let raw = Object.fromEntries(formData)
-  console.log(raw)
   
   // Validate password length
   if (!raw.password || raw.password.length < 8) {
@@ -410,9 +409,63 @@ export async function signUp(prevState, formData) {
     };
   }
 
+  const mistId = raw.mist_id?.toString().trim();
+  if (!mistId || !/^\d+$/.test(mistId)) {
+    return {
+      success: false,
+      message: "MIST Student ID must contain numbers only",
+    };
+  }
+
+  const batchName = raw.batch_name?.toString().trim();
+  if (!batchName) {
+    return {
+      success: false,
+      message: "Batch details are required",
+    };
+  }
+
+  const validateImage = (file, label) => {
+    if (!file || typeof file === "string" || file.size === 0) {
+      return `${label} is required`;
+    }
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      return `${label} must be a JPG or PNG image`;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return `${label} must be 5MB or smaller`;
+    }
+    return "";
+  };
+
+  const profilePictureError = validateImage(raw.profile_pic, "Profile picture");
+  const idCardError = validateImage(raw.mist_id_card, "MIST ID card");
+  if (profilePictureError || idCardError) {
+    return {
+      success: false,
+      message: profilePictureError || idCardError,
+    };
+  }
+
+  const profileUpload = await uploadImage(
+    "profile_pics",
+    mistId,
+    raw.profile_pic,
+    "all_picture"
+  );
+  if (profileUpload.error) {
+    return {
+      success: false,
+      message: "Problem uploading profile picture",
+    };
+  }
+  raw.profile_pic = profileUpload.url;
+  raw.mist_id = mistId;
+  raw.batch_name = batchName;
+
   const { url, error } = await uploadImage(
     "mist_id_cards",
-    raw.mist_id,
+    mistId,
     raw.mist_id_card,
     "all_picture"
   );
@@ -422,7 +475,6 @@ export async function signUp(prevState, formData) {
       message: "Problem uploading image",
     };
   }
-  console.log(url);
   raw.mist_id_card = url;
   const response = await post("auth/signup", raw);
   if (response.error)

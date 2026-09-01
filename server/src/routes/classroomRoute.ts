@@ -9,6 +9,7 @@ import {
   toggleTrainerRole,
   toggleAdminRole,
   listAllUsers,
+  getStudentProfileReadiness,
   listTrainers,
   createClassroom,
   updateClassroom,
@@ -206,6 +207,7 @@ route.post('/admin/create-user', createFullUser);
 route.post('/admin/create-users-bulk', createUsersBulk);
 route.post('/admin/change-password', changeUserPassword);
 route.get('/admin/users', listAllUsers);
+route.get('/admin/student-profile-readiness', getStudentProfileReadiness);
 route.get('/admin/trainers-list', listTrainers);
 
 // Classroom CRUD

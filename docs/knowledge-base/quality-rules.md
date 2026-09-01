@@ -771,3 +771,10 @@ Changing the formula grammar, metric filter fields, scoring previews, saved form
 
 Do not overgeneralize:
 Formula filters are row selectors for contest/result-unit metrics, not a general scripting language.
+# 2026-09-01 - Admin Export Privacy and Visualization Rule
+
+Rule:
+Admin analytics endpoints must revalidate admin authorization, select the minimum fields required by the UI/export, avoid logging row data, and return generic database errors. CSV downloads must reflect the visible filter policy and neutralize spreadsheet formula-leading values. Charts must provide text/count equivalents, use tabular numerals, keep mobile overflow scoped, and honor reduced motion.
+
+Applies when:
+Building or reviewing administrative analytics, roster/profile exports, readiness dashboards, or student-data visualizations.

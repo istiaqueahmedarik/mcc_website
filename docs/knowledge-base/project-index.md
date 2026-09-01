@@ -1067,3 +1067,32 @@ Maintaining contest scoring APIs, database migrations, rank sorting, report snap
 
 Do not overgeneralize:
 Supabase migration `20260829171842` (`contest_report_score_pair_v2_20260829`) was applied and verified on 2026-08-29. Keep the migration in deployment history before deploying controllers that write the new columns to any other environment.
+# 2026-09-01 - admin-student-profile-readiness-20260901 - Approved Scope and Plan
+
+Source:
+- `docs/rsd/admin-student-profile-readiness-20260901-rsd.md`
+- `docs/decisions/admin-student-profile-readiness-20260901-technical-decisions.md`
+- `docs/tasks/admin-student-profile-readiness-20260901-task-plan.md`
+
+Fact:
+The approved admin tool adds protected student profile readiness analytics and filtered CSV export, defaulting to CSE batches 22–26. It uses a server-authoritative users query, a server-side bearer-token proxy, URL-backed range/status filters, accessible batch and missing-field graphs, and installed Motion with reduced-motion behavior. No schema change is approved.
+
+Applies when:
+Implementing or reviewing the admin student-profile readiness page, query, navigation, graph, filters, or CSV export.
+
+Do not overgeneralize:
+The plan does not approve profile mutation, public access, broad admin redesign, email/phone export, or Supabase schema/policy changes.
+# 2026-09-01 - admin-student-profile-readiness-20260901 - Implemented Entry Points
+
+Source:
+- `docs/reviews/admin-student-profile-readiness-20260901-implementation-review.md`
+- `docs/decisions/admin-student-profile-readiness-20260901-technical-decisions.md`
+
+Fact:
+Admin student profile readiness is implemented at `client/src/app/admin/student-profiles/` with an authenticated proxy at `client/src/app/api/classroom/admin/student-profile-readiness/route.js`. Server authority is `getStudentProfileReadiness` in `server/src/controllers/classroomController.ts`, registered as `GET /classroom/admin/student-profile-readiness`. The page defaults to batches 22–26, visualizes ready versus incomplete profiles and missing fields, previews status/search matches, and safely exports the current view.
+
+Applies when:
+Maintaining student-profile completeness analytics, the admin CSV export, its batch rules, or its Motion-based readiness visualization.
+
+Do not overgeneralize:
+This implementation does not edit profiles, verify handles, export contact details, expose a public endpoint, persist files, or change the database schema.

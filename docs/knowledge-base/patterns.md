@@ -858,3 +858,15 @@ Splitting an existing score contract, adding formula-driven tie-breakers, or evo
 
 Do not overgeneralize:
 Compatibility aliases are transitional API support, not permission to maintain two independent sources of truth.
+# 2026-09-01 - Admin Readiness Analytics and Safe CSV Export
+
+Pattern:
+For admin exports over user data, keep classification and completeness rules in one admin-authorized server query, return only the row fields required by the tool, and derive all aggregates from the same snapshot. Generate a filtered browser CSV by quoting every field, adding a UTF-8 BOM, and neutralizing values that begin with spreadsheet formula characters. Pair visual charts with visible counts and descriptive accessible labels.
+
+For MCC student profile readiness specifically, classify batch from the student ID rather than `batch_name`: use characters 3–4 for exactly 9 digits, or the first 2 characters for 2–8 digits. Treat other lengths as unclassified.
+
+Applies when:
+Adding another protected profile/readiness export or small-to-medium admin CSV download.
+
+Do not use when:
+The export needs background processing, durable file storage, audit history, very large datasets, or public access.
