@@ -7645,7 +7645,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           />
                         ) : (
                           <div className="overflow-hidden rounded-lg bg-card shadow-sm ring-1 ring-border/50">
-                            <ScrollArea className="max-h-[560px]">
+                            <ScrollArea className="h-[clamp(18rem,calc(100vh-26rem),34rem)]">
                               <div className="divide-y divide-border/50">
                                 {visibleLinkPendingStudents.length > 0 && (
                                   <div className="bg-blue-500/5">
