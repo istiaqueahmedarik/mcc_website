@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from '@/lib/utils'
 import { AlertCircle, CheckCheck, Download, FileText, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
 import Image from "next/image"
@@ -66,6 +67,35 @@ function ProviderBadge({ provider }) {
   )
 }
 
+function ProviderProfileLink({ provider, id }) {
+  if (!id) return <span aria-hidden="true" className="h-7 w-7" />
+
+  const isCodeforces = provider === "codeforces"
+  const label = isCodeforces ? "Codeforces" : "VJudge"
+  const href = isCodeforces
+    ? `https://codeforces.com/profile/${encodeURIComponent(id)}`
+    : `https://vjudge.net/user/${encodeURIComponent(id)}`
+
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open ${label} profile for ${id}`}
+      title={`${label}: ${id}`}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97]"
+    >
+      <Image
+        src={isCodeforces ? "/cf.png" : "/vj.jpg"}
+        alt=""
+        width={14}
+        height={14}
+        className="h-3.5 w-3.5 rounded-[3px] object-cover"
+      />
+    </Link>
+  )
+}
+
 function ReportTable({
   merged,
   liveReportId,
@@ -78,6 +108,7 @@ function ReportTable({
   highlightStudentId = "",
   highlightVjudgeId = "",
   highlightGroupIds = [],
+  enableViewModes = false,
 }) {
   const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
   const isScoredSnapshot = Boolean(merged?.snapshotVersion === 2 || merged?.scoring)
@@ -87,6 +118,11 @@ function ReportTable({
   const formatScore = (value, precision = scorePrecision) => {
     const numeric = Number(value)
     return Number.isFinite(numeric) ? numeric.toFixed(precision) : "0"
+  }
+  const formatCompactNumber = (value) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return "0"
+    return numeric.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")
   }
   const clampPercentage = (value, fallback = 0) => {
     const numeric = Number(value)
@@ -98,6 +134,7 @@ function ReportTable({
     String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)),
   )
   const [searchText, setSearchText] = useState("")
+  const [viewMode, setViewMode] = useState("compact")
   const [removeWorstCount, setRemoveWorstCount] = useState(0)
   const [optOutContests, setOptOutContests] = useState({})
   const [advancedFilters] = useState({
@@ -127,6 +164,7 @@ function ReportTable({
     [isTscCombined, tfcPercentage],
   )
   const normalizedHighlightStudentId = String(highlightStudentId || "")
+  const isCompactView = enableViewModes && viewMode === "compact"
   const normalizedHighlightVjudgeId = String(highlightVjudgeId || "").trim().toLowerCase()
   const highlightedGroupIdSet = useMemo(
     () => new Set((highlightGroupIds || []).map((id) => String(id))),
@@ -1191,7 +1229,7 @@ function ReportTable({
       )}
 
       <div>
-        <div className="flex items-center gap-2 bg-card p-3 rounded-lg border shadow-sm">
+        <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-2 shadow-sm sm:px-3">
           <div className="flex items-center gap-2">
             <Users2 className="h-5 w-5 text-muted-foreground" />
             <span className="font-medium">Showing</span>
@@ -1200,6 +1238,18 @@ function ReportTable({
             </Badge>
             <span className="font-medium">participants</span>
           </div>
+          {enableViewModes && (
+            <Tabs value={viewMode} onValueChange={setViewMode}>
+              <TabsList className="h-12" aria-label="Contest report view">
+                <TabsTrigger className="h-10 px-3 text-xs active:scale-[0.97]" value="compact">
+                  Compact
+                </TabsTrigger>
+                <TabsTrigger className="h-10 px-3 text-xs active:scale-[0.97]" value="extended">
+                  Extended
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
         </div>
       </div>
 
@@ -1213,14 +1263,16 @@ function ReportTable({
           tabIndex: 0,
         }}
       >
-        <Table className="min-w-max" containerClassName="overflow-visible">
+        <Table className={cn("min-w-max", isCompactView && "text-xs")} containerClassName="overflow-visible">
           <TableHeader>
             <TableRow>
-              <TableHead>Rank</TableHead>
-              {!solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
-              <TableHead>Name</TableHead>
-              <TableHead>Contests</TableHead>
-              {solveOnly ? (
+              <TableHead className={cn(isCompactView && "h-9 px-3")}>Rank</TableHead>
+              {!isCompactView && !solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
+              <TableHead className={cn(isCompactView && "h-9 w-[240px] min-w-[240px] px-3")}>{isCompactView ? "Name / ID" : "Name"}</TableHead>
+              {!isCompactView && <TableHead>Contests</TableHead>}
+              {isCompactView ? (
+                <TableHead className="h-9 px-3 text-right">Solved (Penalty)</TableHead>
+              ) : solveOnly ? (
                 <TableHead>Total Solves</TableHead>
               ) : isScoredSnapshot ? (
                 <>
@@ -1236,9 +1288,12 @@ function ReportTable({
                 </>
               )}
               {orderedContestIds.map((cid) => (
-                <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
-                  <div className="flex max-w-[140px] items-center gap-1.5 truncate">
-                    <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />
+                <TableHead
+                  key={cid}
+                  className={cn(optOutContests[cid] && "bg-destructive/10", isCompactView && "h-9 px-3 text-right")}
+                >
+                  <div className={cn("flex max-w-[140px] items-center gap-1.5 truncate", isCompactView && "max-w-[104px] justify-end")}>
+                    {!isCompactView && <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />}
                     <span className="truncate">{merged.contestIdToTitle[cid]}</span>
                     {optOutContests[cid] && (
                       <span className="ml-1 text-destructive">
@@ -1291,6 +1346,18 @@ function ReportTable({
                 || (Array.isArray(codeforcesContest?.sourceHandles) ? codeforcesContest.sourceHandles[0] : null)
                 || (hasProvider(u, "codeforces") ? sourceHandlesForUser(u)[0] : null)
               const resolvedMistId = mappedStudent?.mistId || mappedStudent?.mist_id || (hasDbProfile ? profile.mist_id || null : u.mist_id || u.mistId || null)
+              const compactParticipantId = resolvedMistId || resolvedVjudgeId || resolvedCfId || u.username || "—"
+              const compactSolved = isScoredSnapshot
+                ? u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score ?? 0
+                : u.effectiveTotalSolved ?? u.totalSolved ?? 0
+              const compactPenalty = isScoredSnapshot
+                ? u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty ?? 0
+                : solveOnly
+                  ? orderedContestIds.reduce((total, contestId) => {
+                      if (optOutContests[contestId]) return total
+                      return total + Number(u.contests?.[contestId]?.penalty || 0)
+                    }, 0)
+                  : u.effectiveTotalPenalty ?? u.effectivePenalty ?? u.totalPenalty ?? 0
               const isClassroomParticipant = Boolean(u.isClassroomParticipant || u.classroomMapping?.isClassroomParticipant)
               const mappedStudentId = String(u.studentId || u.classroomMapping?.studentId || u.classroomMapping?.student?.id || "")
               const mappedGroupId = String(u.groupId || u.classroomMapping?.groupId || u.classroomMapping?.group?.id || "")
@@ -1324,11 +1391,11 @@ function ReportTable({
                     isTop && 'top-rank-wrapper',
                   )}
                 >
-                  <TableCell>
+                  <TableCell className={cn(isCompactView && "px-3 py-2 text-right align-middle")}>
                     <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
                       <Badge
                         variant="default"
-                        className={`min-w-[32px] transition-all duration-200 ${index < 12
+                        className={`${isCompactView ? "h-5 min-w-7 px-1.5 text-[10px]" : "min-w-[32px]"} transition-colors duration-200 ${index < 12
                             ? index < 3
                               ? "bg-yellow-500 text-white"
                               : index < 6
@@ -1344,7 +1411,7 @@ function ReportTable({
                     </div>
                   </TableCell>
                   {/* Progress */}
-                  {!solveOnly && !isScoredSnapshot && (
+                  {!isCompactView && !solveOnly && !isScoredSnapshot && (
                     <TableCell className="min-w-[90px]">
                       {(() => {
                         const p = progressByUser[identity] || { status: 'neutral', delta: 0 }
@@ -1371,7 +1438,21 @@ function ReportTable({
                       })()}
                     </TableCell>
                   )}
-                  <TableCell>
+                  <TableCell className={cn(isCompactView && "px-3 py-2")}>
+                    {isCompactView ? (
+                      <div className="grid w-[216px] grid-cols-[minmax(0,1fr)_1.75rem_1.75rem] items-center gap-1">
+                        <div className="min-w-0 leading-tight">
+                          <p className="truncate text-xs font-semibold text-foreground" title={resolvedName}>
+                            {resolvedName}
+                          </p>
+                          <p className="mt-0.5 truncate text-[10px] text-muted-foreground" title={String(compactParticipantId)}>
+                            {compactParticipantId}
+                          </p>
+                        </div>
+                        <ProviderProfileLink provider="vjudge" id={resolvedVjudgeId} />
+                        <ProviderProfileLink provider="codeforces" id={resolvedCfId} />
+                      </div>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
@@ -1441,49 +1522,21 @@ function ReportTable({
                               .map((provider) => (
                                 <ProviderBadge key={`${identity}-${provider}`} provider={provider} />
                               ))}
-                            {resolvedVjudgeId ? (
-                              <Link
-                                href={`https://vjudge.net/user/${encodeURIComponent(resolvedVjudgeId)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center"
-                                title={`VJudge: ${resolvedVjudgeId}`}
-                              >
-                                <Image
-                                  src="/vj.jpg"
-                                  alt="VJudge"
-                                  width={16}
-                                  height={16}
-                                  className="h-4 w-4 rounded-sm object-cover"
-                                />
-                              </Link>
-                            ) : null}
-
-                            {resolvedCfId ? (
-                              <Link
-                                href={`https://codeforces.com/profile/${encodeURIComponent(resolvedCfId)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center"
-                                title={`Codeforces: ${resolvedCfId}`}
-                              >
-                                <Image
-                                  src="/cf.png"
-                                  alt="Codeforces"
-                                  width={16}
-                                  height={16}
-                                  className="h-4 w-4 rounded-sm object-cover"
-                                />
-                              </Link>
-                            ) : null}
+                            {resolvedVjudgeId ? <ProviderProfileLink provider="vjudge" id={resolvedVjudgeId} /> : null}
+                            {resolvedCfId ? <ProviderProfileLink provider="codeforces" id={resolvedCfId} /> : null}
                           </div>
                         )}
                       </div>
                     </div>
+                    )}
                   </TableCell>
                   
-                  <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>
-                  {solveOnly ? (
+                  {!isCompactView && <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>}
+                  {isCompactView ? (
+                    <TableCell className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                      {formatCompactNumber(compactSolved)}<span className="font-normal text-muted-foreground">({formatCompactNumber(compactPenalty)})</span>
+                    </TableCell>
+                  ) : solveOnly ? (
                     <TableCell className="text-base font-semibold tabular-nums">{u.effectiveTotalSolved}</TableCell>
                   ) : isScoredSnapshot ? (
                     <>
@@ -1569,6 +1622,24 @@ function ReportTable({
                     const optedOutContests = Array.isArray(u.optedOutContests) ? u.optedOutContests : []
                     const isWorst = worstContests.includes(cid)
                     const isOptedOut = optedOutContests.includes(cid)
+                    if (isCompactView) {
+                      const isExcluded = !perf || isWorst || isOptedOut || perf?.excluded || perf?.dropped
+                      const solved = isExcluded ? 0 : Number(perf?.solved || 0)
+                      const penalty = isExcluded ? 0 : Number(perf?.penalty || 0)
+                      return (
+                        <TableCell
+                          key={cid}
+                          className={cn(
+                            "px-3 py-2 text-right tabular-nums",
+                            isExcluded && "text-muted-foreground",
+                            (isWorst || isOptedOut || perf?.excluded || perf?.dropped) && "bg-muted/50",
+                          )}
+                        >
+                          <span className="font-semibold text-foreground">{formatCompactNumber(solved)}</span>
+                          <span>({formatCompactNumber(penalty)})</span>
+                        </TableCell>
+                      )
+                    }
                     if (solveOnly) {
                       const isManual = Boolean(perf?.manualSolveOverride)
                       return (

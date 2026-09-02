@@ -37,6 +37,7 @@ async function page({ params, searchParams }) {
         liveReportId={liveReportId}
         name={merged.name || "Contest report"}
         publishEndpoint={canPublish ? `/api/contest-room/${encodeURIComponent(roomId)}/publish` : null}
+        enableViewModes
       />
     </div>
   );

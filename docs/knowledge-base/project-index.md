@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-02 - Trainer Contest Report Compact Mode
+
+Trainer-facing generated contest reports and the classroom trainer contest workbench now enable the shared `ReportTable` Compact/Extended switch. Compact is local UI state and defaults to a dense rank, aligned Name/ID plus provider profile links, aggregate `solved(penalty)`, and per-contest `solved(penalty)` matrix; Extended preserves the prior full report. The UI implementation lives in `client/src/components/ReportTable.js`, with trainer opt-ins in `client/src/components/ClassroomContestPanel.jsx` and `client/src/app/contests_report/details/[id]/generate_report/page.js`. Classroom report generation in `server/src/controllers/classroomContestController.ts` now admits only mapped classroom students/groups while retaining full raw snapshots for mapping. Student classroom presentation and public live reports are unchanged.
+
 ## 2026-09-02 - trainer-contest-tab-and-vjudge-session-route - Implemented Entry Points
 
 Source:

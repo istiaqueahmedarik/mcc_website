@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-09-02 - Contest Report View Modes Stay Presentational
+
+Source:
+- `docs/reviews/trainer-contest-report-compact-mode-20260902-implementation-review.md`
+
+Rule:
+Compact/Extended contest report modes may change only the visible table columns, density, and formatting. They must use the same ranked report rows and must not change search semantics, report generation, authoritative rank, sharing payloads, CSV/PDF exports, or snapshot data. Compact result cells use `solved(penalty)` and preserve excluded/dropped/removed state visually.
+
+Compact Name/ID provider links should use fixed slots so icon presence does not shift the identity or numeric columns. Classroom report generation must filter mapped rank data to `isClassroomParticipant` identities before merging/scoring; raw snapshots retain complete standings rows for trainer mapping and audit. Existing reports may be projected client-side only when explicit membership markers exist, preserving compatibility with legacy unmarked reports.
+
+Applies when:
+Changing `ReportTable`, trainer report density, report mode controls, or compact result formatting.
+
+Do not overgeneralize:
+Do not use a presentation mode as a scoring policy, data filter, export option, or public/student default without a separate approved decision.
+
 ## 2026-09-02 - EDU Friends Fetches Must Fail Before Persistence
 
 Source:

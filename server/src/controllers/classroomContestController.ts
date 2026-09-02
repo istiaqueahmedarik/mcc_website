@@ -2657,6 +2657,8 @@ async function buildClassroomScoredReportSnapshot(
     allDemerits[contestKey] = contestDemerits;
     contestIdToWeight[contestKey] = Number(item.weight || 1);
 
+    // Raw snapshots retain full standings for trainer mapping; generated reports
+    // include only identities resolved to this classroom's students or groups.
     const rankData = applyDemeritsToRankData(
       applyRankDataClassroomMappings({
         ...(snapshot.rank_data || {}),
@@ -2669,7 +2671,7 @@ async function buildClassroomScoredReportSnapshot(
           externalContestId,
           title: item.title || snapshot.rank_data?.contestInfo?.title || `Contest ${externalContestId}`,
         },
-      }, maps, provider, false),
+      }, maps, provider, true),
       contestDemerits,
     );
     results.push(rankData);

@@ -1,5 +1,19 @@
 # Doc Usage
 
+## 2026-09-02 - trainer-contest-report-compact-mode - Implementation Docs Used
+
+Source:
+- `docs/reviews/trainer-contest-report-compact-mode-20260902-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the required interface/Apple/Emil design skills, Context7 React derived-list/state guidance, current contest-report mapping decisions, and the existing shared report, Tabs, Table, ScrollArea, classroom mapping, trainer workbench, and generated-report entry points. These inputs kept the mode accessible and dense, aligned provider links consistently, and moved classroom-only filtering to report generation while preserving complete raw snapshots.
+
+Applies when:
+Auditing the Compact/Extended trainer contest report implementation.
+
+Do not overgeneralize:
+No authenticated browser session, live report data, production deployment, API change, or database mutation was performed.
+
 ## 2026-09-02 - classroom-contest-report-scroll-edu-friends - Implementation Docs Used
 
 Source:

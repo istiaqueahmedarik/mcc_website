@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-09-02 - trainer-contest-report-compact-mode - Trainer-Scoped Report Density
+
+Source:
+- `docs/rsd/trainer-contest-report-compact-mode-20260902-rsd.md`
+- `docs/reviews/trainer-contest-report-compact-mode-20260902-implementation-review.md`
+
+Decision:
+Trainer contest reports opt into a local Compact/Extended presentation switch with Compact as the default. Compact shows rank, aligned Name/ID plus available VJudge/Codeforces profile links, aggregate solved/penalty, and per-contest solved/penalty values without avatars or auxiliary scoring columns. Generated classroom report inputs include only mapped classroom students/groups; raw provider snapshots remain complete for mapping. Existing stored classroom reports with explicit membership markers receive the same classroom-only client projection. Public live reports, scoring formulas, publishing, and export schemas retain their current behavior. This supersedes only the unmatched `vjudge:<handle>` report-identity portion of the 2026-08-10 mixed-provider decision.
+
+Applies when:
+Changing trainer contest report density, report identity presentation, or the shared report table's view-mode controls.
+
+Do not overgeneralize:
+Do not persist view mode, remove full data from Extended mode, apply the trainer default to student/public reports, discard unmatched rows from raw snapshots, or make presentation state affect authoritative scoring or exported/shared payloads.
+
 ## 2026-09-02 - classroom-contest-report-scroll-edu-friends - Narrow EDU Fetches
 
 Source:

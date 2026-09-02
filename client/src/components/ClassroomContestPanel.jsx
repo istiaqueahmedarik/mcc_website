@@ -557,7 +557,6 @@ export function ClassroomContestPanel({
     [contestOrderDraft, selectedRoomContestsById],
   );
   const reportData = report?.data || null;
-  const mappingSummary = reportData?.mappingSummary || null;
   const selectedRoomContestOrder = useMemo(
     () => (selectedRoom?.contests || []).map(contestReportKey).filter(Boolean),
     [selectedRoom],
@@ -570,11 +569,29 @@ export function ClassroomContestPanel({
       ...selectedRoomContestOrder.filter((contestId) => reportContestSet.has(contestId)),
       ...reportContestIds.filter((contestId) => !selectedRoomContestOrder.includes(contestId)),
     ];
+    const reportUsers = Array.isArray(reportData.users) ? reportData.users : [];
+    const hasClassroomMarkers = reportUsers.some((user) => (
+      typeof user?.isClassroomParticipant === "boolean"
+      || typeof user?.classroomMapping?.isClassroomParticipant === "boolean"
+    ));
+    const classroomUsers = hasClassroomMarkers
+      ? reportUsers.filter((user) => Boolean(user?.isClassroomParticipant || user?.classroomMapping?.isClassroomParticipant))
+      : reportUsers;
     return {
       ...reportData,
       contestIds: orderedContestIds,
+      users: classroomUsers,
+      mappingSummary: hasClassroomMarkers
+        ? {
+            ...(reportData.mappingSummary || {}),
+            matchedRows: classroomUsers.length,
+            unmatchedRows: 0,
+            totalRows: classroomUsers.length,
+          }
+        : reportData.mappingSummary,
     };
   }, [reportData, selectedRoomContestOrder]);
+  const mappingSummary = orderedReportData?.mappingSummary || null;
   const providerCounts = useMemo(() => {
     const counts = { vjudge: 0, codeforces: 0 };
     rooms.forEach((room) => {
@@ -1451,7 +1468,7 @@ export function ClassroomContestPanel({
                       studentHandleLabel={currentStudentHandleSummary}
                     />
                     <ReportTable
-                      merged={reportData}
+                      merged={orderedReportData}
                       liveReportId={`classroom_${classroomId}_${selectedRoom?.id || selectedRoomId}`}
                       name={selectedRoom?.name || "Classroom contests"}
                       showLiveShare={false}
@@ -1782,12 +1799,13 @@ export function ClassroomContestPanel({
               </div>
             ) : reportData ? (
               <ReportTable
-                merged={reportData}
+                merged={orderedReportData}
                 liveReportId={`classroom_${classroomId}_${selectedRoom.id}`}
                 name={selectedRoom.name}
                 showLiveShare={false}
                 solveOnly={!reportData?.scoring}
                 contestOrder={selectedRoomContestOrder}
+                enableViewModes
                 shareControl={
                   <ClassroomShareControl
                     report={report}
