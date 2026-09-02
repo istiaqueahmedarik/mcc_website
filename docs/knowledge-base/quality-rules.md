@@ -811,3 +811,20 @@ Admin analytics endpoints must revalidate admin authorization, select the minimu
 
 Applies when:
 Building or reviewing administrative analytics, roster/profile exports, readiness dashboards, or student-data visualizations.
+
+## 2026-09-02 - Provider Session Setup Must Match Both API Routes
+
+Source:
+- `client/src/app/api/classroom/[id]/contests/vjudge-session/route.js`
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/routes/classroomRoute.ts`
+- `server/src/utils/vjudgeSession.ts`
+
+Rule:
+Any provider-session setup endpoint under `/api/classroom/*` must have behaviorally equivalent Next and Hono handlers when production may route `/api/*` directly to Hono. VJudge classroom setup accepts only JSESSIONID input, keeps the value in an HTTP-only root cookie, clears legacy username/password cookies, and retains JWT plus classroom-manager authorization on Hono.
+
+Applies when:
+Changing classroom provider-session connect/status/clear flows, nginx `/api/*` routing, or provider-cookie transport.
+
+Do not overgeneralize:
+Do not persist provider web sessions in the database, log or return their values, accept account passwords in the classroom VJudge flow, or weaken application authorization because the provider credential is present.

@@ -85,8 +85,6 @@ const EMPTY_CONTEST_FORM = {
 };
 
 const EMPTY_SESSION_FORM = {
-  username: "",
-  password: "",
   session: "",
 };
 
@@ -502,7 +500,7 @@ export function ClassroomContestPanel({
   const [report, setReport] = useState(null);
   const [scoringConfig, setScoringConfig] = useState(null);
   const [scoringLoading, setScoringLoading] = useState(false);
-  const [vjSession, setVjSession] = useState({ connected: false, username: "" });
+  const [vjSession, setVjSession] = useState({ connected: false });
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
   const [busyKey, setBusyKey] = useState("");
@@ -648,8 +646,8 @@ export function ClassroomContestPanel({
       const [roomsRes, sessionRes, codeforcesCredentialRes, codeforcesSessionRes] = await Promise.all([
         apiGet(contestApi(classroomId, "rooms")),
         isTrainer
-          ? apiGet(contestApi(classroomId, "vjudge-session")).catch(() => ({ connected: false, username: "" }))
-          : Promise.resolve({ connected: false, username: "" }),
+          ? apiGet(contestApi(classroomId, "vjudge-session")).catch(() => ({ connected: false }))
+          : Promise.resolve({ connected: false }),
         isTrainer
           ? apiGet(contestApi(classroomId, "codeforces-credentials")).catch(() => ({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }))
           : Promise.resolve({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }),
@@ -659,10 +657,7 @@ export function ClassroomContestPanel({
       ]);
       const nextRooms = Array.isArray(roomsRes?.rooms) ? roomsRes.rooms : [];
       setRooms(nextRooms);
-      setVjSession({
-        connected: Boolean(sessionRes?.connected),
-        username: sessionRes?.username || "",
-      });
+      setVjSession({ connected: Boolean(sessionRes?.connected) });
       setCodeforcesCredentialStatus({
         ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
         ...(codeforcesCredentialRes?.credential || {}),
@@ -903,7 +898,7 @@ export function ClassroomContestPanel({
     setBusyKey("vj-session");
     try {
       const res = await apiPost(contestApi(classroomId, "vjudge-session"), sessionForm);
-      setVjSession({ connected: Boolean(res?.connected), username: res?.username || sessionForm.username || "" });
+      setVjSession({ connected: Boolean(res?.connected) });
       setSessionDialogOpen(false);
       setSessionForm(EMPTY_SESSION_FORM);
       toast.success("VJudge session connected");
@@ -918,7 +913,7 @@ export function ClassroomContestPanel({
     setBusyKey("vj-session-clear");
     try {
       await apiRequest(contestApi(classroomId, "vjudge-session"), { method: "DELETE" });
-      setVjSession({ connected: false, username: "" });
+      setVjSession({ connected: false });
       toast.success("VJudge session cleared");
     } catch (error) {
       toast.error(error?.message || "Failed to clear VJudge session");
@@ -2025,45 +2020,25 @@ export function ClassroomContestPanel({
               <DialogHeader className="border-b px-5 py-4 sm:px-6">
                 <DialogTitle>VJudge Session</DialogTitle>
                 <DialogDescription>
-                  {vjSession.connected ? `Connected${vjSession.username ? ` as ${vjSession.username}` : ""}.` : "No active VJudge session."}
+                  {vjSession.connected ? "A VJudge session is connected." : "Paste a VJudge JSESSIONID to connect."}
                 </DialogDescription>
               </DialogHeader>
-              <Tabs defaultValue="login" className={cn(dialogBodyClass, "block")}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="login">Login</TabsTrigger>
-                  <TabsTrigger value="session">Session</TabsTrigger>
-                </TabsList>
-                <TabsContent value="login" className="mt-4 grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vj-username">Username</Label>
-                    <Input
-                      id="vj-username"
-                      value={sessionForm.username}
-                      onChange={(event) => setSessionForm((form) => ({ ...form, username: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="vj-password">Password</Label>
-                    <Input
-                      id="vj-password"
-                      type="password"
-                      value={sessionForm.password}
-                      onChange={(event) => setSessionForm((form) => ({ ...form, password: event.target.value }))}
-                    />
-                  </div>
-                </TabsContent>
-                <TabsContent value="session" className="mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="vj-session">JSESSIONID</Label>
-                    <Textarea
-                      id="vj-session"
-                      value={sessionForm.session}
-                      onChange={(event) => setSessionForm((form) => ({ ...form, session: event.target.value }))}
-                      rows={4}
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <div className={dialogBodyClass}>
+                <div className="space-y-2">
+                  <Label htmlFor="vj-session">JSESSIONID</Label>
+                  <Textarea
+                    id="vj-session"
+                    value={sessionForm.session}
+                    onChange={(event) => setSessionForm((form) => ({ ...form, session: event.target.value }))}
+                    rows={4}
+                    placeholder="Paste JSESSIONID or JSESSIONID=…"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    MCC stores this in an HTTP-only browser cookie for contest fetches. Your VJudge username and password are not collected.
+                  </p>
+                </div>
+              </div>
               <DialogFooter className="gap-2 border-t bg-muted/20 px-5 py-4 sm:justify-between sm:px-6">
                 <Button type="button" variant="outline" className={pressableClass} onClick={clearVjudgeSession} disabled={busyKey === "vj-session-clear"}>
                   {busyKey === "vj-session-clear" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

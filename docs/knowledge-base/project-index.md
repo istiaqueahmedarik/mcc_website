@@ -1,5 +1,24 @@
 # Project Index
 
+## 2026-09-02 - trainer-contest-tab-and-vjudge-session-route - Implemented Entry Points
+
+Source:
+- `client/src/app/classroom/live/[id]/ClassroomLiveClient.js`
+- `client/src/components/ClassroomContestPanel.jsx`
+- `client/src/app/api/classroom/[id]/contests/vjudge-session/route.js`
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/routes/classroomRoute.ts`
+- `server/src/utils/vjudgeSession.ts`
+
+Fact:
+The trainer classroom navigation now exposes Contests as a primary tab instead of a More-menu item. Classroom VJudge setup accepts only a pasted JSESSIONID and stores it in a root-scoped HTTP-only cookie; the UI and Next route no longer collect or submit a VJudge username/password. Matching authenticated GET, POST, and DELETE Hono routes at `/classroom/:id/contests/vjudge-session` support production deployments that route `/api/*` directly to Hono, while retaining classroom-manager authorization.
+
+Applies when:
+Maintaining trainer classroom navigation, classroom VJudge session setup, provider-cookie cleanup, or direct-Hono production routing.
+
+Do not overgeneralize:
+This does not remove unrelated legacy VJudge login APIs, persist the VJudge session in Postgres, expose the cookie to browser JavaScript, or prove that the change has been deployed to production.
+
 ## 2026-09-01 - classroom-contest-upsolves - Implemented Entry Points
 
 Source:

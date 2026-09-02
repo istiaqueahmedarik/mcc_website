@@ -83,13 +83,13 @@ const TRAINER_PRIMARY_NAVIGATION = [
   { value: 'live', label: 'Live', icon: Target, tourId: 'classroom-tour-tab-live' },
   { value: 'topics', label: 'Topics', icon: Layers3, tourId: 'classroom-tour-tab-topics' },
   { value: 'students', label: 'People', icon: Users, tourId: 'classroom-tour-tab-students' },
+  { value: 'contests', label: 'Contests', icon: Trophy },
 ];
 
 const TRAINER_SECONDARY_NAVIGATION = [
   { value: 'threads', label: 'Threads', icon: MessageSquare },
   { value: 'board', label: 'Board', icon: PenTool },
   { value: 'analytics', label: 'Progress Matrix', icon: BarChart3 },
-  { value: 'contests', label: 'Contests', icon: Trophy },
   { value: 'schedule', label: 'Schedule', icon: Calendar },
   { value: 'attendance-summary', label: 'Attendance', icon: UserCheck },
   { value: 'settings', label: 'Settings', icon: SlidersHorizontal },
@@ -133,7 +133,7 @@ const trainerClassroomSteps = [
     element: "#classroom-tour-tabs",
     popover: {
       title: "🎛️ Primary Classroom Tools",
-      description: "Your four frequent destinations stay visible: Updates, Live, Topics, and People. Secondary teaching and administration tools live under More.",
+      description: "Your frequent destinations stay visible: Updates, Live, Topics, People, and Contests. Secondary teaching and administration tools live under More.",
       side: "bottom",
       align: "start",
     },
@@ -169,7 +169,7 @@ const trainerClassroomSteps = [
     element: "#classroom-tour-more",
     popover: {
       title: "••• More Classroom Tools",
-      description: "Open Threads, Board, Progress Matrix, Contests, Schedule, Attendance, and Settings here. You can also right-click the navigation strip for the same shortcuts.",
+      description: "Open Threads, Board, Progress Matrix, Schedule, Attendance, and Settings here. You can also right-click the navigation strip for the same shortcuts.",
       side: "bottom",
       align: "end",
     },

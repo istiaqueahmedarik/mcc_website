@@ -107,6 +107,8 @@ import {
   createClassroomContestRoom,
   createClassroomContestSolveOverride,
   deleteClassroomCodeforcesCredentials,
+  deleteClassroomCodeforcesSession,
+  deleteClassroomVjudgeSession,
   deleteClassroomContestDemerit,
   deleteClassroomContestHandleOverride,
   deleteClassroomContestItem,
@@ -116,6 +118,7 @@ import {
   generateClassroomContestReport,
   getClassroomCodeforcesCredentials,
   getClassroomCodeforcesSession,
+  getClassroomVjudgeSession,
   getClassroomContestReport,
   getClassroomContestScoring,
   listClassroomContestDemerits,
@@ -126,7 +129,7 @@ import {
   previewClassroomContestScoring,
   saveClassroomCodeforcesCredentials,
   saveClassroomCodeforcesSession,
-  deleteClassroomCodeforcesSession,
+  saveClassroomVjudgeSession,
   shareClassroomContestReport,
   updateClassroomContestDemerit,
   updateClassroomContestHandleOverride,
@@ -309,6 +312,9 @@ route.delete('/:id/contests/codeforces-credentials', deleteClassroomCodeforcesCr
 route.get('/:id/contests/codeforces-session', getClassroomCodeforcesSession);
 route.post('/:id/contests/codeforces-session', saveClassroomCodeforcesSession);
 route.delete('/:id/contests/codeforces-session', deleteClassroomCodeforcesSession);
+route.get('/:id/contests/vjudge-session', getClassroomVjudgeSession);
+route.post('/:id/contests/vjudge-session', saveClassroomVjudgeSession);
+route.delete('/:id/contests/vjudge-session', deleteClassroomVjudgeSession);
 route.get('/:id/contests/rooms', listClassroomContestRooms);
 route.post('/:id/contests/rooms', createClassroomContestRoom);
 route.patch('/:id/contests/rooms/:roomId', updateClassroomContestRoom);

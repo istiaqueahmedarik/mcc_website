@@ -31,7 +31,7 @@ import {
   type ContestSourceInput,
 } from '../services/contestScoringService';
 import { isValidFormulaIdentifier, parseFormula } from '../services/contestFormula';
-import { getVjudgeSession } from '../utils/vjudgeSession';
+import { getVjudgeSession, normalizeVjudgeSession } from '../utils/vjudgeSession';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONTEST_TYPES = new Set(['TFC', 'TSC', 'TPC']);
@@ -779,6 +779,36 @@ export const deleteClassroomCodeforcesSession = async (c: any) => {
   const actor = await getManagedActor(c, classroomId);
   if ('error' in actor) return c.json({ error: actor.error }, actor.status);
   deleteCookie(c, 'cf_session', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  return c.json({ success: true, connected: false });
+};
+
+export const getClassroomVjudgeSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  return c.json({ success: true, connected: Boolean(getVjudgeSession(c)) });
+};
+
+export const saveClassroomVjudgeSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  const body = await readJsonBody(c);
+  const session = normalizeVjudgeSession(body?.session ?? body?.jsessionid ?? body?.vjSession);
+  if (!session) return c.json({ error: 'VJudge JSESSIONID is required' }, 400);
+  setCookie(c, 'vj_session', session, PROVIDER_SESSION_COOKIE_OPTIONS);
+  deleteCookie(c, 'vj_session_username', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  deleteCookie(c, 'vj_session_password', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  return c.json({ success: true, connected: true });
+};
+
+export const deleteClassroomVjudgeSession = async (c: any) => {
+  const classroomId = c.req.param('id');
+  const actor = await getManagedActor(c, classroomId);
+  if ('error' in actor) return c.json({ error: actor.error }, actor.status);
+  deleteCookie(c, 'vj_session', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  deleteCookie(c, 'vj_session_username', { path: '/', secure: process.env.NODE_ENV === 'production' });
+  deleteCookie(c, 'vj_session_password', { path: '/', secure: process.env.NODE_ENV === 'production' });
   return c.json({ success: true, connected: false });
 };
 

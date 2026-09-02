@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { Hono } from 'hono';
-import { getVjudgeSession } from './vjudgeSession';
+import { getVjudgeSession, normalizeVjudgeSession } from './vjudgeSession';
 
 function createApp() {
   const app = new Hono();
@@ -34,5 +34,15 @@ describe('getVjudgeSession', () => {
     });
 
     expect(await response.json()).toEqual({ session: 'header-session' });
+  });
+});
+
+describe('normalizeVjudgeSession', () => {
+  test('extracts JSESSIONID from a pasted cookie string', () => {
+    expect(normalizeVjudgeSession('foo=bar; JSESSIONID=session-token; baz=1')).toBe('session-token');
+  });
+
+  test('accepts a raw session token', () => {
+    expect(normalizeVjudgeSession('session-token')).toBe('session-token');
   });
 });
