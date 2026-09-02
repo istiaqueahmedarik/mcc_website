@@ -1,4 +1,4 @@
-import { fetchCodeforcesContestRank, type CodeforcesApiCredentials } from './codeforcesContestService';
+import { fetchCodeforcesContestRank } from './codeforcesContestService';
 import { fetchVjudgeContestRank } from './vjudgeContestService';
 
 export const CLASSROOM_CONTEST_PROVIDERS = ['vjudge', 'codeforces'] as const;
@@ -9,7 +9,6 @@ export type ClassroomContestRankRequest = {
   externalContestId: string;
   problemWeights?: number[];
   vjudgeSession?: string;
-  codeforcesCredentialProvider?: () => Promise<CodeforcesApiCredentials | null>;
   codeforcesSession?: string;
   codeforcesTargetHandles?: string[];
   includeUpsolves?: boolean;
@@ -45,7 +44,6 @@ export function splitContestKey(contestKey: string) {
 export async function fetchClassroomContestRank(request: ClassroomContestRankRequest) {
   if (request.provider === 'codeforces') {
     return fetchCodeforcesContestRank(request.externalContestId, request.problemWeights, {
-      credentialProvider: request.codeforcesCredentialProvider,
       webSession: request.codeforcesSession,
       targetHandles: request.codeforcesTargetHandles,
       includeUpsolves: request.includeUpsolves,

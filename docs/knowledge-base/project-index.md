@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-02 - Codeforces Session-Only Public, Gym, and EDU Standings
+
+Classroom Codeforces fetching is web-session-only. `server/src/services/codeforcesContestService.ts` routes regular numeric IDs to `/contest/{id}/standings/friends/true`, high-number IDs to `/gym/{id}/standings/friends/true`, and EDU sources to their constrained friends/read-list views. The bounded crawler requires the trainer's HTTP-only JSESSIONID, handles both points/hacks and solved/penalty layouts, and filters to classroom handles before persistence. API signing, credential endpoints, encrypted-credential helpers, and trainer API-key UI were removed. Numeric Codeforces items may opt into bounded per-handle submission-history crawling for upsolves; VJudge retains its late-rank-submission mode. Coverage lives in `server/src/services/codeforcesContestService.test.ts`.
+
 ## 2026-09-02 - Trainer Contest Report Compact Mode
 
 Trainer-facing generated contest reports and the classroom trainer contest workbench now enable the shared `ReportTable` Compact/Extended switch. Compact is local UI state and defaults to a dense rank, aligned Name/ID plus provider profile links, aggregate `solved(penalty)`, and per-contest `solved(penalty)` matrix; Extended preserves the prior full report. The UI implementation lives in `client/src/components/ReportTable.js`, with trainer opt-ins in `client/src/components/ClassroomContestPanel.jsx` and `client/src/app/contests_report/details/[id]/generate_report/page.js`. Classroom report generation in `server/src/controllers/classroomContestController.ts` now admits only mapped classroom students/groups while retaining full raw snapshots for mapping. Student classroom presentation and public live reports are unchanged.
@@ -34,7 +38,7 @@ Source:
 - `docs/sql/classroom-contest-upsolves-20260901.sql`
 
 Fact:
-Each classroom Codeforces or VJudge contest item now stores an `include_upsolves` flag. It defaults to false, so snapshots use contest-time submissions only. Trainers can opt in from the contest form; changing the flag invalidates old snapshots and marks the generated report stale. VJudge then retains late rank submissions, while numeric Codeforces contests scan bounded post-contest status pages and apply only submissions belonging to classroom-mapped handles. EDU lesson standings keep their existing practice-course behavior.
+Each classroom Codeforces or VJudge contest item stores an `include_upsolves` flag. It defaults to false and is available in add/edit for both providers; changing it invalidates old snapshots and marks the generated report stale. VJudge retains late rank submissions. Numeric Codeforces sources crawl bounded per-handle contest histories and upgrade only problems unsolved in the official friends standings row.
 
 Applies when:
 Maintaining classroom contest item configuration, snapshot refresh behavior, VJudge duration filtering, Codeforces post-contest submission fetching, or report solve/penalty inputs.
@@ -100,10 +104,10 @@ Source:
 - `docs/decisions/trainer-classroom-codeforces-contests-20260810-technical-decisions.md`
 
 Fact:
-Classroom contest reports now support mixed VJudge and Codeforces contest items inside the classroom-private workflow. Provider adapters live in `server/src/services/classroomContestRankService.ts` and `server/src/services/codeforcesContestService.ts`; encrypted trainer Codeforces credential helpers live in `server/src/utils/codeforcesCredentialCrypto.ts`; classroom persistence, credential endpoints, unmapped Codeforces row review, and report generation stay in `server/src/controllers/classroomContestController.ts`; trainer/student UI stays in `client/src/components/ClassroomContestPanel.jsx`; report display compatibility stays in `client/src/components/ReportTable.js`; rollout SQL is split into `docs/sql/trainer-classroom-codeforces-contests-20260810-expand.sql` and `docs/sql/trainer-classroom-codeforces-contests-20260810-contract.sql`.
+Classroom contest reports support mixed VJudge and Codeforces contest items inside the classroom-private workflow. Provider adapters live in `server/src/services/classroomContestRankService.ts` and `server/src/services/codeforcesContestService.ts`; classroom persistence and report generation stay in `server/src/controllers/classroomContestController.ts`; trainer/student UI stays in `client/src/components/ClassroomContestPanel.jsx`; report display compatibility stays in `client/src/components/ReportTable.js`; rollout SQL is split into `docs/sql/trainer-classroom-codeforces-contests-20260810-expand.sql` and `docs/sql/trainer-classroom-codeforces-contests-20260810-contract.sql`. The 2026-09-02 session-only change removed the application credential endpoints and encrypted-credential helper.
 
 Applies when:
-Maintaining classroom contest provider selection, Codeforces standings fetches, trainer Codeforces credential setup, classroom contest snapshots, provider-aware handle overrides, map/ignore handling for unmatched Codeforces rows, contest demerits, mixed-provider report generation, report table identity/profile display, or classroom-only Codeforces rollout.
+Maintaining classroom contest provider selection, Codeforces standings fetches, Codeforces web-session setup, classroom contest snapshots, provider-aware handle overrides, contest demerits, mixed-provider report generation, report table identity/profile display, or classroom-only Codeforces rollout.
 
 Do not overgeneralize:
 This does not change global VJudge contest-rank routes, global contest-report tables/routes, saved standings, public report sharing, BAPS/Toph standings, team collection, or student-managed Codeforces credentials.

@@ -8,13 +8,13 @@ Source:
 - `docs/reviews/classroom-codeforces-edu-lesson-standings-20260901-implementation-review.md`
 
 Pattern:
-When an existing provider lacks an API for a classroom-only source, keep crawling inside the provider adapter: validate a fixed-origin source identity, require an ephemeral HTTP-only session, choose the narrowest authenticated provider view available, bound timeout/response bytes/concurrency/page count, reject login/challenge HTML, parse provider markup into the existing normalized contract, and discard rows outside explicit classroom target handles before persistence. For ordinary Codeforces EDU lessons, use `friends=true`; preserve explicit read-list sources, and fail with actionable guidance when the narrowed result contains no classroom target. Preserve header-first and root-cookie-second session transport for Next-proxy and direct-Hono production routes.
+Keep classroom Codeforces crawling inside the provider adapter: validate a fixed-origin source identity, require an ephemeral HTTP-only session, choose the narrowest authenticated provider view available, bound timeout/response bytes/concurrency/page count, reject login/challenge HTML, parse provider markup into the existing normalized contract, and discard rows outside explicit classroom target handles before persistence. Numeric public contests use `/contest/{id}/standings/friends/true`, high-number Gyms use `/gym/{id}/standings/friends/true`, ordinary EDU lessons use `friends=true`, and explicit EDU read-list sources remain supported. Preserve header-first and root-cookie-second session transport for Next-proxy and direct-Hono production routes.
 
 Applies when:
 Maintaining Codeforces EDU crawling or adding a similarly constrained authenticated provider source to classroom snapshots.
 
 Do not overgeneralize:
-Do not accept arbitrary URLs, persist full third-party standings, log session values, silently convert access failures to empty snapshots, or use crawling when a stable official API exists.
+Do not accept arbitrary URLs, persist full third-party standings, log session values, silently convert access failures to empty snapshots, or add a Codeforces API credential fallback.
 
 ## 2026-08-17 - Shared Visible And Contextual Commands
 
@@ -54,13 +54,13 @@ Source:
 - `docs/reviews/trainer-classroom-codeforces-contests-20260810-implementation-review.md`
 
 Pattern:
-Fetch Codeforces public contests anonymously with only `contestId`; retry with a signed server-only request only when Codeforces reports access/authentication is required. For classroom Gym/group/mashup contests, load the acting trainer's encrypted Codeforces API credentials lazily for that signed retry. Treat high-number "contest not found" responses as possibly hidden private/group contests and retry signed before failing. Throttle through a process-local queue, set a bounded timeout and response-size guard, filter to official contestants, and persist all official rows in Codeforces snapshots. Preserve native rank/full participant metadata separately from normalized classroom score.
+Resolve a validated numeric classroom Codeforces source to one fixed friends-standings path: regular IDs use `/contest/{id}/standings/friends/true` and high-number Gym IDs use `/gym/{id}/standings/friends/true`. Require the transient Codeforces web session for both, enforce timeout/response/page/concurrency limits, detect score/hacks versus solved/penalty layouts from headers and problem links, and discard rows outside explicit classroom target handles during parsing. When upsolves are explicitly enabled, crawl `/submissions/{handle}/contest/{id}` only for handles already present in the filtered standings; order rows by submission ID, subtract official rejected attempts, and upgrade only officially unsolved problems. Bound handles, pages, and concurrency and fail with `CODEFORCES_UPSOLVE_LIMIT` rather than returning a partial result.
 
 Applies when:
-Maintaining Codeforces standings fetches, Gym/group/mashup access, API credentials, rate-limit handling, or classroom snapshot filtering.
+Maintaining Codeforces standings fetches, public/Gym source routing, web-session handling, layout parsing, or classroom snapshot filtering.
 
 Do not overgeneralize:
-Do not send API credentials to the browser, do not add optional filters to anonymous public regular contest requests, do not decrypt trainer credentials for public contests, and do not count unmapped or ignored Codeforces rows in generated classroom reports.
+Do not call signed or anonymous Codeforces standings APIs, accept API keys/secrets, crawl group/mashup or arbitrary paths, count unrelated friends, invent absent participants, or silently enable Codeforces upsolves.
 
 ## 2026-08-10 - Codeforces Unmapped Row Review
 
@@ -69,7 +69,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Pattern:
-After a Codeforces fetch, keep the full official snapshot and compute classroom mapping at report/read time. Expose latest unmapped Codeforces rows from room snapshots so trainers can either map a handle to a classroom student/group or save an `ignore` handle override. `ignore` overrides have no student/group target, no `identityKey`, and exclude matching rows from generated classroom rankings while leaving the fetched snapshot intact.
+Codeforces web fetches filter to verified or explicitly overridden classroom target handles before persistence. Existing handle overrides still resolve a returned handle to a classroom student/group or explicitly ignore it; `ignore` overrides have no student/group target and no `identityKey`.
 
 Applies when:
 Changing classroom Codeforces snapshot persistence, handle override targets, report generation, trainer mapping UI, or unmapped standings review.

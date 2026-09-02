@@ -106,7 +106,6 @@ import {
   createClassroomContestItem,
   createClassroomContestRoom,
   createClassroomContestSolveOverride,
-  deleteClassroomCodeforcesCredentials,
   deleteClassroomCodeforcesSession,
   deleteClassroomVjudgeSession,
   deleteClassroomContestDemerit,
@@ -116,7 +115,6 @@ import {
   deleteClassroomContestSolveOverride,
   fetchClassroomContestItem,
   generateClassroomContestReport,
-  getClassroomCodeforcesCredentials,
   getClassroomCodeforcesSession,
   getClassroomVjudgeSession,
   getClassroomContestReport,
@@ -127,7 +125,6 @@ import {
   listClassroomContestUnmatchedRows,
   listClassroomContestRooms,
   previewClassroomContestScoring,
-  saveClassroomCodeforcesCredentials,
   saveClassroomCodeforcesSession,
   saveClassroomVjudgeSession,
   shareClassroomContestReport,
@@ -306,9 +303,6 @@ route.get('/:id/checkins', getClassroomDailyCheckins);
 route.post('/:id/checkins', createClassroomDailyCheckin);
 
 // Classroom-scoped contest reports
-route.get('/:id/contests/codeforces-credentials', getClassroomCodeforcesCredentials);
-route.put('/:id/contests/codeforces-credentials', saveClassroomCodeforcesCredentials);
-route.delete('/:id/contests/codeforces-credentials', deleteClassroomCodeforcesCredentials);
 route.get('/:id/contests/codeforces-session', getClassroomCodeforcesSession);
 route.post('/:id/contests/codeforces-session', saveClassroomCodeforcesSession);
 route.delete('/:id/contests/codeforces-session', deleteClassroomCodeforcesSession);

@@ -88,18 +88,6 @@ const EMPTY_SESSION_FORM = {
   session: "",
 };
 
-const EMPTY_CODEFORCES_CREDENTIAL_FORM = {
-  apiKey: "",
-  apiSecret: "",
-};
-
-const EMPTY_CODEFORCES_CREDENTIAL_STATUS = {
-  configured: false,
-  apiKeyHint: null,
-  updatedAt: null,
-  lastUsedAt: null,
-};
-
 const EMPTY_CODEFORCES_SESSION = { connected: false };
 const EMPTY_CODEFORCES_SESSION_FORM = { session: "" };
 
@@ -507,7 +495,7 @@ export function ClassroomContestPanel({
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const [contestDialogOpen, setContestDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
-  const [codeforcesCredentialDialogOpen, setCodeforcesCredentialDialogOpen] = useState(false);
+  const [codeforcesSessionDialogOpen, setCodeforcesSessionDialogOpen] = useState(false);
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
   const [demeritDialogOpen, setDemeritDialogOpen] = useState(false);
   const [solveOverrideDialogOpen, setSolveOverrideDialogOpen] = useState(false);
@@ -515,8 +503,6 @@ export function ClassroomContestPanel({
   const [roomForm, setRoomForm] = useState(EMPTY_ROOM_FORM);
   const [contestForm, setContestForm] = useState(EMPTY_CONTEST_FORM);
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
-  const [codeforcesCredentialForm, setCodeforcesCredentialForm] = useState(EMPTY_CODEFORCES_CREDENTIAL_FORM);
-  const [codeforcesCredentialStatus, setCodeforcesCredentialStatus] = useState(EMPTY_CODEFORCES_CREDENTIAL_STATUS);
   const [codeforcesSession, setCodeforcesSession] = useState(EMPTY_CODEFORCES_SESSION);
   const [codeforcesSessionForm, setCodeforcesSessionForm] = useState(EMPTY_CODEFORCES_SESSION_FORM);
   const [handleForm, setHandleForm] = useState(EMPTY_HANDLE_FORM);
@@ -605,18 +591,8 @@ export function ClassroomContestPanel({
     () => Boolean(selectedRoom?.contests?.some((contest) => contestProvider(contest) === "vjudge")),
     [selectedRoom],
   );
-  const selectedRoomHasCodeforcesEdu = useMemo(
-    () => Boolean(selectedRoom?.contests?.some((contest) => (
-      contestProvider(contest) === "codeforces"
-      && String(contest?.externalContestId || "").startsWith("edu:")
-    ))),
-    [selectedRoom],
-  );
-  const selectedRoomHasCodeforcesApiSource = useMemo(
-    () => Boolean(selectedRoom?.contests?.some((contest) => (
-      contestProvider(contest) === "codeforces"
-      && !String(contest?.externalContestId || "").startsWith("edu:")
-    ))),
+  const selectedRoomHasCodeforces = useMemo(
+    () => Boolean(selectedRoom?.contests?.some((contest) => contestProvider(contest) === "codeforces")),
     [selectedRoom],
   );
   const hasVjudgeContests = providerCounts.vjudge > 0;
@@ -660,14 +636,11 @@ export function ClassroomContestPanel({
   const refreshWorkspace = useCallback(async () => {
     setLoading(true);
     try {
-      const [roomsRes, sessionRes, codeforcesCredentialRes, codeforcesSessionRes] = await Promise.all([
+      const [roomsRes, sessionRes, codeforcesSessionRes] = await Promise.all([
         apiGet(contestApi(classroomId, "rooms")),
         isTrainer
           ? apiGet(contestApi(classroomId, "vjudge-session")).catch(() => ({ connected: false }))
           : Promise.resolve({ connected: false }),
-        isTrainer
-          ? apiGet(contestApi(classroomId, "codeforces-credentials")).catch(() => ({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }))
-          : Promise.resolve({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }),
         isTrainer
           ? apiGet(contestApi(classroomId, "codeforces-session")).catch(() => EMPTY_CODEFORCES_SESSION)
           : Promise.resolve(EMPTY_CODEFORCES_SESSION),
@@ -675,10 +648,6 @@ export function ClassroomContestPanel({
       const nextRooms = Array.isArray(roomsRes?.rooms) ? roomsRes.rooms : [];
       setRooms(nextRooms);
       setVjSession({ connected: Boolean(sessionRes?.connected) });
-      setCodeforcesCredentialStatus({
-        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
-        ...(codeforcesCredentialRes?.credential || {}),
-      });
       setCodeforcesSession({ connected: Boolean(codeforcesSessionRes?.connected) });
       setSelectedRoomId((current) => {
         if (current && nextRooms.some((room) => room.id === current)) return current;
@@ -939,50 +908,6 @@ export function ClassroomContestPanel({
     }
   };
 
-  const saveCodeforcesCredentials = async (event) => {
-    event.preventDefault();
-    setBusyKey("cf-credentials");
-    try {
-      const res = await apiRequest(contestApi(classroomId, "codeforces-credentials"), {
-        method: "PUT",
-        body: {
-          apiKey: codeforcesCredentialForm.apiKey.trim(),
-          apiSecret: codeforcesCredentialForm.apiSecret.trim(),
-        },
-      });
-      setCodeforcesCredentialStatus({
-        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
-        ...(res?.credential || {}),
-      });
-      setCodeforcesCredentialForm(EMPTY_CODEFORCES_CREDENTIAL_FORM);
-      setCodeforcesCredentialDialogOpen(false);
-      toast.success("Codeforces API credentials saved");
-    } catch (error) {
-      toast.error(error?.message || "Failed to save Codeforces API credentials");
-    } finally {
-      setBusyKey("");
-    }
-  };
-
-  const clearCodeforcesCredentials = async () => {
-    if (!window.confirm("Remove your saved Codeforces API credentials from this MCC account?")) return;
-
-    setBusyKey("cf-credentials-clear");
-    try {
-      const res = await apiRequest(contestApi(classroomId, "codeforces-credentials"), { method: "DELETE" });
-      setCodeforcesCredentialStatus({
-        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
-        ...(res?.credential || {}),
-      });
-      setCodeforcesCredentialForm(EMPTY_CODEFORCES_CREDENTIAL_FORM);
-      toast.success("Codeforces API credentials removed");
-    } catch (error) {
-      toast.error(error?.message || "Failed to remove Codeforces API credentials");
-    } finally {
-      setBusyKey("");
-    }
-  };
-
   const saveCodeforcesSession = async () => {
     const session = codeforcesSessionForm.session.trim();
     if (!session) {
@@ -994,9 +919,10 @@ export function ClassroomContestPanel({
       const res = await apiPost(contestApi(classroomId, "codeforces-session"), { session });
       setCodeforcesSession({ connected: Boolean(res?.connected) });
       setCodeforcesSessionForm(EMPTY_CODEFORCES_SESSION_FORM);
-      toast.success("Codeforces EDU session connected");
+      setCodeforcesSessionDialogOpen(false);
+      toast.success("Codeforces web session connected");
     } catch (error) {
-      toast.error(error?.message || "Failed to connect Codeforces EDU session");
+      toast.error(error?.message || "Failed to connect Codeforces web session");
     } finally {
       setBusyKey("");
     }
@@ -1008,9 +934,9 @@ export function ClassroomContestPanel({
       await apiRequest(contestApi(classroomId, "codeforces-session"), { method: "DELETE" });
       setCodeforcesSession(EMPTY_CODEFORCES_SESSION);
       setCodeforcesSessionForm(EMPTY_CODEFORCES_SESSION_FORM);
-      toast.success("Codeforces EDU session cleared");
+      toast.success("Codeforces web session cleared");
     } catch (error) {
-      toast.error(error?.message || "Failed to clear Codeforces EDU session");
+      toast.error(error?.message || "Failed to clear Codeforces web session");
     } finally {
       setBusyKey("");
     }
@@ -1034,30 +960,19 @@ export function ClassroomContestPanel({
       if (
         provider === "codeforces"
         && (
-          code === "CODEFORCES_CREDENTIALS_MISSING"
-          || code === "CODEFORCES_CREDENTIALS_UNAVAILABLE"
-          || code === "CODEFORCES_CREDENTIAL_ENCRYPTION_MISSING"
-          || code === "CODEFORCES_EDU_SESSION_MISSING"
-          || code === "CODEFORCES_EDU_SESSION_INVALID"
+          code === "CODEFORCES_WEB_SESSION_MISSING"
+          || code === "CODEFORCES_WEB_SESSION_INVALID"
         )
       ) {
-        setCodeforcesCredentialDialogOpen(true);
+        setCodeforcesSessionDialogOpen(true);
       }
       const providerError =
-        code === "CODEFORCES_CREDENTIALS_MISSING"
-          ? "Add your Codeforces API key and secret to fetch this Gym, group, or mashup contest"
-          : code === "CODEFORCES_CREDENTIALS_UNAVAILABLE"
-            ? "Saved Codeforces credentials could not be used; re-save them from Codeforces API settings"
-            : code === "CODEFORCES_CREDENTIAL_ENCRYPTION_MISSING"
-              ? "Codeforces credential encryption is not configured on the server"
-            : code === "CODEFORCES_EDU_SESSION_MISSING"
-              ? "Connect a Codeforces JSESSIONID to fetch EDU course standings"
-            : code === "CODEFORCES_EDU_SESSION_INVALID"
-              ? "The Codeforces EDU session expired or cannot access this course; reconnect it and retry"
-            : code === "CODEFORCES_EDU_NO_CLASSROOM_FRIENDS"
-              ? "No classroom students were found in your Codeforces friends standings. Add their handles as Codeforces friends, then try again"
-            : code === "CODEFORCES_RATE_LIMIT"
-              ? "Codeforces rate limit was hit; try again shortly"
+        code === "CODEFORCES_WEB_SESSION_MISSING"
+          ? "Connect a Codeforces JSESSIONID to fetch friends standings"
+          : code === "CODEFORCES_WEB_SESSION_INVALID"
+            ? "The Codeforces web session expired or cannot access this standings page; reconnect it and retry"
+            : code === "CODEFORCES_WEB_NO_CLASSROOM_FRIENDS"
+              ? "No classroom students were found in this friends standings view. Add their handles as Codeforces friends, then try again"
               : error?.message || `Failed to fetch ${providerLabel(provider)} rank`;
       toast.error(providerError);
     } finally {
@@ -1525,12 +1440,12 @@ export function ClassroomContestPanel({
               )}
               <Button
                 size="sm"
-                variant={codeforcesCredentialStatus.configured ? "outline" : hasCodeforcesContests ? "default" : "outline"}
+                variant={codeforcesSession.connected ? "outline" : hasCodeforcesContests ? "default" : "outline"}
                 className="gap-1.5"
-                onClick={() => setCodeforcesCredentialDialogOpen(true)}
+                onClick={() => setCodeforcesSessionDialogOpen(true)}
               >
                 <KeyRound className="h-4 w-4" />
-                {codeforcesCredentialStatus.configured ? "Codeforces Ready" : "Codeforces Access"}
+                {codeforcesSession.connected ? "Codeforces Ready" : "Connect Codeforces"}
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMappingDialogOpen(true)}>
                 <Users className="h-4 w-4" />
@@ -1670,30 +1585,15 @@ export function ClassroomContestPanel({
                     </div>
                   )}
 
-                  {selectedRoomHasCodeforcesApiSource && !codeforcesCredentialStatus.configured && (
-                    <div className="flex flex-col gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 p-3 text-xs text-sky-800 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Public Codeforces contests fetch anonymously. For Gym, group, or mashup contests, add your trainer API key and secret.</span>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className={cn("h-8 shrink-0 border-sky-500/30 bg-background/70 text-sky-800 hover:text-sky-900", pressableClass)}
-                        onClick={() => setCodeforcesCredentialDialogOpen(true)}
-                      >
-                        Manage API
-                      </Button>
-                    </div>
-                  )}
-
-                  {selectedRoomHasCodeforcesEdu && !codeforcesSession.connected && (
+                  {selectedRoomHasCodeforces && !codeforcesSession.connected && (
                     <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Codeforces EDU lesson standings need an active Codeforces JSESSIONID.</span>
+                      <span>Codeforces contest, Gym, and EDU friends standings need an active JSESSIONID.</span>
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
                         className={cn("h-8 shrink-0 border-amber-500/30 bg-background/70 text-amber-800 hover:text-amber-900", pressableClass)}
-                        onClick={() => setCodeforcesCredentialDialogOpen(true)}
+                        onClick={() => setCodeforcesSessionDialogOpen(true)}
                       >
                         Connect session
                       </Button>
@@ -1943,7 +1843,10 @@ export function ClassroomContestPanel({
                     <Label>Provider</Label>
                     <Select
                       value={contestForm.provider}
-                      onValueChange={(value) => setContestForm((form) => ({ ...form, provider: value }))}
+                      onValueChange={(value) => setContestForm((form) => ({
+                        ...form,
+                        provider: value,
+                      }))}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -1966,7 +1869,7 @@ export function ClassroomContestPanel({
                     />
                     <p className="text-xs text-muted-foreground">
                       {contestForm.provider === "codeforces"
-                        ? "Paste a contest, Gym, group contest, or EDU lesson standings URL. EDU lessons use your connected JSESSIONID."
+                        ? "Paste a public contest, Gym, or EDU lesson standings URL. Codeforces fetches the connected account's friends standings."
                         : "Use the numeric VJudge contest ID."}
                     </p>
                   </div>
@@ -2017,7 +1920,9 @@ export function ClassroomContestPanel({
                   <span className="space-y-1">
                     <span className="block text-sm font-medium">Include upsolves</span>
                     <span className="block text-xs text-muted-foreground">
-                      Count accepted submissions made after the contest ends. Leave unchecked to use contest-time submissions only.
+                      {contestForm.provider === "codeforces"
+                        ? "Crawl each classroom handle's contest submissions and count accepted solutions after the official standings result."
+                        : "Count accepted VJudge submissions made after the contest ends."}
                     </span>
                   </span>
                 </label>
@@ -2073,95 +1978,25 @@ export function ClassroomContestPanel({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={codeforcesCredentialDialogOpen} onOpenChange={setCodeforcesCredentialDialogOpen}>
+        <Dialog open={codeforcesSessionDialogOpen} onOpenChange={setCodeforcesSessionDialogOpen}>
           <DialogContent className={formDialogClass}>
-            <form onSubmit={saveCodeforcesCredentials} className="flex max-h-[88vh] flex-col" autoComplete="off">
+            <div className="flex max-h-[88vh] flex-col">
               <DialogHeader className="border-b px-5 py-4 sm:px-6">
-                <DialogTitle>Codeforces Access</DialogTitle>
+                <DialogTitle>Codeforces Session</DialogTitle>
                 <DialogDescription>
-                  Configure API access for private contests and a browser session for EDU course standings.
+                  Connect the Codeforces account whose friends standings should be used for contests, Gym, and EDU.
                 </DialogDescription>
               </DialogHeader>
               <div className={dialogBodyClass}>
                 <div className="space-y-4">
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold">
-                          {codeforcesCredentialStatus.configured ? "Credentials saved" : "No Codeforces API credentials saved"}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {codeforcesCredentialStatus.configured
-                            ? `Stored key ${codeforcesCredentialStatus.apiKeyHint || "••••"} is encrypted on the server.`
-                            : "Add credentials from a Codeforces account that can view your private Gym, group, or mashup contests."}
-                        </p>
-                      </div>
-                      <ProviderBadge provider="codeforces" className="h-6 w-fit px-2 text-[11px]" />
-                    </div>
-                    {codeforcesCredentialStatus.lastUsedAt && (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Last used {new Date(codeforcesCredentialStatus.lastUsedAt).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-900">
-                    <p className="font-semibold">How to create the key</p>
-                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">
-                      <li>
-                        Open{" "}
-                        <a
-                          href="https://codeforces.com/settings/api"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="font-medium underline underline-offset-2"
-                        >
-                          Codeforces API settings
-                        </a>
-                        .
-                      </li>
-                      <li>Create or copy the API key and secret from the account that has Gym, group, or mashup access.</li>
-                      <li>Paste both values below. MCC encrypts them and uses them only for authenticated Codeforces standings fetches.</li>
-                    </ol>
-                  </div>
-
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="codeforces-api-key">API key</Label>
-                      <Input
-                        id="codeforces-api-key"
-                        name="cf-api-key"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={codeforcesCredentialForm.apiKey}
-                        onChange={(event) => setCodeforcesCredentialForm((form) => ({ ...form, apiKey: event.target.value }))}
-                        placeholder="Paste Codeforces API key…"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="codeforces-api-secret">API secret</Label>
-                      <Input
-                        id="codeforces-api-secret"
-                        name="cf-api-secret"
-                        type="password"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={codeforcesCredentialForm.apiSecret}
-                        onChange={(event) => setCodeforcesCredentialForm((form) => ({ ...form, apiSecret: event.target.value }))}
-                        placeholder="Paste Codeforces API secret…"
-                      />
-                      <p className="text-xs text-muted-foreground">The secret is never shown again. To rotate it, paste a new key and secret and save.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 border-t pt-4">
+                  <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold">EDU course session</p>
+                        <p className="text-sm font-semibold">Codeforces web session</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {codeforcesSession.connected
                             ? "Connected for this browser. The session is stored as an HTTP-only cookie for 12 hours."
-                            : "Required only for codeforces.com/edu/course/.../standings URLs."}
+                            : "Required for public contest, Gym, and EDU friends standings."}
                         </p>
                       </div>
                       <Badge variant="outline" className={cn(
@@ -2191,7 +2026,7 @@ export function ClassroomContestPanel({
                         placeholder="Paste JSESSIONID or JSESSIONID=…"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Copy it from the Codeforces cookie storage while signed in and enrolled in the course. It is never written to the database or returned in report data.
+                        Copy it from Codeforces cookie storage while signed in and able to access the target contest, Gym, or EDU course. It is never written to the database or returned in report data.
                       </p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
@@ -2218,26 +2053,12 @@ export function ClassroomContestPanel({
                   </div>
                 </div>
               </div>
-              <DialogFooter className="gap-2 border-t bg-muted/20 px-5 py-4 sm:justify-between sm:px-6">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className={pressableClass}
-                  onClick={clearCodeforcesCredentials}
-                  disabled={!codeforcesCredentialStatus.configured || busyKey === "cf-credentials-clear"}
-                >
-                  {busyKey === "cf-credentials-clear" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Clear saved key
+              <DialogFooter className="border-t bg-muted/20 px-5 py-4 sm:px-6">
+                <Button type="button" variant="outline" className={pressableClass} onClick={() => setCodeforcesSessionDialogOpen(false)}>
+                  Close
                 </Button>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" className={pressableClass} onClick={() => setCodeforcesCredentialDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit" className={pressableClass} disabled={busyKey === "cf-credentials"}>
-                    {busyKey === "cf-credentials" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                    Save credentials
-                  </Button>
-                </div>
               </DialogFooter>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
 

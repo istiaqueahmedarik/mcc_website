@@ -10,14 +10,9 @@ import {
 import {
   normalizeCodeforcesContestSource,
   parseCodeforcesContestSource,
-  validateCodeforcesEduSession,
+  validateCodeforcesSession,
 } from '../services/codeforcesContestService';
 import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from '../utils/classroomPreEnrollment';
-import {
-  codeforcesApiKeyHint,
-  decryptCodeforcesCredential,
-  encryptCodeforcesCredential,
-} from '../utils/codeforcesCredentialCrypto';
 import { getCodeforcesSession, normalizeCodeforcesSession } from '../utils/codeforcesSession';
 import {
   BASE_SCORING_VARIABLES,
@@ -337,34 +332,6 @@ async function nextClassroomContestFormulaKey(classroomId: string, roomId: strin
   throw new Error('Unable to allocate a contest formula key');
 }
 
-async function loadTrainerCodeforcesCredentialRow(trainerId: string) {
-  const rows = await sql`
-    SELECT *
-    FROM public.classroom_codeforces_credentials
-    WHERE trainer_id = ${trainerId}
-    LIMIT 1
-  `;
-  return rows[0] || null;
-}
-
-async function loadTrainerCodeforcesCredentials(trainerId: string) {
-  const row = await loadTrainerCodeforcesCredentialRow(trainerId);
-  if (!row) return null;
-
-  const [apiKey, apiSecret] = await Promise.all([
-    decryptCodeforcesCredential(row.api_key_ciphertext),
-    decryptCodeforcesCredential(row.api_secret_ciphertext),
-  ]);
-
-  await sql`
-    UPDATE public.classroom_codeforces_credentials
-    SET last_used_at = now()
-    WHERE trainer_id = ${trainerId}
-  `;
-
-  return { apiKey, apiSecret };
-}
-
 function roomToApi(row: any, contests: any[] = [], report: any = null) {
   return {
     id: row.id,
@@ -476,19 +443,6 @@ function solveOverrideToApi(row: any) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-function codeforcesCredentialStatusToApi(row: any = null) {
-  return {
-    configured: Boolean(row),
-    apiKeyHint: row?.api_key_hint || null,
-    updatedAt: row?.updated_at || null,
-    lastUsedAt: row?.last_used_at || null,
-  };
-}
-
-function normalizeCodeforcesCredential(value: unknown, maxLength = 1000): string {
-  return normalizeText(value, maxLength);
 }
 
 function reportToApi(row: any) {
@@ -737,22 +691,6 @@ export const deleteClassroomContestRoom = async (c: any) => {
   }
 };
 
-function codeforcesCredentialStorageError(error: any) {
-  const message = String(error?.message || '');
-  if (message.includes('CODEFORCES_CREDENTIAL_ENCRYPTION_KEY')) {
-    return {
-      statusCode: 500,
-      body: {
-        status: 'error',
-        code: 'CODEFORCES_CREDENTIAL_ENCRYPTION_MISSING',
-        error: 'Codeforces credential encryption is not configured on the server.',
-      },
-    };
-  }
-
-  return null;
-}
-
 export const getClassroomCodeforcesSession = async (c: any) => {
   const classroomId = c.req.param('id');
   const actor = await getManagedActor(c, classroomId);
@@ -767,8 +705,10 @@ export const saveClassroomCodeforcesSession = async (c: any) => {
   const body = await readJsonBody(c);
   const session = normalizeCodeforcesSession(body?.session ?? body?.jsessionid);
   if (!session) return c.json({ error: 'Codeforces JSESSIONID is required' }, 400);
-  if (!(await validateCodeforcesEduSession(session))) {
-    return c.json({ error: 'Codeforces rejected this JSESSIONID. Sign in again and copy the current cookie.' }, 401);
+  if (!(await validateCodeforcesSession(session))) {
+    return c.json({
+      error: 'Codeforces could not verify this JSESSIONID. Confirm you are signed in, wait briefly if Codeforces is blocking requests, then try again.',
+    }, 503);
   }
   setCookie(c, 'cf_session', session, PROVIDER_SESSION_COOKIE_OPTIONS);
   return c.json({ success: true, connected: true });
@@ -810,113 +750,6 @@ export const deleteClassroomVjudgeSession = async (c: any) => {
   deleteCookie(c, 'vj_session_username', { path: '/', secure: process.env.NODE_ENV === 'production' });
   deleteCookie(c, 'vj_session_password', { path: '/', secure: process.env.NODE_ENV === 'production' });
   return c.json({ success: true, connected: false });
-};
-
-export const getClassroomCodeforcesCredentials = async (c: any) => {
-  const classroomId = c.req.param('id');
-  try {
-    const actor = await getManagedActor(c, classroomId);
-    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
-
-    const row = await loadTrainerCodeforcesCredentialRow(actor.userId);
-    return c.json({
-      success: true,
-      credential: codeforcesCredentialStatusToApi(row),
-      setupUrl: 'https://codeforces.com/settings/api',
-      instructions: [
-        'Open Codeforces API settings.',
-        'Create or copy an API key and secret from the Codeforces account that can view the Gym or mashup contest.',
-        'Paste both values here. MCC stores them encrypted and uses them only for authenticated Codeforces standings fetches.',
-      ],
-    });
-  } catch (error: any) {
-    console.error('Error loading trainer Codeforces API credential status:', error);
-    return c.json({ error: error?.message || 'Failed to load Codeforces API credential status' }, 500);
-  }
-};
-
-export const saveClassroomCodeforcesCredentials = async (c: any) => {
-  const classroomId = c.req.param('id');
-  try {
-    const actor = await getManagedActor(c, classroomId);
-    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
-
-    const body = await readJsonBody(c);
-    const apiKey = normalizeCodeforcesCredential(body?.apiKey ?? body?.api_key ?? body?.key, 200);
-    const apiSecret = normalizeCodeforcesCredential(body?.apiSecret ?? body?.api_secret ?? body?.secret, 1000);
-    if (!apiKey || !apiSecret) {
-      return c.json({
-        status: 'error',
-        code: 'CODEFORCES_CREDENTIALS_REQUIRED',
-        error: 'Codeforces API key and secret are required.',
-      }, 400);
-    }
-
-    const [apiKeyCiphertext, apiSecretCiphertext] = await Promise.all([
-      encryptCodeforcesCredential(apiKey),
-      encryptCodeforcesCredential(apiSecret),
-    ]);
-    const keyHint = codeforcesApiKeyHint(apiKey);
-
-    const rows = await sql`
-      INSERT INTO public.classroom_codeforces_credentials (
-        trainer_id,
-        api_key_ciphertext,
-        api_secret_ciphertext,
-        api_key_hint,
-        created_by,
-        updated_by
-      )
-      VALUES (
-        ${actor.userId},
-        ${apiKeyCiphertext},
-        ${apiSecretCiphertext},
-        ${keyHint},
-        ${actor.userId},
-        ${actor.userId}
-      )
-      ON CONFLICT (trainer_id)
-      DO UPDATE SET
-        api_key_ciphertext = EXCLUDED.api_key_ciphertext,
-        api_secret_ciphertext = EXCLUDED.api_secret_ciphertext,
-        api_key_hint = EXCLUDED.api_key_hint,
-        updated_by = EXCLUDED.updated_by,
-        updated_at = now()
-      RETURNING *
-    `;
-
-    return c.json({
-      success: true,
-      credential: codeforcesCredentialStatusToApi(rows[0]),
-    });
-  } catch (error: any) {
-    const storageError = codeforcesCredentialStorageError(error);
-    if (storageError) return c.json(storageError.body, storageError.statusCode as any);
-
-    console.error('Error saving trainer Codeforces API credentials:', error);
-    return c.json({ error: error?.message || 'Failed to save Codeforces API credentials' }, 500);
-  }
-};
-
-export const deleteClassroomCodeforcesCredentials = async (c: any) => {
-  const classroomId = c.req.param('id');
-  try {
-    const actor = await getManagedActor(c, classroomId);
-    if ('error' in actor) return c.json({ error: actor.error }, actor.status);
-
-    await sql`
-      DELETE FROM public.classroom_codeforces_credentials
-      WHERE trainer_id = ${actor.userId}
-    `;
-
-    return c.json({
-      success: true,
-      credential: codeforcesCredentialStatusToApi(null),
-    });
-  } catch (error: any) {
-    console.error('Error deleting trainer Codeforces API credentials:', error);
-    return c.json({ error: error?.message || 'Failed to delete Codeforces API credentials' }, 500);
-  }
 };
 
 export const createClassroomContestItem = async (c: any) => {
@@ -1204,9 +1037,6 @@ export const fetchClassroomContestItem = async (c: any) => {
       codeforcesSession: provider === 'codeforces' ? getCodeforcesSession(c) : undefined,
       codeforcesTargetHandles: classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
       includeUpsolves: Boolean(contest.include_upsolves),
-      codeforcesCredentialProvider: provider === 'codeforces'
-        ? () => loadTrainerCodeforcesCredentials(actor.userId)
-        : undefined,
     });
     if (result.statusCode !== 200) {
       return c.json(result.body, result.statusCode as any);

@@ -51,10 +51,10 @@ Fact:
 This task used `AGENTS.md`, the project knowledge base, the required `supabase`, `supabase-postgres-best-practices`, `interface-design`, `apple-design`, `emil-design-eng`, and `context7` skills, Context7 React form/accessibility docs, current Supabase changelog/RLS/privilege guidance, Vercel Web Interface Guidelines, official Codeforces API help/method docs for authentication/rate-limit/`contest.standings`, and current classroom contest controller/service/UI source.
 
 Applies when:
-Auditing classroom Codeforces provider behavior, trainer-owned Codeforces credential setup, signed Gym/group/mashup standings fetches, encrypted credential storage, full Codeforces snapshot retention, trainer map/ignore handling for unmatched rows, or why public standings remain anonymous-only.
+Auditing the historical 2026-08-10 classroom Codeforces API-credential implementation. The 2026-09-02 session-only decision supersedes those credential and API-fetch details.
 
 Do not overgeneralize:
-This docs pass did not run live Codeforces Gym/group smoke tests or apply SQL to production; rollout still requires configuring `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY`, applying expand SQL, and having trainers save credentials with Gym/group/mashup access.
+Do not use this historical entry as current rollout guidance. Current classroom Codeforces fetching requires an HTTP-only JSESSIONID and no Codeforces credential-encryption environment variable.
 
 ## 2026-08-10 - admin-full-user-csv-20260810 - Docs Used
 

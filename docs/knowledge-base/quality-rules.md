@@ -1,5 +1,22 @@
 # Quality Rules
 
+## 2026-09-02 - Codeforces Crawling Must Stay Session-Only and Bounded
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Rule:
+Classroom Codeforces fetches must use only a transient JSESSIONID and fixed-origin friends/read-list HTML. Construct regular numeric paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound timeout, response size, page count, and concurrency; require an accessible standings table; detect points/hacks versus solved/penalty layouts; and retain only explicit classroom target handles before snapshot persistence. Never persist or return the session. Optional numeric upsolves may additionally use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
+
+Because Codeforces blocks Bun's native HTTP fingerprint on numeric friends standings, production requests use `curl` without a shell. Supply JSESSIONID through curl's stdin configuration rather than process arguments, keep injected fetch clients for tests, cap response bytes and time, and treat provider 403/503 responses as temporary blocking rather than invalid API credentials.
+
+Applies when:
+Changing numeric Codeforces source routing, standings parsing, Codeforces web-session transport, or classroom snapshot persistence.
+
+Do not overgeneralize:
+Do not crawl arbitrary URLs, call Codeforces standings APIs, accept API credentials, retain unrelated friends, create absent participants from submission history, or turn the browser session into a stored provider credential.
+
 ## 2026-09-02 - Contest Report View Modes Stay Presentational
 
 Source:
@@ -43,13 +60,13 @@ Source:
 - `docs/sql/classroom-contest-upsolves-20260901.sql`
 
 Rule:
-Classroom contest snapshots must remain contest-time-only unless the saved contest item explicitly enables `include_upsolves`. Changing that flag invalidates the prior snapshots and marks the generated report stale. VJudge may retain late submissions from its rank payload; Codeforces upsolve scans must be bounded, stop once they reach the official contest window, and persist only submissions matching classroom target handles.
+Classroom contest snapshots remain contest-time-only unless the saved contest item explicitly enables `include_upsolves`. VJudge may retain late submissions from its rank payload. Numeric Codeforces sources may crawl only the filtered standings handles, must process submission IDs chronologically, subtract contest-time rejected attempts already represented in the official cell, and fail closed when handle/page limits are exceeded.
 
 Applies when:
 Changing classroom contest fetch options, provider adapters, snapshot reuse, or post-contest solve calculations.
 
 Do not overgeneralize:
-Do not silently enable upsolves for existing rows, scan unbounded Codeforces status history, persist unrelated participant submissions, or reuse a snapshot created under the opposite setting.
+Do not silently enable upsolves for existing rows, persist unrelated participant submissions, create practice-only identities absent from friends standings, return partial data after a crawl limit, or reuse a snapshot created under the opposite setting.
 
 ## 2026-09-01 - EDU Crawls Must Fail Closed And Filter Before Persistence
 
@@ -113,22 +130,21 @@ Changing classroom contest report generation, TFC/TSC aggregation, demerits, pro
 Do not overgeneralize:
 Do not migrate unrelated global reports to this identity model without a separate compatibility plan, and do not break saved legacy classroom reports that lack the new fields.
 
-## 2026-08-10 - Provider Secrets Stay Server-Only
+## 2026-08-10 - Provider Secrets Stay Server-Only (Codeforces Portion Superseded)
 
 Source:
 - `server/src/services/codeforcesContestService.ts`
-- `server/src/utils/codeforcesCredentialCrypto.ts`
 - `server/src/controllers/classroomContestController.ts`
 - `client/src/app/api/classroom/[id]/contests/[...path]/route.js`
 
 Rule:
-External contest provider secrets must stay server-only. For classroom Codeforces Gym/group/mashup fetches, trainers save their own API key/secret through authorized Hono endpoints; the server stores AES-GCM ciphertext using `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY` and returns only status, key hint, and timestamps. Browser/Next proxy code may forward classroom auth and provider-specific browser session cookies only when already part of the existing workflow, but it must not log or return provider API secrets.
+External contest provider secrets must stay server-only. The 2026-09-02 session-only Codeforces decision removes API key/secret collection, storage, endpoints, and decryption entirely. Browser/Next proxy code may forward provider-specific browser session cookies only when already part of the existing authorized workflow, and it must never log or return them.
 
 Applies when:
-Changing Codeforces Gym fetches, external contest provider credentials, classroom contest proxies, deployment environment setup, or error handling around provider access.
+Changing Codeforces fetches, external contest provider sessions, classroom contest proxies, deployment environment setup, or error handling around provider access.
 
 Do not overgeneralize:
-Do not add `NEXT_PUBLIC_` provider secrets, deployment-wide shared Codeforces API credentials for classroom Gym access, plaintext credential storage, reveal-secret endpoints, or diagnostic logging that prints env values or trainer-provided secrets.
+Do not reintroduce Codeforces API credentials, add `NEXT_PUBLIC_` provider sessions, persist JSESSIONID, create reveal-session endpoints, or add diagnostic logging that prints env values or trainer-provided sessions.
 
 ## 2026-08-10 - Unmapped Codeforces Rows Must Not Become Report Identities
 

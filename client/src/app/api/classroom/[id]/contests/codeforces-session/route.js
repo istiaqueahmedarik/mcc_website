@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { spawn } from "node:child_process";
 
 const cookieOptions = {
   httpOnly: true,
@@ -10,12 +11,16 @@ const cookieOptions = {
 };
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const codeforcesUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
 
 function extractSession(value) {
   const text = String(value || "").trim();
   if (!text) return "";
   const match = text.match(/(?:^|;\s*)JSESSIONID=([^;\s]+)/i);
-  return (match?.[1] || text.replace(/^JSESSIONID=/i, "").trim()).slice(0, 1000);
+  const session = (match?.[1] || text.replace(/^JSESSIONID=/i, "").trim()).slice(0, 1000);
+  return /^[A-Za-z0-9._-]+$/.test(session) ? session : "";
 }
 
 async function requireAuthCookie() {
@@ -24,28 +29,56 @@ async function requireAuthCookie() {
 }
 
 async function validateCodeforcesSession(session) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  try {
-    const response = await fetch("https://codeforces.com/edu/courses?locale=en&mobile=true", {
-      method: "GET",
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-        Cookie: `JSESSIONID=${session}`,
-        "User-Agent": "MCC Classroom EDU Session Validator",
-      },
-      redirect: "follow",
-      cache: "no-store",
-      signal: controller.signal,
+  return new Promise((resolve) => {
+    const child = spawn("curl", [
+      "--silent",
+      "--show-error",
+      "--location",
+      "--max-time",
+      "30",
+      "--write-out",
+      "\n%{http_code}",
+      "--config",
+      "-",
+      "https://codeforces.com/edu/courses",
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+    let output = "";
+    let outputBytes = 0;
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    child.stdout.on("data", (chunk) => {
+      outputBytes += chunk.length;
+      if (outputBytes > 1024 * 1024 + 32) {
+        child.kill();
+        finish(false);
+        return;
+      }
+      output += chunk.toString("utf8");
     });
-    if (!response.ok) return false;
-    const html = (await response.text()).slice(0, 1024 * 1024);
-    return /href=["']\/profile\//i.test(html) && !/href=["']\/enter(?:[?"'])/i.test(html);
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
+    child.stderr.resume();
+    child.on("error", () => finish(false));
+    child.on("close", (exitCode) => {
+      if (exitCode !== 0) return finish(false);
+      const separator = output.lastIndexOf("\n");
+      const status = Number(output.slice(separator + 1));
+      const html = separator >= 0 ? output.slice(0, separator) : "";
+      finish(status >= 200 && status < 300
+        && /href=["']\/profile\//i.test(html)
+        && !/href=["']\/enter(?:[?"'])/i.test(html));
+    });
+    child.stdin.end([
+      "header = \"Accept: text/html,application/xhtml+xml\"",
+      "header = \"Accept-Language: en-US,en;q=0.9\"",
+      `header = \"Cookie: JSESSIONID=${session}\"`,
+      `user-agent = \"${codeforcesUserAgent}\"`,
+      "",
+    ].join("\n"));
+  });
 }
 
 export async function GET() {
@@ -67,8 +100,8 @@ export async function POST(request) {
   }
   if (!(await validateCodeforcesSession(session))) {
     return NextResponse.json(
-      { error: "Codeforces rejected this JSESSIONID. Sign in again and copy the current cookie." },
-      { status: 401 },
+      { error: "Codeforces could not verify this JSESSIONID. Confirm you are signed in, wait briefly if Codeforces is blocking requests, then try again." },
+      { status: 503 },
     );
   }
 

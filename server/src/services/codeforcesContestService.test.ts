@@ -1,68 +1,22 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  applyCodeforcesUpsolves,
-  buildCodeforcesApiSignature,
+  applyCodeforcesWebUpsolves,
   fetchCodeforcesContestRank,
   normalizeCodeforcesContestSource,
-  normalizeCodeforcesStandings,
   parseCodeforcesContestSource,
   parseCodeforcesEduStandingsPage,
-  validateCodeforcesEduSession,
+  parseCodeforcesNumericStandingsPage,
+  parseCodeforcesSubmissionPage,
+  validateCodeforcesSession,
 } from './codeforcesContestService';
 
-function okResponse(result: any) {
-  return new Response(JSON.stringify({ status: 'OK', result }), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
-}
-
-function failedResponse(comment: string, status = 200) {
-  return new Response(JSON.stringify({ status: 'FAILED', comment }), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
-
-const baseContest = {
-  contest: {
-    id: 2,
-    name: 'Codeforces Beta Round #2',
-    type: 'ICPC',
-    phase: 'FINISHED',
-    frozen: false,
-    durationSeconds: 7200,
-    startTimeSeconds: 1267200000,
-  },
-  problems: [
-    { contestId: 2, index: 'A', name: 'Winner' },
-    { contestId: 2, index: 'B', name: 'The least round way' },
-  ],
-  rows: [
-    {
-      party: { participantType: 'CONTESTANT', members: [{ handle: 'alice' }] },
-      rank: 1,
-      points: 2,
-      penalty: 42,
-      problemResults: [{ points: 1 }, { points: 1 }],
-    },
-    {
-      party: { participantType: 'PRACTICE', members: [{ handle: 'tourist' }] },
-      rank: 2,
-      points: 2,
-      penalty: 10,
-      problemResults: [{ points: 1 }, { points: 1 }],
-    },
-  ],
-};
-
 function eduPage(rows: string, pagination = '') {
-  return `<!doctype html><html><head><title>Standings - Codeforces</title></head><body>
+  return `<!doctype html><html><body>
     <div class="contest-name">Binary Search</div>
     <table class="standings">
       <tr><th>#</th><th>Who</th><th>=</th>
         <th><a href="/edu/course/2/lesson/6/1/practice/contest/283911/problem/A" title="A - Binary Search">A</a></th>
-        <th><a href="/edu/course/2/lesson/6/1/practice/contest/283911/problem/B" title="B - Closest Left">B</a></th>
+        <th><a href="/edu/course/2/lesson/6/1/practice/contest/283911/problem/*" title="* - Wildcard">*</a></th>
       </tr>
       ${rows}
       <tr class="standingsStatisticsRow"><td colspan="5">stats</td></tr>
@@ -74,470 +28,290 @@ const eduAliceRow = `<tr><td>1</td><td class="contestant-cell"><a href="/profile
   <td problemid="1" acceptedsubmissionid="11"><span class="cell-accepted">+1</span></td>
   <td problemid="2" acceptedsubmissionid="12"><span class="cell-accepted">+</span></td></tr>`;
 
-describe('Codeforces contest sources', () => {
+function numericPage(
+  kind: 'contest' | 'gym',
+  contestId: string,
+  aggregateHeader: string,
+  aggregateTitle: string,
+  problemHeaders: string,
+  rows: string,
+  pagination = '',
+) {
+  return `<!doctype html><html><body>
+    <div class="contest-name">Classroom Contest</div>
+    <table class="standings">
+      <tr><th>#</th><th>Who</th><th title="Score">=</th><th title="${aggregateTitle}">${aggregateHeader}</th>
+        ${problemHeaders}
+      </tr>
+      ${rows}
+      <tr class="standingsStatisticsRow"><td>stats</td></tr>
+    </table>${pagination}
+  </body></html>`;
+}
+
+const gymHeaders = `<th><a href="/gym/708543/problem/A" title="A - First">A</a></th>
+  <th><a href="/gym/708543/problem/B" title="B - Second">B</a></th>`;
+const gymAliceRow = `<tr><td>1</td><td><a href="/profile/Alice">Alice</a></td><td>1</td><td>37</td>
+  <td problemid="10"><span class="cell-accepted">+2</span></td>
+  <td problemid="11"><span class="cell-rejected">-1</span></td></tr>`;
+
+const contestHeaders = `<th><a href="/contest/2258/problem/A">A</a><span>500</span></th>
+  <th><a href="/contest/2258/problem/B1">B1</a><span>1000</span></th>`;
+const contestAliceRow = `<tr><td>1 (5)</td><td><a href="/profile/Alice">Alice</a></td><td><span title="Score">1200</span></td><td>+2 -1</td>
+  <td problemid="20"><span class="cell-passed-system-test">450</span><span class="cell-time">00:15</span></td>
+  <td problemid="21"><span class="cell-passed-system-test">750</span><span class="cell-time">00:40</span></td></tr>`;
+
+function submissionRow(
+  kind: 'contest' | 'gym',
+  contestId: string,
+  id: number,
+  handle: string,
+  problemIndex: string,
+  verdict: string,
+) {
+  return `<tr data-submission-id="${id}">
+    <td class="id-cell"><a href="/${kind}/${contestId}/submission/${id}">${id}</a></td>
+    <td class="status-small"><span class="format-time">Sep/02/2026 19:04</span></td>
+    <td class="status-party-cell"><a href="/profile/${handle}">${handle}</a></td>
+    <td><a href="/${kind}/${contestId}/problem/${problemIndex}">${problemIndex}</a></td>
+    <td>C++</td>
+    <td class="status-verdict-cell"><span class="submissionVerdictWrapper" submissionVerdict="${verdict}">${verdict}</span></td>
+  </tr>`;
+}
+
+function submissionPage(rows: string, pagination = '') {
+  return `<!doctype html><html><body><table class="status-frame-datatable">
+    <tr><th>#</th><th>When</th><th>Who</th><th>Problem</th><th>Lang</th><th>Verdict</th></tr>
+    ${rows}
+  </table>${pagination}</body></html>`;
+}
+
+describe('Codeforces web standings sources', () => {
   test('validates that a JSESSIONID reaches an authenticated Codeforces page', async () => {
-    const authenticated = await validateCodeforcesEduSession('session-token', {
+    const authenticated = await validateCodeforcesSession('session-token', {
       fetchImpl: (async () => new Response('<a href="/profile/Trainer">Trainer</a>')) as any,
     });
-    const signedOut = await validateCodeforcesEduSession('expired-token', {
-      fetchImpl: (async () => new Response('<a href="/enter?back=%2Fedu%2Fcourses">Enter</a>')) as any,
-    });
     expect(authenticated).toBe(true);
-    expect(signedOut).toBe(false);
   });
 
-  test('normalizes EDU standings URLs without mistaking course or lesson ids for contest ids', () => {
-    expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings')).toBe('edu:2:6:friends');
-    expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings?friends=true')).toBe('edu:2:6:friends');
-    expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings?list=abc123')).toBe('edu:2:6:list:abc123');
-    expect(parseCodeforcesContestSource('edu:2:6')).toMatchObject({ kind: 'edu', filter: 'friends' });
+  test('normalizes EDU URLs and accepts numeric contest sources', () => {
+    expect(normalizeCodeforcesContestSource(
+      'https://codeforces.com/edu/course/2/lesson/6/standings?friends=true',
+    )).toBe('edu:2:6:friends');
+    expect(parseCodeforcesContestSource('2258')).toEqual({ kind: 'contest', contestId: '2258' });
   });
 
-  test('parses EDU solved and rejected-attempt values and filters handles', () => {
-    const bobRow = `<tr><td>2</td><td class="contestant-cell"><a href="/profile/Bob">Bob</a></td><td>0</td>
-      <td><span class="cell-rejected">-2</span></td><td></td></tr>`;
+  test('parses EDU results literally and filters before returning rows', () => {
+    const bobRow = eduAliceRow.replaceAll('Alice', 'Bob');
     const parsed = parseCodeforcesEduStandingsPage(eduPage(`${eduAliceRow}${bobRow}`), ['alice']);
 
-    expect(parsed.title).toBe('Binary Search');
-    expect(parsed.problems).toHaveLength(2);
+    expect(parsed.problems.map((problem) => problem.index)).toEqual(['A', '*']);
+    expect(parsed.problems[1].name).toBe('Wildcard');
     expect(parsed.teams).toHaveLength(1);
     expect(parsed.teams[0].username).toBe('Alice');
-    expect(parsed.teams[0].solvedCount).toBe(2);
-    expect(parsed.teams[0].penalty).toBe(1);
-    expect(parsed.teams[0].submissions[0].rejectedAttemptCount).toBe(1);
   });
 
-  test('parses EDU problem labels containing regular-expression syntax', () => {
-    const html = eduPage(eduAliceRow).replace(
-      'title="A - Binary Search">A</a>',
-      'title="* - Binary Search">*</a>',
+  test('parses Gym solved and native penalty columns', () => {
+    const bobRow = gymAliceRow.replaceAll('Alice', 'Bob').replace('<td>37</td>', '<td>51</td>');
+    const parsed = parseCodeforcesNumericStandingsPage(
+      numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, `${gymAliceRow}${bobRow}`),
+      '708543',
+      ['alice'],
     );
 
-    const parsed = parseCodeforcesEduStandingsPage(html, ['alice']);
-
-    expect(parsed.problems[0].index).toBe('*');
-    expect(parsed.problems[0].name).toBe('Binary Search');
+    expect(parsed.problems.map((problem) => problem.index)).toEqual(['A', 'B']);
+    expect(parsed.teams).toHaveLength(1);
+    expect(parsed.teams[0].nativeRank).toBe(1);
+    expect(parsed.teams[0].solvedCount).toBe(1);
+    expect(parsed.teams[0].penalty).toBe(37);
+    expect(parsed.teams[0].providerMeta.sourceType).toBe('gym-web');
   });
 
-  test('crawls paginated EDU standings with the web session and keeps target handles only', async () => {
-    const urls: string[] = [];
-    const fetchImpl = async (url: RequestInfo | URL, init?: RequestInit) => {
-      urls.push(String(url));
-      expect(String((init?.headers as Record<string, string>)?.Cookie || '')).toBe('JSESSIONID=session-token');
-      const page = new URL(String(url)).searchParams.get('page');
-      return new Response(page === '1'
-        ? eduPage(eduAliceRow, '<a href="/edu/course/2/lesson/6/standings?page=2">201 - 400</a>')
-        : eduPage('<tr><td>201</td><td class="contestant-cell"><a href="/profile/Bob">Bob</a></td><td>1</td><td><span class="cell-accepted">+</span></td><td></td></tr>'),
-      { status: 200 });
+  test('parses public points contests using Score and Hacks columns', () => {
+    const parsed = parseCodeforcesNumericStandingsPage(
+      numericPage('contest', '2258', '*', 'Hacks', contestHeaders, contestAliceRow),
+      '2258',
+      ['alice'],
+    );
+
+    expect(parsed.problems.map((problem) => [problem.index, problem.points])).toEqual([['A', 500], ['B1', 1000]]);
+    expect(parsed.teams[0].nativeRank).toBe(1);
+    expect(parsed.teams[0].nativePoints).toBe(1200);
+    expect(parsed.teams[0].solvedCount).toBe(2);
+    expect(parsed.teams[0].penalty).toBe(0);
+    expect(parsed.teams[0].successfulHackCount).toBe(2);
+    expect(parsed.teams[0].unsuccessfulHackCount).toBe(1);
+    expect(parsed.teams[0].submissions.map((submission: any) => submission.points)).toEqual([450, 750]);
+  });
+
+  test('parses only the requested handle from contest submission history', () => {
+    const parsed = parseCodeforcesSubmissionPage(submissionPage([
+      submissionRow('gym', '708543', 101, 'Alice', 'B', 'WRONG_ANSWER'),
+      submissionRow('gym', '708543', 102, 'Alice', 'B', 'OK'),
+      submissionRow('gym', '708543', 103, 'Bob', 'B', 'OK'),
+    ].join('')), '708543', 'alice', 'gym');
+
+    expect(parsed.submissions.map((submission) => [submission.id, submission.verdict])).toEqual([
+      [101, 'WRONG_ANSWER'],
+      [102, 'OK'],
+    ]);
+  });
+
+  test('applies an accepted web upsolve without double-counting official failures', () => {
+    const parsed = parseCodeforcesNumericStandingsPage(
+      numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, gymAliceRow),
+      '708543',
+      ['alice'],
+    );
+    const standings: any = {
+      problems: parsed.problems,
+      teams: parsed.teams,
+      problemWeights: [1, 1],
+      providerMeta: {},
     };
+    applyCodeforcesWebUpsolves(standings, [
+      { id: 100, handle: 'Alice', problem: { index: 'B' }, verdict: 'WRONG_ANSWER' },
+      { id: 101, handle: 'Alice', problem: { index: 'B' }, verdict: 'WRONG_ANSWER' },
+      { id: 102, handle: 'Alice', problem: { index: 'B' }, verdict: 'OK' },
+    ]);
 
-    const result = await fetchCodeforcesContestRank('edu:2:6', [2, 3], {
-      fetchImpl: fetchImpl as any,
-      webSession: 'session-token',
-      targetHandles: ['alice', 'bob'],
-      eduConcurrency: 1,
-    });
-
-    expect(result.statusCode).toBe(200);
-    expect(urls).toHaveLength(2);
-    expect(urls.every((url) => new URL(url).searchParams.get('friends') === 'true')).toBe(true);
-    expect(result.body.totalProblems).toBe(2);
-    expect(result.body.teams).toHaveLength(2);
-    expect(result.body.teams[0].finalScore).toBe(5);
-    expect(result.body.providerMeta.sourceType).toBe('edu');
-  });
-
-  test('reports when friends-only EDU standings contain no classroom student', async () => {
-    const result = await fetchCodeforcesContestRank('edu:2:6', undefined, {
-      fetchImpl: (async () => new Response(eduPage(eduAliceRow), { status: 200 })) as any,
-      webSession: 'session-token',
-      targetHandles: ['bob'],
-    });
-
-    expect(result.statusCode).toBe(422);
-    expect(result.body.code).toBe('CODEFORCES_EDU_NO_CLASSROOM_FRIENDS');
-    expect(result.body.message).toContain('Codeforces friends standings');
-  });
-
-  test('rejects EDU HTML that does not contain an accessible standings table', () => {
-    expect(() => parseCodeforcesEduStandingsPage('<title>Courses - Codeforces</title>')).toThrow('session is expired');
-  });
-});
-
-describe('normalizeCodeforcesStandings', () => {
-  test('normalizes ICPC rows and excludes non-official participant types', () => {
-    const normalized = normalizeCodeforcesStandings(baseContest);
-
-    expect(normalized.error).toBeUndefined();
-    expect(normalized.totalProblems).toBe(2);
-    expect(normalized.totalTeams).toBe(1);
-    expect(normalized.contestInfo.phase).toBe('FINISHED');
-    expect(normalized.contestInfo.frozen).toBe(false);
-    expect(normalized.teams[0].username).toBe('alice');
-    expect(normalized.teams[0].solvedCount).toBe(2);
-    expect(normalized.teams[0].finalScore).toBe(2);
-    expect(normalized.teams[0].nativeRank).toBe(1);
-  });
-
-  test('scales native Codeforces points without custom weights', () => {
-    const normalized = normalizeCodeforcesStandings({
-      ...baseContest,
-      contest: { ...baseContest.contest, id: 2255, type: 'CF' },
-      problems: [
-        { contestId: 2255, index: 'A', name: 'A', points: 500 },
-        { contestId: 2255, index: 'B', name: 'B', points: 1000 },
-      ],
-      rows: [{
-        party: { participantType: 'CONTESTANT', members: [{ handle: 'bob' }] },
-        rank: 7,
-        points: 1300,
-        penalty: 100,
-        problemResults: [{ points: 250 }, { points: 1000 }],
-      }],
-    });
-
-    expect(normalized.error).toBeUndefined();
-    expect(normalized.teams[0].solvedCount).toBe(2);
-    expect(normalized.teams[0].finalScore).toBe(1.7333);
-    expect(normalized.teams[0].nativePoints).toBe(1300);
-  });
-
-  test('applies custom weights by earned fraction and keeps hack adjustment normalized', () => {
-    const normalized = normalizeCodeforcesStandings({
-      ...baseContest,
-      contest: { ...baseContest.contest, id: 2255, type: 'CF' },
-      problems: [
-        { contestId: 2255, index: 'A', name: 'A', points: 500 },
-        { contestId: 2255, index: 'B', name: 'B', points: 1000 },
-      ],
-      rows: [{
-        party: { participantType: 'CONTESTANT', members: [{ handle: 'bob' }] },
-        rank: 7,
-        points: 1300,
-        penalty: 100,
-        problemResults: [{ points: 250 }, { points: 1000 }],
-      }],
-    }, [2, 3]);
-
-    expect(normalized.error).toBeUndefined();
-    expect(normalized.problemWeights).toEqual([2, 3]);
-    expect(normalized.teams[0].providerMeta.hackAdjustment).toBe(50);
-    expect(normalized.teams[0].finalScore).toBe(4.1667);
-  });
-
-  test('adds accepted post-contest submissions only for classroom handles', () => {
-    const normalized = normalizeCodeforcesStandings({
-      ...baseContest,
-      rows: [{
-        party: { participantType: 'CONTESTANT', members: [{ handle: 'alice' }] },
-        rank: 1,
-        points: 1,
-        penalty: 30,
-        problemResults: [{ points: 1 }, { points: 0 }],
-      }],
-    });
-    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
-
-    applyCodeforcesUpsolves(normalized, [
-      {
-        creationTimeSeconds: contestEnd + 60,
-        verdict: 'WRONG_ANSWER',
-        problem: { index: 'B' },
-        author: { members: [{ handle: 'alice' }] },
-      },
-      {
-        creationTimeSeconds: contestEnd + 120,
-        verdict: 'OK',
-        problem: { index: 'B' },
-        author: { members: [{ handle: 'alice' }] },
-      },
-      {
-        creationTimeSeconds: contestEnd + 120,
-        verdict: 'OK',
-        problem: { index: 'A' },
-        author: { members: [{ handle: 'not-in-classroom' }] },
-      },
-    ], ['alice']);
-
-    expect(normalized.teams).toHaveLength(1);
-    expect(normalized.teams[0].solvedCount).toBe(2);
-    expect(normalized.teams[0].submissions[1].type).toBe('UPSOLVE');
-    expect(normalized.teams[0].submissions[1].rejectedAttemptCount).toBe(1);
-    expect(normalized.teams[0].providerMeta.upsolveSolvedCount).toBe(1);
-  });
-
-  test('creates a practice-only row when a classroom handle upsolves without competing', () => {
-    const normalized = normalizeCodeforcesStandings({ ...baseContest, rows: [] });
-    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
-
-    applyCodeforcesUpsolves(normalized, [{
-      creationTimeSeconds: contestEnd + 60,
-      verdict: 'OK',
-      problem: { index: 'A' },
-      author: { members: [{ handle: 'bob' }] },
-    }], ['bob']);
-
-    expect(normalized.teams).toHaveLength(1);
-    expect(normalized.teams[0].username).toBe('bob');
-    expect(normalized.teams[0].solvedCount).toBe(1);
-    expect(normalized.teams[0].providerMeta.party.participantType).toBe('PRACTICE');
+    expect(standings.teams[0].solvedCount).toBe(2);
+    expect(standings.teams[0].penalty).toBe(57);
+    expect(standings.teams[0].submissions[1].isUpsolve).toBe(true);
+    expect(standings.teams[0].submissions[1].rejectedAttemptCount).toBe(2);
   });
 });
 
 describe('fetchCodeforcesContestRank', () => {
-  test('fetches public standings anonymously with only contestId', async () => {
-    const urls: string[] = [];
-    let credentialProviderCalls = 0;
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return okResponse(baseContest);
-    };
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      credentialProvider: async () => {
-        credentialProviderCalls += 1;
-        return { apiKey: 'key', apiSecret: 'secret' };
-      },
-      rateLimitMs: 0,
+  test('crawls a public contest friends URL with only the web session', async () => {
+    const requests: Array<{ url: string; cookie: string }> = [];
+    const result = await fetchCodeforcesContestRank('2258', [2, 4], {
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          cookie: String((init?.headers as Record<string, string>)?.Cookie || ''),
+        });
+        return new Response(numericPage('contest', '2258', '*', 'Hacks', contestHeaders, contestAliceRow));
+      }) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
     });
-    const searchParams = new URL(urls[0]).searchParams;
 
     expect(result.statusCode).toBe(200);
-    expect(Array.from(searchParams.keys())).toEqual(['contestId']);
-    expect(searchParams.get('contestId')).toBe('2');
-    expect(credentialProviderCalls).toBe(0);
+    expect(requests).toHaveLength(1);
+    expect(new URL(requests[0].url).pathname).toBe('/contest/2258/standings/friends/true');
+    expect(requests[0].cookie).toBe('JSESSIONID=session-token');
+    expect(result.body.providerMeta.sourceType).toBe('contest-web');
+    expect(result.body.teams[0].finalScore).toBe(4.8);
   });
 
-  test('fetches post-contest submissions only when upsolves are enabled', async () => {
+  test('crawls a high-number Gym friends URL without API credentials', async () => {
     const urls: string[] = [];
-    const contestEnd = baseContest.contest.startTimeSeconds + baseContest.contest.durationSeconds;
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return urls.length === 1
-        ? okResponse({
-          ...baseContest,
-          rows: [{
-            party: { participantType: 'CONTESTANT', members: [{ handle: 'alice' }] },
-            rank: 1,
-            points: 1,
-            penalty: 10,
-            problemResults: [{ points: 1 }, { points: 0 }],
-          }],
-        })
-        : okResponse([
-          {
-            creationTimeSeconds: contestEnd + 60,
-            verdict: 'OK',
-            problem: { index: 'B' },
-            author: { members: [{ handle: 'alice' }] },
-          },
-          {
-            creationTimeSeconds: contestEnd,
-            verdict: 'WRONG_ANSWER',
-            problem: { index: 'B' },
-            author: { members: [{ handle: 'alice' }] },
-          },
-        ]);
-    };
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      includeUpsolves: true,
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        return new Response(numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, gymAliceRow));
+      }) as any,
+      webSession: 'session-token',
       targetHandles: ['alice'],
-      rateLimitMs: 0,
-      upsolvePageSize: 10,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(new URL(urls[0]).pathname).toBe('/gym/708543/standings/friends/true');
+    expect(result.body.teams[0].penalty).toBe(37);
+  });
+
+  test('crawls bounded per-handle submission history when Codeforces upsolves are enabled', async () => {
+    const urls: string[] = [];
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        const value = String(url);
+        urls.push(value);
+        if (value.includes('/submissions/')) {
+          return new Response(submissionPage([
+            submissionRow('gym', '708543', 100, 'Alice', 'B', 'WRONG_ANSWER'),
+            submissionRow('gym', '708543', 101, 'Alice', 'B', 'OK'),
+          ].join('')));
+        }
+        return new Response(numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, gymAliceRow));
+      }) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      includeUpsolves: true,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/gym/708543/standings/friends/true',
+      '/submissions/Alice/contest/708543',
+    ]);
+    expect(result.body.teams[0].solvedCount).toBe(2);
+    expect(result.body.providerMeta.includeUpsolves).toBe(true);
+  });
+
+  test('fails closed when a Codeforces upsolve history exceeds the page limit', async () => {
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        if (String(url).includes('/submissions/')) {
+          return new Response(submissionPage('', '<a href="/submissions/Alice/contest/708543/page/11">11</a>'));
+        }
+        return new Response(numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, gymAliceRow));
+      }) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      includeUpsolves: true,
+      upsolveMaxPages: 10,
+    });
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_UPSOLVE_LIMIT');
+  });
+
+  test('crawls paginated EDU standings and stops after finding target handles', async () => {
+    const urls: string[] = [];
+    const result = await fetchCodeforcesContestRank('edu:2:6', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        const page = new URL(String(url)).searchParams.get('page');
+        return new Response(page === '1'
+          ? eduPage('', '<a href="/edu/course/2/lesson/6/standings?page=2">next</a>')
+          : eduPage(eduAliceRow));
+      }) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
     });
 
     expect(result.statusCode).toBe(200);
     expect(urls).toHaveLength(2);
-    expect(new URL(urls[1]).pathname).toEndWith('/contest.status');
-    expect(result.body.teams[0].solvedCount).toBe(2);
+    expect(result.body.teams[0].username).toBe('Alice');
   });
 
-  test('retries with signed credentials when access requires authentication', async () => {
-    const urls: string[] = [];
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return urls.length === 1
-        ? failedResponse('Access denied. You are not allowed to view the contest.')
-        : okResponse(baseContest);
-    };
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      apiKey: 'key',
-      apiSecret: 'secret',
-      nowSeconds: () => 1000,
-      randomPrefix: () => 'abcdef',
-      rateLimitMs: 0,
-    });
-    const firstParams = new URL(urls[0]).searchParams;
-    const secondParams = new URL(urls[1]).searchParams;
-
-    expect(result.statusCode).toBe(200);
-    expect(Array.from(firstParams.keys())).toEqual(['contestId']);
-    expect(secondParams.get('apiKey')).toBe('key');
-    expect(secondParams.get('showUnofficial')).toBe('false');
-    expect(String(secondParams.get('apiSig') || '').startsWith('abcdef')).toBe(true);
-  });
-
-  test('uses a lazy credential provider for authenticated standings retry', async () => {
-    const urls: string[] = [];
-    let credentialProviderCalls = 0;
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return urls.length === 1
-        ? failedResponse('Access denied. You are not allowed to view the contest.')
-        : okResponse(baseContest);
-    };
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      credentialProvider: async () => {
-        credentialProviderCalls += 1;
-        return { apiKey: 'trainer-key', apiSecret: 'trainer-secret' };
-      },
-      nowSeconds: () => 1000,
-      randomPrefix: () => 'abcdef',
-      rateLimitMs: 0,
-    });
-
-    const secondParams = new URL(urls[1]).searchParams;
-
-    expect(result.statusCode).toBe(200);
-    expect(credentialProviderCalls).toBe(1);
-    expect(secondParams.get('apiKey')).toBe('trainer-key');
-    expect(secondParams.get('apiSig')).toContain('abcdef');
-  });
-
-  test('retries high-number hidden contests with signed credentials after anonymous not found', async () => {
-    const urls: string[] = [];
-    let credentialProviderCalls = 0;
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return urls.length === 1
-        ? failedResponse('contestId: Contest with id 626074 not found')
-        : okResponse({ ...baseContest, contest: { ...baseContest.contest, id: 626074 } });
-    };
-
-    const result = await fetchCodeforcesContestRank('626074', undefined, {
-      fetchImpl: fetchImpl as any,
-      credentialProvider: async () => {
-        credentialProviderCalls += 1;
-        return { apiKey: 'trainer-key', apiSecret: 'trainer-secret' };
-      },
-      nowSeconds: () => 1000,
-      randomPrefix: () => 'abcdef',
-      rateLimitMs: 0,
-    });
-
-    const secondParams = new URL(urls[1]).searchParams;
-
-    expect(result.statusCode).toBe(200);
-    expect(credentialProviderCalls).toBe(1);
-    expect(secondParams.get('contestId')).toBe('626074');
-    expect(secondParams.get('apiKey')).toBe('trainer-key');
-  });
-
-  test('does not retry low-number missing contests as private contests', async () => {
-    const urls: string[] = [];
-    let credentialProviderCalls = 0;
-    const fetchImpl = async (url: RequestInfo | URL) => {
-      urls.push(String(url));
-      return failedResponse('contestId: Contest with id 999 not found');
-    };
-
-    const result = await fetchCodeforcesContestRank('999', undefined, {
-      fetchImpl: fetchImpl as any,
-      credentialProvider: async () => {
-        credentialProviderCalls += 1;
-        return { apiKey: 'trainer-key', apiSecret: 'trainer-secret' };
-      },
-      rateLimitMs: 0,
-    });
-
-    expect(result.statusCode).toBe(502);
-    expect(urls.length).toBe(1);
-    expect(credentialProviderCalls).toBe(0);
-  });
-
-  test('returns credential guidance when signed retry has no credentials', async () => {
-    const fetchImpl = async () => failedResponse('Access denied. You are not allowed to view the contest.');
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      apiKey: '',
-      apiSecret: '',
-      rateLimitMs: 0,
-    });
-
+  test('requires a JSESSIONID for all Codeforces standings sources', async () => {
+    const result = await fetchCodeforcesContestRank('2258', undefined, { targetHandles: ['alice'] });
     expect(result.statusCode).toBe(428);
-    expect(result.body.code).toBe('CODEFORCES_CREDENTIALS_MISSING');
+    expect(result.body.code).toBe('CODEFORCES_WEB_SESSION_MISSING');
   });
 
-  test('returns unusable credential guidance when credential provider fails', async () => {
-    const fetchImpl = async () => failedResponse('Access denied. You are not allowed to view the contest.');
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      credentialProvider: async () => {
-        throw new Error('decrypt failed');
-      },
-      rateLimitMs: 0,
+  test('fails when friends standings contain no classroom handles', async () => {
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async () => new Response(
+        numericPage('contest', '2258', '*', 'Hacks', contestHeaders, contestAliceRow),
+      )) as any,
+      webSession: 'session-token',
+      targetHandles: ['bob'],
     });
-
-    expect(result.statusCode).toBe(503);
-    expect(result.body.code).toBe('CODEFORCES_CREDENTIALS_UNAVAILABLE');
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_WEB_NO_CLASSROOM_FRIENDS');
   });
 
-  test('retries once after a Codeforces rate-limit failure', async () => {
-    let calls = 0;
-    const sleeps: number[] = [];
-    const fetchImpl = async () => {
-      calls += 1;
-      return calls === 1
-        ? failedResponse('Call limit exceeded')
-        : okResponse(baseContest);
-    };
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      rateLimitMs: 12,
-      sleep: async (ms) => {
-        sleeps.push(ms);
-      },
-    });
-
-    expect(result.statusCode).toBe(200);
-    expect(calls).toBe(2);
-    expect(sleeps).toContain(12);
-  });
-
-  test('guards oversized responses before parsing', async () => {
-    const fetchImpl = async () => new Response('{"status":"OK","result":', { status: 200 });
-
-    const result = await fetchCodeforcesContestRank('2', undefined, {
-      fetchImpl: fetchImpl as any,
-      rateLimitMs: 0,
+  test('guards oversized web responses', async () => {
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async () => new Response('<html>too large</html>')) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
       maxResponseBytes: 8,
     });
-
     expect(result.statusCode).toBe(502);
     expect(result.body.code).toBe('CODEFORCES_RESPONSE_TOO_LARGE');
-  });
-});
-
-describe('buildCodeforcesApiSignature', () => {
-  test('uses sorted params and six-character random prefix', () => {
-    const params = {
-      contestId: 2,
-      apiKey: 'key',
-      time: 1000,
-    };
-    const signature = buildCodeforcesApiSignature('contest.standings', params, 'secret', 'abcdef');
-
-    expect(signature.length).toBe(134);
-    expect(signature.startsWith('abcdef')).toBe(true);
   });
 });

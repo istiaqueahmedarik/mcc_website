@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-09-02 - classroom-codeforces-web-only-standings - Session-Only Codeforces Fetching
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Decision:
+Classroom Codeforces fetching no longer uses anonymous or signed Codeforces API requests and no longer accepts trainer API keys or secrets. Numeric public contests crawl the fixed-origin `/contest/{id}/standings/friends/true` view, high-number Gyms crawl `/gym/{id}/standings/friends/true`, and EDU sources retain their constrained friends/read-list views. Every Codeforces fetch requires the trainer's transient HTTP-only JSESSIONID and retains only explicit classroom target handles. When `include_upsolves` is enabled for a numeric source, the adapter additionally crawls bounded per-handle contest-submission histories and upgrades only problems still unsolved in the official friends row. VJudge retains its existing opt-in late-submission handling.
+
+Applies when:
+Changing classroom Codeforces source parsing, standings fetching, session transport, snapshot filtering, provider settings, or upsolve behavior.
+
+Do not overgeneralize:
+Do not reintroduce Codeforces API credentials, accept arbitrary crawl origins or paths, persist or expose JSESSIONID, claim support for group/mashup paths, or create participants absent from the filtered friends standings.
+
 ## 2026-09-02 - contest-score-adjustment-rules - Ordered Pre-Formula Corrections
 
 Source:
@@ -22,7 +38,7 @@ Source:
 - `docs/reviews/trainer-contest-report-compact-mode-20260902-implementation-review.md`
 
 Decision:
-Trainer contest reports opt into a local Compact/Extended presentation switch with Compact as the default. Compact shows rank, aligned Name/ID plus available VJudge/Codeforces profile links, aggregate solved/penalty, and per-contest solved/penalty values without avatars or auxiliary scoring columns. Generated classroom report inputs include only mapped classroom students/groups; raw provider snapshots remain complete for mapping. Existing stored classroom reports with explicit membership markers receive the same classroom-only client projection. Public live reports, scoring formulas, publishing, and export schemas retain their current behavior. This supersedes only the unmatched `vjudge:<handle>` report-identity portion of the 2026-08-10 mixed-provider decision.
+Trainer contest reports opt into a local Compact/Extended presentation switch with Compact as the default. Compact shows rank, aligned Name/ID plus available VJudge/Codeforces profile links, aggregate solved/penalty, and per-contest solved/penalty values without avatars or auxiliary scoring columns. Generated classroom report inputs include only mapped classroom students/groups; provider snapshots retain the bounded rows returned by their adapter for mapping and audit. Existing stored classroom reports with explicit membership markers receive the same classroom-only client projection. Public live reports, scoring formulas, publishing, and export schemas retain their current behavior. This supersedes only the unmatched `vjudge:<handle>` report-identity portion of the 2026-08-10 mixed-provider decision.
 
 Applies when:
 Changing trainer contest report density, report identity presentation, or the shared report table's view-mode controls.
@@ -52,7 +68,7 @@ Source:
 - `docs/reviews/classroom-codeforces-edu-lesson-standings-20260901-implementation-review.md`
 
 Decision:
-Represent Codeforces EDU lessons as explicit nonnumeric Codeforces source keys and crawl their authenticated standings HTML with a trainer-provided JSESSIONID stored only in a 12-hour HTTP-only browser cookie. Parse solve count and rejected-attempt penalty into the existing snapshot/scoring contract, retaining only verified or explicitly overridden classroom handles. Keep numeric contest API behavior unchanged.
+Represent Codeforces EDU lessons as explicit nonnumeric Codeforces source keys and crawl their authenticated standings HTML with a trainer-provided JSESSIONID stored only in a 12-hour HTTP-only browser cookie. Parse solve count and rejected-attempt penalty into the existing snapshot/scoring contract, retaining only verified or explicitly overridden classroom handles. The 2026-09-02 session-only decision supersedes this entry's former API-first rule for numeric contests.
 
 Applies when:
 Changing classroom Codeforces sources, session transport, EDU parsing, snapshot filtering, report keys, or scoring.
@@ -81,13 +97,13 @@ Source:
 - `docs/reviews/trainer-classroom-codeforces-contests-20260810-implementation-review.md`
 
 Decision:
-Classroom contest rooms support VJudge and Codeforces through a classroom-only provider adapter. Codeforces public standings are fetched anonymously first; Gym/group/mashup access uses the acting trainer's encrypted Codeforces API credentials only when authentication is required. Codeforces snapshots retain all official standings rows so trainers can map unknown rows to classroom students/groups or explicitly ignore them. Reports merge mixed providers through canonical `student:<uuid>`, `group:<uuid>`, or unmatched `vjudge:<handle>` identities and use provider-prefixed contest keys such as `codeforces:2255`.
+Classroom contest rooms support VJudge and Codeforces through a classroom-only provider adapter. Reports merge mixed providers through canonical `student:<uuid>`, `group:<uuid>`, or unmatched `vjudge:<handle>` identities and use provider-prefixed contest keys such as `codeforces:2255`. The 2026-09-02 session-only decision supersedes this entry's former Codeforces API-credential and full-standings retention rules.
 
 Applies when:
-Changing classroom contest fetch logic, mixed-provider reports, handle overrides, demerits, Codeforces credentials, provider-prefixed report keys, or report-table profile lookup.
+Changing classroom contest fetch logic, mixed-provider reports, handle overrides, demerits, provider-prefixed report keys, or report-table profile lookup.
 
 Do not overgeneralize:
-Do not add deployment-wide shared Codeforces API credentials for classroom Gym fetches, expose Codeforces secrets to Next/browser code, count unmapped/ignored Codeforces rows in classroom reports, or route classroom reports through global public report tables.
+Do not reintroduce Codeforces API credentials, count unmapped/ignored Codeforces rows in classroom reports, or route classroom reports through global public report tables.
 
 ## 2026-08-10 - classroom-discord-channel-change-20260810 - Channel Destination Changes
 
