@@ -1266,12 +1266,12 @@ function ReportTable({
         <Table className={cn("min-w-max", isCompactView && "text-xs")} containerClassName="overflow-visible">
           <TableHeader>
             <TableRow>
-              <TableHead className={cn(isCompactView && "h-9 px-3")}>Rank</TableHead>
+              <TableHead className={cn(isCompactView && "h-9 px-3 text-center")}>Rank</TableHead>
               {!isCompactView && !solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
               <TableHead className={cn(isCompactView && "h-9 w-[240px] min-w-[240px] px-3")}>{isCompactView ? "Name / ID" : "Name"}</TableHead>
               {!isCompactView && <TableHead>Contests</TableHead>}
               {isCompactView ? (
-                <TableHead className="h-9 px-3 text-right">Solved (Penalty)</TableHead>
+                <TableHead className="h-9 px-3 text-center">Solved (Penalty)</TableHead>
               ) : solveOnly ? (
                 <TableHead>Total Solves</TableHead>
               ) : isScoredSnapshot ? (
@@ -1290,9 +1290,9 @@ function ReportTable({
               {orderedContestIds.map((cid) => (
                 <TableHead
                   key={cid}
-                  className={cn(optOutContests[cid] && "bg-destructive/10", isCompactView && "h-9 px-3 text-right")}
+                  className={cn(optOutContests[cid] && "bg-destructive/10", isCompactView && "h-9 px-3 text-center")}
                 >
-                  <div className={cn("flex max-w-[140px] items-center gap-1.5 truncate", isCompactView && "max-w-[104px] justify-end")}>
+                  <div className={cn("flex items-center gap-1.5 truncate", isCompactView ? "w-full justify-center" : "max-w-[140px]")}>
                     {!isCompactView && <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />}
                     <span className="truncate">{merged.contestIdToTitle[cid]}</span>
                     {optOutContests[cid] && (
@@ -1391,7 +1391,7 @@ function ReportTable({
                     isTop && 'top-rank-wrapper',
                   )}
                 >
-                  <TableCell className={cn(isCompactView && "px-3 py-2 text-right align-middle")}>
+                  <TableCell className={cn(isCompactView && "px-3 py-2 text-center align-middle")}>
                     <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
                       <Badge
                         variant="default"
@@ -1533,7 +1533,7 @@ function ReportTable({
                   
                   {!isCompactView && <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>}
                   {isCompactView ? (
-                    <TableCell className="px-3 py-2 text-right font-semibold tabular-nums text-foreground">
+                    <TableCell className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">
                       {formatCompactNumber(compactSolved)}<span className="font-normal text-muted-foreground">({formatCompactNumber(compactPenalty)})</span>
                     </TableCell>
                   ) : solveOnly ? (
@@ -1630,7 +1630,7 @@ function ReportTable({
                         <TableCell
                           key={cid}
                           className={cn(
-                            "px-3 py-2 text-right tabular-nums",
+                            "px-3 py-2 text-center tabular-nums",
                             isExcluded && "text-muted-foreground",
                             (isWorst || isOptedOut || perf?.excluded || perf?.dropped) && "bg-muted/50",
                           )}

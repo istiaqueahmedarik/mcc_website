@@ -11,6 +11,7 @@
 7. Compact Name/ID cells use fixed provider-link slots so VJudge and Codeforces icons align across rows and open the exact profile in a new tab.
 8. `server/src/controllers/classroomContestController.ts` filters mapped rank data during report generation, keeping raw snapshots complete while excluding unmatched VJudge identities from previews and saved reports.
 9. `client/src/components/ClassroomContestPanel.jsx` applies the same marker-aware classroom-only projection to existing stored reports, so older generated reports stop displaying unmatched rows immediately without hiding legacy reports that predate membership markers.
+10. Compact rank, aggregate result, and contest headers/cells now use the same centered alignment box; contest header wrappers span the full cell rather than anchoring a max-width child to the left.
 
 ## Requirement Review
 
@@ -32,6 +33,7 @@
 | No report-density control | Keyboard-accessible Radix two-mode control with 40px targets | Gives trainers explicit agency with familiar selected/focus states. |
 | Profile IDs were text-only in Compact | Fixed VJudge/Codeforces icon rail beside the name | Makes provider profiles one click away while keeping every Name/ID column aligned. |
 | Unmatched VJudge handles became report participants | Report inputs retain only mapped classroom identities | Keeps classroom reports scoped to the actual roster without discarding raw fetch evidence. |
+| Compact headers and values used different horizontal anchors | Matching centered header/cell alignment with full-width contest labels | Keeps every title directly above its result, including wide final columns. |
 
 ## Verification
 

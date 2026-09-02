@@ -22,6 +22,7 @@
 - Compact rows show rank, Name/ID, aggregate `solved(penalty)`, and one `solved(penalty)` cell per contest.
 - Compact rows do not show avatars, contests attended, score/deviation details, demerits, provider badges, or per-contest auxiliary score details.
 - Compact Name/ID cells reserve aligned slots for small VJudge and Codeforces profile links when present.
+- Compact rank and result headers share the same centered alignment as their row cells across variable-width contest columns.
 - Generated and previewed classroom reports contain only mapped classroom students/groups; unmatched VJudge standings rows remain available only in raw snapshots.
 - The switch is keyboard accessible, exposes its selected state, and retains visible focus behavior.
 - Search, ranking, highlighting, scrolling, sharing, CSV, and PDF behavior remain unchanged.

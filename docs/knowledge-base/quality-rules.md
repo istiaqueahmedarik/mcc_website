@@ -10,6 +10,8 @@ Compact/Extended contest report modes may change only the visible table columns,
 
 Compact Name/ID provider links should use fixed slots so icon presence does not shift the identity or numeric columns. Classroom report generation must filter mapped rank data to `isClassroomParticipant` identities before merging/scoring; raw snapshots retain complete standings rows for trainer mapping and audit. Existing reports may be projected client-side only when explicit membership markers exist, preserving compatibility with legacy unmarked reports.
 
+Compact rank and result columns must apply the same alignment and padding to `TableHead` and `TableCell`. Any nested contest-title wrapper must span the full header cell so max-content width cannot shift the title away from its row values.
+
 Applies when:
 Changing `ReportTable`, trainer report density, report mode controls, or compact result formatting.
 
