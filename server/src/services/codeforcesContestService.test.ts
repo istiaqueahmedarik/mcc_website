@@ -107,6 +107,18 @@ describe('Codeforces contest sources', () => {
     expect(parsed.teams[0].submissions[0].rejectedAttemptCount).toBe(1);
   });
 
+  test('parses EDU problem labels containing regular-expression syntax', () => {
+    const html = eduPage(eduAliceRow).replace(
+      'title="A - Binary Search">A</a>',
+      'title="* - Binary Search">*</a>',
+    );
+
+    const parsed = parseCodeforcesEduStandingsPage(html, ['alice']);
+
+    expect(parsed.problems[0].index).toBe('*');
+    expect(parsed.problems[0].name).toBe('Binary Search');
+  });
+
   test('crawls paginated EDU standings with the web session and keeps target handles only', async () => {
     const urls: string[] = [];
     const fetchImpl = async (url: RequestInfo | URL, init?: RequestInit) => {

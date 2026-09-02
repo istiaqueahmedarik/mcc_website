@@ -374,3 +374,11 @@ Two independent Realtime clients measured send-start and commit-to-receive separ
 
 Prevention:
 Measure the complete click/commit/render path, eliminate redundant hot-path round trips, return canonical projections from the atomic persistence statement, and never use provider-managed/reserved Auth metadata as an application ownership marker. Use a protected custom `app_metadata` key and test after a process restart.
+
+## 2026-09-02 - Provider Labels Must Not Become Regex Source
+
+Incident:
+Codeforces EDU standings parsing interpolated a provider-controlled problem label directly into a regular expression. Labels containing quantifiers such as `*` caused `Invalid regular expression: nothing to repeat` and aborted classroom contest fetches.
+
+Prevention:
+Use literal string prefix handling for provider-controlled labels. If a dynamic regular expression is genuinely required, escape every interpolated value and cover metacharacter input in a regression test.

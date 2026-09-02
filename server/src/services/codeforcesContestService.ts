@@ -726,6 +726,11 @@ function parseAttemptCount(text: string) {
   return match?.[1] ? Number(match[1]) : 0;
 }
 
+function removeProblemLabelPrefix(fullTitle: string, label: string) {
+  if (!fullTitle.toLowerCase().startsWith(label.toLowerCase())) return fullTitle;
+  return fullTitle.slice(label.length).replace(/^\s*-\s*/, '') || fullTitle;
+}
+
 export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: string[]): EduPageParseResult {
   const $ = cheerio.load(html);
   const table = $('table.standings').first();
@@ -752,7 +757,7 @@ export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: st
       contestId: pathMatch?.[3] ? Number(pathMatch[3]) : null,
       problemId: null,
       index: label,
-      name: fullTitle.replace(new RegExp(`^${label}\\s*-\\s*`, 'i'), '') || fullTitle,
+      name: removeProblemLabelPrefix(fullTitle, label),
       type: 'PROGRAMMING',
       points: 1,
       eduStep: pathMatch?.[2] ? Number(pathMatch[2]) : null,
