@@ -400,3 +400,16 @@ This task used `AGENTS.md`, the repository knowledge base, the required `interfa
 
 Applies when:
 Auditing why this tool uses installed `framer-motion`, avoids a new chart dependency, keeps the token in the server proxy, or treats CSV safety and visual accessibility as part of the export contract.
+## 2026-09-02 - contest-score-adjustment-rules - Implementation Docs Used
+
+Source:
+- `docs/reviews/contest-score-adjustment-rules-20260902-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the contest-scoring knowledge base and prior score-pair decisions, the required interface/Apple/Emil design skills, Context7 React immutable-array and Radix scrollable-dialog guidance, Supabase schema guidance and changelog checks, Postgres data-type/constraint/short-transaction rules, the current Vercel Web Interface Guidelines, and existing scoring UI/service/controller/migration/test entry points.
+
+Applies when:
+Auditing why adjustments use ordered immutable UI state, existing accessible primitives, structured JSON, server validation, a version-locked write transaction, a global no-op default, a classroom penalty-zero default, and a viewport-bounded dialog.
+
+Do not overgeneralize:
+The migration was not applied live, and no authenticated browser or production deployment verification was performed.

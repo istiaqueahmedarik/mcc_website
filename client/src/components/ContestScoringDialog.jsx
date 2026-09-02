@@ -10,6 +10,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  SlidersHorizontal,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -60,6 +61,7 @@ const DEFAULT_CONFIG = {
   ],
   excludedUnitKeys: [],
   dropWorstCount: 0,
+  adjustmentRules: [],
 };
 
 const DEFAULT_COMPOSITE_FORMULA = "sum(raw_score)";
@@ -98,6 +100,20 @@ const DEFAULT_SORT_KEYS = [
   "effective_penalty",
   "tfc_component",
   "tsc_component",
+];
+
+const ADJUSTMENT_FIELDS = [
+  { value: "solved", label: "Solved", description: "Changes the solved metric before the final solved-score formula." },
+  { value: "penalty", label: "Penalty", description: "Changes penalty before the final penalty formula and tie-breaking." },
+  { value: "raw_score", label: "Raw score", description: "Changes the result-unit score before drop-worst and final formulas." },
+  { value: "demerits", label: "Demerits", description: "Changes demerit points exposed to the final formulas." },
+];
+
+const ADJUSTMENT_OPERATIONS = [
+  { value: "add", label: "Boost (+)" },
+  { value: "subtract", label: "Reduce (-)" },
+  { value: "multiply", label: "Multiply (×)" },
+  { value: "set", label: "Set (=)" },
 ];
 
 const METRIC_HELP = {
@@ -388,6 +404,25 @@ function formatNumber(value, precision = 2) {
   return Number.isFinite(numeric) ? numeric.toFixed(precision) : "0.00";
 }
 
+function createAdjustmentRule() {
+  const generatedId = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    id: `rule_${generatedId}`,
+    unitKey: "*",
+    field: "solved",
+    operation: "add",
+    value: 1,
+    attendance: "attended",
+  };
+}
+
+function adjustmentSummary(rule, unitName) {
+  const field = ADJUSTMENT_FIELDS.find((item) => item.value === rule.field)?.label || rule.field;
+  const operation = ADJUSTMENT_OPERATIONS.find((item) => item.value === rule.operation)?.label || rule.operation;
+  const audience = rule.attendance === "all" ? "all rows" : "attended rows";
+  return `${field} · ${operation} ${Number(rule.value) || 0} · ${unitName} · ${audience}`;
+}
+
 function uniqueFormulaKey(base, usedKeys) {
   const normalized = String(base || "group")
     .toLowerCase()
@@ -674,6 +709,40 @@ export default function ContestScoringDialog({
     }));
   };
 
+  const addAdjustmentRule = () => {
+    setConfig((current) => ({
+      ...current,
+      adjustmentRules: [...(current.adjustmentRules || []), createAdjustmentRule()].slice(0, 32),
+    }));
+  };
+
+  const setAdjustmentRule = (ruleId, patch) => {
+    setConfig((current) => ({
+      ...current,
+      adjustmentRules: (current.adjustmentRules || []).map((rule) => (
+        rule.id === ruleId ? { ...rule, ...patch } : rule
+      )),
+    }));
+  };
+
+  const moveAdjustmentRule = (index, direction) => {
+    setConfig((current) => {
+      const adjustmentRules = [...(current.adjustmentRules || [])];
+      const target = index + direction;
+      if (target < 0 || target >= adjustmentRules.length) return current;
+      const [rule] = adjustmentRules.splice(index, 1);
+      adjustmentRules.splice(target, 0, rule);
+      return { ...current, adjustmentRules };
+    });
+  };
+
+  const removeAdjustmentRule = (ruleId) => {
+    setConfig((current) => ({
+      ...current,
+      adjustmentRules: (current.adjustmentRules || []).filter((rule) => rule.id !== ruleId),
+    }));
+  };
+
   const previewConfig = async () => {
     setPreviewing(true);
     setError("");
@@ -732,9 +801,9 @@ export default function ContestScoringDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-6xl gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
         <TooltipProvider delayDuration={180}>
-          <DialogHeader className="border-b px-5 py-4">
+          <DialogHeader className="shrink-0 border-b px-5 py-4">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <Calculator className="h-5 w-5" />
               Scoring & Merge
@@ -742,15 +811,16 @@ export default function ContestScoringDialog({
             <DialogDescription>{roomName || "Contest room"}</DialogDescription>
           </DialogHeader>
 
-          <Tabs defaultValue="units" className="min-h-0">
-          <div className="border-b px-5 pt-4">
-            <TabsList className="grid w-full grid-cols-3 sm:w-auto">
+          <Tabs defaultValue="units" className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b px-5 pt-4">
+            <TabsList className="grid h-auto w-full grid-cols-2 sm:w-auto sm:grid-cols-4">
               <TabsTrigger value="units">Result Units</TabsTrigger>
               <TabsTrigger value="formula">Score Formulas</TabsTrigger>
+              <TabsTrigger value="adjustments">Adjustments</TabsTrigger>
               <TabsTrigger value="preview">Rank & Preview</TabsTrigger>
             </TabsList>
           </div>
-          <ScrollArea className="h-[min(68vh,720px)]">
+          <ScrollArea className="min-h-0 flex-1">
             <div className="px-5 py-4">
               {error && (
                 <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -1174,6 +1244,186 @@ export default function ContestScoringDialog({
                     </section>
                   </TabsContent>
 
+                  <TabsContent value="adjustments" className="mt-0 space-y-4">
+                    <section className="rounded-lg border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="max-w-2xl">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold">Score adjustments</h3>
+                            <Badge variant={(config.adjustmentRules || []).length > 0 ? "secondary" : "outline"}>
+                              {(config.adjustmentRules || []).length > 0
+                                ? `${config.adjustmentRules.length} active`
+                                : "Unchanged"}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Rules run from top to bottom before drop-worst and the final formulas. Solved, penalty, and demerits never go below zero.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="gap-2"
+                          onClick={addAdjustmentRule}
+                          disabled={(config.adjustmentRules || []).length >= 32}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Add Rule
+                        </Button>
+                      </div>
+                    </section>
+
+                    {(config.adjustmentRules || []).length === 0 ? (
+                      <section className="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed px-5 py-10 text-center">
+                        <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <SlidersHorizontal className="h-5 w-5" />
+                        </span>
+                        <h3 className="text-sm font-semibold">No score adjustments</h3>
+                        <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                          Every result stays unchanged. Add a rule only when a contest or composite needs an explicit correction.
+                        </p>
+                      </section>
+                    ) : (
+                      <div className="space-y-3">
+                        {(config.adjustmentRules || []).map((rule, index) => {
+                          const unitName = rule.unitKey === "*"
+                            ? "All result units"
+                            : displayResultUnits.find((unit) => unit.key === rule.unitKey)?.name || rule.unitKey;
+                          return (
+                            <section key={rule.id} className="rounded-lg border bg-muted/10 p-4">
+                              <div className="mb-3 flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Rule {index + 1}
+                                  </p>
+                                  <p className="mt-1 truncate text-sm font-medium">
+                                    {adjustmentSummary(rule, unitName)}
+                                  </p>
+                                </div>
+                                <div className="flex shrink-0 gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10"
+                                    onClick={() => moveAdjustmentRule(index, -1)}
+                                    disabled={index === 0}
+                                    aria-label={`Move rule ${index + 1} up`}
+                                  >
+                                    <ArrowUp className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10"
+                                    onClick={() => moveAdjustmentRule(index, 1)}
+                                    disabled={index === config.adjustmentRules.length - 1}
+                                    aria-label={`Move rule ${index + 1} down`}
+                                  >
+                                    <ArrowDown className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-10 w-10 text-destructive hover:text-destructive"
+                                    onClick={() => removeAdjustmentRule(rule.id)}
+                                    aria-label={`Remove rule ${index + 1}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
+                                <div className="space-y-1.5 lg:col-span-3">
+                                  <FieldLabel
+                                    htmlFor={`adjustment-unit-${rule.id}`}
+                                    help="Choose one result unit or apply this rule to every unit."
+                                  >
+                                    Result unit
+                                  </FieldLabel>
+                                  <Select value={rule.unitKey || "*"} onValueChange={(value) => setAdjustmentRule(rule.id, { unitKey: value })}>
+                                    <SelectTrigger id={`adjustment-unit-${rule.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="*">All result units</SelectItem>
+                                      {displayResultUnits.map((unit) => (
+                                        <SelectItem key={unit.key} value={unit.key}>{unit.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5 lg:col-span-2">
+                                  <FieldLabel
+                                    htmlFor={`adjustment-field-${rule.id}`}
+                                    help={ADJUSTMENT_FIELDS.find((item) => item.value === rule.field)?.description}
+                                  >
+                                    Field
+                                  </FieldLabel>
+                                  <Select value={rule.field} onValueChange={(value) => setAdjustmentRule(rule.id, { field: value })}>
+                                    <SelectTrigger id={`adjustment-field-${rule.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ADJUSTMENT_FIELDS.map((item) => (
+                                        <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5 lg:col-span-2">
+                                  <Label htmlFor={`adjustment-operation-${rule.id}`}>Change</Label>
+                                  <Select value={rule.operation} onValueChange={(value) => setAdjustmentRule(rule.id, { operation: value })}>
+                                    <SelectTrigger id={`adjustment-operation-${rule.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {ADJUSTMENT_OPERATIONS.map((item) => (
+                                        <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5 lg:col-span-2">
+                                  <Label htmlFor={`adjustment-value-${rule.id}`}>Value</Label>
+                                  <Input
+                                    id={`adjustment-value-${rule.id}`}
+                                    type="number"
+                                    step="any"
+                                    value={rule.value}
+                                    onChange={(event) => setAdjustmentRule(rule.id, { value: Number(event.target.value) })}
+                                    className="tabular-nums"
+                                  />
+                                </div>
+                                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                                  <FieldLabel
+                                    htmlFor={`adjustment-attendance-${rule.id}`}
+                                    help="Attended only avoids granting values to a participant with no result for that unit."
+                                  >
+                                    Apply to
+                                  </FieldLabel>
+                                  <Select value={rule.attendance || "attended"} onValueChange={(value) => setAdjustmentRule(rule.id, { attendance: value })}>
+                                    <SelectTrigger id={`adjustment-attendance-${rule.id}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="attended">Attended rows only</SelectItem>
+                                      <SelectItem value="all">All rows, including missing</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            </section>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </TabsContent>
+
                   <TabsContent value="preview" className="mt-0 space-y-4">
                     <section className="rounded-lg border p-4">
                       <div className="mb-3 flex items-center justify-between gap-2">
@@ -1305,7 +1555,7 @@ export default function ContestScoringDialog({
           </ScrollArea>
           </Tabs>
 
-          <DialogFooter className="border-t px-5 py-4">
+          <DialogFooter className="shrink-0 border-t px-5 py-4">
             <Button variant="outline" onClick={() => setIsOpen(false)}>Close</Button>
             <Button onClick={saveConfig} disabled={saving || loading} className="gap-2">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}

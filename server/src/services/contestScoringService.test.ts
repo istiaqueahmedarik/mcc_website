@@ -121,6 +121,107 @@ describe('buildScoredContestReport', () => {
     expect(report.users[0].scoreTrace.penaltyScoreFormula).toBe('sum(penalty) + sum(demerits)');
   });
 
+  test('applies ordered field adjustments before final formulas and traces each change', () => {
+    const report = buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [
+        source({
+          itemId: 'item-1',
+          contestKey: 'c101',
+          formulaKey: 'alpha',
+          sortOrder: 0,
+          teams: [team('alice', 2, 2, 40), team('bob', 1, 1, 10)],
+        }),
+        source({
+          itemId: 'item-2',
+          contestKey: 'c102',
+          formulaKey: 'beta',
+          sortOrder: 1,
+          teams: [team('alice', 0, 0, 0)],
+        }),
+      ],
+      config: {
+        solvedScoreFormula: 'sum(solved)',
+        penaltyScoreFormula: 'sum(penalty)',
+        sortRules: [{ key: 'solved_score', direction: 'desc' }],
+        adjustmentRules: [
+          { id: 'boost-alpha', unitKey: 'alpha', field: 'solved', operation: 'add', value: 2, attendance: 'attended' },
+          { id: 'reduce-alpha', unitKey: 'alpha', field: 'penalty', operation: 'subtract', value: 20, attendance: 'attended' },
+          { id: 'skip-missing', unitKey: 'beta', field: 'solved', operation: 'add', value: 5, attendance: 'attended' },
+        ],
+      },
+    });
+
+    const alice = report.users.find((user: any) => user.username === 'alice');
+    const bob = report.users.find((user: any) => user.username === 'bob');
+    expect(alice?.solvedScore).toBe(4);
+    expect(bob?.solvedScore).toBe(3);
+    expect(alice?.penaltyScore).toBe(20);
+    expect(bob?.penaltyScore).toBe(0);
+    expect(alice?.contests.beta.solved).toBe(0);
+    expect(alice?.contests.alpha.adjustments.map((item: any) => item.ruleId)).toEqual(['boost-alpha', 'reduce-alpha']);
+    expect(report.scoring.adjustmentRules).toHaveLength(3);
+  });
+
+  test('keeps empty adjustments unchanged and evaluates active rules top-to-bottom', () => {
+    const options = {
+      roomId: 'room-1',
+      scope: 'global' as const,
+      sources: [source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'alpha', teams: [team('alice', 2, 3, 10)] })],
+      config: {
+        solvedScoreFormula: 'sum(raw_score)',
+        penaltyScoreFormula: 'sum(penalty)',
+        sortRules: [{ key: 'solved_score', direction: 'desc' as const }],
+      },
+    };
+    const unchanged = buildScoredContestReport(options);
+    const adjusted = buildScoredContestReport({
+      ...options,
+      config: {
+        ...options.config,
+        adjustmentRules: [
+          { id: 'set-score', unitKey: 'alpha', field: 'raw_score' as const, operation: 'set' as const, value: 10 },
+          { id: 'double-score', unitKey: 'alpha', field: 'raw_score' as const, operation: 'multiply' as const, value: 2 },
+        ],
+      },
+    });
+
+    expect(unchanged.users[0].solvedScore).toBe(3);
+    expect(unchanged.scoring.adjustmentRules).toEqual([]);
+    expect(adjusted.users[0].solvedScore).toBe(20);
+    expect(adjusted.users[0].scoreTrace.resultUnits[0].adjustments.map((item: any) => item.after)).toEqual([10, 20]);
+  });
+
+  test('rejects invalid or unknown adjustment rules', () => {
+    expect(() => buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'alpha', teams: [team('alice', 1, 1)] })],
+      config: {
+        adjustmentRules: [{ id: 'bad-field', unitKey: 'alpha', field: 'rank' as any, operation: 'add', value: 1 }],
+      },
+    })).toThrow('Score adjustment field');
+
+    expect(() => buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'alpha', teams: [team('alice', 1, 1)] })],
+      config: {
+        adjustmentRules: [{ id: 'bad-unit', unitKey: 'missing', field: 'solved', operation: 'add', value: 1 }],
+      },
+    })).toThrow('unknown result unit');
+
+    expect(() => buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'alpha', teams: [team('alice', 1, 1)] })],
+      config: {
+        adjustmentRules: [{ id: 'bad-scope', unitKey: 'alpha', field: 'solved', operation: 'add', value: 1, attendance: 'sometimes' as any }],
+      },
+    })).toThrow('attendance scope');
+  });
+
   test('supplies zero metrics and attendance flag for missing participation', () => {
     const report = buildScoredContestReport({
       roomId: 'room-1',
@@ -194,22 +295,31 @@ describe('buildScoredContestReport', () => {
     expect(report.users.map((user: any) => user.rank)).toEqual([1, 2, 2]);
   });
 
-  test('keeps classroom default as total solve-only ordering', () => {
+  test('keeps classroom default as solve-only ordering and ignores penalty', () => {
     const report = buildScoredContestReport({
       roomId: 'room-1',
       scope: 'classroom',
       defaultConfig: defaultScoringConfigForScope('classroom', 'TFC', ['first', 'second']),
       sources: [
-        source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'first', sortOrder: 0, teams: [team('alice', 1, 1), team('bob', 2, 2)] }),
-        source({ itemId: 'item-2', contestKey: 'c102', formulaKey: 'second', sortOrder: 1, teams: [team('alice', 10, 10), team('bob', 0, 0)] }),
+        source({ itemId: 'item-1', contestKey: 'c101', formulaKey: 'first', sortOrder: 0, teams: [team('alice', 1, 1, 80), team('bob', 2, 2, 20)] }),
+        source({ itemId: 'item-2', contestKey: 'c102', formulaKey: 'second', sortOrder: 1, teams: [team('alice', 10, 10, 120), team('bob', 0, 0)] }),
       ],
       config: {},
     });
 
     expect(report.scoring.formula).toBe('sum(solved)');
     expect(report.scoring.penaltyScoreFormula).toBe('sum(penalty) + stddev(penalty)');
+    expect(report.scoring.adjustmentRules).toEqual([{
+      id: 'classroom_ignore_penalty',
+      unitKey: '*',
+      field: 'penalty',
+      operation: 'multiply',
+      value: 0,
+      attendance: 'attended',
+    }]);
     expect(report.users.map((user: any) => user.username)).toEqual(['alice', 'bob']);
     expect(report.users.map((user: any) => user.score)).toEqual([11, 2]);
+    expect(report.users.map((user: any) => user.penaltyScore)).toEqual([0, 0]);
   });
 
   test('filters metrics by row properties in final formulas', () => {

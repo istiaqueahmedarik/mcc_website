@@ -341,6 +341,7 @@ function rowToGlobalScoringConfig(row: any, groups: any[], fallback: ContestScor
         sortRules: parseJsonArray(row.sort_rules),
         excludedUnitKeys: parseJsonArray(row.excluded_unit_keys),
         dropWorstCount: Number(row.drop_worst_count || 0),
+        adjustmentRules: parseJsonArray(row.adjustment_rules),
         version: Number(row.version || 0),
     }, fallback)
 }
@@ -394,7 +395,7 @@ function normalizeGlobalScoringPayload(body: any, fallback: ContestScoringConfig
     parseFormula(solvedScoreFormula)
     parseFormula(penaltyScoreFormula)
 
-    return {
+    return normalizeScoringConfig({
         groups,
         formula: solvedScoreFormula,
         solvedScoreFormula,
@@ -405,7 +406,8 @@ function normalizeGlobalScoringPayload(body: any, fallback: ContestScoringConfig
             .map((key) => normalizeFormulaKey(key))
             .filter(Boolean) as string[],
         dropWorstCount: normalizeDropWorstCount(source.dropWorstCount ?? source.drop_worst_count, fallback.dropWorstCount),
-    }
+        adjustmentRules: parseJsonArray(source.adjustmentRules ?? source.adjustment_rules),
+    }, fallback)
 }
 
 async function buildGlobalScoredReportSnapshot(
@@ -857,6 +859,7 @@ export const updateContestRoomScoring = async (c: any) => {
                     sort_rules,
                     excluded_unit_keys,
                     drop_worst_count,
+                    adjustment_rules,
                     version,
                     created_by,
                     updated_by
@@ -870,6 +873,7 @@ export const updateContestRoomScoring = async (c: any) => {
                     ${tx.json(requestedConfig.sortRules || [])},
                     ${tx.json(requestedConfig.excludedUnitKeys || [])},
                     ${requestedConfig.dropWorstCount || 0},
+                    ${tx.json(requestedConfig.adjustmentRules || [])},
                     ${nextVersion},
                     ${actor.id},
                     ${actor.id}
@@ -883,6 +887,7 @@ export const updateContestRoomScoring = async (c: any) => {
                     sort_rules = EXCLUDED.sort_rules,
                     excluded_unit_keys = EXCLUDED.excluded_unit_keys,
                     drop_worst_count = EXCLUDED.drop_worst_count,
+                    adjustment_rules = EXCLUDED.adjustment_rules,
                     version = EXCLUDED.version,
                     updated_by = EXCLUDED.updated_by,
                     updated_at = now()

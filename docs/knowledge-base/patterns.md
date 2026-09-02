@@ -886,3 +886,18 @@ Adding another protected profile/readiness export or small-to-medium admin CSV d
 
 Do not use when:
 The export needs background processing, durable file storage, audit history, very large datasets, or public access.
+## 2026-09-02 - Structured Score Adjustments
+
+Source:
+- `server/src/services/contestScoringService.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+- `docs/sql/contest-score-adjustment-rules-20260902.sql`
+
+Pattern:
+Represent common score corrections as bounded, ordered data rather than rewriting formulas or executing user code. Apply rules to result-unit metrics in the authoritative server pipeline before drop-worst and final formulas, normalize them before persistence, and include before/after entries in preview traces. Keep global/admin defaults empty. Classroom/trainer may use a scoped policy default such as `penalty × 0`; backfills must increment the config version and mark affected generated reports stale.
+
+Applies when:
+Adding another scoring correction field, operation, scope, or trace renderer.
+
+Do not overgeneralize:
+Do not apply these adjustments in report components, provider snapshots, or manual solve/de-merit persistence.

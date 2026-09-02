@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-09-02 - contest-score-adjustment-rules - Ordered Pre-Formula Corrections
+
+Source:
+- `docs/rsd/contest-score-adjustment-rules-20260902-rsd.md`
+- `docs/reviews/contest-score-adjustment-rules-20260902-implementation-review.md`
+
+Decision:
+Global/admin and classroom/trainer scoring configs may contain up to 32 ordered, structured adjustment rules. Each rule targets all result units or one contest/composite unit, changes solved, penalty, raw score, or demerits through add/subtract/multiply/set, and defaults to attended rows only. The server applies rules after result-unit construction and before drop-worst and final formulas. Global/admin keeps an empty no-op default; classroom/trainer defaults to `penalty × 0`. Solved, penalty, and demerits floor at zero while raw score retains finite negative values.
+
+Applies when:
+Changing contest score corrections, result-unit metrics, drop-worst ordering, scoring previews/traces, or scoring-config persistence.
+
+Do not overgeneralize:
+These rules are not participant-specific, do not mutate provider snapshots/manual overrides/demerit records, and must not become arbitrary executable expressions or client-owned ranking logic.
+
 ## 2026-09-02 - trainer-contest-report-compact-mode - Trainer-Scoped Report Density
 
 Source:

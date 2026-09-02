@@ -11,6 +11,19 @@ import {
 
 export type SortDirection = 'asc' | 'desc';
 
+export type ContestScoreAdjustmentField = 'solved' | 'penalty' | 'raw_score' | 'demerits';
+export type ContestScoreAdjustmentOperation = 'add' | 'subtract' | 'multiply' | 'set';
+export type ContestScoreAdjustmentAttendance = 'attended' | 'all';
+
+export type ContestScoreAdjustmentRuleInput = {
+  id?: string;
+  unitKey?: string;
+  field?: ContestScoreAdjustmentField;
+  operation?: ContestScoreAdjustmentOperation;
+  value?: number;
+  attendance?: ContestScoreAdjustmentAttendance;
+};
+
 export type ContestScoringGroupInput = {
   id?: string | null;
   name: string;
@@ -30,6 +43,7 @@ export type ContestScoringConfigInput = {
   sortRules?: Array<{ key: string; direction: SortDirection }>;
   excludedUnitKeys?: string[];
   dropWorstCount?: number;
+  adjustmentRules?: ContestScoreAdjustmentRuleInput[];
   version?: number;
 };
 
@@ -122,6 +136,14 @@ type UnitMetrics = {
   sourceBreakdown: Record<string, any>;
   provider?: string | null;
   externalContestId?: string | null;
+  adjustments: Array<{
+    ruleId: string;
+    field: ContestScoreAdjustmentField;
+    operation: ContestScoreAdjustmentOperation;
+    value: number;
+    before: number;
+    after: number;
+  }>;
 };
 
 const FORMULA_KEY_FALLBACK_PREFIX = 'contest';
@@ -131,6 +153,14 @@ const DEFAULT_GLOBAL_FORMULA = 'sum(raw_score) - stddev(raw_score)';
 const DEFAULT_GLOBAL_PENALTY_FORMULA = 'sum(penalty) + stddev(penalty)';
 const DEFAULT_CLASSROOM_FORMULA = 'sum(solved)';
 const DEFAULT_CLASSROOM_PENALTY_FORMULA = 'sum(penalty) + stddev(penalty)';
+const DEFAULT_CLASSROOM_ADJUSTMENT_RULES: ContestScoreAdjustmentRuleInput[] = [{
+  id: 'classroom_ignore_penalty',
+  unitKey: '*',
+  field: 'penalty',
+  operation: 'multiply',
+  value: 0,
+  attendance: 'attended',
+}];
 
 export const BASE_SCORING_VARIABLES = [
   'sum(solved)',
@@ -190,6 +220,11 @@ export const DEFAULT_SCORING_SORT_RULES: Array<{ key: string; direction: SortDir
   { key: 'attended_count', direction: 'desc' },
 ];
 
+const SCORE_ADJUSTMENT_FIELDS = new Set<ContestScoreAdjustmentField>(['solved', 'penalty', 'raw_score', 'demerits']);
+const SCORE_ADJUSTMENT_OPERATIONS = new Set<ContestScoreAdjustmentOperation>(['add', 'subtract', 'multiply', 'set']);
+const MAX_ADJUSTMENT_RULES = 32;
+const MAX_ADJUSTMENT_VALUE = 1_000_000_000;
+
 function normalizeText(value: unknown, maxLength = 500): string {
   return String(value ?? '').trim().slice(0, maxLength);
 }
@@ -217,6 +252,45 @@ function uniqueStrings(values: unknown[], maxLength = 180): string[] {
 
 function normalizeHandle(value: unknown): string {
   return normalizeText(value, 180).toLowerCase();
+}
+
+export function normalizeScoreAdjustmentRules(rawRules: unknown): ContestScoreAdjustmentRuleInput[] {
+  if (rawRules === undefined || rawRules === null) return [];
+  if (!Array.isArray(rawRules)) throw new Error('Score adjustments must be an array');
+  if (rawRules.length > MAX_ADJUSTMENT_RULES) {
+    throw new Error(`Score adjustments cannot contain more than ${MAX_ADJUSTMENT_RULES} rules`);
+  }
+
+  const seenIds = new Set<string>();
+  return rawRules.map((rawRule: any, index) => {
+    const id = normalizeText(rawRule?.id, 80) || `rule_${index + 1}`;
+    const unitKey = normalizeText(rawRule?.unitKey ?? rawRule?.unit_key, 48).toLowerCase() || '*';
+    const field = normalizeText(rawRule?.field, 24).toLowerCase() as ContestScoreAdjustmentField;
+    const operation = normalizeText(rawRule?.operation, 24).toLowerCase() as ContestScoreAdjustmentOperation;
+    const requestedAttendance = normalizeText(rawRule?.attendance, 16).toLowerCase();
+    if (requestedAttendance && !['attended', 'all'].includes(requestedAttendance)) {
+      throw new Error(`Score adjustment attendance scope "${requestedAttendance}" is invalid`);
+    }
+    const attendance = requestedAttendance === 'all' ? 'all' : 'attended';
+    const value = Number(rawRule?.value);
+
+    if (seenIds.has(id)) throw new Error(`Duplicate score adjustment id "${id}"`);
+    seenIds.add(id);
+    if (unitKey !== '*' && !isValidFormulaIdentifier(unitKey)) {
+      throw new Error(`Score adjustment unit "${unitKey}" is invalid`);
+    }
+    if (!SCORE_ADJUSTMENT_FIELDS.has(field)) {
+      throw new Error(`Score adjustment field "${field || 'unknown'}" is invalid`);
+    }
+    if (!SCORE_ADJUSTMENT_OPERATIONS.has(operation)) {
+      throw new Error(`Score adjustment operation "${operation || 'unknown'}" is invalid`);
+    }
+    if (!Number.isFinite(value) || Math.abs(value) > MAX_ADJUSTMENT_VALUE) {
+      throw new Error(`Score adjustment value for rule "${id}" must be finite and within ${MAX_ADJUSTMENT_VALUE}`);
+    }
+
+    return { id, unitKey, field, operation, value, attendance };
+  });
 }
 
 function sourceHandlesForRankRow(row: any): string[] {
@@ -300,6 +374,7 @@ export function normalizeScoringConfig(
       48,
     ),
     dropWorstCount,
+    adjustmentRules: normalizeScoreAdjustmentRules(source.adjustmentRules ?? fallback.adjustmentRules ?? []),
     version: Number(source.version ?? fallback.version ?? 0) || 0,
   };
 }
@@ -325,6 +400,7 @@ export function defaultScoringConfigForScope(scope: 'global' | 'classroom', room
     sortRules: scope === 'classroom' ? classroomSortRules : DEFAULT_SCORING_SORT_RULES,
     excludedUnitKeys: [],
     dropWorstCount: 0,
+    adjustmentRules: scope === 'classroom' ? DEFAULT_CLASSROOM_ADJUSTMENT_RULES : [],
     version: 0,
   });
 }
@@ -714,7 +790,61 @@ function buildUnitMetrics(
       sourceBreakdown,
       provider: unit.provider,
       externalContestId: unit.externalContestId,
+      adjustments: [],
     };
+  });
+}
+
+function adjustedMetricValue(
+  current: number,
+  operation: ContestScoreAdjustmentOperation,
+  operand: number,
+  clampAtZero: boolean,
+) {
+  let next = current;
+  if (operation === 'add') next = current + operand;
+  if (operation === 'subtract') next = current - operand;
+  if (operation === 'multiply') next = current * operand;
+  if (operation === 'set') next = operand;
+  if (!Number.isFinite(next)) throw new Error('Score adjustment produced a non-finite value');
+  return clampAtZero ? Math.max(0, next) : next;
+}
+
+function applyScoreAdjustments(
+  unitMetrics: UnitMetrics[],
+  rules: ContestScoreAdjustmentRuleInput[],
+) {
+  rules.forEach((rule) => {
+    const field = rule.field as ContestScoreAdjustmentField;
+    const operation = rule.operation as ContestScoreAdjustmentOperation;
+    const operand = numeric(rule.value, 0);
+    unitMetrics.forEach((unit) => {
+      if (rule.unitKey !== '*' && rule.unitKey !== unit.key) return;
+      if (rule.attendance !== 'all' && unit.attended !== 1) return;
+
+      const before = field === 'raw_score'
+        ? unit.rawScore
+        : field === 'demerits'
+          ? unit.demerits
+          : unit[field];
+      const after = adjustedMetricValue(before, operation, operand, field !== 'raw_score');
+      if (field === 'raw_score') {
+        unit.rawScore = after;
+        unit.finalScore = after;
+      } else if (field === 'demerits') {
+        unit.demerits = after;
+      } else {
+        unit[field] = after;
+      }
+      unit.adjustments.push({
+        ruleId: String(rule.id),
+        field,
+        operation,
+        value: operand,
+        before,
+        after,
+      });
+    });
   });
 }
 
@@ -893,6 +1023,11 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
   config.excludedUnitKeys.forEach((key) => {
     if (!unitKeySet.has(key)) throw new Error(`Cannot exclude unknown result unit "${key}"`);
   });
+  config.adjustmentRules.forEach((rule) => {
+    if (rule.unitKey !== '*' && !unitKeySet.has(String(rule.unitKey))) {
+      throw new Error(`Score adjustment references unknown result unit "${rule.unitKey}"`);
+    }
+  });
   parseFormula(config.solvedScoreFormula);
   parseFormula(config.penaltyScoreFormula);
   config.sortRules.forEach((rule) => {
@@ -906,6 +1041,7 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
   const unitMetricsByParticipant = new Map<string, UnitMetrics[]>();
   participants.forEach((participant) => {
     const metrics = buildUnitMetrics(participant, sourcesByItemId, unitDefinitions, excluded);
+    applyScoreAdjustments(metrics, config.adjustmentRules);
     applyDropWorst(metrics, config.dropWorstCount);
     unitMetricsByParticipant.set(participant.identityKey, metrics);
   });
@@ -938,6 +1074,7 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
       sourceItemIds: unit.sourceItemIds,
       sourceFormulaKeys: unitDefinitionByKey.get(unit.key)?.sourceFormulaKeys || [],
       sourceBreakdown: unit.sourceBreakdown,
+      adjustments: unit.adjustments,
       isComposite: unit.sourceContestIds.length > 1,
     }]));
 
@@ -980,6 +1117,7 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
           dropped: unit.dropped,
           excluded: unit.excluded,
           sourceBreakdown: unit.sourceBreakdown,
+          adjustments: unit.adjustments,
         })),
         variables,
         formula: config.solvedScoreFormula,
@@ -1041,6 +1179,7 @@ export function buildScoredContestReport(options: ContestScoringOptions) {
       sortRules: config.sortRules,
       excludedUnitKeys: config.excludedUnitKeys,
       dropWorstCount: config.dropWorstCount,
+      adjustmentRules: config.adjustmentRules,
       functions: APPROVED_FORMULA_FUNCTIONS,
       variables: BASE_SCORING_VARIABLES,
       sortKeys: SORTABLE_SCORING_KEYS,

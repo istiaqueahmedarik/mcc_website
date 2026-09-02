@@ -862,3 +862,17 @@ Changing classroom provider-session connect/status/clear flows, nginx `/api/*` r
 
 Do not overgeneralize:
 Do not persist provider web sessions in the database, log or return their values, accept account passwords in the classroom VJudge flow, or weaken application authorization because the provider credential is present.
+## 2026-09-02 - Score Adjustment Safety
+
+Source:
+- `docs/rsd/contest-score-adjustment-rules-20260902-rsd.md`
+- `server/src/services/contestScoringService.ts`
+
+Rule:
+Score adjustments must use a closed field/operation/scope contract, remain bounded to 32 rules and finite values, and be normalized before database writes. Validate referenced result-unit keys against the current room. Apply rules top-to-bottom before drop-worst and final formulas, trace every applied before/after value, and floor solved/penalty/demerits at zero. Global/admin keeps no rules as an exact no-op; classroom/trainer defaults to `penalty × 0` unless a manager saves another rule list.
+
+Applies when:
+Changing scoring configuration, correction rules, result-unit construction, preview traces, or scoring migrations.
+
+Do not overgeneralize:
+Do not add arbitrary code, participant targeting, client-side authoritative scoring, or provider-snapshot mutation without a separate approved decision.

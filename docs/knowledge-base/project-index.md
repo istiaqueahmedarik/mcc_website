@@ -1174,3 +1174,20 @@ Maintaining student-profile completeness analytics, the admin CSV export, its ba
 
 Do not overgeneralize:
 This implementation does not edit profiles, verify handles, export contact details, expose a public endpoint, persist files, or change the database schema.
+## 2026-09-02 - contest-score-adjustment-rules - Entry Points
+
+Source:
+- `docs/sql/contest-score-adjustment-rules-20260902.sql`
+- `server/src/services/contestScoringService.ts`
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ContestScoringDialog.jsx`
+
+Fact:
+The shared Scoring & Merge dialog now has an Adjustments tab for ordered result-unit metric corrections. Both global and classroom scoring configs persist `adjustment_rules`; the server validates and applies them before drop-worst/final formulas and exposes applied before/after trace entries. Global/admin defaults to no rules; classroom/trainer defaults to an attended-row `penalty × 0` rule. The modal uses a dynamic viewport cap and flexible inner scroller so its fixed header, tabs, and footer remain reachable.
+
+Applies when:
+Maintaining contest scoring configuration, previews, generation, traces, or the shared manager editor.
+
+Do not overgeneralize:
+Apply `docs/sql/contest-score-adjustment-rules-20260902.sql` and then `docs/sql/contest-score-adjustment-trainer-default-20260902.sql` before deploying the matching controllers. This change was not applied to a live database or deployed to production.
