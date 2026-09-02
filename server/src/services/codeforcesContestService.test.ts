@@ -87,10 +87,10 @@ describe('Codeforces contest sources', () => {
   });
 
   test('normalizes EDU standings URLs without mistaking course or lesson ids for contest ids', () => {
-    expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings')).toBe('edu:2:6');
+    expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings')).toBe('edu:2:6:friends');
     expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings?friends=true')).toBe('edu:2:6:friends');
     expect(normalizeCodeforcesContestSource('https://codeforces.com/edu/course/2/lesson/6/standings?list=abc123')).toBe('edu:2:6:list:abc123');
-    expect(parseCodeforcesContestSource('edu:2:6')?.kind).toBe('edu');
+    expect(parseCodeforcesContestSource('edu:2:6')).toMatchObject({ kind: 'edu', filter: 'friends' });
   });
 
   test('parses EDU solved and rejected-attempt values and filters handles', () => {
@@ -140,10 +140,23 @@ describe('Codeforces contest sources', () => {
 
     expect(result.statusCode).toBe(200);
     expect(urls).toHaveLength(2);
+    expect(urls.every((url) => new URL(url).searchParams.get('friends') === 'true')).toBe(true);
     expect(result.body.totalProblems).toBe(2);
     expect(result.body.teams).toHaveLength(2);
     expect(result.body.teams[0].finalScore).toBe(5);
     expect(result.body.providerMeta.sourceType).toBe('edu');
+  });
+
+  test('reports when friends-only EDU standings contain no classroom student', async () => {
+    const result = await fetchCodeforcesContestRank('edu:2:6', undefined, {
+      fetchImpl: (async () => new Response(eduPage(eduAliceRow), { status: 200 })) as any,
+      webSession: 'session-token',
+      targetHandles: ['bob'],
+    });
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_EDU_NO_CLASSROOM_FRIENDS');
+    expect(result.body.message).toContain('Codeforces friends standings');
   });
 
   test('rejects EDU HTML that does not contain an accessible standings table', () => {

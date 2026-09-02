@@ -8,7 +8,7 @@ Source:
 - `docs/reviews/classroom-codeforces-edu-lesson-standings-20260901-implementation-review.md`
 
 Pattern:
-When an existing provider lacks an API for a classroom-only source, keep crawling inside the provider adapter: validate a fixed-origin source identity, require an ephemeral HTTP-only session, bound timeout/response bytes/concurrency/page count, reject login/challenge HTML, parse provider markup into the existing normalized contract, and discard rows outside explicit classroom target handles before persistence. Preserve header-first and root-cookie-second session transport for Next-proxy and direct-Hono production routes.
+When an existing provider lacks an API for a classroom-only source, keep crawling inside the provider adapter: validate a fixed-origin source identity, require an ephemeral HTTP-only session, choose the narrowest authenticated provider view available, bound timeout/response bytes/concurrency/page count, reject login/challenge HTML, parse provider markup into the existing normalized contract, and discard rows outside explicit classroom target handles before persistence. For ordinary Codeforces EDU lessons, use `friends=true`; preserve explicit read-list sources, and fail with actionable guidance when the narrowed result contains no classroom target. Preserve header-first and root-cookie-second session transport for Next-proxy and direct-Hono production routes.
 
 Applies when:
 Maintaining Codeforces EDU crawling or adding a similarly constrained authenticated provider source to classroom snapshots.

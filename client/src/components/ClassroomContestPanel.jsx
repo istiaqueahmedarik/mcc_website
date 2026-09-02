@@ -1037,6 +1037,8 @@ export function ClassroomContestPanel({
               ? "Connect a Codeforces JSESSIONID to fetch EDU course standings"
             : code === "CODEFORCES_EDU_SESSION_INVALID"
               ? "The Codeforces EDU session expired or cannot access this course; reconnect it and retry"
+            : code === "CODEFORCES_EDU_NO_CLASSROOM_FRIENDS"
+              ? "No classroom students were found in your Codeforces friends standings. Add their handles as Codeforces friends, then try again"
             : code === "CODEFORCES_RATE_LIMIT"
               ? "Codeforces rate limit was hit; try again shortly"
               : error?.message || `Failed to fetch ${providerLabel(provider)} rank`;

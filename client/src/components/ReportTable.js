@@ -1203,8 +1203,17 @@ function ReportTable({
         </div>
       </div>
 
-      <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-        <Table>
+      <ScrollArea
+        className="w-full whitespace-nowrap rounded-md border"
+        horizontal
+        viewportClassName="pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        viewportProps={{
+          role: "region",
+          "aria-label": "Contest report table",
+          tabIndex: 0,
+        }}
+      >
+        <Table className="min-w-max" containerClassName="overflow-visible">
           <TableHeader>
             <TableRow>
               <TableHead>Rank</TableHead>

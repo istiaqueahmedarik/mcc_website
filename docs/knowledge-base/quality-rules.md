@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-09-02 - EDU Friends Fetches Must Fail Before Persistence
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Rule:
+Plain and legacy classroom EDU lesson sources must request `friends=true` on every crawled page. If the filtered result contains no verified or explicitly overridden classroom Codeforces handle, return `CODEFORCES_EDU_NO_CLASSROOM_FRIENDS` before the controller inserts a snapshot, and show the trainer guidance to add the students as Codeforces friends and verify their saved handles.
+
+Applies when:
+Changing EDU source parsing, pagination URLs, classroom target filtering, fetch errors, or snapshot persistence.
+
+Do not overgeneralize:
+Do not use this error for numeric contests, explicit read-list sources, session failures, or a successful friends fetch containing at least one classroom target.
+
 ## 2026-09-01 - Classroom Upsolves Must Be Explicit and Snapshot-Safe
 
 Source:

@@ -1,5 +1,19 @@
 # Doc Usage
 
+## 2026-09-02 - classroom-contest-report-scroll-edu-friends - Implementation Docs Used
+
+Source:
+- `docs/reviews/classroom-contest-report-scroll-edu-friends-20260902-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom contest knowledge base and prior EDU implementation review, Context7 React guidance, current Codeforces friends-standings documentation/search evidence, and the current report, scroll-area, provider service, controller, and trainer toast paths. These inputs kept the change classroom-scoped, session-safe, friends-only for ordinary EDU sources, and accessible for wide report tables.
+
+Applies when:
+Auditing the report scrollbar or EDU friends-only fetch behavior.
+
+Do not overgeneralize:
+No live authenticated Codeforces session, trainer browser account, production deployment, database mutation, or automatic Codeforces friend update was performed.
+
 ## 2026-08-17 - trainer-student-context-menu-simplification-20260817 - Implementation Docs Used
 
 Source:

@@ -1,5 +1,20 @@
 # Decisions
 
+## 2026-09-02 - classroom-contest-report-scroll-edu-friends - Narrow EDU Fetches
+
+Source:
+- `docs/rsd/classroom-contest-report-scroll-edu-friends-20260902-rsd.md`
+- `docs/reviews/classroom-contest-report-scroll-edu-friends-20260902-implementation-review.md`
+
+Decision:
+Plain Codeforces EDU lesson URLs and legacy unfiltered EDU identifiers resolve to the authenticated friends-only standings view. Explicit Codeforces read-list sources remain valid. A friends-only response with no verified or overridden classroom handle fails before snapshot persistence with trainer-facing guidance. Contest reports keep intrinsic table width and expose horizontal overflow through a labelled, keyboard-focusable Radix viewport.
+
+Applies when:
+Changing classroom EDU source normalization/crawling, no-match provider errors, or contest-report overflow behavior.
+
+Do not overgeneralize:
+Do not apply friends filtering to numeric Codeforces contests, remove explicit read-list support, mutate the trainer's Codeforces friends, or change global report routes.
+
 ## 2026-09-01 - classroom-codeforces-edu-lesson-standings - Ephemeral EDU Crawl Adapter
 
 Source:

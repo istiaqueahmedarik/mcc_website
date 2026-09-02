@@ -94,7 +94,7 @@ export function parseCodeforcesContestSource(value: unknown): CodeforcesContestS
     kind: 'edu',
     courseId: eduMatch[1],
     lessonId: eduMatch[2],
-    filter: eduMatch[3] ? 'friends' : eduMatch[4] ? 'list' : 'all',
+    filter: eduMatch[4] ? 'list' : 'friends',
     ...(eduMatch[4] ? { listKey: eduMatch[4] } : {}),
   };
 }
@@ -111,7 +111,7 @@ export function normalizeCodeforcesContestSource(value: unknown): string {
     return `edu:${urlMatch[1]}:${urlMatch[2]}:list:${listKey}`;
   }
   if (params.get('friends') === 'true') return `edu:${urlMatch[1]}:${urlMatch[2]}:friends`;
-  return `edu:${urlMatch[1]}:${urlMatch[2]}`;
+  return `edu:${urlMatch[1]}:${urlMatch[2]}:friends`;
 }
 
 export async function validateCodeforcesEduSession(
@@ -942,6 +942,13 @@ async function fetchCodeforcesEduLessonRank(
     const teams = Array.from(teamByHandle.values()).sort(
       (left: any, right: any) => left.nativeRank - right.nativeRank || left.username.localeCompare(right.username),
     );
+    if (source.filter === 'friends' && Array.isArray(options.targetHandles) && teams.length === 0) {
+      throw new CodeforcesApiError(
+        'CODEFORCES_EDU_NO_CLASSROOM_FRIENDS',
+        'No classroom students were found in your Codeforces friends standings. Add their handles as Codeforces friends and make sure their verified Codeforces IDs are saved, then try again.',
+        422,
+      );
+    }
     const sourceId = `edu:${source.courseId}:${source.lessonId}`;
 
     return {

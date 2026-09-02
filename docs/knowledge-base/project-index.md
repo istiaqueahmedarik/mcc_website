@@ -49,13 +49,13 @@ Source:
 - `docs/sql/classroom-codeforces-edu-lesson-standings-20260901.sql`
 
 Fact:
-Classroom-private Codeforces reports accept EDU lesson standings URLs in addition to numeric contests. EDU sources use `edu:<course>:<lesson>` identities, crawl authenticated standings HTML with a trainer-provided HTTP-only JSESSIONID, parse solved and rejected-attempt penalty separately, and persist only verified/overridden classroom handles. The crawler has bounded response size, concurrency, and page count; missing/expired sessions fail before snapshot persistence. The Supabase identifier-constraint migration was applied and verified on 2026-09-01. The classroom live shell now caps at 1600px instead of 1060px so dense contest and report surfaces can use wide displays without changing small-screen padding behavior.
+Classroom-private Codeforces reports accept EDU lesson standings URLs in addition to numeric contests. Plain URLs and legacy `edu:<course>:<lesson>` identities fetch the authenticated `friends=true` view with a trainer-provided HTTP-only JSESSIONID; explicit `list=<readKey>` sources remain supported. The adapter parses solved and rejected-attempt penalty separately, persists only verified/overridden classroom handles, and fails with actionable guidance when no classroom student appears in the trainer's friends standings. The crawler has bounded response size, concurrency, and page count; missing/expired sessions fail before snapshot persistence. The Supabase identifier-constraint migration was applied and verified on 2026-09-01. The classroom live shell caps at 1600px, and dense report tables expose labelled, keyboard-focusable horizontal scrolling.
 
 Applies when:
 Maintaining classroom Codeforces URL parsing, EDU course snapshots, provider sessions, report scoring/breakdowns, Codeforces handle mapping, or the classroom contest identifier constraint.
 
 Do not overgeneralize:
-This does not add EDU support to global legacy reports, store Codeforces web sessions in Postgres, create Codeforces lists/friends, accept arbitrary crawl origins, or auto-refresh standings.
+This does not add EDU support to global legacy reports, store Codeforces web sessions in Postgres, mutate Codeforces lists/friends, accept arbitrary crawl origins, or auto-refresh standings.
 
 ## 2026-09-01 - user-full-name-reverification - Implemented Entry Points
 
