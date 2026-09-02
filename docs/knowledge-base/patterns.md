@@ -1,5 +1,20 @@
 # Patterns
 
+## 2026-09-02 - Numeric Codeforces API-First Fallback
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+Pattern:
+For a numeric classroom Codeforces source, try anonymous `contest.standings` with only `contestId`, enforce the provider rate and response limits, normalize the official rows, and discard non-classroom handles before persistence. Fall back to the fixed-origin authenticated friends HTML view only when the API fails or yields no classroom handle. Keep fallback metadata to a non-sensitive error code. EDU remains crawl-only, and web-session values never enter logs, snapshots, or API URLs.
+
+Applies when:
+Maintaining classroom numeric Codeforces fetching, API failure behavior, Gym fallback, or provider snapshot filtering.
+
+Do not overgeneralize:
+Do not send handles or other optional parameters on the anonymous public standings request, silently persist the full API ranklist, or add credential/OAuth persistence for this fallback.
+
 ## 2026-09-01 - Authenticated Provider HTML As A Bounded Adapter
 
 Source:

@@ -1587,7 +1587,7 @@ export function ClassroomContestPanel({
 
                   {selectedRoomHasCodeforces && !codeforcesSession.connected && (
                     <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Codeforces contest, Gym, and EDU friends standings need an active JSESSIONID.</span>
+                      <span>Public contests use the API first. Connect JSESSIONID for Gym/EDU, upsolves, and crawl fallback.</span>
                       <Button
                         type="button"
                         size="sm"
@@ -1984,7 +1984,7 @@ export function ClassroomContestPanel({
               <DialogHeader className="border-b px-5 py-4 sm:px-6">
                 <DialogTitle>Codeforces Session</DialogTitle>
                 <DialogDescription>
-                  Connect the Codeforces account whose friends standings should be used for contests, Gym, and EDU.
+                  Connect the Codeforces account used when API-first fetching needs authenticated friends standings.
                 </DialogDescription>
               </DialogHeader>
               <div className={dialogBodyClass}>
@@ -1996,7 +1996,7 @@ export function ClassroomContestPanel({
                         <p className="mt-1 text-xs text-muted-foreground">
                           {codeforcesSession.connected
                             ? "Connected for this browser. The session is stored as an HTTP-only cookie for 12 hours."
-                            : "Required for public contest, Gym, and EDU friends standings."}
+                            : "Optional for public API standings; required for Gym/EDU, upsolves, and crawl fallback."}
                         </p>
                       </div>
                       <Badge variant="outline" className={cn(

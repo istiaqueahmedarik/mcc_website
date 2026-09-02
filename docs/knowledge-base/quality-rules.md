@@ -138,7 +138,7 @@ Source:
 - `client/src/app/api/classroom/[id]/contests/[...path]/route.js`
 
 Rule:
-External contest provider secrets must stay server-only. The 2026-09-02 session-only Codeforces decision removes API key/secret collection, storage, endpoints, and decryption entirely. Browser/Next proxy code may forward provider-specific browser session cookies only when already part of the existing authorized workflow, and it must never log or return them.
+External contest provider secrets must stay server-only. The Codeforces API-first path is anonymous and must use exactly `contestId`; it does not restore API key/secret or OAuth collection, storage, endpoints, or decryption. Browser/Next proxy code may forward provider-specific browser session cookies only for the existing authorized crawl fallback, and it must never log or return them.
 
 Applies when:
 Changing Codeforces fetches, external contest provider sessions, classroom contest proxies, deployment environment setup, or error handling around provider access.

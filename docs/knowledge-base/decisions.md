@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-09-02 - classroom-codeforces-api-first-fallback - Public API Before Web Crawl
+
+Source:
+- `docs/rsd/classroom-codeforces-api-first-fallback-20260902-rsd.md`
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+Decision:
+For every numeric classroom Codeforces source, request the anonymous official `contest.standings` API first with exactly the `contestId` query parameter. Normalize and filter a successful public response to explicit classroom target handles before persistence. If the API is unavailable, rejects a private Gym/mashup, returns an invalid payload, or contains no classroom handle, fall back to the existing fixed-origin authenticated friends-standings crawler. EDU lessons remain authenticated crawl-only because Codeforces has no EDU standings API. Opt-in upsolve discovery remains bounded and session-backed. The API queue observes Codeforces's one-request-per-two-seconds limit. This supersedes the numeric web-only portion of the session-only decision below, but does not restore API credential storage.
+
+Applies when:
+Changing numeric classroom Codeforces standings, API throttling/normalization, web fallback, provider sessions, or EDU fetching.
+
+Do not overgeneralize:
+Do not add extra query parameters to anonymous public `contest.standings`, persist full external standings, introduce OAuth, store Codeforces API keys/secrets, or route EDU lessons through a nonexistent API method.
+
 ## 2026-09-02 - classroom-codeforces-web-only-standings - Session-Only Codeforces Fetching
 
 Source:
@@ -8,7 +24,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Decision:
-Classroom Codeforces fetching no longer uses anonymous or signed Codeforces API requests and no longer accepts trainer API keys or secrets. Numeric public contests crawl the fixed-origin `/contest/{id}/standings/friends/true` view, high-number Gyms crawl `/gym/{id}/standings/friends/true`, and EDU sources retain their constrained friends/read-list views. Every Codeforces fetch requires the trainer's transient HTTP-only JSESSIONID and retains only explicit classroom target handles. When `include_upsolves` is enabled for a numeric source, the adapter additionally crawls bounded per-handle contest-submission histories and upgrades only problems still unsolved in the official friends row. VJudge retains its existing opt-in late-submission handling.
+Classroom Codeforces fetching no longer accepts trainer API keys or secrets. EDU sources use constrained friends/read-list views, while numeric web fallback uses `/contest/{id}/standings/friends/true` or `/gym/{id}/standings/friends/true` with the trainer's transient HTTP-only JSESSIONID. When `include_upsolves` is enabled for a numeric source, the adapter additionally crawls bounded per-handle contest-submission histories and upgrades only problems still unsolved in the official row. The API-first decision above supersedes this entry's requirement that every numeric fetch begin with web crawling and require JSESSIONID.
 
 Applies when:
 Changing classroom Codeforces source parsing, standings fetching, session transport, snapshot filtering, provider settings, or upsolve behavior.

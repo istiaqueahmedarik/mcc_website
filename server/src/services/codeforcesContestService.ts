@@ -7,6 +7,8 @@ export type CodeforcesServiceResult = {
 
 export type CodeforcesFetchOptions = {
   fetchImpl?: typeof fetch;
+  apiRateLimitMs?: number;
+  sleep?: (ms: number) => Promise<void>;
   timeoutMs?: number;
   maxResponseBytes?: number;
   webSession?: string;
@@ -20,6 +22,9 @@ export type CodeforcesFetchOptions = {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+const CODEFORCES_API_BASE = 'https://codeforces.com/api';
+const DEFAULT_API_RATE_LIMIT_MS = 2_100;
+const CONTESTANT_TYPE = 'CONTESTANT';
 const CODEFORCES_WEB_BASE = 'https://codeforces.com';
 const CODEFORCES_BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 const EDU_SOURCE_REGEX = /^edu:(\d+):(\d+)(?::(friends)|:list:([A-Za-z0-9]+))?$/i;
@@ -28,6 +33,9 @@ const DEFAULT_WEB_MAX_PAGES = 250;
 const DEFAULT_UPSOLVE_CONCURRENCY = 3;
 const DEFAULT_UPSOLVE_MAX_PAGES = 10;
 const MAX_UPSOLVE_HANDLES = 200;
+
+let lastCodeforcesApiRequestAt = 0;
+let codeforcesApiQueue: Promise<unknown> = Promise.resolve();
 
 class CodeforcesWebError extends Error {
   code: string;
@@ -39,6 +47,22 @@ class CodeforcesWebError extends Error {
     this.code = code;
     this.statusCode = statusCode;
   }
+}
+
+class CodeforcesApiError extends Error {
+  code: string;
+  statusCode: number;
+
+  constructor(code: string, message: string, statusCode = 502) {
+    super(message);
+    this.name = 'CodeforcesApiError';
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
+function defaultSleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
@@ -117,6 +141,197 @@ export function normalizeCodeforcesContestSource(value: unknown): string {
     return `edu:${urlMatch[1]}:${urlMatch[2]}:list:${listKey}`;
   }
   return `edu:${urlMatch[1]}:${urlMatch[2]}:friends`;
+}
+
+async function runCodeforcesApiRequest<T>(operation: () => Promise<T>, options: CodeforcesFetchOptions) {
+  const sleep = options.sleep || defaultSleep;
+  const rateLimitMs = Math.max(0, options.apiRateLimitMs ?? DEFAULT_API_RATE_LIMIT_MS);
+  const run = codeforcesApiQueue.then(async () => {
+    const waitMs = Math.max(0, rateLimitMs - (Date.now() - lastCodeforcesApiRequestAt));
+    if (waitMs > 0) await sleep(waitMs);
+    lastCodeforcesApiRequestAt = Date.now();
+    return operation();
+  });
+  codeforcesApiQueue = run.catch(() => undefined);
+  return run;
+}
+
+async function requestCodeforcesApiStandings(contestId: string, options: CodeforcesFetchOptions) {
+  return runCodeforcesApiRequest(async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const url = new URL(`${CODEFORCES_API_BASE}/contest.standings`);
+    // Codeforces requires public regular standings requests to contain only contestId.
+    url.searchParams.set('contestId', contestId);
+    try {
+      const response = await (options.fetchImpl || fetch)(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'MCC Classroom Contest Rank Fetcher',
+        },
+        signal: controller.signal,
+      });
+      const text = await readTextWithLimit(response, options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES);
+      let payload: any;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new CodeforcesApiError('CODEFORCES_API_INVALID_JSON', 'Codeforces API returned a non-JSON response.');
+      }
+      const comment = normalizeText(payload?.comment || response.statusText, 1000);
+      if (!response.ok || payload?.status !== 'OK') {
+        throw new CodeforcesApiError(
+          response.status === 429 || /call limit|too many requests/i.test(comment)
+            ? 'CODEFORCES_API_RATE_LIMIT'
+            : 'CODEFORCES_API_UNAVAILABLE',
+          comment || `Codeforces API returned HTTP ${response.status}.`,
+          response.status === 429 ? 429 : 502,
+        );
+      }
+      return payload.result;
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        throw new CodeforcesApiError('CODEFORCES_API_TIMEOUT', 'Codeforces API request timed out.', 504);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }, options);
+}
+
+function maxProblemPoints(problem: any) {
+  const explicit = toFiniteNumber(problem?.points, NaN);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return 1;
+}
+
+export function normalizeCodeforcesApiStandings(raw: any, problemWeights?: number[], targetHandles?: string[]) {
+  if (!raw || typeof raw !== 'object' || !raw.contest || !Array.isArray(raw.problems) || !Array.isArray(raw.rows)) {
+    return { error: 'Invalid Codeforces standings payload.' };
+  }
+
+  const contest = raw.contest;
+  const problems = raw.problems.map((problem: any, index: number) => ({
+    contestId: problem?.contestId ?? contest.id,
+    problemsetName: problem?.problemsetName,
+    index: normalizeText(problem?.index || String.fromCharCode(65 + index), 20),
+    name: normalizeText(problem?.name || `Problem ${index + 1}`, 300),
+    type: problem?.type,
+    points: maxProblemPoints(problem),
+    rating: problem?.rating,
+    tags: Array.isArray(problem?.tags) ? problem.tags : [],
+  }));
+  const { hasCustomWeights, weights } = configuredWeights(problemWeights, problems.length);
+  const totalMaximumPoints = problems.reduce(
+    (sum: number, problem: any) => sum + toFiniteNumber(problem.points, 1),
+    0,
+  ) || problems.length || 1;
+  const totalWeight = weights.reduce((sum: number, weight: number) => sum + weight, 0);
+  const hackNormalizationFactor = totalMaximumPoints > 0 ? totalWeight / totalMaximumPoints : 0;
+  const officialRows = raw.rows.filter((row: any) => row?.party?.participantType === CONTESTANT_TYPE);
+  const targetSet = Array.isArray(targetHandles)
+    ? new Set(targetHandles.map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean))
+    : null;
+
+  const teams = officialRows.map((row: any) => {
+    const party = row.party || {};
+    const sourceHandles = Array.isArray(party.members)
+      ? party.members.map((member: any) => normalizeText(member?.handle, 120)).filter(Boolean)
+      : [];
+    if (targetSet && !sourceHandles.some((handle: string) => targetSet.has(handle.toLowerCase()))) return null;
+    const teamName = normalizeText(party.teamName, 180);
+    const username = teamName || sourceHandles[0] || `rank-${row.rank}`;
+    const problemResults = Array.isArray(row.problemResults) ? row.problemResults : [];
+    const submissions = problems.map((problem: any, problemIndex: number) => {
+      const result = problemResults[problemIndex] || {};
+      const points = toFiniteNumber(result.points, 0);
+      return {
+        problemIndex,
+        problemLabel: problem.index,
+        status: points > 0 ? 1 : 0,
+        points,
+        maxPoints: toFiniteNumber(problem.points, 1),
+        penalty: result.penalty,
+        rejectedAttemptCount: toFiniteNumber(result.rejectedAttemptCount, 0),
+        bestSubmissionTimeSeconds: result.bestSubmissionTimeSeconds,
+        type: result.type,
+      };
+    });
+    const rawProblemPoints = submissions.reduce(
+      (sum: number, submission: any) => sum + toFiniteNumber(submission.points, 0),
+      0,
+    );
+    const nativePoints = toFiniteNumber(row.points, 0);
+    const hackAdjustment = nativePoints - rawProblemPoints;
+    const weightedProblemScore = submissions.reduce((sum: number, submission: any, index: number) => {
+      const maximum = toFiniteNumber(submission.maxPoints, 1);
+      const fraction = maximum > 0 ? toFiniteNumber(submission.points, 0) / maximum : 0;
+      return sum + Math.max(0, Math.min(1, fraction)) * (weights[index] || 0);
+    }, 0);
+    return {
+      teamId: party.teamId ?? null,
+      username,
+      realName: teamName || sourceHandles.join(', ') || username,
+      avatarUrl: null,
+      submissions,
+      solvedCount: submissions.filter((submission: any) => submission.points > 0).length,
+      penalty: toFiniteNumber(row.penalty, 0),
+      finalScore: roundScore(hasCustomWeights
+        ? weightedProblemScore + (hackAdjustment * hackNormalizationFactor)
+        : nativePoints * problems.length / totalMaximumPoints),
+      nativeRank: row.rank,
+      nativePoints,
+      successfulHackCount: toFiniteNumber(row.successfulHackCount, 0),
+      unsuccessfulHackCount: toFiniteNumber(row.unsuccessfulHackCount, 0),
+      sourceHandles,
+      provider: 'codeforces',
+      providerMeta: {
+        party,
+        nativeRank: row.rank,
+        nativePoints,
+        rawProblemPoints,
+        hackAdjustment,
+        lastSubmissionTimeSeconds: row.lastSubmissionTimeSeconds,
+        sourceType: 'contest-api',
+      },
+    };
+  }).filter(Boolean);
+
+  return {
+    contestInfo: {
+      id: String(contest.id),
+      title: contest.name,
+      begin: contest.startTimeSeconds ? contest.startTimeSeconds * 1000 : null,
+      length: contest.durationSeconds ? contest.durationSeconds * 1000 : null,
+      end: contest.startTimeSeconds && contest.durationSeconds
+        ? (contest.startTimeSeconds + contest.durationSeconds) * 1000
+        : null,
+      provider: 'codeforces',
+      type: contest.type,
+      phase: contest.phase,
+      frozen: Boolean(contest.frozen),
+      startTimeSeconds: contest.startTimeSeconds,
+      durationSeconds: contest.durationSeconds,
+      freezeDurationSeconds: contest.freezeDurationSeconds,
+    },
+    provider: 'codeforces',
+    totalTeams: teams.length,
+    fullParticipantCount: officialRows.length,
+    totalProblems: problems.length,
+    problemWeights: weights,
+    problems,
+    teams,
+    providerMeta: {
+      sourceType: 'contest-api',
+      contestId: String(contest.id),
+      fullParticipantCount: officialRows.length,
+      officialParticipantCount: officialRows.length,
+      hasCustomWeights,
+      includeUpsolves: false,
+    },
+  };
 }
 
 async function readTextWithLimit(response: Response, maxResponseBytes: number) {
@@ -908,7 +1123,7 @@ async function fetchCodeforcesEduLessonRank(
   }
 }
 
-async function fetchCodeforcesNumericRank(
+async function fetchCodeforcesNumericWebRank(
   contestId: string,
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
@@ -965,6 +1180,53 @@ async function fetchCodeforcesNumericRank(
     return { statusCode: 200, body };
   } catch (error: any) {
     return serviceErrorToResult(error);
+  }
+}
+
+async function fetchCodeforcesNumericRank(
+  contestId: string,
+  problemWeights: number[] | undefined,
+  options: CodeforcesFetchOptions,
+): Promise<CodeforcesServiceResult> {
+  try {
+    const raw = await requestCodeforcesApiStandings(contestId, options);
+    const normalized: any = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
+    if (normalized.error) {
+      throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
+    }
+    if (Array.isArray(options.targetHandles) && normalized.teams.length === 0) {
+      throw new CodeforcesApiError(
+        'CODEFORCES_API_NO_CLASSROOM_HANDLES',
+        'The public API standings did not contain a classroom handle.',
+        422,
+      );
+    }
+    if (options.includeUpsolves) {
+      const sourceKind = numericSourceKind(contestId);
+      const upsolveSubmissions = await fetchCodeforcesWebUpsolveSubmissions(
+        contestId,
+        sourceKind,
+        normalized.teams,
+        options,
+      );
+      applyCodeforcesWebUpsolves(
+        normalized,
+        upsolveSubmissions,
+        Boolean(normalized.providerMeta?.hasCustomWeights),
+      );
+    }
+    return { statusCode: 200, body: normalized };
+  } catch (error: any) {
+    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
+    if (fallback.statusCode === 200) {
+      fallback.body.providerMeta = {
+        ...(fallback.body.providerMeta || {}),
+        apiFallbackCode: error instanceof CodeforcesApiError
+          ? error.code
+          : 'CODEFORCES_API_UNEXPECTED_ERROR',
+      };
+    }
+    return fallback;
   }
 }
 

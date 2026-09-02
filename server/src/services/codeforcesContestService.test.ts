@@ -86,6 +86,47 @@ function submissionPage(rows: string, pagination = '') {
   </table>${pagination}</body></html>`;
 }
 
+function apiStandings(handles = ['Alice']) {
+  return {
+    contest: {
+      id: 2258,
+      name: 'Classroom Contest',
+      type: 'CF',
+      phase: 'FINISHED',
+      startTimeSeconds: 1_700_000_000,
+      durationSeconds: 7_200,
+    },
+    problems: [
+      { contestId: 2258, index: 'A', name: 'First', points: 500 },
+      { contestId: 2258, index: 'B1', name: 'Second', points: 1000 },
+    ],
+    rows: handles.map((handle, index) => ({
+      party: { participantType: 'CONTESTANT', members: [{ handle }] },
+      rank: index + 1,
+      points: 1200,
+      penalty: 0,
+      successfulHackCount: 2,
+      unsuccessfulHackCount: 1,
+      problemResults: [
+        { points: 450, rejectedAttemptCount: 0 },
+        { points: 750, rejectedAttemptCount: 0 },
+      ],
+    })),
+  };
+}
+
+function apiOk(result: any) {
+  return new Response(JSON.stringify({ status: 'OK', result }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function apiFailed(comment = 'Contest with id 708543 not found') {
+  return new Response(JSON.stringify({ status: 'FAILED', comment }), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 describe('Codeforces web standings sources', () => {
   test('validates that a JSESSIONID reaches an authenticated Codeforces page', async () => {
     const authenticated = await validateCodeforcesSession('session-token', {
@@ -183,7 +224,7 @@ describe('Codeforces web standings sources', () => {
 });
 
 describe('fetchCodeforcesContestRank', () => {
-  test('crawls a public contest friends URL with only the web session', async () => {
+  test('uses the anonymous API first for a public numeric contest', async () => {
     const requests: Array<{ url: string; cookie: string }> = [];
     const result = await fetchCodeforcesContestRank('2258', [2, 4], {
       fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
@@ -191,33 +232,42 @@ describe('fetchCodeforcesContestRank', () => {
           url: String(url),
           cookie: String((init?.headers as Record<string, string>)?.Cookie || ''),
         });
-        return new Response(numericPage('contest', '2258', '*', 'Hacks', contestHeaders, contestAliceRow));
+        return apiOk(apiStandings(['Alice', 'Bob']));
       }) as any,
-      webSession: 'session-token',
       targetHandles: ['alice'],
+      apiRateLimitMs: 0,
     });
 
     expect(result.statusCode).toBe(200);
     expect(requests).toHaveLength(1);
-    expect(new URL(requests[0].url).pathname).toBe('/contest/2258/standings/friends/true');
-    expect(requests[0].cookie).toBe('JSESSIONID=session-token');
-    expect(result.body.providerMeta.sourceType).toBe('contest-web');
+    expect(new URL(requests[0].url).pathname).toBe('/api/contest.standings');
+    expect(Array.from(new URL(requests[0].url).searchParams.keys())).toEqual(['contestId']);
+    expect(requests[0].cookie).toBe('');
+    expect(result.body.providerMeta.sourceType).toBe('contest-api');
+    expect(result.body.fullParticipantCount).toBe(2);
+    expect(result.body.teams).toHaveLength(1);
     expect(result.body.teams[0].finalScore).toBe(4.8);
   });
 
-  test('crawls a high-number Gym friends URL without API credentials', async () => {
+  test('falls back to a high-number Gym friends URL when the anonymous API fails', async () => {
     const urls: string[] = [];
     const result = await fetchCodeforcesContestRank('708543', undefined, {
       fetchImpl: (async (url: RequestInfo | URL) => {
         urls.push(String(url));
+        if (String(url).includes('/api/contest.standings')) return apiFailed();
         return new Response(numericPage('gym', '708543', 'Penalty', 'Penalty', gymHeaders, gymAliceRow));
       }) as any,
       webSession: 'session-token',
       targetHandles: ['alice'],
+      apiRateLimitMs: 0,
     });
 
     expect(result.statusCode).toBe(200);
-    expect(new URL(urls[0]).pathname).toBe('/gym/708543/standings/friends/true');
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/gym/708543/standings/friends/true',
+    ]);
+    expect(result.body.providerMeta.apiFallbackCode).toBe('CODEFORCES_API_UNAVAILABLE');
     expect(result.body.teams[0].penalty).toBe(37);
   });
 
@@ -227,6 +277,7 @@ describe('fetchCodeforcesContestRank', () => {
       fetchImpl: (async (url: RequestInfo | URL) => {
         const value = String(url);
         urls.push(value);
+        if (value.includes('/api/contest.standings')) return apiFailed();
         if (value.includes('/submissions/')) {
           return new Response(submissionPage([
             submissionRow('gym', '708543', 100, 'Alice', 'B', 'WRONG_ANSWER'),
@@ -238,10 +289,12 @@ describe('fetchCodeforcesContestRank', () => {
       webSession: 'session-token',
       targetHandles: ['alice'],
       includeUpsolves: true,
+      apiRateLimitMs: 0,
     });
 
     expect(result.statusCode).toBe(200);
     expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
       '/gym/708543/standings/friends/true',
       '/submissions/Alice/contest/708543',
     ]);
@@ -252,6 +305,7 @@ describe('fetchCodeforcesContestRank', () => {
   test('fails closed when a Codeforces upsolve history exceeds the page limit', async () => {
     const result = await fetchCodeforcesContestRank('708543', undefined, {
       fetchImpl: (async (url: RequestInfo | URL) => {
+        if (String(url).includes('/api/contest.standings')) return apiFailed();
         if (String(url).includes('/submissions/')) {
           return new Response(submissionPage('', '<a href="/submissions/Alice/contest/708543/page/11">11</a>'));
         }
@@ -261,6 +315,7 @@ describe('fetchCodeforcesContestRank', () => {
       targetHandles: ['alice'],
       includeUpsolves: true,
       upsolveMaxPages: 10,
+      apiRateLimitMs: 0,
     });
 
     expect(result.statusCode).toBe(422);
@@ -286,8 +341,12 @@ describe('fetchCodeforcesContestRank', () => {
     expect(result.body.teams[0].username).toBe('Alice');
   });
 
-  test('requires a JSESSIONID for all Codeforces standings sources', async () => {
-    const result = await fetchCodeforcesContestRank('2258', undefined, { targetHandles: ['alice'] });
+  test('requires a JSESSIONID when the numeric API request needs the crawl fallback', async () => {
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async () => apiFailed('Public standings unavailable')) as any,
+      targetHandles: ['alice'],
+      apiRateLimitMs: 0,
+    });
     expect(result.statusCode).toBe(428);
     expect(result.body.code).toBe('CODEFORCES_WEB_SESSION_MISSING');
   });
@@ -299,6 +358,7 @@ describe('fetchCodeforcesContestRank', () => {
       )) as any,
       webSession: 'session-token',
       targetHandles: ['bob'],
+      apiRateLimitMs: 0,
     });
     expect(result.statusCode).toBe(422);
     expect(result.body.code).toBe('CODEFORCES_WEB_NO_CLASSROOM_FRIENDS');
@@ -310,6 +370,7 @@ describe('fetchCodeforcesContestRank', () => {
       webSession: 'session-token',
       targetHandles: ['alice'],
       maxResponseBytes: 8,
+      apiRateLimitMs: 0,
     });
     expect(result.statusCode).toBe(502);
     expect(result.body.code).toBe('CODEFORCES_RESPONSE_TOO_LARGE');

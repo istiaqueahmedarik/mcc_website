@@ -1,8 +1,8 @@
 # Project Index
 
-## 2026-09-02 - Codeforces Session-Only Public, Gym, and EDU Standings
+## 2026-09-02 - Codeforces API-First Numeric Standings With Web Fallback
 
-Classroom Codeforces fetching is web-session-only. `server/src/services/codeforcesContestService.ts` routes regular numeric IDs to `/contest/{id}/standings/friends/true`, high-number IDs to `/gym/{id}/standings/friends/true`, and EDU sources to their constrained friends/read-list views. The bounded crawler requires the trainer's HTTP-only JSESSIONID, handles both points/hacks and solved/penalty layouts, and filters to classroom handles before persistence. API signing, credential endpoints, encrypted-credential helpers, and trainer API-key UI were removed. Numeric Codeforces items may opt into bounded per-handle submission-history crawling for upsolves; VJudge retains its late-rank-submission mode. Coverage lives in `server/src/services/codeforcesContestService.test.ts`.
+`server/src/services/codeforcesContestService.ts` now requests the anonymous official `contest.standings` API first for numeric sources, using exactly `contestId`, process-wide 2.1-second throttling, bounded responses, local normalization, and classroom-handle filtering. API failure or a response without a classroom handle falls back to the existing authenticated `/contest/{id}/standings/friends/true` or `/gym/{id}/standings/friends/true` crawler. EDU sources remain constrained authenticated friends/read-list crawls. Public API success does not require JSESSIONID; fallback and opt-in web upsolve discovery do. API keys/secrets and OAuth are not collected or stored. Coverage lives in `server/src/services/codeforcesContestService.test.ts`.
 
 ## 2026-09-02 - Trainer Contest Report Compact Mode
 
