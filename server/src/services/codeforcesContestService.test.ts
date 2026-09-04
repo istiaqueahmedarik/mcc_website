@@ -519,6 +519,75 @@ describe('fetchCodeforcesContestRank', () => {
     expect(result.body.code).toBe('CODEFORCES_CREDENTIALS_MISSING');
   });
 
+  test('preserves the signed API failure when the web fallback is also blocked', async () => {
+    let apiCalls = 0;
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        if (new URL(String(url)).pathname.includes('/api/')) {
+          apiCalls += 1;
+          return apiFailed(apiCalls === 1
+            ? 'contestId: Contest with id 708543 not found'
+            : 'apiKey trainer-key is invalid');
+        }
+        return new Response('', { status: 503 });
+      }) as any,
+      credentialProvider: async () => ({ apiKey: 'trainer-key', apiSecret: 'trainer-secret' }),
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      nowSeconds: () => 1_000,
+      randomPrefix: () => 'abcdef',
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(502);
+    expect(result.body.code).toBe('CODEFORCES_API_UNAVAILABLE');
+    expect(result.body.message).toBe('apiKey [redacted] is invalid');
+    expect(result.body.fallbackCode).toBe('CODEFORCES_WEB_BLOCKED');
+    expect(JSON.stringify(result.body)).not.toContain('trainer-key');
+    expect(JSON.stringify(result.body)).not.toContain('trainer-secret');
+    expect(JSON.stringify(result.body)).not.toContain('session-token');
+  });
+
+  test('does not crawl HTML after signed standings contain no classroom handles', async () => {
+    const urls: string[] = [];
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        const value = String(url);
+        urls.push(value);
+        return urls.length === 1 ? apiFailed() : apiOk(apiStandings(['Bob']));
+      }) as any,
+      credentialProvider: async () => ({ apiKey: 'trainer-key', apiSecret: 'trainer-secret' }),
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      nowSeconds: () => 1_000,
+      randomPrefix: () => 'abcdef',
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_API_NO_CLASSROOM_HANDLES');
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/api/contest.standings',
+    ]);
+  });
+
+  test('keeps the web block when no signed API credentials are configured', async () => {
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => (
+        new URL(String(url)).pathname.includes('/api/')
+          ? apiFailed()
+          : new Response('', { status: 503 })
+      )) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(503);
+    expect(result.body.code).toBe('CODEFORCES_WEB_BLOCKED');
+  });
+
   test('fails when friends standings contain no classroom handles', async () => {
     const result = await fetchCodeforcesContestRank('2258', undefined, {
       fetchImpl: (async () => new Response(

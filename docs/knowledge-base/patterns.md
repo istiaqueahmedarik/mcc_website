@@ -1,5 +1,20 @@
 # Patterns
 
+## 2026-09-04 - Preserve the Actionable Upstream Failure
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+Pattern:
+When an ordered provider strategy exhausts multiple transports, return the failure from the preferred authenticated transport if credentials were actually available, and attach only a bounded non-sensitive code for the later fallback. If the preferred response was valid but contained no requested classroom identities, return that mapping error without trying a less authoritative transport. Before returning provider comments, literally remove request credentials and signatures. If authenticated credentials were missing, preserve the fallback transport's own result.
+
+Applies when:
+Maintaining Codeforces signed API errors, crawl fallback errors, or trainer-facing provider diagnostics.
+
+Do not overgeneralize:
+Do not return signed URLs, request bodies, sessions, keys, secrets, signatures, or unrestricted upstream response bodies.
+
 ## 2026-09-04 - Match Codeforces Upsolve Transport to Standings Transport
 
 Source:

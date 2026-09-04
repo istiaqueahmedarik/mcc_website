@@ -11,6 +11,8 @@ Numeric classroom Codeforces fetches must preserve this order: anonymous officia
 
 Because Codeforces blocks Bun's native HTTP fingerprint on numeric friends standings, production requests use `curl` without a shell. Supply JSESSIONID through curl's stdin configuration rather than process arguments, keep injected fetch clients for tests, cap response bytes and time, and treat provider 403/503 responses as temporary blocking rather than invalid API credentials.
 
+If saved credentials were available and both signed API and HTML fallback fail, return the signed API failure because it identifies the actionable credential/access problem; attach only the bounded web fallback code. Literally redact the request API key and `apiSig` from provider comments before returning them. When credentials are missing, preserve the HTML fallback result.
+
 Applies when:
 Changing numeric Codeforces source routing, standings parsing, Codeforces web-session transport, or classroom snapshot persistence.
 

@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-04 - Codeforces Signed Failure Diagnostics
+
+When signed Codeforces standings succeed but contain no classroom handles, `server/src/services/codeforcesContestService.ts` returns that mapping error without an unnecessary HTML crawl. When saved credentials are available but both signed API standings and the authenticated HTML fallback fail, it returns the signed provider error and adds only the non-sensitive HTML fallback code. Any API key or `apiSig` echoed by Codeforces is redacted literally. Missing-credential requests retain the web error. Focused coverage is in `server/src/services/codeforcesContestService.test.ts`; deployment and authenticated retry are pending.
+
 ## 2026-09-04 - Codeforces API-Native Upsolves
 
 Numeric Codeforces standings that succeed through the official API now keep opt-in upsolve collection on bounded `contest.status` paging, using the same anonymous or signed mode as the standings request. Only HTML-origin standings use per-handle HTML submission histories. This prevents private Gym fetches with upsolves from discarding a successful signed API result because Codeforces blocked the later HTML request. Implementation and focused coverage live in `server/src/services/codeforcesContestService.ts` and `server/src/services/codeforcesContestService.test.ts`; production deployment and authenticated live verification are pending.

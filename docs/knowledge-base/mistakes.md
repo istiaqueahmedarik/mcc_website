@@ -1,3 +1,18 @@
+## 2026-09-04 - Web Fallback Masked the Signed Codeforces Failure
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `docs/reviews/classroom-codeforces-signed-failure-diagnostics-20260904-implementation-review.md`
+
+What happened:
+After a signed private-Gym API request failed, a later 403/503 HTML fallback replaced the provider's API failure comment with `CODEFORCES_WEB_BLOCKED`. Disabling upsolves did not help because the failure occurred while loading standings, not submissions.
+
+Detection:
+The second hosted retry used the newly deployed web-error wording while live state showed upsolves disabled, credentials successfully loaded, and no snapshot written. Provider/server clocks differed by only about one second.
+
+Prevention:
+When an authenticated preferred transport and a later fallback both fail, preserve the safe preferred-transport error and add only the fallback code. Redact any echoed key/signature and test both credential-present and credential-missing behavior.
+
 ## 2026-09-04 - API Standings Downgraded to Blockable HTML for Upsolves
 
 Source:

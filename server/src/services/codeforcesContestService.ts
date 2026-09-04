@@ -261,7 +261,11 @@ async function requestCodeforcesApi(
       } catch {
         throw new CodeforcesApiError('CODEFORCES_API_INVALID_JSON', 'Codeforces API returned a non-JSON response.');
       }
-      const comment = normalizeText(payload?.comment || response.statusText, 1000);
+      let comment = normalizeText(payload?.comment || response.statusText, 1000);
+      [requestParams.apiKey, requestParams.apiSig].forEach((sensitiveValue) => {
+        const literal = String(sensitiveValue || '');
+        if (literal) comment = comment.split(literal).join('[redacted]');
+      });
       if (!response.ok || payload?.status !== 'OK') {
         throw new CodeforcesApiError(
           response.status === 429 || /call limit|too many requests/i.test(comment)
@@ -1399,6 +1403,12 @@ async function fetchCodeforcesNumericRank(
   }
 
   if (!normalized) {
+    if (
+      apiError instanceof CodeforcesApiError
+      && apiError.code === 'CODEFORCES_API_NO_CLASSROOM_HANDLES'
+    ) {
+      return serviceErrorToResult(apiError);
+    }
     const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
     if (fallback.statusCode === 200) {
       fallback.body.providerMeta = {
@@ -1417,6 +1427,14 @@ async function fetchCodeforcesNumericRank(
       )
     ) {
       return serviceErrorToResult(apiError);
+    }
+    if (
+      apiError instanceof CodeforcesApiError
+      && apiError.code !== 'CODEFORCES_CREDENTIALS_MISSING'
+    ) {
+      const apiFailure = serviceErrorToResult(apiError);
+      apiFailure.body.fallbackCode = normalizeText(fallback.body?.code, 100) || null;
+      return apiFailure;
     }
     return fallback;
   }

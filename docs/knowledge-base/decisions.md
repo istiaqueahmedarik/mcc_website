@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-09-04 - classroom-codeforces-signed-failure-diagnostics - Prefer Signed Failure
+
+Source:
+- `docs/rsd/classroom-codeforces-signed-failure-diagnostics-20260904-rsd.md`
+- `docs/reviews/classroom-codeforces-signed-failure-diagnostics-20260904-implementation-review.md`
+- `server/src/services/codeforcesContestService.ts`
+
+Decision:
+When saved credentials were available and signed Codeforces standings fail, a subsequent HTML fallback failure must not mask the signed provider error. Return the bounded signed API code/message with literal API-key/signature redaction and attach only the non-sensitive fallback code. If credentials were missing, retain the HTML fallback result.
+
+Applies when:
+Changing Codeforces access ordering, signed API failure handling, or provider error presentation.
+
+Do not overgeneralize:
+Do not expose provider sessions, secrets, signatures, signed URLs, or full upstream bodies, and do not remove the web fallback itself.
+
 ## 2026-09-04 - classroom-codeforces-api-upsolves - API Transport Continuity
 
 Source:

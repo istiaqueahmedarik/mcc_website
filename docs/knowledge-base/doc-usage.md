@@ -1,5 +1,16 @@
 # Doc Usage
 
+## 2026-09-04 - classroom-codeforces-signed-failure-diagnostics - Implementation Docs Used
+
+Source:
+- `docs/reviews/classroom-codeforces-signed-failure-diagnostics-20260904-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom provider knowledge base, Context7 discovery, the Supabase safety skill and current changelog for read-only state inspection, current Codeforces API authorization/method documentation, the deployed workflow result, the provider/server clock comparison, and the current service/test paths. Codeforces documents `FAILED.comment` as its API failure detail and requires an authenticated user who can view a private Gym.
+
+Applies when:
+Auditing signed Codeforces failure precedence, private Gym credential troubleshooting, or secret-safe provider error output.
+
 ## 2026-09-04 - classroom-codeforces-api-upsolves - Implementation Docs Used
 
 Source:
