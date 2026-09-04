@@ -226,6 +226,7 @@ describe('Codeforces web standings sources', () => {
 describe('fetchCodeforcesContestRank', () => {
   test('uses the anonymous API first for a public numeric contest', async () => {
     const requests: Array<{ url: string; cookie: string }> = [];
+    let credentialProviderCalls = 0;
     const result = await fetchCodeforcesContestRank('2258', [2, 4], {
       fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
         requests.push({
@@ -234,6 +235,10 @@ describe('fetchCodeforcesContestRank', () => {
         });
         return apiOk(apiStandings(['Alice', 'Bob']));
       }) as any,
+      credentialProvider: async () => {
+        credentialProviderCalls += 1;
+        return { apiKey: 'unused-key', apiSecret: 'unused-secret' };
+      },
       targetHandles: ['alice'],
       apiRateLimitMs: 0,
     });
@@ -243,6 +248,7 @@ describe('fetchCodeforcesContestRank', () => {
     expect(new URL(requests[0].url).pathname).toBe('/api/contest.standings');
     expect(Array.from(new URL(requests[0].url).searchParams.keys())).toEqual(['contestId']);
     expect(requests[0].cookie).toBe('');
+    expect(credentialProviderCalls).toBe(0);
     expect(result.body.providerMeta.sourceType).toBe('contest-api');
     expect(result.body.fullParticipantCount).toBe(2);
     expect(result.body.teams).toHaveLength(1);
@@ -267,8 +273,45 @@ describe('fetchCodeforcesContestRank', () => {
       '/api/contest.standings',
       '/gym/708543/standings/friends/true',
     ]);
-    expect(result.body.providerMeta.apiFallbackCode).toBe('CODEFORCES_API_UNAVAILABLE');
+    expect(result.body.providerMeta.apiFallbackCode).toBe('CODEFORCES_CREDENTIALS_MISSING');
     expect(result.body.teams[0].penalty).toBe(37);
+  });
+
+  test('uses saved credentials for a signed API retry before crawl fallback', async () => {
+    const urls: string[] = [];
+    let credentialProviderCalls = 0;
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        return urls.length === 1 ? apiFailed() : apiOk({
+          ...apiStandings(['Alice']),
+          contest: { ...apiStandings().contest, id: 708543 },
+        });
+      }) as any,
+      credentialProvider: async () => {
+        credentialProviderCalls += 1;
+        return { apiKey: 'trainer-key', apiSecret: 'trainer-secret' };
+      },
+      targetHandles: ['alice'],
+      nowSeconds: () => 1_000,
+      randomPrefix: () => 'abcdef',
+      apiRateLimitMs: 0,
+    });
+
+    const anonymousParams = new URL(urls[0]).searchParams;
+    const signedParams = new URL(urls[1]).searchParams;
+    expect(result.statusCode).toBe(200);
+    expect(urls).toHaveLength(2);
+    expect(Array.from(anonymousParams.keys())).toEqual(['contestId']);
+    expect(signedParams.get('apiKey')).toBe('trainer-key');
+    expect(signedParams.get('showUnofficial')).toBe('false');
+    expect(signedParams.get('time')).toBe('1000');
+    expect(signedParams.get('apiSig')).toBe(
+      'abcdeff92797f12c2c6311bc369b762f0cdd6e371145cd66e077a1ca290ed80d2cdbb78deef0725be2fce7610eba3800b17a1efdc029ab489adabba1043ee39e18622f',
+    );
+    expect(String(urls[1])).not.toContain('trainer-secret');
+    expect(credentialProviderCalls).toBe(1);
+    expect(result.body.providerMeta.authenticated).toBe(true);
   });
 
   test('crawls bounded per-handle submission history when Codeforces upsolves are enabled', async () => {
@@ -341,14 +384,14 @@ describe('fetchCodeforcesContestRank', () => {
     expect(result.body.teams[0].username).toBe('Alice');
   });
 
-  test('requires a JSESSIONID when the numeric API request needs the crawl fallback', async () => {
+  test('requests API credentials when neither signed API nor crawl fallback is available', async () => {
     const result = await fetchCodeforcesContestRank('2258', undefined, {
       fetchImpl: (async () => apiFailed('Public standings unavailable')) as any,
       targetHandles: ['alice'],
       apiRateLimitMs: 0,
     });
     expect(result.statusCode).toBe(428);
-    expect(result.body.code).toBe('CODEFORCES_WEB_SESSION_MISSING');
+    expect(result.body.code).toBe('CODEFORCES_CREDENTIALS_MISSING');
   });
 
   test('fails when friends standings contain no classroom handles', async () => {

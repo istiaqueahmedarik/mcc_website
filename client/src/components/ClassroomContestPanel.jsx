@@ -90,6 +90,13 @@ const EMPTY_SESSION_FORM = {
 
 const EMPTY_CODEFORCES_SESSION = { connected: false };
 const EMPTY_CODEFORCES_SESSION_FORM = { session: "" };
+const EMPTY_CODEFORCES_CREDENTIAL_FORM = { apiKey: "", apiSecret: "" };
+const EMPTY_CODEFORCES_CREDENTIAL_STATUS = {
+  configured: false,
+  apiKeyHint: null,
+  updatedAt: null,
+  lastUsedAt: null,
+};
 
 const EMPTY_HANDLE_FORM = {
   provider: "vjudge",
@@ -503,6 +510,8 @@ export function ClassroomContestPanel({
   const [roomForm, setRoomForm] = useState(EMPTY_ROOM_FORM);
   const [contestForm, setContestForm] = useState(EMPTY_CONTEST_FORM);
   const [sessionForm, setSessionForm] = useState(EMPTY_SESSION_FORM);
+  const [codeforcesCredentialForm, setCodeforcesCredentialForm] = useState(EMPTY_CODEFORCES_CREDENTIAL_FORM);
+  const [codeforcesCredentialStatus, setCodeforcesCredentialStatus] = useState(EMPTY_CODEFORCES_CREDENTIAL_STATUS);
   const [codeforcesSession, setCodeforcesSession] = useState(EMPTY_CODEFORCES_SESSION);
   const [codeforcesSessionForm, setCodeforcesSessionForm] = useState(EMPTY_CODEFORCES_SESSION_FORM);
   const [handleForm, setHandleForm] = useState(EMPTY_HANDLE_FORM);
@@ -636,11 +645,14 @@ export function ClassroomContestPanel({
   const refreshWorkspace = useCallback(async () => {
     setLoading(true);
     try {
-      const [roomsRes, sessionRes, codeforcesSessionRes] = await Promise.all([
+      const [roomsRes, sessionRes, codeforcesCredentialRes, codeforcesSessionRes] = await Promise.all([
         apiGet(contestApi(classroomId, "rooms")),
         isTrainer
           ? apiGet(contestApi(classroomId, "vjudge-session")).catch(() => ({ connected: false }))
           : Promise.resolve({ connected: false }),
+        isTrainer
+          ? apiGet(contestApi(classroomId, "codeforces-credentials")).catch(() => ({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }))
+          : Promise.resolve({ credential: EMPTY_CODEFORCES_CREDENTIAL_STATUS }),
         isTrainer
           ? apiGet(contestApi(classroomId, "codeforces-session")).catch(() => EMPTY_CODEFORCES_SESSION)
           : Promise.resolve(EMPTY_CODEFORCES_SESSION),
@@ -648,6 +660,10 @@ export function ClassroomContestPanel({
       const nextRooms = Array.isArray(roomsRes?.rooms) ? roomsRes.rooms : [];
       setRooms(nextRooms);
       setVjSession({ connected: Boolean(sessionRes?.connected) });
+      setCodeforcesCredentialStatus({
+        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
+        ...(codeforcesCredentialRes?.credential || {}),
+      });
       setCodeforcesSession({ connected: Boolean(codeforcesSessionRes?.connected) });
       setSelectedRoomId((current) => {
         if (current && nextRooms.some((room) => room.id === current)) return current;
@@ -908,6 +924,50 @@ export function ClassroomContestPanel({
     }
   };
 
+  const saveCodeforcesCredentials = async () => {
+    const apiKey = codeforcesCredentialForm.apiKey.trim();
+    const apiSecret = codeforcesCredentialForm.apiSecret.trim();
+    if (!apiKey || !apiSecret) {
+      toast.error("Codeforces API key and secret are required");
+      return;
+    }
+    setBusyKey("cf-credentials");
+    try {
+      const res = await apiRequest(contestApi(classroomId, "codeforces-credentials"), {
+        method: "PUT",
+        body: { apiKey, apiSecret },
+      });
+      setCodeforcesCredentialStatus({
+        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
+        ...(res?.credential || {}),
+      });
+      setCodeforcesCredentialForm(EMPTY_CODEFORCES_CREDENTIAL_FORM);
+      toast.success("Codeforces API credentials saved");
+    } catch (error) {
+      toast.error(error?.message || "Failed to save Codeforces API credentials");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const clearCodeforcesCredentials = async () => {
+    if (!window.confirm("Remove your saved Codeforces API credentials from this MCC account?")) return;
+    setBusyKey("cf-credentials-clear");
+    try {
+      const res = await apiRequest(contestApi(classroomId, "codeforces-credentials"), { method: "DELETE" });
+      setCodeforcesCredentialStatus({
+        ...EMPTY_CODEFORCES_CREDENTIAL_STATUS,
+        ...(res?.credential || {}),
+      });
+      setCodeforcesCredentialForm(EMPTY_CODEFORCES_CREDENTIAL_FORM);
+      toast.success("Codeforces API credentials removed");
+    } catch (error) {
+      toast.error(error?.message || "Failed to remove Codeforces API credentials");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const saveCodeforcesSession = async () => {
     const session = codeforcesSessionForm.session.trim();
     if (!session) {
@@ -919,7 +979,6 @@ export function ClassroomContestPanel({
       const res = await apiPost(contestApi(classroomId, "codeforces-session"), { session });
       setCodeforcesSession({ connected: Boolean(res?.connected) });
       setCodeforcesSessionForm(EMPTY_CODEFORCES_SESSION_FORM);
-      setCodeforcesSessionDialogOpen(false);
       toast.success("Codeforces web session connected");
     } catch (error) {
       toast.error(error?.message || "Failed to connect Codeforces web session");
@@ -960,14 +1019,23 @@ export function ClassroomContestPanel({
       if (
         provider === "codeforces"
         && (
-          code === "CODEFORCES_WEB_SESSION_MISSING"
+          code === "CODEFORCES_CREDENTIALS_MISSING"
+          || code === "CODEFORCES_CREDENTIALS_UNAVAILABLE"
+          || code === "CODEFORCES_CREDENTIAL_ENCRYPTION_MISSING"
+          || code === "CODEFORCES_WEB_SESSION_MISSING"
           || code === "CODEFORCES_WEB_SESSION_INVALID"
         )
       ) {
         setCodeforcesSessionDialogOpen(true);
       }
       const providerError =
-        code === "CODEFORCES_WEB_SESSION_MISSING"
+        code === "CODEFORCES_CREDENTIALS_MISSING"
+          ? "Add your Codeforces API key and secret, or connect JSESSIONID for crawl fallback"
+          : code === "CODEFORCES_CREDENTIALS_UNAVAILABLE"
+            ? "Saved Codeforces API credentials could not be loaded; save them again"
+            : code === "CODEFORCES_CREDENTIAL_ENCRYPTION_MISSING"
+              ? "Codeforces credential encryption is not configured on the server"
+              : code === "CODEFORCES_WEB_SESSION_MISSING"
           ? "Connect a Codeforces JSESSIONID to fetch friends standings"
           : code === "CODEFORCES_WEB_SESSION_INVALID"
             ? "The Codeforces web session expired or cannot access this standings page; reconnect it and retry"
@@ -1440,12 +1508,12 @@ export function ClassroomContestPanel({
               )}
               <Button
                 size="sm"
-                variant={codeforcesSession.connected ? "outline" : hasCodeforcesContests ? "default" : "outline"}
+                variant={codeforcesCredentialStatus.configured || codeforcesSession.connected ? "outline" : hasCodeforcesContests ? "default" : "outline"}
                 className="gap-1.5"
                 onClick={() => setCodeforcesSessionDialogOpen(true)}
               >
                 <KeyRound className="h-4 w-4" />
-                {codeforcesSession.connected ? "Codeforces Ready" : "Connect Codeforces"}
+                {codeforcesCredentialStatus.configured || codeforcesSession.connected ? "Codeforces Ready" : "Codeforces Access"}
               </Button>
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMappingDialogOpen(true)}>
                 <Users className="h-4 w-4" />
@@ -1587,7 +1655,7 @@ export function ClassroomContestPanel({
 
                   {selectedRoomHasCodeforces && !codeforcesSession.connected && (
                     <div className="flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between">
-                      <span>Public contests use the API first. Connect JSESSIONID for Gym/EDU, upsolves, and crawl fallback.</span>
+                      <span>Public contests use the API first. Add API credentials for signed private access; JSESSIONID remains the crawl fallback.</span>
                       <Button
                         type="button"
                         size="sm"
@@ -1978,17 +2046,125 @@ export function ClassroomContestPanel({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={codeforcesSessionDialogOpen} onOpenChange={setCodeforcesSessionDialogOpen}>
+        <Dialog
+          open={codeforcesSessionDialogOpen}
+          onOpenChange={(open) => {
+            setCodeforcesSessionDialogOpen(open);
+            if (!open) {
+              setCodeforcesCredentialForm(EMPTY_CODEFORCES_CREDENTIAL_FORM);
+              setCodeforcesSessionForm(EMPTY_CODEFORCES_SESSION_FORM);
+            }
+          }}
+        >
           <DialogContent className={formDialogClass}>
             <div className="flex max-h-[88vh] flex-col">
               <DialogHeader className="border-b px-5 py-4 sm:px-6">
-                <DialogTitle>Codeforces Session</DialogTitle>
+                <DialogTitle>Codeforces Access</DialogTitle>
                 <DialogDescription>
-                  Connect the Codeforces account used when API-first fetching needs authenticated friends standings.
+                  Configure signed API access and the authenticated crawl fallback.
                 </DialogDescription>
               </DialogHeader>
               <div className={dialogBodyClass}>
                 <div className="space-y-4">
+                  <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Codeforces API credentials</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {codeforcesCredentialStatus.configured
+                            ? `Encrypted key ${codeforcesCredentialStatus.apiKeyHint || "••••"} is saved for signed API retries.`
+                            : "Used after the anonymous API fails for a private Gym or mashup."}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "shrink-0",
+                        codeforcesCredentialStatus.configured
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
+                          : "text-muted-foreground",
+                      )}>
+                        {codeforcesCredentialStatus.configured ? "Saved" : "Not saved"}
+                      </Badge>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Create a key and secret in{" "}
+                      <a
+                        href="https://codeforces.com/settings/api"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-foreground underline underline-offset-2"
+                      >
+                        Codeforces API settings
+                      </a>
+                      . The secret is encrypted server-side and is never shown again.
+                    </p>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="codeforces-api-key">API key</Label>
+                        <Input
+                          id="codeforces-api-key"
+                          name="cf-api-key"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={codeforcesCredentialForm.apiKey}
+                          onChange={(event) => setCodeforcesCredentialForm((form) => ({ ...form, apiKey: event.target.value }))}
+                          placeholder="Paste API key"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="codeforces-api-secret">API secret</Label>
+                        <Input
+                          id="codeforces-api-secret"
+                          name="cf-api-secret"
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
+                          value={codeforcesCredentialForm.apiSecret}
+                          onChange={(event) => setCodeforcesCredentialForm((form) => ({ ...form, apiSecret: event.target.value }))}
+                          placeholder="Paste API secret"
+                        />
+                      </div>
+                    </div>
+
+                    {codeforcesCredentialStatus.lastUsedAt && (
+                      <p className="text-xs text-muted-foreground">
+                        Last used {new Date(codeforcesCredentialStatus.lastUsedAt).toLocaleString()}
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={pressableClass}
+                        onClick={clearCodeforcesCredentials}
+                        disabled={
+                          !codeforcesCredentialStatus.configured
+                          || busyKey === "cf-credentials"
+                          || busyKey === "cf-credentials-clear"
+                        }
+                      >
+                        {busyKey === "cf-credentials-clear" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Clear key
+                      </Button>
+                      <Button
+                        type="button"
+                        className={pressableClass}
+                        onClick={saveCodeforcesCredentials}
+                        disabled={
+                          busyKey === "cf-credentials"
+                          || busyKey === "cf-credentials-clear"
+                          || !codeforcesCredentialForm.apiKey.trim()
+                          || !codeforcesCredentialForm.apiSecret.trim()
+                        }
+                      >
+                        {busyKey === "cf-credentials" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                        Save credentials
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>

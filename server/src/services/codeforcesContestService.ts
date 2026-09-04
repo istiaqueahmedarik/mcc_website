@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'crypto';
 import * as cheerio from 'cheerio';
 
 export type CodeforcesServiceResult = {
@@ -5,8 +6,18 @@ export type CodeforcesServiceResult = {
   body: any;
 };
 
+export type CodeforcesApiCredentials = {
+  apiKey: string;
+  apiSecret: string;
+};
+
 export type CodeforcesFetchOptions = {
   fetchImpl?: typeof fetch;
+  apiKey?: string;
+  apiSecret?: string;
+  credentialProvider?: () => Promise<CodeforcesApiCredentials | null>;
+  nowSeconds?: () => number;
+  randomPrefix?: () => string;
   apiRateLimitMs?: number;
   sleep?: (ms: number) => Promise<void>;
   timeoutMs?: number;
@@ -52,12 +63,14 @@ class CodeforcesWebError extends Error {
 class CodeforcesApiError extends Error {
   code: string;
   statusCode: number;
+  comment?: string;
 
-  constructor(code: string, message: string, statusCode = 502) {
+  constructor(code: string, message: string, statusCode = 502, comment?: string) {
     super(message);
     this.name = 'CodeforcesApiError';
     this.code = code;
     this.statusCode = statusCode;
+    this.comment = comment;
   }
 }
 
@@ -156,13 +169,80 @@ async function runCodeforcesApiRequest<T>(operation: () => Promise<T>, options: 
   return run;
 }
 
-async function requestCodeforcesApiStandings(contestId: string, options: CodeforcesFetchOptions) {
+function sortedQuery(params: Record<string, string | number | boolean>) {
+  return Object.entries(params)
+    .map(([key, value]) => [String(key), String(value)] as const)
+    .sort(([keyA, valueA], [keyB, valueB]) => keyA.localeCompare(keyB) || valueA.localeCompare(valueB))
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
+}
+
+export function buildCodeforcesApiSignature(
+  methodName: string,
+  params: Record<string, string | number | boolean>,
+  apiSecret: string,
+  randomPrefix: string,
+) {
+  const query = sortedQuery(params);
+  return `${randomPrefix}${createHash('sha512')
+    .update(`${randomPrefix}/${methodName}?${query}#${apiSecret}`)
+    .digest('hex')}`;
+}
+
+async function resolveCodeforcesApiCredentials(options: CodeforcesFetchOptions): Promise<CodeforcesApiCredentials> {
+  let apiKey = normalizeText(options.apiKey, 200);
+  let apiSecret = normalizeText(options.apiSecret, 1000);
+  if ((!apiKey || !apiSecret) && options.credentialProvider) {
+    let provided: CodeforcesApiCredentials | null;
+    try {
+      provided = await options.credentialProvider();
+    } catch {
+      throw new CodeforcesApiError(
+        'CODEFORCES_CREDENTIALS_UNAVAILABLE',
+        'Saved Codeforces API credentials could not be decrypted or loaded.',
+        503,
+      );
+    }
+    apiKey = normalizeText(provided?.apiKey, 200);
+    apiSecret = normalizeText(provided?.apiSecret, 1000);
+  }
+  if (!apiKey || !apiSecret) {
+    throw new CodeforcesApiError(
+      'CODEFORCES_CREDENTIALS_MISSING',
+      'Codeforces API key and secret are required for an authenticated API retry.',
+      428,
+    );
+  }
+  return { apiKey, apiSecret };
+}
+
+async function requestCodeforcesApiStandings(
+  contestId: string,
+  options: CodeforcesFetchOptions,
+  signed = false,
+) {
+  const methodName = 'contest.standings';
+  const requestParams: Record<string, string | number | boolean> = { contestId };
+  if (signed) {
+    const credentials = await resolveCodeforcesApiCredentials(options);
+    const randomPrefix = (options.randomPrefix || (() => randomBytes(3).toString('hex')))()
+      .slice(0, 6)
+      .padEnd(6, '0');
+    requestParams.apiKey = credentials.apiKey;
+    requestParams.showUnofficial = false;
+    requestParams.time = (options.nowSeconds || (() => Math.floor(Date.now() / 1000)))();
+    requestParams.apiSig = buildCodeforcesApiSignature(
+      methodName,
+      requestParams,
+      credentials.apiSecret,
+      randomPrefix,
+    );
+  }
   return runCodeforcesApiRequest(async () => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    const url = new URL(`${CODEFORCES_API_BASE}/contest.standings`);
-    // Codeforces requires public regular standings requests to contain only contestId.
-    url.searchParams.set('contestId', contestId);
+    const url = new URL(`${CODEFORCES_API_BASE}/${methodName}`);
+    url.search = sortedQuery(requestParams);
     try {
       const response = await (options.fetchImpl || fetch)(url, {
         method: 'GET',
@@ -187,6 +267,7 @@ async function requestCodeforcesApiStandings(contestId: string, options: Codefor
             : 'CODEFORCES_API_UNAVAILABLE',
           comment || `Codeforces API returned HTTP ${response.status}.`,
           response.status === 429 ? 429 : 502,
+          comment,
         );
       }
       return payload.result;
@@ -1188,9 +1269,11 @@ async function fetchCodeforcesNumericRank(
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
 ): Promise<CodeforcesServiceResult> {
+  let normalized: any = null;
+  let apiError: any = null;
   try {
-    const raw = await requestCodeforcesApiStandings(contestId, options);
-    const normalized: any = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
+    const raw = await requestCodeforcesApiStandings(contestId, options, false);
+    normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
     if (normalized.error) {
       throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
     }
@@ -1201,6 +1284,55 @@ async function fetchCodeforcesNumericRank(
         422,
       );
     }
+  } catch (error: any) {
+    apiError = error;
+    try {
+      const raw = await requestCodeforcesApiStandings(contestId, options, true);
+      normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
+      if (normalized.error) {
+        throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
+      }
+      if (Array.isArray(options.targetHandles) && normalized.teams.length === 0) {
+        throw new CodeforcesApiError(
+          'CODEFORCES_API_NO_CLASSROOM_HANDLES',
+          'The authenticated API standings did not contain a classroom handle.',
+          422,
+        );
+      }
+      normalized.providerMeta = {
+        ...(normalized.providerMeta || {}),
+        authenticated: true,
+      };
+    } catch (signedError: any) {
+      apiError = signedError;
+      normalized = null;
+    }
+  }
+
+  if (!normalized) {
+    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
+    if (fallback.statusCode === 200) {
+      fallback.body.providerMeta = {
+        ...(fallback.body.providerMeta || {}),
+        apiFallbackCode: apiError instanceof CodeforcesApiError
+          ? apiError.code
+          : 'CODEFORCES_API_UNEXPECTED_ERROR',
+      };
+      return fallback;
+    }
+    if (
+      apiError instanceof CodeforcesApiError
+      && (
+        fallback.body?.code === 'CODEFORCES_WEB_SESSION_MISSING'
+        || fallback.body?.code === 'CODEFORCES_WEB_SESSION_INVALID'
+      )
+    ) {
+      return serviceErrorToResult(apiError);
+    }
+    return fallback;
+  }
+
+  try {
     if (options.includeUpsolves) {
       const sourceKind = numericSourceKind(contestId);
       const upsolveSubmissions = await fetchCodeforcesWebUpsolveSubmissions(
@@ -1217,21 +1349,12 @@ async function fetchCodeforcesNumericRank(
     }
     return { statusCode: 200, body: normalized };
   } catch (error: any) {
-    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
-    if (fallback.statusCode === 200) {
-      fallback.body.providerMeta = {
-        ...(fallback.body.providerMeta || {}),
-        apiFallbackCode: error instanceof CodeforcesApiError
-          ? error.code
-          : 'CODEFORCES_API_UNEXPECTED_ERROR',
-      };
-    }
-    return fallback;
+    return serviceErrorToResult(error);
   }
 }
 
 function serviceErrorToResult(error: any): CodeforcesServiceResult {
-  if (error instanceof CodeforcesWebError) {
+  if (error instanceof CodeforcesWebError || error instanceof CodeforcesApiError) {
     return {
       statusCode: error.statusCode,
       body: {

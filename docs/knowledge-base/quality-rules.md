@@ -1,13 +1,13 @@
 # Quality Rules
 
-## 2026-09-02 - Codeforces Crawling Must Stay Session-Only and Bounded
+## 2026-09-04 - Codeforces Access Must Be Ordered, Secret-Safe, and Bounded
 
 Source:
 - `server/src/services/codeforcesContestService.ts`
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Rule:
-Classroom Codeforces fetches must use only a transient JSESSIONID and fixed-origin friends/read-list HTML. Construct regular numeric paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound timeout, response size, page count, and concurrency; require an accessible standings table; detect points/hacks versus solved/penalty layouts; and retain only explicit classroom target handles before snapshot persistence. Never persist or return the session. Optional numeric upsolves may additionally use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
+Numeric classroom Codeforces fetches must preserve this order: anonymous official API with exactly `contestId`, a lazily loaded signed API retry using the trainer's encrypted credentials, then transient-JSESSIONID fixed-origin friends HTML. EDU remains crawl-only. Construct regular numeric crawl paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound API/crawl timeout, response size, page count, and concurrency; and retain only explicit classroom target handles before snapshot persistence. Never persist or return the browser session. Optional numeric upsolves may additionally use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
 
 Because Codeforces blocks Bun's native HTTP fingerprint on numeric friends standings, production requests use `curl` without a shell. Supply JSESSIONID through curl's stdin configuration rather than process arguments, keep injected fetch clients for tests, cap response bytes and time, and treat provider 403/503 responses as temporary blocking rather than invalid API credentials.
 
@@ -15,7 +15,7 @@ Applies when:
 Changing numeric Codeforces source routing, standings parsing, Codeforces web-session transport, or classroom snapshot persistence.
 
 Do not overgeneralize:
-Do not crawl arbitrary URLs, call Codeforces standings APIs, accept API credentials, retain unrelated friends, create absent participants from submission history, or turn the browser session into a stored provider credential.
+Do not crawl arbitrary URLs, add signed parameters to the first anonymous request, retain unrelated participants, create absent participants from submission history, expose saved API secrets, or turn the browser session into a stored provider credential.
 
 ## 2026-09-02 - Contest Report View Modes Stay Presentational
 
@@ -130,7 +130,7 @@ Changing classroom contest report generation, TFC/TSC aggregation, demerits, pro
 Do not overgeneralize:
 Do not migrate unrelated global reports to this identity model without a separate compatibility plan, and do not break saved legacy classroom reports that lack the new fields.
 
-## 2026-08-10 - Provider Secrets Stay Server-Only (Codeforces Portion Superseded)
+## 2026-09-04 - Provider Secrets Stay Server-Only
 
 Source:
 - `server/src/services/codeforcesContestService.ts`
@@ -138,13 +138,13 @@ Source:
 - `client/src/app/api/classroom/[id]/contests/[...path]/route.js`
 
 Rule:
-External contest provider secrets must stay server-only. The Codeforces API-first path is anonymous and must use exactly `contestId`; it does not restore API key/secret or OAuth collection, storage, endpoints, or decryption. Browser/Next proxy code may forward provider-specific browser session cookies only for the existing authorized crawl fallback, and it must never log or return them.
+External contest provider secrets must stay server-only. Codeforces API keys and secrets are accepted only by protected classroom-manager endpoints, encrypted independently with AES-256-GCM under a dedicated server environment key, returned only as connection metadata/key hint, and decrypted lazily for signed API requests. The first API request remains anonymous with exactly `contestId`. Browser/Next proxy code may forward provider-specific browser session cookies only for the existing authorized crawl fallback, and it must never log or return them.
 
 Applies when:
 Changing Codeforces fetches, external contest provider sessions, classroom contest proxies, deployment environment setup, or error handling around provider access.
 
 Do not overgeneralize:
-Do not reintroduce Codeforces API credentials, add `NEXT_PUBLIC_` provider sessions, persist JSESSIONID, create reveal-session endpoints, or add diagnostic logging that prints env values or trainer-provided sessions.
+Do not add `NEXT_PUBLIC_` provider secrets, persist JSESSIONID, create reveal-secret/session endpoints, reuse the credential-encryption key for unrelated purposes, or add diagnostic logging that prints env values or trainer-provided credentials.
 
 ## 2026-08-10 - Unmapped Codeforces Rows Must Not Become Report Identities
 

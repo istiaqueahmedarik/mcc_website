@@ -1,5 +1,7 @@
 # Classroom Codeforces API-First Fallback RSD
 
+> Superseded in part on 2026-09-04: saved signed API credentials are now retried after anonymous API failure and before web crawling. The anonymous-first requirement remains current.
+
 ## Requirement
 
 For numeric classroom Codeforces contests, try the official API first and use the authenticated HTML crawler only as fallback. Keep EDU lesson standings on the existing authenticated crawler. Determine whether Codeforces OAuth improves this workflow.

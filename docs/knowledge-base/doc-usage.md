@@ -1,5 +1,19 @@
 # Doc Usage
 
+## 2026-09-04 - classroom-codeforces-signed-api-before-crawl - Implementation Docs Used
+
+Source:
+- `docs/reviews/classroom-codeforces-signed-api-before-crawl-20260904-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom contest knowledge base, the required interface/Apple/Emil, Context7, Supabase, and Postgres skills, official Codeforces API authentication/signature guidance, current Supabase RLS guidance and changelog, read-only live table/grant inspection, and the current provider service/controller/routes/UI. These inputs preserved anonymous-first behavior, restored per-trainer signed API access without exposing secrets, and retained the bounded crawl fallback.
+
+Applies when:
+Auditing the restored Codeforces API credential input, signed request order, encrypted storage, or the combined provider access dialog.
+
+Do not overgeneralize:
+No real trainer credential was replayed, no live signed Codeforces request was made, no database row was mutated, and production deployment/browser verification remain pending.
+
 ## 2026-09-02 - trainer-contest-report-compact-mode - Implementation Docs Used
 
 Source:
@@ -51,10 +65,10 @@ Fact:
 This task used `AGENTS.md`, the project knowledge base, the required `supabase`, `supabase-postgres-best-practices`, `interface-design`, `apple-design`, `emil-design-eng`, and `context7` skills, Context7 React form/accessibility docs, current Supabase changelog/RLS/privilege guidance, Vercel Web Interface Guidelines, official Codeforces API help/method docs for authentication/rate-limit/`contest.standings`, and current classroom contest controller/service/UI source.
 
 Applies when:
-Auditing the historical 2026-08-10 classroom Codeforces API-credential implementation. The 2026-09-02 session-only decision supersedes those credential and API-fetch details.
+Auditing the historical 2026-08-10 classroom Codeforces API-credential implementation. The 2026-09-04 decision restores a narrower anonymous-then-signed-then-crawl flow; use its current RSD and review for rollout guidance.
 
 Do not overgeneralize:
-Do not use this historical entry as current rollout guidance. Current classroom Codeforces fetching requires an HTTP-only JSESSIONID and no Codeforces credential-encryption environment variable.
+Do not use this historical entry as current rollout guidance. Current classroom Codeforces fetching can use encrypted API credentials for signed retries and uses HTTP-only JSESSIONID only for crawling.
 
 ## 2026-08-10 - admin-full-user-csv-20260810 - Docs Used
 

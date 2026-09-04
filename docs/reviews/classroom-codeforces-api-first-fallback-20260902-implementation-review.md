@@ -1,5 +1,7 @@
 # Classroom Codeforces API-First Fallback Implementation Review
 
+> Superseded in part on 2026-09-04 by `classroom-codeforces-signed-api-before-crawl-20260904-implementation-review.md`.
+
 ## Review Flow
 
 1. `server/src/services/codeforcesContestService.ts` adds a throttled, bounded anonymous `contest.standings` request containing only `contestId`.

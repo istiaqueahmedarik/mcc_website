@@ -1,8 +1,12 @@
 # Project Index
 
+## 2026-09-04 - Codeforces Signed API Credentials and Crawl Fallback
+
+Trainer-managed Codeforces access is exposed in `client/src/components/ClassroomContestPanel.jsx` through one compact dialog with separate API key/secret and JSESSIONID sections. Protected GET/PUT/DELETE credential endpoints are registered in `server/src/routes/classroomRoute.ts` and implemented in `server/src/controllers/classroomContestController.ts`; they return only connection state, key hint, and timestamps. `server/src/utils/codeforcesCredentialCrypto.ts` encrypts each value with AES-256-GCM under the dedicated server key. For numeric contests, `server/src/services/codeforcesContestService.ts` tries anonymous API, saved signed API, then bounded authenticated crawling; EDU remains crawl-only. The existing `classroom_codeforces_credentials` table was verified with RLS enabled and no anon/authenticated DML grants, so no schema migration was needed.
+
 ## 2026-09-02 - Codeforces API-First Numeric Standings With Web Fallback
 
-`server/src/services/codeforcesContestService.ts` now requests the anonymous official `contest.standings` API first for numeric sources, using exactly `contestId`, process-wide 2.1-second throttling, bounded responses, local normalization, and classroom-handle filtering. API failure or a response without a classroom handle falls back to the existing authenticated `/contest/{id}/standings/friends/true` or `/gym/{id}/standings/friends/true` crawler. EDU sources remain constrained authenticated friends/read-list crawls. Public API success does not require JSESSIONID; fallback and opt-in web upsolve discovery do. API keys/secrets and OAuth are not collected or stored. Coverage lives in `server/src/services/codeforcesContestService.test.ts`.
+`server/src/services/codeforcesContestService.ts` requests the anonymous official `contest.standings` API first for numeric sources, using exactly `contestId`, process-wide 2.1-second throttling, bounded responses, local normalization, and classroom-handle filtering. The 2026-09-04 entry above supersedes the former direct web fallback: a saved signed API request is now attempted before the authenticated crawler. EDU sources remain constrained authenticated friends/read-list crawls.
 
 ## 2026-09-02 - Trainer Contest Report Compact Mode
 
@@ -104,7 +108,7 @@ Source:
 - `docs/decisions/trainer-classroom-codeforces-contests-20260810-technical-decisions.md`
 
 Fact:
-Classroom contest reports support mixed VJudge and Codeforces contest items inside the classroom-private workflow. Provider adapters live in `server/src/services/classroomContestRankService.ts` and `server/src/services/codeforcesContestService.ts`; classroom persistence and report generation stay in `server/src/controllers/classroomContestController.ts`; trainer/student UI stays in `client/src/components/ClassroomContestPanel.jsx`; report display compatibility stays in `client/src/components/ReportTable.js`; rollout SQL is split into `docs/sql/trainer-classroom-codeforces-contests-20260810-expand.sql` and `docs/sql/trainer-classroom-codeforces-contests-20260810-contract.sql`. The 2026-09-02 session-only change removed the application credential endpoints and encrypted-credential helper.
+Classroom contest reports support mixed VJudge and Codeforces contest items inside the classroom-private workflow. Provider adapters live in `server/src/services/classroomContestRankService.ts` and `server/src/services/codeforcesContestService.ts`; classroom persistence and report generation stay in `server/src/controllers/classroomContestController.ts`; trainer/student UI stays in `client/src/components/ClassroomContestPanel.jsx`; report display compatibility stays in `client/src/components/ReportTable.js`; rollout SQL is split into `docs/sql/trainer-classroom-codeforces-contests-20260810-expand.sql` and `docs/sql/trainer-classroom-codeforces-contests-20260810-contract.sql`. The 2026-09-04 signed-API change restores the protected credential endpoints and encrypted-credential helper.
 
 Applies when:
 Maintaining classroom contest provider selection, Codeforces standings fetches, Codeforces web-session setup, classroom contest snapshots, provider-aware handle overrides, contest demerits, mixed-provider report generation, report table identity/profile display, or classroom-only Codeforces rollout.

@@ -1,5 +1,21 @@
 # Patterns
 
+## 2026-09-04 - Lazy Signed Codeforces API Retry
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `server/src/utils/codeforcesCredentialCrypto.ts`
+
+Pattern:
+Keep the first public standings request anonymous and minimal. Only after it is unusable, lazily load the classroom manager's encrypted credentials, generate a Codeforces SHA-512 `apiSig` from sorted parameters, and retry the same normalized/filtering path. If signed access is unavailable or fails, use the fixed-origin bounded web crawler. Credential management endpoints must be manager-authorized and return metadata only; decrypt only server-side at the point of use.
+
+Applies when:
+Maintaining classroom Codeforces signed requests, provider fallback order, credential lifecycle, or failure metadata.
+
+Do not overgeneralize:
+Do not put secrets into logs, client state, snapshots, or report payloads; do not load credentials for successful anonymous requests; and do not use this persistence model for JSESSIONID.
+
 ## 2026-09-02 - Numeric Codeforces API-First Fallback
 
 Source:
@@ -7,13 +23,13 @@ Source:
 - `server/src/services/codeforcesContestService.test.ts`
 
 Pattern:
-For a numeric classroom Codeforces source, try anonymous `contest.standings` with only `contestId`, enforce the provider rate and response limits, normalize the official rows, and discard non-classroom handles before persistence. Fall back to the fixed-origin authenticated friends HTML view only when the API fails or yields no classroom handle. Keep fallback metadata to a non-sensitive error code. EDU remains crawl-only, and web-session values never enter logs, snapshots, or API URLs.
+For a numeric classroom Codeforces source, try anonymous `contest.standings` with only `contestId`, enforce the provider rate and response limits, normalize the official rows, and discard non-classroom handles before persistence. The 2026-09-04 pattern above inserts a lazy signed API retry before the fixed-origin authenticated friends HTML view. Keep fallback metadata to a non-sensitive error code. EDU remains crawl-only, and web-session values never enter logs, snapshots, or API URLs.
 
 Applies when:
 Maintaining classroom numeric Codeforces fetching, API failure behavior, Gym fallback, or provider snapshot filtering.
 
 Do not overgeneralize:
-Do not send handles or other optional parameters on the anonymous public standings request, silently persist the full API ranklist, or add credential/OAuth persistence for this fallback.
+Do not send handles or other optional parameters on the anonymous public standings request, silently persist the full API ranklist, or add OAuth persistence.
 
 ## 2026-09-01 - Authenticated Provider HTML As A Bounded Adapter
 
@@ -29,7 +45,7 @@ Applies when:
 Maintaining Codeforces EDU crawling or adding a similarly constrained authenticated provider source to classroom snapshots.
 
 Do not overgeneralize:
-Do not accept arbitrary URLs, persist full third-party standings, log session values, silently convert access failures to empty snapshots, or add a Codeforces API credential fallback.
+Do not accept arbitrary URLs, persist full third-party standings, log session values, silently convert access failures to empty snapshots, or use saved API credentials in crawl requests.
 
 ## 2026-08-17 - Shared Visible And Contextual Commands
 
@@ -75,7 +91,7 @@ Applies when:
 Maintaining Codeforces standings fetches, public/Gym source routing, web-session handling, layout parsing, or classroom snapshot filtering.
 
 Do not overgeneralize:
-Do not call signed or anonymous Codeforces standings APIs, accept API keys/secrets, crawl group/mashup or arbitrary paths, count unrelated friends, invent absent participants, or silently enable Codeforces upsolves.
+This historical crawler-specific pattern does not define the current API ordering. Do not crawl group/mashup or arbitrary paths, count unrelated friends, invent absent participants, or silently enable Codeforces upsolves.
 
 ## 2026-08-10 - Codeforces Unmapped Row Review
 
