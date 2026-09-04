@@ -1,5 +1,20 @@
 # Patterns
 
+## 2026-09-04 - Preserve Numeric API Rows Until Classroom Mapping
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Pattern:
+Successful numeric Codeforces API responses retain every official contestant row in the snapshot and record how many rows matched the requested classroom handles. Resolve verified handles and overrides after normalization, expose unresolved rows to the trainer mapping workflow, and filter generated reports to mapped classroom identities. Keep EDU and HTML crawling target-filtered because their pagination bounds depend on the requested handles.
+
+Applies when:
+Changing numeric Codeforces snapshot persistence, classroom handle mapping, unmatched-row review, or report membership filtering.
+
+Do not overgeneralize:
+Do not include practice/unofficial rows, admit unmapped identities into reports, remove response bounds, or broaden EDU/HTML crawls.
+
 ## 2026-09-04 - Preserve the Actionable Upstream Failure
 
 Source:
@@ -7,7 +22,7 @@ Source:
 - `server/src/services/codeforcesContestService.test.ts`
 
 Pattern:
-When an ordered provider strategy exhausts multiple transports, return the failure from the preferred authenticated transport if credentials were actually available, and attach only a bounded non-sensitive code for the later fallback. If the preferred response was valid but contained no requested classroom identities, return that mapping error without trying a less authoritative transport. Before returning provider comments, literally remove request credentials and signatures. If authenticated credentials were missing, preserve the fallback transport's own result.
+When an ordered provider strategy exhausts multiple transports, return the failure from the preferred authenticated transport if credentials were actually available, and attach only a bounded non-sensitive code for the later fallback. Before returning provider comments, literally remove request credentials and signatures. If authenticated credentials were missing, preserve the fallback transport's own result. A valid numeric API response with zero classroom matches is data for the mapping workflow, not a provider failure.
 
 Applies when:
 Maintaining Codeforces signed API errors, crawl fallback errors, or trainer-facing provider diagnostics.
@@ -130,7 +145,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Pattern:
-Codeforces web fetches filter to verified or explicitly overridden classroom target handles before persistence. Existing handle overrides still resolve a returned handle to a classroom student/group or explicitly ignore it; `ignore` overrides have no student/group target and no `identityKey`.
+Codeforces EDU and numeric web fetches filter to verified or explicitly overridden classroom target handles before persistence. Numeric API fetches retain official rows so the trainer can review unresolved handles. Existing handle overrides resolve a returned handle to a classroom student/group or explicitly ignore it; `ignore` overrides have no student/group target and no `identityKey`.
 
 Applies when:
 Changing classroom Codeforces snapshot persistence, handle override targets, report generation, trainer mapping UI, or unmapped standings review.

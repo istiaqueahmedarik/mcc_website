@@ -1,5 +1,7 @@
 # Classroom Codeforces Signed API Before Crawl Implementation Review
 
+> Superseded in part on 2026-09-04 by `classroom-codeforces-unmapped-api-snapshots-20260904-implementation-review.md`: successful numeric API results now retain official rows for trainer mapping.
+
 ## Review Flow
 
 1. `server/src/utils/codeforcesCredentialCrypto.ts` owns AES-256-GCM encryption, decryption, key validation, randomized IVs, and safe key hints.

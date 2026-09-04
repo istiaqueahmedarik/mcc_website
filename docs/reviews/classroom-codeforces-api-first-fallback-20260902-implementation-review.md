@@ -1,6 +1,6 @@
 # Classroom Codeforces API-First Fallback Implementation Review
 
-> Superseded in part on 2026-09-04 by `classroom-codeforces-signed-api-before-crawl-20260904-implementation-review.md`.
+> Superseded in part on 2026-09-04 by `classroom-codeforces-signed-api-before-crawl-20260904-implementation-review.md` and `classroom-codeforces-unmapped-api-snapshots-20260904-implementation-review.md`. Anonymous-first routing remains current; API pre-persistence target filtering does not.
 
 ## Review Flow
 

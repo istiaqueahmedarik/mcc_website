@@ -1,8 +1,12 @@
 # Project Index
 
+## 2026-09-04 - Codeforces Numeric API Snapshots Support Unmapped Review
+
+`server/src/services/codeforcesContestService.ts` now retains every official `CONTESTANT` row returned by successful anonymous or signed numeric Codeforces standings. It records requested classroom-handle and matching-row counts in non-sensitive provider metadata rather than failing when the count is zero. `server/src/controllers/classroomContestController.ts` continues to attach classroom mappings to snapshots, expose unmatched rows to the trainer Handle Mappings dialog, and exclude unmapped/ignored identities from generated classroom reports. EDU and numeric HTML crawls remain bounded and classroom-handle filtered.
+
 ## 2026-09-04 - Codeforces Signed Failure Diagnostics
 
-When signed Codeforces standings succeed but contain no classroom handles, `server/src/services/codeforcesContestService.ts` returns that mapping error without an unnecessary HTML crawl. When saved credentials are available but both signed API standings and the authenticated HTML fallback fail, it returns the signed provider error and adds only the non-sensitive HTML fallback code. Any API key or `apiSig` echoed by Codeforces is redacted literally. Missing-credential requests retain the web error. Focused coverage is in `server/src/services/codeforcesContestService.test.ts`; deployment and authenticated retry are pending.
+When saved credentials are available but both signed API standings and the authenticated HTML fallback fail, `server/src/services/codeforcesContestService.ts` returns the signed provider error and adds only the non-sensitive HTML fallback code. Any API key or `apiSig` echoed by Codeforces is redacted literally. Missing-credential requests retain the web error. A valid API response with no roster-handle match is now handled by the unmapped-review flow above rather than as a provider failure.
 
 ## 2026-09-04 - Codeforces API-Native Upsolves
 
@@ -14,7 +18,7 @@ Trainer-managed Codeforces access is exposed in `client/src/components/Classroom
 
 ## 2026-09-02 - Codeforces API-First Numeric Standings With Web Fallback
 
-`server/src/services/codeforcesContestService.ts` requests the anonymous official `contest.standings` API first for numeric sources, using exactly `contestId`, process-wide 2.1-second throttling, bounded responses, local normalization, and classroom-handle filtering. The 2026-09-04 entry above supersedes the former direct web fallback: a saved signed API request is now attempted before the authenticated crawler. EDU sources remain constrained authenticated friends/read-list crawls.
+`server/src/services/codeforcesContestService.ts` requests the anonymous official `contest.standings` API first for numeric sources, using exactly `contestId`, process-wide 2.1-second throttling, bounded responses, and local normalization. Successful API snapshots retain official rows for mapping. The 2026-09-04 entries above supersede the former direct web fallback and pre-persistence API filtering: a saved signed API request is attempted before the authenticated crawler when anonymous access fails. EDU sources remain constrained authenticated friends/read-list crawls.
 
 ## 2026-09-02 - Trainer Contest Report Compact Mode
 

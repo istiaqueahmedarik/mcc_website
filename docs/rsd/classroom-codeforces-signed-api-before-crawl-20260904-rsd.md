@@ -1,5 +1,7 @@
 # Classroom Codeforces Signed API Before Crawl RSD
 
+> Superseded in part on 2026-09-04: successful numeric API snapshots retain all official rows for trainer mapping instead of failing when the current roster has no matching handle.
+
 ## Requirement
 
 Restore the trainer-facing Codeforces API key/secret input. For numeric classroom contests, keep the anonymous official API check first, retry through the signed API when saved credentials are available, and use the authenticated HTML crawler only as fallback. Keep EDU on the crawler.
@@ -12,7 +14,7 @@ Restore the trainer-facing Codeforces API key/secret input. For numeric classroo
 - Numeric fetching orders access as anonymous API, signed API, then constrained web crawl.
 - The anonymous request contains exactly `contestId`; the signed request uses sorted Codeforces parameters and a SHA-512 `apiSig` without exposing the secret.
 - Credentials are loaded lazily, so a successful anonymous request neither reads nor uses them.
-- Existing rate, timeout, response-size, classroom-handle filtering, EDU crawl, and upsolve bounds remain in force.
+- Existing rate, timeout, response-size, EDU/web classroom-handle filtering, and upsolve bounds remain in force.
 - JSESSIONID remains transient and HTTP-only rather than database-persisted.
 - Codeforces OAuth is not added because it does not replace the documented API key/secret signature scheme.
 
@@ -29,4 +31,3 @@ Restore the trainer-facing Codeforces API key/secret input. For numeric classroo
 - Persisting Codeforces browser sessions.
 - Changing VJudge behavior, report scoring, snapshot schema, or global contest routes.
 - Production deployment or process restart.
-

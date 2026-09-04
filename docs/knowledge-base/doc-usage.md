@@ -1,5 +1,20 @@
 # Doc Usage
 
+## 2026-09-04 - classroom-codeforces-unmapped-api-snapshots - Implementation Docs Used
+
+Source:
+- `docs/rsd/classroom-codeforces-unmapped-api-snapshots-20260904-rsd.md`
+- `docs/reviews/classroom-codeforces-unmapped-api-snapshots-20260904-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom contest knowledge base, Context7 discovery, the Supabase safety skill and current changelog, official Codeforces API method documentation, read-only live roster/contest inspection, and a redacted signed standings comparison. These inputs established that private-Gym access succeeded, the sole verified classroom handle appeared in neither official nor practice rows, and the pre-snapshot target filter blocked the existing trainer mapping workflow.
+
+Applies when:
+Auditing numeric Codeforces snapshot retention, a zero-handle-match fetch, or the trainer unmatched-handle workflow.
+
+Do not overgeneralize:
+No provider credential value or unrelated participant row is documented, no classroom identity was guessed, and production deployment remains a separate step.
+
 ## 2026-09-04 - classroom-codeforces-signed-failure-diagnostics - Implementation Docs Used
 
 Source:

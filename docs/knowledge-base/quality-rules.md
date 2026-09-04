@@ -7,7 +7,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Rule:
-Numeric classroom Codeforces fetches must preserve this order: anonymous official API with exactly `contestId`, a lazily loaded signed API retry using the trainer's encrypted credentials, then transient-JSESSIONID fixed-origin friends HTML. EDU remains crawl-only. Construct regular numeric crawl paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound API/crawl timeout, response size, page count, and concurrency; and retain only explicit classroom target handles before snapshot persistence. Never persist or return the browser session. Optional numeric upsolves must follow the successful standings transport: API-origin standings use bounded `contest.status` paging in the same anonymous/signed mode, while HTML-origin standings may use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
+Numeric classroom Codeforces fetches must preserve this order: anonymous official API with exactly `contestId`, a lazily loaded signed API retry using the trainer's encrypted credentials, then transient-JSESSIONID fixed-origin friends HTML. EDU remains crawl-only. Construct regular numeric crawl paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound API/crawl timeout, response size, page count, and concurrency. Successful numeric API snapshots retain official contestant rows for trainer mapping, while EDU/HTML snapshots retain only explicit classroom target handles. Never persist or return the browser session. Optional numeric upsolves must follow the successful standings transport: API-origin standings use bounded `contest.status` paging in the same anonymous/signed mode, while HTML-origin standings may use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
 
 Because Codeforces blocks Bun's native HTTP fingerprint on numeric friends standings, production requests use `curl` without a shell. Supply JSESSIONID through curl's stdin configuration rather than process arguments, keep injected fetch clients for tests, cap response bytes and time, and treat provider 403/503 responses as temporary blocking rather than invalid API credentials.
 
@@ -17,7 +17,7 @@ Applies when:
 Changing numeric Codeforces source routing, standings parsing, Codeforces web-session transport, or classroom snapshot persistence.
 
 Do not overgeneralize:
-Do not crawl arbitrary URLs, add signed parameters to the first anonymous request, retain unrelated participants, create absent participants from submission history, expose saved API secrets, or turn the browser session into a stored provider credential.
+Do not crawl arbitrary URLs, add signed parameters to the first anonymous request, retain unofficial/practice participants, admit unmapped API rows into classroom reports, create absent participants from submission history, expose saved API secrets, or turn the browser session into a stored provider credential.
 
 ## 2026-09-02 - Contest Report View Modes Stay Presentational
 

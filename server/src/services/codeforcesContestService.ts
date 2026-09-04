@@ -334,13 +334,20 @@ export function normalizeCodeforcesApiStandings(raw: any, problemWeights?: numbe
   const targetSet = Array.isArray(targetHandles)
     ? new Set(targetHandles.map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean))
     : null;
+  const classroomHandleMatchCount = targetSet
+    ? officialRows.filter((row: any) => (
+      Array.isArray(row?.party?.members)
+      && row.party.members.some((member: any) => targetSet.has(normalizeText(member?.handle, 120).toLowerCase()))
+    )).length
+    : null;
 
+  // Numeric API snapshots retain official rows so trainers can review and map
+  // handles that are not yet present in the verified classroom roster.
   const teams = officialRows.map((row: any) => {
     const party = row.party || {};
     const sourceHandles = Array.isArray(party.members)
       ? party.members.map((member: any) => normalizeText(member?.handle, 120)).filter(Boolean)
       : [];
-    if (targetSet && !sourceHandles.some((handle: string) => targetSet.has(handle.toLowerCase()))) return null;
     const teamName = normalizeText(party.teamName, 180);
     const username = teamName || sourceHandles[0] || `rank-${row.rank}`;
     const problemResults = Array.isArray(row.problemResults) ? row.problemResults : [];
@@ -397,7 +404,7 @@ export function normalizeCodeforcesApiStandings(raw: any, problemWeights?: numbe
         sourceType: 'contest-api',
       },
     };
-  }).filter(Boolean);
+  });
 
   return {
     contestInfo: {
@@ -428,6 +435,8 @@ export function normalizeCodeforcesApiStandings(raw: any, problemWeights?: numbe
       contestId: String(contest.id),
       fullParticipantCount: officialRows.length,
       officialParticipantCount: officialRows.length,
+      requestedClassroomHandleCount: targetSet?.size ?? null,
+      classroomHandleMatchCount,
       hasCustomWeights,
       includeUpsolves: false,
     },
@@ -1369,13 +1378,6 @@ async function fetchCodeforcesNumericRank(
     if (normalized.error) {
       throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
     }
-    if (Array.isArray(options.targetHandles) && normalized.teams.length === 0) {
-      throw new CodeforcesApiError(
-        'CODEFORCES_API_NO_CLASSROOM_HANDLES',
-        'The public API standings did not contain a classroom handle.',
-        422,
-      );
-    }
   } catch (error: any) {
     apiError = error;
     try {
@@ -1383,13 +1385,6 @@ async function fetchCodeforcesNumericRank(
       normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
       if (normalized.error) {
         throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
-      }
-      if (Array.isArray(options.targetHandles) && normalized.teams.length === 0) {
-        throw new CodeforcesApiError(
-          'CODEFORCES_API_NO_CLASSROOM_HANDLES',
-          'The authenticated API standings did not contain a classroom handle.',
-          422,
-        );
       }
       normalized.providerMeta = {
         ...(normalized.providerMeta || {}),
@@ -1403,12 +1398,6 @@ async function fetchCodeforcesNumericRank(
   }
 
   if (!normalized) {
-    if (
-      apiError instanceof CodeforcesApiError
-      && apiError.code === 'CODEFORCES_API_NO_CLASSROOM_HANDLES'
-    ) {
-      return serviceErrorToResult(apiError);
-    }
     const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
     if (fallback.statusCode === 200) {
       fallback.body.providerMeta = {

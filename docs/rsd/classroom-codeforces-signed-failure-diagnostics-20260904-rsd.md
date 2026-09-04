@@ -1,5 +1,7 @@
 # Classroom Codeforces Signed Failure Diagnostics RSD
 
+> Superseded in part on 2026-09-04: a valid numeric API response with no classroom-handle match is now retained as an official-row snapshot for trainer mapping. Signed-failure precedence and redaction remain current.
+
 ## Problem
 
 When signed Codeforces API standings fail and the later HTML fallback is blocked, the response exposes only `CODEFORCES_WEB_BLOCKED`. This masks the provider's signed API failure comment, which is the actionable evidence for an invalid key, signature, time, source restriction, or missing private-Gym access.
@@ -11,7 +13,7 @@ If saved credentials were available and the signed API attempt failed, prefer th
 ## Acceptance Criteria
 
 - A failed signed API attempt followed by a failed web fallback returns the signed API code/message.
-- A successful signed API response with no classroom handles returns that mapping error without making an unnecessary HTML request.
+- A successful signed API response with no classroom handles remains successful and does not make an unnecessary HTML request.
 - The response includes the web fallback code but not its session, API key, API secret, signature, URL, or response body.
 - A credentials-missing request followed by a blocked web fallback still returns `CODEFORCES_WEB_BLOCKED`.
 - Successful API and successful web fallback behavior are unchanged.

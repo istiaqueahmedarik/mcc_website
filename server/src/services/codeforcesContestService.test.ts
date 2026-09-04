@@ -240,7 +240,7 @@ describe('Codeforces web standings sources', () => {
 });
 
 describe('fetchCodeforcesContestRank', () => {
-  test('uses the anonymous API first for a public numeric contest', async () => {
+  test('uses the anonymous API first and retains complete official standings', async () => {
     const requests: Array<{ url: string; cookie: string }> = [];
     let credentialProviderCalls = 0;
     const result = await fetchCodeforcesContestRank('2258', [2, 4], {
@@ -267,8 +267,41 @@ describe('fetchCodeforcesContestRank', () => {
     expect(credentialProviderCalls).toBe(0);
     expect(result.body.providerMeta.sourceType).toBe('contest-api');
     expect(result.body.fullParticipantCount).toBe(2);
-    expect(result.body.teams).toHaveLength(1);
+    expect(result.body.teams).toHaveLength(2);
     expect(result.body.teams[0].finalScore).toBe(4.8);
+    expect(result.body.providerMeta.requestedClassroomHandleCount).toBe(1);
+    expect(result.body.providerMeta.classroomHandleMatchCount).toBe(1);
+  });
+
+  test('retains unmatched public API rows without loading saved credentials', async () => {
+    const urls: string[] = [];
+    let credentialProviderCalls = 0;
+    const standings = apiStandings(['Bob']);
+    standings.rows.push({
+      ...standings.rows[0],
+      party: { participantType: 'PRACTICE', members: [{ handle: 'Charlie' }] },
+      rank: 2,
+    });
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        return apiOk(standings);
+      }) as any,
+      credentialProvider: async () => {
+        credentialProviderCalls += 1;
+        return { apiKey: 'unused-key', apiSecret: 'unused-secret' };
+      },
+      targetHandles: ['alice'],
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(urls).toHaveLength(1);
+    expect(credentialProviderCalls).toBe(0);
+    expect(result.body.teams.map((team: any) => team.username)).toEqual(['Bob']);
+    expect(result.body.fullParticipantCount).toBe(1);
+    expect(result.body.providerMeta.requestedClassroomHandleCount).toBe(1);
+    expect(result.body.providerMeta.classroomHandleMatchCount).toBe(0);
   });
 
   test('falls back to a high-number Gym friends URL when the anonymous API fails', async () => {
@@ -548,7 +581,7 @@ describe('fetchCodeforcesContestRank', () => {
     expect(JSON.stringify(result.body)).not.toContain('session-token');
   });
 
-  test('does not crawl HTML after signed standings contain no classroom handles', async () => {
+  test('retains signed API rows for trainer mapping when no classroom handle matches', async () => {
     const urls: string[] = [];
     const result = await fetchCodeforcesContestRank('708543', undefined, {
       fetchImpl: (async (url: RequestInfo | URL) => {
@@ -564,8 +597,11 @@ describe('fetchCodeforcesContestRank', () => {
       apiRateLimitMs: 0,
     });
 
-    expect(result.statusCode).toBe(422);
-    expect(result.body.code).toBe('CODEFORCES_API_NO_CLASSROOM_HANDLES');
+    expect(result.statusCode).toBe(200);
+    expect(result.body.teams.map((team: any) => team.username)).toEqual(['Bob']);
+    expect(result.body.providerMeta.authenticated).toBe(true);
+    expect(result.body.providerMeta.requestedClassroomHandleCount).toBe(1);
+    expect(result.body.providerMeta.classroomHandleMatchCount).toBe(0);
     expect(urls.map((url) => new URL(url).pathname)).toEqual([
       '/api/contest.standings',
       '/api/contest.standings',

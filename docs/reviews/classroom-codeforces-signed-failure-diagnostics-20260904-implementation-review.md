@@ -1,5 +1,7 @@
 # Classroom Codeforces Signed Failure Diagnostics Implementation Review
 
+> Superseded in part on 2026-09-04 by `classroom-codeforces-unmapped-api-snapshots-20260904-implementation-review.md`: a valid numeric API response with zero classroom matches is now retained for mapping. Signed-failure precedence and redaction remain current.
+
 ## Review Flow
 
 1. The deployed API-native upsolve revision was confirmed through GitHub Actions and the updated hosted error text.

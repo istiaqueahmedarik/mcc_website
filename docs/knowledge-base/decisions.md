@@ -1,5 +1,22 @@
 # Decisions
 
+## 2026-09-04 - classroom-codeforces-unmapped-api-snapshots - Retain Official Rows for Mapping
+
+Source:
+- `docs/rsd/classroom-codeforces-unmapped-api-snapshots-20260904-rsd.md`
+- `docs/reviews/classroom-codeforces-unmapped-api-snapshots-20260904-implementation-review.md`
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Decision:
+Successful numeric Codeforces API standings retain every official contestant row in the classroom snapshot even when no verified/overridden classroom handle matches. Provider metadata records requested and matching handle counts. Classroom mappings remain the authority for report membership, so unmapped and ignored rows are reviewable but cannot affect generated classroom results. EDU and HTML crawls remain target-filtered.
+
+Applies when:
+Changing numeric Codeforces normalization, snapshots, unmatched-handle review, or classroom report membership.
+
+Do not overgeneralize:
+Do not persist practice/unofficial rows, guess student ownership, automatically rewrite verified handles, or admit unmapped rows into reports.
+
 ## 2026-09-04 - classroom-codeforces-signed-failure-diagnostics - Prefer Signed Failure
 
 Source:
@@ -57,13 +74,13 @@ Source:
 - `server/src/services/codeforcesContestService.test.ts`
 
 Decision:
-For every numeric classroom Codeforces source, request the anonymous official `contest.standings` API first with exactly the `contestId` query parameter. Normalize and filter a successful public response to explicit classroom target handles before persistence. The 2026-09-04 signed-API decision supersedes this entry's direct jump from anonymous failure to web crawling; the anonymous-first, normalization, filtering, EDU, upsolve, and rate-limit rules remain current.
+For every numeric classroom Codeforces source, request the anonymous official `contest.standings` API first with exactly the `contestId` query parameter. The 2026-09-04 signed-API decision supersedes this entry's direct jump from anonymous failure to web crawling, and the unmapped-snapshot decision supersedes pre-persistence API filtering. Anonymous-first ordering, normalization, EDU/web target filtering, upsolve bounds, and rate limits remain current.
 
 Applies when:
 Changing numeric classroom Codeforces standings, API throttling/normalization, web fallback, provider sessions, or EDU fetching.
 
 Do not overgeneralize:
-Do not add extra query parameters to the first anonymous public `contest.standings` request, persist full external standings, introduce OAuth, or route EDU lessons through a nonexistent API method.
+Do not add extra query parameters to the first anonymous public `contest.standings` request, persist unofficial/practice rows, admit unmapped rows into reports, introduce OAuth, or route EDU lessons through a nonexistent API method.
 
 ## 2026-09-02 - classroom-codeforces-web-only-standings - Session-Only Codeforces Fetching
 

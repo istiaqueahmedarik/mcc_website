@@ -1,3 +1,18 @@
+## 2026-09-04 - Pre-Snapshot Filtering Blocked Handle Mapping
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+What happened:
+Numeric Codeforces API standings were filtered to verified/overridden classroom handles before persistence. When the configured handle had not participated, fetch failed with `CODEFORCES_API_NO_CLASSROOM_HANDLES`, so the trainer could not save a snapshot or use the existing unmatched-row mapping UI to connect the actual participant handle.
+
+Detection:
+A redacted signed comparison showed valid access and 23 official plus 15 practice rows, while the one active verified classroom handle appeared in neither set. Code review then exposed the circular dependency between pre-snapshot filtering and snapshot-backed handle discovery.
+
+Prevention:
+Retain bounded official numeric API rows through snapshot mapping, record match counts as metadata, and enforce classroom membership when generating reports. Keep focused regression coverage for zero-match anonymous and signed API responses.
+
 ## 2026-09-04 - Web Fallback Masked the Signed Codeforces Failure
 
 Source:
