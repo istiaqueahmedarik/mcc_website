@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-04 - Codeforces API-Native Upsolves
+
+Numeric Codeforces standings that succeed through the official API now keep opt-in upsolve collection on bounded `contest.status` paging, using the same anonymous or signed mode as the standings request. Only HTML-origin standings use per-handle HTML submission histories. This prevents private Gym fetches with upsolves from discarding a successful signed API result because Codeforces blocked the later HTML request. Implementation and focused coverage live in `server/src/services/codeforcesContestService.ts` and `server/src/services/codeforcesContestService.test.ts`; production deployment and authenticated live verification are pending.
+
 ## 2026-09-04 - Codeforces Signed API Credentials and Crawl Fallback
 
 Trainer-managed Codeforces access is exposed in `client/src/components/ClassroomContestPanel.jsx` through one compact dialog with separate API key/secret and JSESSIONID sections. Protected GET/PUT/DELETE credential endpoints are registered in `server/src/routes/classroomRoute.ts` and implemented in `server/src/controllers/classroomContestController.ts`; they return only connection state, key hint, and timestamps. `server/src/utils/codeforcesCredentialCrypto.ts` encrypts each value with AES-256-GCM under the dedicated server key. For numeric contests, `server/src/services/codeforcesContestService.ts` tries anonymous API, saved signed API, then bounded authenticated crawling; EDU remains crawl-only. The existing `classroom_codeforces_credentials` table was verified with RLS enabled and no anon/authenticated DML grants, so no schema migration was needed.

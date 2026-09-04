@@ -27,6 +27,7 @@ export type CodeforcesFetchOptions = {
   eduConcurrency?: number;
   eduMaxPages?: number;
   includeUpsolves?: boolean;
+  upsolvePageSize?: number;
   upsolveConcurrency?: number;
   upsolveMaxPages?: number;
 };
@@ -43,6 +44,8 @@ const DEFAULT_WEB_CONCURRENCY = 6;
 const DEFAULT_WEB_MAX_PAGES = 250;
 const DEFAULT_UPSOLVE_CONCURRENCY = 3;
 const DEFAULT_UPSOLVE_MAX_PAGES = 10;
+const DEFAULT_API_UPSOLVE_PAGE_SIZE = 2_000;
+const DEFAULT_API_UPSOLVE_MAX_PAGES = 25;
 const MAX_UPSOLVE_HANDLES = 200;
 
 let lastCodeforcesApiRequestAt = 0;
@@ -216,20 +219,19 @@ async function resolveCodeforcesApiCredentials(options: CodeforcesFetchOptions):
   return { apiKey, apiSecret };
 }
 
-async function requestCodeforcesApiStandings(
-  contestId: string,
+async function requestCodeforcesApi(
+  methodName: string,
+  params: Record<string, string | number | boolean>,
   options: CodeforcesFetchOptions,
   signed = false,
 ) {
-  const methodName = 'contest.standings';
-  const requestParams: Record<string, string | number | boolean> = { contestId };
+  const requestParams: Record<string, string | number | boolean> = { ...params };
   if (signed) {
     const credentials = await resolveCodeforcesApiCredentials(options);
     const randomPrefix = (options.randomPrefix || (() => randomBytes(3).toString('hex')))()
       .slice(0, 6)
       .padEnd(6, '0');
     requestParams.apiKey = credentials.apiKey;
-    requestParams.showUnofficial = false;
     requestParams.time = (options.nowSeconds || (() => Math.floor(Date.now() / 1000)))();
     requestParams.apiSig = buildCodeforcesApiSignature(
       methodName,
@@ -280,6 +282,19 @@ async function requestCodeforcesApiStandings(
       clearTimeout(timeout);
     }
   }, options);
+}
+
+function requestCodeforcesApiStandings(
+  contestId: string,
+  options: CodeforcesFetchOptions,
+  signed = false,
+) {
+  return requestCodeforcesApi(
+    'contest.standings',
+    signed ? { contestId, showUnofficial: false } : { contestId },
+    options,
+    signed,
+  );
 }
 
 function maxProblemPoints(problem: any) {
@@ -885,8 +900,8 @@ async function requestCodeforcesHtml(url: string, options: CodeforcesFetchOption
     throw new CodeforcesWebError(
       response.status === 403 || response.status === 503 ? 'CODEFORCES_WEB_BLOCKED' : 'CODEFORCES_WEB_HTTP_ERROR',
       response.status === 403 || response.status === 503
-        ? 'Codeforces blocked the standings request. Wait briefly, then reconnect the session.'
-        : `Codeforces standings returned HTTP ${response.status}.`,
+        ? 'Codeforces blocked the authenticated web request. Wait briefly, then reconnect the session.'
+        : `Codeforces authenticated web request returned HTTP ${response.status}.`,
       response.status === 403 || response.status === 503 ? 503 : 502,
     );
   }
@@ -1011,6 +1026,76 @@ function ensureClassroomFriends(teams: any[], targetHandles: string[] | undefine
   }
 }
 
+function codeforcesSubmissionHandles(submission: any): string[] {
+  return Array.isArray(submission?.author?.members)
+    ? submission.author.members
+      .map((member: any) => normalizeText(member?.handle, 120))
+      .filter(Boolean)
+    : [];
+}
+
+async function fetchCodeforcesApiUpsolveSubmissions(
+  contestId: string,
+  contestEndSeconds: number,
+  options: CodeforcesFetchOptions,
+  signed: boolean,
+) {
+  const targetSet = new Set(
+    (options.targetHandles || []).map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean),
+  );
+  if (targetSet.size === 0 || !contestEndSeconds) return [];
+  if (targetSet.size > MAX_UPSOLVE_HANDLES) {
+    throw new CodeforcesApiError(
+      'CODEFORCES_UPSOLVE_LIMIT',
+      `Codeforces upsolve fetching is limited to ${MAX_UPSOLVE_HANDLES} classroom handles per fetch.`,
+      422,
+    );
+  }
+
+  const pageSize = Math.max(1, Math.min(10_000, options.upsolvePageSize ?? DEFAULT_API_UPSOLVE_PAGE_SIZE));
+  const maxPages = Math.max(1, Math.min(100, options.upsolveMaxPages ?? DEFAULT_API_UPSOLVE_MAX_PAGES));
+  const submissions: CodeforcesWebSubmission[] = [];
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const raw = await requestCodeforcesApi(
+      'contest.status',
+      { contestId, from: page * pageSize + 1, count: pageSize },
+      options,
+      signed,
+    );
+    if (!Array.isArray(raw)) {
+      throw new CodeforcesApiError(
+        'CODEFORCES_API_INVALID_PAYLOAD',
+        'Codeforces contest status returned an invalid payload.',
+      );
+    }
+
+    let reachedContestWindow = false;
+    raw.forEach((submission: any) => {
+      const createdAt = toFiniteNumber(submission?.creationTimeSeconds, 0);
+      if (createdAt <= contestEndSeconds) {
+        reachedContestWindow = true;
+        return;
+      }
+      const handle = codeforcesSubmissionHandles(submission)
+        .find((candidate) => targetSet.has(candidate.toLowerCase()));
+      const id = toFiniteNumber(submission?.id, 0);
+      const problemIndex = normalizeText(submission?.problem?.index, 20);
+      const verdict = normalizeText(submission?.verdict, 80).toUpperCase();
+      if (!handle || !id || !problemIndex || !verdict) return;
+      submissions.push({ id, handle, problem: { index: problemIndex }, verdict });
+    });
+
+    if (reachedContestWindow || raw.length < pageSize) return submissions;
+  }
+
+  throw new CodeforcesApiError(
+    'CODEFORCES_UPSOLVE_LIMIT',
+    'Codeforces has too many post-contest submissions to calculate upsolves safely for this contest.',
+    422,
+  );
+}
+
 async function fetchCodeforcesWebUpsolveSubmissions(
   contestId: string,
   sourceKind: NumericSourceKind,
@@ -1067,6 +1152,7 @@ export function applyCodeforcesWebUpsolves(
   standings: any,
   submissions: CodeforcesWebSubmission[],
   hasCustomWeights = false,
+  includesContestAttempts = true,
 ) {
   if (!standings || !Array.isArray(standings.teams) || !Array.isArray(standings.problems)) return standings;
   if (!Array.isArray(submissions) || submissions.length === 0) return standings;
@@ -1082,7 +1168,7 @@ export function applyCodeforcesWebUpsolves(
     });
   });
 
-  const states = new Map<string, { failed: number; officialRejected: number }>();
+  const states = new Map<string, { failed: number; officialRejected: number; countedOfficialAttempts: number }>();
   const changedTeams = new Set<any>();
   submissions.slice().sort((left, right) => left.id - right.id).forEach((submission) => {
     const team = teamByHandle.get(submission.handle.toLowerCase());
@@ -1095,6 +1181,7 @@ export function applyCodeforcesWebUpsolves(
     const state = states.get(key) || {
       failed: 0,
       officialRejected: toFiniteNumber(current.rejectedAttemptCount, 0),
+      countedOfficialAttempts: includesContestAttempts ? toFiniteNumber(current.rejectedAttemptCount, 0) : 0,
     };
     if (submission.verdict !== 'OK') {
       if (submission.verdict !== 'TESTING' && submission.verdict !== 'SUBMITTED') state.failed += 1;
@@ -1102,7 +1189,7 @@ export function applyCodeforcesWebUpsolves(
       return;
     }
 
-    const additionalFailures = Math.max(0, state.failed - state.officialRejected);
+    const additionalFailures = Math.max(0, state.failed - state.countedOfficialAttempts);
     team.submissions[problemIndex] = {
       ...current,
       status: 1,
@@ -1271,6 +1358,7 @@ async function fetchCodeforcesNumericRank(
 ): Promise<CodeforcesServiceResult> {
   let normalized: any = null;
   let apiError: any = null;
+  let usedSignedApi = false;
   try {
     const raw = await requestCodeforcesApiStandings(contestId, options, false);
     normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
@@ -1303,6 +1391,7 @@ async function fetchCodeforcesNumericRank(
         ...(normalized.providerMeta || {}),
         authenticated: true,
       };
+      usedSignedApi = true;
     } catch (signedError: any) {
       apiError = signedError;
       normalized = null;
@@ -1334,18 +1423,27 @@ async function fetchCodeforcesNumericRank(
 
   try {
     if (options.includeUpsolves) {
-      const sourceKind = numericSourceKind(contestId);
-      const upsolveSubmissions = await fetchCodeforcesWebUpsolveSubmissions(
+      const contestStart = toFiniteNumber(normalized.contestInfo?.startTimeSeconds, 0);
+      const contestDuration = toFiniteNumber(normalized.contestInfo?.durationSeconds, 0);
+      const upsolveSubmissions = await fetchCodeforcesApiUpsolveSubmissions(
         contestId,
-        sourceKind,
-        normalized.teams,
+        contestStart + contestDuration,
         options,
+        usedSignedApi,
       );
       applyCodeforcesWebUpsolves(
         normalized,
         upsolveSubmissions,
         Boolean(normalized.providerMeta?.hasCustomWeights),
+        false,
       );
+      normalized.providerMeta = {
+        ...(normalized.providerMeta || {}),
+        includeUpsolves: true,
+        upsolveSubmissionCount: upsolveSubmissions.length,
+        upsolveSource: 'contest-status-api',
+        upsolveAuthenticated: usedSignedApi,
+      };
     }
     return { statusCode: 200, body: normalized };
   } catch (error: any) {

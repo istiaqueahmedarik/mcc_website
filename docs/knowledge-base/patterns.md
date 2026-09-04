@@ -1,5 +1,20 @@
 # Patterns
 
+## 2026-09-04 - Match Codeforces Upsolve Transport to Standings Transport
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+Pattern:
+After numeric standings load through the official API, page `contest.status` through the same anonymous or signed access mode, stop after crossing the contest-end boundary, filter to explicit classroom handles, and apply only post-contest attempts. Keep page size/count, response size, timeout, request rate, and target-handle count bounded. Use constrained per-handle HTML submission histories only when the standings themselves came from the HTML adapter.
+
+Applies when:
+Maintaining Codeforces upsolve ingestion, private Gym fetches, signed status requests, or provider fallback ordering.
+
+Do not overgeneralize:
+Do not downgrade an API-origin fetch to HTML, add authentication parameters to the first anonymous standings request, create participants absent from filtered standings, or persist provider credentials/sessions in snapshots.
+
 ## 2026-09-04 - Lazy Signed Codeforces API Retry
 
 Source:

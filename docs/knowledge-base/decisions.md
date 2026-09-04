@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-09-04 - classroom-codeforces-api-upsolves - API Transport Continuity
+
+Source:
+- `docs/rsd/classroom-codeforces-api-upsolves-20260904-rsd.md`
+- `docs/reviews/classroom-codeforces-api-upsolves-20260904-implementation-review.md`
+- `server/src/services/codeforcesContestService.ts`
+
+Decision:
+For numeric contests with opt-in upsolves, standings loaded by the official API use bounded `contest.status` paging in the same anonymous or signed mode. Standings loaded by the authenticated HTML adapter keep the constrained per-handle HTML submission crawler. API status rows are filtered to classroom handles, stop at the contest-end boundary, and never require JSESSIONID transport.
+
+Applies when:
+Changing classroom Codeforces upsolve fetching, signed private Gym access, status pagination, or fallback behavior.
+
+Do not overgeneralize:
+Do not change EDU/VJudge behavior, create practice-only participants absent from the filtered standings, remove existing request bounds, or use status paging when the source standings came from HTML.
+
 ## 2026-09-04 - classroom-codeforces-signed-api-before-crawl - Saved Signed API Retry
 
 Source:

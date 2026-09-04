@@ -1,3 +1,32 @@
+## 2026-09-04 - API Standings Downgraded to Blockable HTML for Upsolves
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `docs/reviews/classroom-codeforces-api-upsolves-20260904-implementation-review.md`
+
+What happened:
+Numeric standings could succeed through the official anonymous or signed API, but enabling upsolves always fetched per-handle HTML submission histories. A Codeforces 403/503 on that later crawl discarded the usable API result and returned the misleading `CODEFORCES_WEB_BLOCKED` standings message.
+
+Detection:
+Read-only inspection of the failing item showed private Gym `708543` with `include_upsolves = true`; tracing the service showed every API success entering `fetchCodeforcesWebUpsolveSubmissions`.
+
+Prevention:
+Keep dependent provider requests on the successful transport when the provider offers the needed API. API standings use bounded `contest.status` for upsolves; only HTML standings use HTML submission histories. Cover transport continuity explicitly for anonymous and signed paths.
+
+## 2026-09-04 - Environment Secret Inspection Recurrence
+
+Source:
+- Local diagnostic command during the classroom Codeforces API-upsolve investigation.
+
+What happened:
+A broad repository search included `.env` files and printed full Supabase connection/service credential lines into the internal execution log while only variable presence was needed.
+
+Detection:
+Immediate review of the tool output showed full values rather than presence booleans.
+
+Prevention:
+Never include `.env*` in content searches. Check an allowlisted variable name through a presence-only script that outputs only `set`/`missing`, and treat any non-trusted logged value as requiring rotation.
+
 ## 2026-08-09 - Classroom Contest Migration RLS Near Miss
 
 Source:

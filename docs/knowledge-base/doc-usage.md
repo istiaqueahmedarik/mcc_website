@@ -1,5 +1,16 @@
 # Doc Usage
 
+## 2026-09-04 - classroom-codeforces-api-upsolves - Implementation Docs Used
+
+Source:
+- `docs/reviews/classroom-codeforces-api-upsolves-20260904-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom contest knowledge base, Context7 discovery, the Supabase/Postgres safety skills for read-only live inspection, the current Codeforces API introduction and `contest.standings`/`contest.status` method documentation, and the prior API-based upsolve implementation from repository history. These inputs preserved Codeforces signing/rate rules and restored API-native upsolves without replaying stored or pasted credentials.
+
+Applies when:
+Auditing API-native upsolves, signed private Gym fetching, or the diagnosis of `CODEFORCES_WEB_BLOCKED` after successful API standings.
+
 ## 2026-09-04 - classroom-codeforces-signed-api-before-crawl - Implementation Docs Used
 
 Source:

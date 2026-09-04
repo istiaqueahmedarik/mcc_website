@@ -127,6 +127,22 @@ function apiFailed(comment = 'Contest with id 708543 not found') {
   });
 }
 
+function apiSubmission(
+  id: number,
+  creationTimeSeconds: number,
+  verdict: string,
+  handle = 'Alice',
+  problemIndex = 'B1',
+) {
+  return {
+    id,
+    creationTimeSeconds,
+    verdict,
+    author: { members: [{ handle }] },
+    problem: { contestId: 2258, index: problemIndex },
+  };
+}
+
 describe('Codeforces web standings sources', () => {
   test('validates that a JSESSIONID reaches an authenticated Codeforces page', async () => {
     const authenticated = await validateCodeforcesSession('session-token', {
@@ -312,6 +328,115 @@ describe('fetchCodeforcesContestRank', () => {
     expect(String(urls[1])).not.toContain('trainer-secret');
     expect(credentialProviderCalls).toBe(1);
     expect(result.body.providerMeta.authenticated).toBe(true);
+  });
+
+  test('keeps anonymous API upsolves on bounded contest.status paging', async () => {
+    const requests: Array<{ url: string; cookie: string }> = [];
+    const standings = apiStandings(['Alice']);
+    standings.rows[0].points = 450;
+    standings.rows[0].problemResults[1] = { points: 0, rejectedAttemptCount: 1 };
+    const contestEnd = standings.contest.startTimeSeconds + standings.contest.durationSeconds;
+
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL, init?: RequestInit) => {
+        requests.push({
+          url: String(url),
+          cookie: String((init?.headers as Record<string, string>)?.Cookie || ''),
+        });
+        if (new URL(String(url)).pathname.endsWith('/contest.status')) {
+          return apiOk([
+            apiSubmission(103, contestEnd + 300, 'OK'),
+            apiSubmission(102, contestEnd + 200, 'WRONG_ANSWER'),
+            apiSubmission(101, contestEnd - 1, 'WRONG_ANSWER'),
+          ]);
+        }
+        return apiOk(standings);
+      }) as any,
+      targetHandles: ['alice'],
+      includeUpsolves: true,
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/api/contest.status',
+    ]);
+    expect(new URL(requests[1].url).searchParams.get('count')).toBe('2000');
+    expect(new URL(requests[1].url).searchParams.has('apiKey')).toBe(false);
+    expect(requests.every((request) => request.cookie === '')).toBe(true);
+    expect(result.body.teams[0].submissions[1].isUpsolve).toBe(true);
+    expect(result.body.teams[0].submissions[1].rejectedAttemptCount).toBe(2);
+    expect(result.body.providerMeta.upsolveSource).toBe('contest-status-api');
+    expect(result.body.providerMeta.upsolveAuthenticated).toBe(false);
+  });
+
+  test('uses the signed contest.status API for private Gym upsolves', async () => {
+    const urls: string[] = [];
+    const standings = apiStandings(['Alice']);
+    standings.contest.id = 708543;
+    standings.rows[0].points = 450;
+    standings.rows[0].problemResults[1] = { points: 0, rejectedAttemptCount: 0 };
+    const contestEnd = standings.contest.startTimeSeconds + standings.contest.durationSeconds;
+
+    const result = await fetchCodeforcesContestRank('708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        const value = String(url);
+        urls.push(value);
+        const parsed = new URL(value);
+        if (parsed.pathname.endsWith('/contest.standings') && !parsed.searchParams.has('apiKey')) {
+          return apiFailed();
+        }
+        if (parsed.pathname.endsWith('/contest.status')) {
+          return apiOk([
+            apiSubmission(202, contestEnd + 200, 'OK'),
+            apiSubmission(201, contestEnd + 100, 'WRONG_ANSWER'),
+          ]);
+        }
+        return apiOk(standings);
+      }) as any,
+      credentialProvider: async () => ({ apiKey: 'trainer-key', apiSecret: 'trainer-secret' }),
+      targetHandles: ['alice'],
+      includeUpsolves: true,
+      nowSeconds: () => 1_000,
+      randomPrefix: () => 'abcdef',
+      apiRateLimitMs: 0,
+    });
+
+    const statusParams = new URL(urls[2]).searchParams;
+    expect(result.statusCode).toBe(200);
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/api/contest.standings',
+      '/api/contest.status',
+    ]);
+    expect(statusParams.get('apiKey')).toBe('trainer-key');
+    expect(statusParams.has('apiSig')).toBe(true);
+    expect(statusParams.has('showUnofficial')).toBe(false);
+    expect(urls.every((url) => !url.includes('trainer-secret'))).toBe(true);
+    expect(result.body.teams[0].submissions[1].isUpsolve).toBe(true);
+    expect(result.body.providerMeta.authenticated).toBe(true);
+    expect(result.body.providerMeta.upsolveAuthenticated).toBe(true);
+  });
+
+  test('fails closed when contest.status exceeds the API upsolve page bound', async () => {
+    const standings = apiStandings(['Alice']);
+    const contestEnd = standings.contest.startTimeSeconds + standings.contest.durationSeconds;
+    const result = await fetchCodeforcesContestRank('2258', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => (
+        new URL(String(url)).pathname.endsWith('/contest.status')
+          ? apiOk([apiSubmission(301, contestEnd + 100, 'WRONG_ANSWER')])
+          : apiOk(standings)
+      )) as any,
+      targetHandles: ['alice'],
+      includeUpsolves: true,
+      upsolvePageSize: 1,
+      upsolveMaxPages: 1,
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_UPSOLVE_LIMIT');
   });
 
   test('crawls bounded per-handle submission history when Codeforces upsolves are enabled', async () => {
