@@ -11,6 +11,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  ExternalLink,
+  FileUp,
   GripVertical,
   KeyRound,
   ListChecks,
@@ -125,6 +127,7 @@ const formDialogClass = cn(spaciousDialogClass, "max-w-2xl");
 const workbenchDialogClass = cn(spaciousDialogClass, "max-w-6xl");
 const dialogBodyClass = "max-h-[calc(88vh-8rem)] overflow-y-auto px-5 py-5 sm:px-6";
 const pressableClass = "transition-[transform,color,background-color,border-color] duration-150 active:scale-[0.98]";
+const MAX_CODEFORCES_EDU_IMPORT_BYTES = 4 * 1024 * 1024;
 const PROVIDER_LABELS = {
   vjudge: "VJudge",
   codeforces: "Codeforces",
@@ -172,6 +175,33 @@ function ProviderBadge({ provider, className = "" }) {
 
 function contestProvider(contest) {
   return normalizeProvider(contest?.provider);
+}
+
+function codeforcesEduSource(contest) {
+  if (contestProvider(contest) !== "codeforces") return null;
+  const value = String(contest?.externalContestId || contest?.external_contest_id || "").trim();
+  const match = value.match(/^edu:(\d+):(\d+)(?::(friends)|:list:([A-Za-z0-9]+))?$/i);
+  if (!match) return null;
+  return {
+    courseId: match[1],
+    lessonId: match[2],
+    filter: match[4] ? "list" : "friends",
+    listKey: match[4] || "",
+  };
+}
+
+function codeforcesEduStandingsUrl(contest) {
+  const source = codeforcesEduSource(contest);
+  if (!source) return "";
+  const url = new URL(
+    `/edu/course/${source.courseId}/lesson/${source.lessonId}/standings`,
+    "https://codeforces.com",
+  );
+  url.searchParams.set("locale", "en");
+  url.searchParams.set("mobile", "true");
+  if (source.filter === "list") url.searchParams.set("list", source.listKey);
+  else url.searchParams.set("friends", "true");
+  return url.toString();
 }
 
 function studentLabel(student) {
@@ -503,6 +533,9 @@ export function ClassroomContestPanel({
   const [contestDialogOpen, setContestDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [codeforcesSessionDialogOpen, setCodeforcesSessionDialogOpen] = useState(false);
+  const [eduImportDialogOpen, setEduImportDialogOpen] = useState(false);
+  const [eduImportContest, setEduImportContest] = useState(null);
+  const [eduImportFile, setEduImportFile] = useState(null);
   const [mappingDialogOpen, setMappingDialogOpen] = useState(false);
   const [demeritDialogOpen, setDemeritDialogOpen] = useState(false);
   const [solveOverrideDialogOpen, setSolveOverrideDialogOpen] = useState(false);
@@ -535,6 +568,8 @@ export function ClassroomContestPanel({
     () => rooms.find((room) => room.id === selectedRoomId) || null,
     [rooms, selectedRoomId],
   );
+  const eduImportSource = codeforcesEduSource(eduImportContest);
+  const eduImportStandingsUrl = codeforcesEduStandingsUrl(eduImportContest);
   const selectedContestForDemerits = useMemo(
     () => selectedRoom?.contests?.find((contest) => contest.id === selectedDemeritContestId) || null,
     [selectedRoom, selectedDemeritContestId],
@@ -1001,6 +1036,72 @@ export function ClassroomContestPanel({
     }
   };
 
+  const openEduImport = (contest) => {
+    if (!selectedRoom || !codeforcesEduSource(contest)) return;
+    setEduImportContest({ ...contest, roomId: selectedRoom.id });
+    setEduImportFile(null);
+    setEduImportDialogOpen(true);
+  };
+
+  const setEduImportOpen = (open) => {
+    setEduImportDialogOpen(open);
+    if (!open) {
+      setEduImportContest(null);
+      setEduImportFile(null);
+    }
+  };
+
+  const importEduStandings = async (event) => {
+    event.preventDefault();
+    if (!eduImportContest?.roomId || !eduImportFile) {
+      toast.error("Choose the saved Codeforces standings HTML file");
+      return;
+    }
+    if (eduImportFile.size > MAX_CODEFORCES_EDU_IMPORT_BYTES) {
+      toast.error("The saved standings HTML must be 4 MiB or smaller");
+      return;
+    }
+
+    setBusyKey(`edu-import:${eduImportContest.id}`);
+    try {
+      const standingsHtml = await eduImportFile.text();
+      if (!standingsHtml.trim()) {
+        toast.error("The selected HTML file is empty");
+        return;
+      }
+      await apiPost(
+        contestApi(
+          classroomId,
+          `rooms/${eduImportContest.roomId}/items/${eduImportContest.id}/fetch`,
+        ),
+        {
+          problemWeights: eduImportContest.problemWeights || [],
+          standingsHtml,
+        },
+      );
+      toast.success("Codeforces EDU rank snapshot imported");
+      setEduImportOpen(false);
+      await refreshWorkspace();
+    } catch (error) {
+      const code = error?.data?.code;
+      const importError =
+        code === "CODEFORCES_EDU_IMPORT_WRONG_SOURCE"
+          ? "This file belongs to a different Codeforces EDU lesson"
+          : code === "CODEFORCES_EDU_IMPORT_INCOMPLETE"
+            ? "This page does not contain every classroom handle; save the friends-filtered standings page"
+            : code === "CODEFORCES_EDU_IMPORT_NO_CLASSROOM_HANDLES"
+              ? "No verified or overridden classroom Codeforces handle was found in this page"
+              : code === "CODEFORCES_EDU_IMPORT_TOO_LARGE"
+                ? "The saved standings HTML must be 4 MiB or smaller"
+                : code === "CODEFORCES_EDU_IMPORT_INVALID_HTML"
+                  ? "This file does not contain an accessible Codeforces EDU standings table"
+                  : error?.data?.message || error?.message || "Failed to import Codeforces EDU standings";
+      toast.error(importError);
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const fetchContest = async (contest) => {
     if (!selectedRoom) return;
     const provider = contestProvider(contest);
@@ -1013,6 +1114,9 @@ export function ClassroomContestPanel({
       await refreshWorkspace();
     } catch (error) {
       const code = error?.data?.code;
+      const blockedEduFetch = provider === "codeforces"
+        && code === "CODEFORCES_WEB_BLOCKED"
+        && Boolean(codeforcesEduSource(contest));
       if (provider === "vjudge" && (code === "NO_VJUDGE_SESSION" || error?.status === 401)) {
         setSessionDialogOpen(true);
       }
@@ -1028,6 +1132,7 @@ export function ClassroomContestPanel({
       ) {
         setCodeforcesSessionDialogOpen(true);
       }
+      if (blockedEduFetch) openEduImport(contest);
       const providerError =
         code === "CODEFORCES_CREDENTIALS_MISSING"
           ? "Add your Codeforces API key and secret, or connect JSESSIONID for crawl fallback"
@@ -1041,6 +1146,8 @@ export function ClassroomContestPanel({
             ? "The Codeforces web session expired or cannot access this standings page; reconnect it and retry"
             : code === "CODEFORCES_WEB_NO_CLASSROOM_FRIENDS"
               ? "No classroom students were found in this friends standings view. Add their handles as Codeforces friends, then try again"
+              : blockedEduFetch
+                ? "Codeforces challenged the server request. Import the saved EDU standings page instead"
               : error?.message || `Failed to fetch ${providerLabel(provider)} rank`;
       toast.error(providerError);
     } finally {
@@ -1683,7 +1790,7 @@ export function ClassroomContestPanel({
                           <TableHead className="w-[96px]">Provider</TableHead>
                           <TableHead className="w-[110px]">Weight</TableHead>
                           <TableHead className="w-[180px]">Snapshot</TableHead>
-                          <TableHead className="w-[320px] text-right">Actions</TableHead>
+                          <TableHead className="w-[372px] text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1706,10 +1813,27 @@ export function ClassroomContestPanel({
                             <TableCell className="text-xs text-muted-foreground">{formatDate(contest.latestSnapshotAt || contest.lastFetchedAt)}</TableCell>
                             <TableCell>
                               <div className="flex justify-end gap-2">
+                                {codeforcesEduSource(contest) && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        className={cn("h-8 w-8 shrink-0", pressableClass)}
+                                        onClick={() => openEduImport(contest)}
+                                        aria-label={`Import saved standings for ${contest.title}`}
+                                      >
+                                        <FileUp className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Import EDU HTML</TooltipContent>
+                                  </Tooltip>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="gap-1"
+                                  className={cn("gap-1", pressableClass)}
                                   onClick={() => fetchContest(contest)}
                                   disabled={busyKey === `fetch:${contest.id}`}
                                 >
@@ -2235,6 +2359,103 @@ export function ClassroomContestPanel({
                 </Button>
               </DialogFooter>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={eduImportDialogOpen} onOpenChange={setEduImportOpen}>
+          <DialogContent className={formDialogClass}>
+            <form onSubmit={importEduStandings} className="flex max-h-[88vh] flex-col">
+              <DialogHeader className="border-b px-5 py-4 sm:px-6">
+                <DialogTitle>Import EDU standings</DialogTitle>
+                <DialogDescription>
+                  Use your browser when Codeforces challenges the server fetch.
+                </DialogDescription>
+              </DialogHeader>
+              <div className={dialogBodyClass}>
+                <div className="space-y-5">
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{eduImportContest?.title || "Codeforces EDU lesson"}</p>
+                        {eduImportSource && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Course {eduImportSource.courseId}, lesson {eduImportSource.lessonId} · {eduImportSource.filter === "list" ? "saved list" : "friends"} standings
+                          </p>
+                        )}
+                      </div>
+                      {eduImportStandingsUrl && (
+                        <Button type="button" size="sm" variant="outline" className={cn("gap-1.5", pressableClass)} asChild>
+                          <a href={eduImportStandingsUrl} target="_blank" rel="noreferrer">
+                            Open standings
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <ol className="space-y-3 text-sm">
+                    <li className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">1</span>
+                      <div>
+                        <p className="font-medium">Open the exact standings page</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Sign in and complete the Codeforces browser check if it appears.</p>
+                      </div>
+                    </li>
+                    <li className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">2</span>
+                      <div>
+                        <p className="font-medium">Save the page as HTML only</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Use the browser&apos;s Save Page As command and choose “Webpage, HTML Only”.</p>
+                      </div>
+                    </li>
+                    <li className="grid grid-cols-[24px_minmax(0,1fr)] gap-3">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">3</span>
+                      <div>
+                        <p className="font-medium">Choose that file below</p>
+                        <p className="mt-1 text-xs text-muted-foreground">The file must be from this lesson and no larger than 4 MiB.</p>
+                      </div>
+                    </li>
+                  </ol>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="codeforces-edu-standings-file">Saved standings HTML</Label>
+                    <Input
+                      key={eduImportContest?.id || "edu-import-file"}
+                      id="codeforces-edu-standings-file"
+                      type="file"
+                      accept=".html,.htm,text/html"
+                      aria-describedby="codeforces-edu-import-privacy"
+                      onChange={(event) => setEduImportFile(event.target.files?.[0] || null)}
+                      required
+                    />
+                    {eduImportFile && (
+                      <p className="text-xs text-muted-foreground">
+                        {eduImportFile.name} · {Math.max(1, Math.round(eduImportFile.size / 1024)).toLocaleString()} KiB
+                      </p>
+                    )}
+                  </div>
+
+                  <div id="codeforces-edu-import-privacy" className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-800">
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>MCC validates and parses this file in memory. Only normalized standings are saved; the HTML itself is not stored or executed.</p>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 border-t bg-muted/20 px-5 py-4 sm:px-6">
+                <Button type="button" variant="outline" className={pressableClass} onClick={() => setEduImportOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className={cn("gap-1.5", pressableClass)}
+                  disabled={!eduImportFile || busyKey === `edu-import:${eduImportContest?.id}`}
+                >
+                  {busyKey === `edu-import:${eduImportContest?.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  Import snapshot
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 

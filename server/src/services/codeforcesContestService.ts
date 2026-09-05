@@ -34,6 +34,7 @@ export type CodeforcesFetchOptions = {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+export const MAX_CODEFORCES_EDU_IMPORT_BYTES = 4 * 1024 * 1024;
 const CODEFORCES_API_BASE = 'https://codeforces.com/api';
 const DEFAULT_API_RATE_LIMIT_MS = 2_100;
 const CONTESTANT_TYPE = 'CONTESTANT';
@@ -1039,6 +1040,125 @@ function ensureClassroomFriends(teams: any[], targetHandles: string[] | undefine
   }
 }
 
+function isProblemFromEduSource(problem: any, source: Extract<CodeforcesContestSource, { kind: 'edu' }>) {
+  try {
+    const url = new URL(normalizeText(problem?.href, 500), CODEFORCES_WEB_BASE);
+    return url.origin === CODEFORCES_WEB_BASE
+      && url.pathname.startsWith(`/edu/course/${source.courseId}/lesson/${source.lessonId}/`);
+  } catch {
+    return false;
+  }
+}
+
+export function importCodeforcesEduStandingsHtml(
+  sourceValue: string,
+  html: unknown,
+  problemWeights?: number[],
+  targetHandles?: string[],
+): CodeforcesServiceResult {
+  try {
+    const source = parseCodeforcesContestSource(sourceValue);
+    if (!source || source.kind !== 'edu') {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_NOT_ALLOWED',
+        'Saved standings HTML can only be imported for a Codeforces EDU lesson.',
+        400,
+      );
+    }
+    if (typeof html !== 'string' || !html.trim()) {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_INVALID_HTML',
+        'Choose the HTML-only file saved from the Codeforces EDU standings page.',
+        422,
+      );
+    }
+    if (new TextEncoder().encode(html).byteLength > MAX_CODEFORCES_EDU_IMPORT_BYTES) {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_TOO_LARGE',
+        'The saved Codeforces standings HTML must be 4 MiB or smaller.',
+        413,
+      );
+    }
+
+    let parsed: HtmlStandingsPageParseResult;
+    try {
+      parsed = parseCodeforcesEduStandingsPage(html, targetHandles);
+    } catch (error: any) {
+      if (error instanceof CodeforcesWebError && error.code === 'CODEFORCES_WEB_SESSION_INVALID') {
+        throw new CodeforcesWebError(
+          'CODEFORCES_EDU_IMPORT_INVALID_HTML',
+          'The saved file does not contain an accessible Codeforces EDU standings table.',
+          422,
+        );
+      }
+      throw error;
+    }
+
+    if (parsed.problems.length === 0 || parsed.problems.some((problem) => !isProblemFromEduSource(problem, source))) {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_WRONG_SOURCE',
+        `Save the standings page for Codeforces EDU course ${source.courseId}, lesson ${source.lessonId}.`,
+        422,
+      );
+    }
+
+    const remaining = remainingTargetHandles(targetHandles, parsed);
+    if (parsed.pageCount > 1 && remaining && remaining.size > 0) {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_INCOMPLETE',
+        'This saved page does not contain every requested classroom handle. Open the friends-filtered standings page and save it again.',
+        422,
+      );
+    }
+
+    const { teams, weights } = mergeWebTeams([parsed], parsed.problems, problemWeights);
+    if (Array.isArray(targetHandles) && teams.length === 0) {
+      throw new CodeforcesWebError(
+        'CODEFORCES_EDU_IMPORT_NO_CLASSROOM_HANDLES',
+        'The saved standings page does not contain a verified or overridden classroom Codeforces handle.',
+        422,
+      );
+    }
+
+    const sourceId = `edu:${source.courseId}:${source.lessonId}`;
+    return {
+      statusCode: 200,
+      body: {
+        contestInfo: {
+          id: sourceId,
+          title: parsed.title,
+          begin: null,
+          length: null,
+          end: null,
+          provider: 'codeforces',
+          type: 'EDU_COURSE',
+          phase: 'FINISHED',
+          frozen: false,
+        },
+        provider: 'codeforces',
+        totalTeams: teams.length,
+        fullParticipantCount: teams.length,
+        totalProblems: parsed.problems.length,
+        problemWeights: weights,
+        problems: parsed.problems,
+        teams,
+        providerMeta: {
+          sourceType: 'edu-browser-import',
+          courseId: source.courseId,
+          lessonId: source.lessonId,
+          filter: source.filter,
+          imported: true,
+          importedPages: 1,
+          reportedPageCount: parsed.pageCount,
+          fullParticipantCount: teams.length,
+        },
+      },
+    };
+  } catch (error: any) {
+    return serviceErrorToResult(error);
+  }
+}
+
 function codeforcesSubmissionHandles(submission: any): string[] {
   return Array.isArray(submission?.author?.members)
     ? submission.author.members
@@ -1300,6 +1420,13 @@ async function fetchCodeforcesEduLessonRank(
       },
     };
   } catch (error: any) {
+    if (error instanceof CodeforcesWebError && error.code === 'CODEFORCES_WEB_BLOCKED') {
+      return serviceErrorToResult(new CodeforcesWebError(
+        error.code,
+        'Codeforces challenged the server request. Open this EDU standings page in your browser and use the classroom saved-HTML import.',
+        error.statusCode,
+      ));
+    }
     return serviceErrorToResult(error);
   }
 }

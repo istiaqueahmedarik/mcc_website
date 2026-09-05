@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   applyCodeforcesWebUpsolves,
   fetchCodeforcesContestRank,
+  importCodeforcesEduStandingsHtml,
+  MAX_CODEFORCES_EDU_IMPORT_BYTES,
   normalizeCodeforcesContestSource,
   parseCodeforcesContestSource,
   parseCodeforcesEduStandingsPage,
@@ -236,6 +238,72 @@ describe('Codeforces web standings sources', () => {
     expect(standings.teams[0].penalty).toBe(57);
     expect(standings.teams[0].submissions[1].isUpsolve).toBe(true);
     expect(standings.teams[0].submissions[1].rejectedAttemptCount).toBe(2);
+  });
+});
+
+describe('Codeforces EDU saved standings import', () => {
+  test('normalizes an exact lesson page without retaining the uploaded document', () => {
+    const html = eduPage(eduAliceRow).replace('</body>', '<script>unique-private-marker</script></body>');
+    const result = importCodeforcesEduStandingsHtml('edu:2:6', html, [2, 3], ['alice']);
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body.teams).toHaveLength(1);
+    expect(result.body.teams[0].username).toBe('Alice');
+    expect(result.body.problemWeights).toEqual([2, 3]);
+    expect(result.body.providerMeta.sourceType).toBe('edu-browser-import');
+    expect(result.body.providerMeta.imported).toBe(true);
+    expect(JSON.stringify(result.body)).not.toContain('unique-private-marker');
+  });
+
+  test('rejects a saved standings page from a different EDU lesson', () => {
+    const result = importCodeforcesEduStandingsHtml(
+      'edu:2:6',
+      eduPage(eduAliceRow).replaceAll('/lesson/6/', '/lesson/7/'),
+      undefined,
+      ['alice'],
+    );
+
+    expect(result.statusCode).toBe(422);
+    expect(result.body.code).toBe('CODEFORCES_EDU_IMPORT_WRONG_SOURCE');
+  });
+
+  test('rejects challenge pages and incomplete paginated imports', () => {
+    const challenge = importCodeforcesEduStandingsHtml(
+      'edu:2:6',
+      '<!doctype html><title>Just a moment...</title>',
+      undefined,
+      ['alice'],
+    );
+    const incomplete = importCodeforcesEduStandingsHtml(
+      'edu:2:6',
+      eduPage('', '<a href="/edu/course/2/lesson/6/standings?page=2">next</a>'),
+      undefined,
+      ['alice'],
+    );
+
+    expect(challenge.statusCode).toBe(422);
+    expect(challenge.body.code).toBe('CODEFORCES_EDU_IMPORT_INVALID_HTML');
+    expect(incomplete.statusCode).toBe(422);
+    expect(incomplete.body.code).toBe('CODEFORCES_EDU_IMPORT_INCOMPLETE');
+  });
+
+  test('rejects imports for non-EDU sources', () => {
+    const result = importCodeforcesEduStandingsHtml('2258', eduPage(eduAliceRow), undefined, ['alice']);
+
+    expect(result.statusCode).toBe(400);
+    expect(result.body.code).toBe('CODEFORCES_EDU_IMPORT_NOT_ALLOWED');
+  });
+
+  test('rejects saved pages above the import limit before parsing', () => {
+    const result = importCodeforcesEduStandingsHtml(
+      'edu:2:6',
+      'x'.repeat(MAX_CODEFORCES_EDU_IMPORT_BYTES + 1),
+      undefined,
+      ['alice'],
+    );
+
+    expect(result.statusCode).toBe(413);
+    expect(result.body.code).toBe('CODEFORCES_EDU_IMPORT_TOO_LARGE');
   });
 });
 
@@ -540,6 +608,18 @@ describe('fetchCodeforcesContestRank', () => {
     expect(result.statusCode).toBe(200);
     expect(urls).toHaveLength(2);
     expect(result.body.teams[0].username).toBe('Alice');
+  });
+
+  test('gives EDU browser-import guidance when Codeforces challenges the server request', async () => {
+    const result = await fetchCodeforcesContestRank('edu:2:6', undefined, {
+      fetchImpl: (async () => new Response('', { status: 403 })) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+    });
+
+    expect(result.statusCode).toBe(503);
+    expect(result.body.code).toBe('CODEFORCES_WEB_BLOCKED');
+    expect(result.body.message).toContain('saved-HTML import');
   });
 
   test('requests API credentials when neither signed API nor crawl fallback is available', async () => {

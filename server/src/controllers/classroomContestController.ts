@@ -8,6 +8,7 @@ import {
   type ClassroomContestProvider,
 } from '../services/classroomContestRankService';
 import {
+  importCodeforcesEduStandingsHtml,
   normalizeCodeforcesContestSource,
   parseCodeforcesContestSource,
   validateCodeforcesSession,
@@ -1169,18 +1170,35 @@ export const fetchClassroomContestItem = async (c: any) => {
     const rosterMaps = provider === 'codeforces' ? await getClassroomRosterMaps(classroomId) : null;
     const overrideMaps = rosterMaps ? await getClassroomHandleOverrideMaps(classroomId, rosterMaps) : null;
     const classroomMaps = rosterMaps && overrideMaps ? { ...rosterMaps, ...overrideMaps } : null;
-    const result = await fetchClassroomContestRank({
-      provider,
-      externalContestId: String(contest.external_contest_id),
-      problemWeights,
-      vjudgeSession: session,
-      codeforcesSession: provider === 'codeforces' ? getCodeforcesSession(c) : undefined,
-      codeforcesTargetHandles: classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
-      includeUpsolves: Boolean(contest.include_upsolves),
-      codeforcesCredentialProvider: provider === 'codeforces'
-        ? () => loadTrainerCodeforcesCredentials(actor.userId)
-        : undefined,
-    });
+    const hasEduStandingsImport = Object.prototype.hasOwnProperty.call(body || {}, 'standingsHtml')
+      || Object.prototype.hasOwnProperty.call(body || {}, 'standings_html');
+    if (hasEduStandingsImport && provider !== 'codeforces') {
+      return c.json({
+        status: 'error',
+        code: 'CODEFORCES_EDU_IMPORT_NOT_ALLOWED',
+        message: 'Saved Codeforces standings HTML can only be imported for a Codeforces EDU lesson.',
+      }, 400);
+    }
+
+    const result = hasEduStandingsImport
+      ? importCodeforcesEduStandingsHtml(
+          String(contest.external_contest_id),
+          body?.standingsHtml ?? body?.standings_html,
+          problemWeights,
+          classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
+        )
+      : await fetchClassroomContestRank({
+          provider,
+          externalContestId: String(contest.external_contest_id),
+          problemWeights,
+          vjudgeSession: session,
+          codeforcesSession: provider === 'codeforces' ? getCodeforcesSession(c) : undefined,
+          codeforcesTargetHandles: classroomMaps ? codeforcesTargetHandles(classroomMaps) : undefined,
+          includeUpsolves: Boolean(contest.include_upsolves),
+          codeforcesCredentialProvider: provider === 'codeforces'
+            ? () => loadTrainerCodeforcesCredentials(actor.userId)
+            : undefined,
+        });
     if (result.statusCode !== 200) {
       return c.json(result.body, result.statusCode as any);
     }

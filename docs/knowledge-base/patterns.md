@@ -1,5 +1,22 @@
 # Patterns
 
+## 2026-09-04 - Browser-Assisted Import for Server-Blocked Provider HTML
+
+Source:
+- `docs/rsd/classroom-codeforces-edu-browser-import-20260904-rsd.md`
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `client/src/components/ClassroomContestPanel.jsx`
+
+Pattern:
+When a fixed-origin provider page works only after a human browser challenge, keep the bounded automatic adapter first and offer an explicit browser-save import through the same authorized mutation pipeline. Reuse the provider parser; bound bytes before parsing; validate document structure, exact source identity, target membership, and pagination completeness; normalize in memory; persist only the normalized domain object. Build the external link from validated stored identifiers rather than accepting a destination URL from the upload request.
+
+Applies when:
+Maintaining Codeforces EDU classroom snapshots or designing a similarly narrow provider recovery path.
+
+Do not overgeneralize:
+Do not forward clearance cookies, browser profiles, passwords, arbitrary origins, executable markup, or raw uploaded provider documents. A manual import is not a general scraping proxy.
+
 ## 2026-09-04 - Preserve Numeric API Rows Until Classroom Mapping
 
 Source:
@@ -68,7 +85,7 @@ Source:
 - `server/src/services/codeforcesContestService.test.ts`
 
 Pattern:
-For a numeric classroom Codeforces source, try anonymous `contest.standings` with only `contestId`, enforce the provider rate and response limits, normalize the official rows, and discard non-classroom handles before persistence. The 2026-09-04 pattern above inserts a lazy signed API retry before the fixed-origin authenticated friends HTML view. Keep fallback metadata to a non-sensitive error code. EDU remains crawl-only, and web-session values never enter logs, snapshots, or API URLs.
+For a numeric classroom Codeforces source, try anonymous `contest.standings` with only `contestId`, enforce the provider rate and response limits, normalize the official rows, and discard non-classroom handles before persistence. The 2026-09-04 pattern above inserts a lazy signed API retry before the fixed-origin authenticated friends HTML view. Keep fallback metadata to a non-sensitive error code. EDU has no API path: automatic fetch uses the crawl, and the browser-assisted import above is a bounded recovery path. Web-session values never enter logs, snapshots, or API URLs.
 
 Applies when:
 Maintaining classroom numeric Codeforces fetching, API failure behavior, Gym fallback, or provider snapshot filtering.

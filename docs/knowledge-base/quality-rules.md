@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-09-04 - Saved Provider HTML Must Fail Closed
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/controllers/classroomContestController.ts`
+- `docs/rsd/classroom-codeforces-edu-browser-import-20260904-rsd.md`
+
+Rule:
+A saved provider document may enter the classroom snapshot pipeline only after the normal manager authorization and only for the stored source type that explicitly supports it. Enforce a byte limit before parsing, treat markup as non-executable data, require the expected table, validate every provider link against the exact stored source identity, enforce target-handle and pagination completeness, and persist only a normalized snapshot. Never log, echo, or store the raw document.
+
+Applies when:
+Changing the Codeforces EDU import, adding upload-assisted provider ingestion, or reviewing contest snapshot privacy.
+
+Do not overgeneralize:
+Do not turn this into arbitrary HTML ingestion, a client-authoritative standings format, a Cloudflare-cookie relay, or a substitute for fixed-origin automatic provider adapters.
+
 ## 2026-09-04 - Codeforces Access Must Be Ordered, Secret-Safe, and Bounded
 
 Source:
@@ -7,7 +23,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Rule:
-Numeric classroom Codeforces fetches must preserve this order: anonymous official API with exactly `contestId`, a lazily loaded signed API retry using the trainer's encrypted credentials, then transient-JSESSIONID fixed-origin friends HTML. EDU remains crawl-only. Construct regular numeric crawl paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound API/crawl timeout, response size, page count, and concurrency. Successful numeric API snapshots retain official contestant rows for trainer mapping, while EDU/HTML snapshots retain only explicit classroom target handles. Never persist or return the browser session. Optional numeric upsolves must follow the successful standings transport: API-origin standings use bounded `contest.status` paging in the same anonymous/signed mode, while HTML-origin standings may use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
+Numeric classroom Codeforces fetches must preserve this order: anonymous official API with exactly `contestId`, a lazily loaded signed API retry using the trainer's encrypted credentials, then transient-JSESSIONID fixed-origin friends HTML. EDU has no API path: its automatic path remains the bounded crawl, and browser-saved HTML is accepted only under the fail-closed recovery rule above. Construct regular numeric crawl paths as `/contest/{validatedNumericId}/standings/friends/true` and high-number Gym paths as `/gym/{validatedNumericId}/standings/friends/true`; bound API/crawl timeout, response size, page count, and concurrency. Successful numeric API snapshots retain official contestant rows for trainer mapping, while EDU/HTML snapshots retain only explicit classroom target handles. Never persist or return the browser session. Optional numeric upsolves must follow the successful standings transport: API-origin standings use bounded `contest.status` paging in the same anonymous/signed mode, while HTML-origin standings may use only validated `/submissions/{handle}/contest/{id}` paths for handles already present in that filtered result.
 
 Because Codeforces blocks Bun's native HTTP fingerprint on numeric friends standings, production requests use `curl` without a shell. Supply JSESSIONID through curl's stdin configuration rather than process arguments, keep injected fetch clients for tests, cap response bytes and time, and treat provider 403/503 responses as temporary blocking rather than invalid API credentials.
 

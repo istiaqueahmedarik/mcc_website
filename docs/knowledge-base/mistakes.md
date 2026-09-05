@@ -1,3 +1,14 @@
+## 2026-09-04 - Session Retry Guidance Could Not Resolve an EDU Server Challenge
+
+What happened:
+The EDU crawler returned `CODEFORCES_WEB_BLOCKED` with guidance to wait and reconnect the Codeforces session. Safe probes showed that the lesson standings route was presenting a Cloudflare browser challenge to the server network, so a fresh JSESSIONID alone could not make that request browser-capable. The official contest API also cannot address an EDU course/lesson source.
+
+Detection:
+The failing item was confirmed as `edu:2:6`; the exact standings and lesson routes returned challenge responses while an EDU index route remained reachable.
+
+Prevention:
+Distinguish provider authentication failure from network/browser challenge failure. Keep credentials transient, avoid repeated credential replay, and give EDU managers the bounded browser-saved HTML import path when the server receives `CODEFORCES_WEB_BLOCKED`.
+
 ## 2026-09-04 - Pre-Snapshot Filtering Blocked Handle Mapping
 
 Source:

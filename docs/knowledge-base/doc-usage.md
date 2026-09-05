@@ -1,5 +1,20 @@
 # Doc Usage
 
+## 2026-09-04 - classroom-codeforces-edu-browser-import - Implementation Docs Used
+
+Source:
+- `docs/rsd/classroom-codeforces-edu-browser-import-20260904-rsd.md`
+- `docs/reviews/classroom-codeforces-edu-browser-import-20260904-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the classroom Codeforces knowledge base, the required interface/Apple/Emil design skills, Context7 React file-input guidance, the Supabase safety skill and current changelog check, read-only contest/roster state inspection, safe unauthenticated Codeforces route probes, and the existing EDU parser/controller/UI paths. These inputs led to a browser-assisted import rather than provider-cookie forwarding or a third-party bypass.
+
+Applies when:
+Auditing the EDU browser-save workflow, its security boundary, or why a reconnected JSESSIONID is not presented as the fix for a server-side Cloudflare challenge.
+
+Do not overgeneralize:
+No pasted credential was replayed, no live database row was mutated, and production deployment, authenticated browser QA, real saved-page import, and hosted request-size verification remain pending.
+
 ## 2026-09-04 - classroom-codeforces-unmapped-api-snapshots - Implementation Docs Used
 
 Source:

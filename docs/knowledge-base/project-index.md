@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-04 - Codeforces EDU Browser-Saved Standings Recovery
+
+When Codeforces returns `CODEFORCES_WEB_BLOCKED` for a classroom EDU lesson, `client/src/components/ClassroomContestPanel.jsx` now opens a focused recovery dialog and also exposes a row-level import action. The trainer opens the exact friends/read-list standings URL in their browser, saves HTML only, and submits it through the existing manager-authorized fetch endpoint. `server/src/services/codeforcesContestService.ts` caps and parses the document, validates the exact course/lesson and requested classroom handles, then returns the existing normalized contract; `server/src/controllers/classroomContestController.ts` persists only the mapped snapshot. Raw HTML is neither executed nor stored. Automatic EDU crawling remains first, while deployment and authenticated hosted verification are pending.
+
 ## 2026-09-04 - Codeforces Numeric API Snapshots Support Unmapped Review
 
 `server/src/services/codeforcesContestService.ts` now retains every official `CONTESTANT` row returned by successful anonymous or signed numeric Codeforces standings. It records requested classroom-handle and matching-row counts in non-sensitive provider metadata rather than failing when the count is zero. `server/src/controllers/classroomContestController.ts` continues to attach classroom mappings to snapshots, expose unmatched rows to the trainer Handle Mappings dialog, and exclude unmapped/ignored identities from generated classroom reports. EDU and numeric HTML crawls remain bounded and classroom-handle filtered.
@@ -14,7 +18,7 @@ Numeric Codeforces standings that succeed through the official API now keep opt-
 
 ## 2026-09-04 - Codeforces Signed API Credentials and Crawl Fallback
 
-Trainer-managed Codeforces access is exposed in `client/src/components/ClassroomContestPanel.jsx` through one compact dialog with separate API key/secret and JSESSIONID sections. Protected GET/PUT/DELETE credential endpoints are registered in `server/src/routes/classroomRoute.ts` and implemented in `server/src/controllers/classroomContestController.ts`; they return only connection state, key hint, and timestamps. `server/src/utils/codeforcesCredentialCrypto.ts` encrypts each value with AES-256-GCM under the dedicated server key. For numeric contests, `server/src/services/codeforcesContestService.ts` tries anonymous API, saved signed API, then bounded authenticated crawling; EDU remains crawl-only. The existing `classroom_codeforces_credentials` table was verified with RLS enabled and no anon/authenticated DML grants, so no schema migration was needed.
+Trainer-managed Codeforces access is exposed in `client/src/components/ClassroomContestPanel.jsx` through one compact dialog with separate API key/secret and JSESSIONID sections. Protected GET/PUT/DELETE credential endpoints are registered in `server/src/routes/classroomRoute.ts` and implemented in `server/src/controllers/classroomContestController.ts`; they return only connection state, key hint, and timestamps. `server/src/utils/codeforcesCredentialCrypto.ts` encrypts each value with AES-256-GCM under the dedicated server key. For numeric contests, `server/src/services/codeforcesContestService.ts` tries anonymous API, saved signed API, then bounded authenticated crawling. EDU has no API path: automatic fetch remains a bounded crawl, with the browser-saved import above available only as recovery. The existing `classroom_codeforces_credentials` table was verified with RLS enabled and no anon/authenticated DML grants, so no schema migration was needed.
 
 ## 2026-09-02 - Codeforces API-First Numeric Standings With Web Fallback
 

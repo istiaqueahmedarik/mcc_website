@@ -1,5 +1,16 @@
 # Decisions
 
+## 2026-09-04 - Codeforces EDU Challenge Recovery Uses Browser-Saved HTML
+
+Decision:
+Keep the authenticated server crawler as the primary EDU standings path. If Codeforces challenges the server request, a classroom manager may save the exact friends/read-list standings page as HTML in their own browser and import it through the existing fetch endpoint. The server accepts this only for an EDU item, validates the file and course/lesson identity, filters to classroom handles, and persists only the normalized snapshot. It will not accept Cloudflare clearance cookies, browser profiles, third-party scraper output, or arbitrary Codeforces pages.
+
+Applies when:
+Changing EDU fetch recovery, provider-session guidance, saved-page parsing, or classroom snapshot persistence.
+
+Do not overgeneralize:
+Numeric Codeforces sources retain their API/signed-API/crawl order, VJudge is unchanged, and browser import does not prove that production proxy limits or authenticated UI behavior have been verified.
+
 ## 2026-09-04 - classroom-codeforces-unmapped-api-snapshots - Retain Official Rows for Mapping
 
 Source:
@@ -58,7 +69,7 @@ Source:
 - `client/src/components/ClassroomContestPanel.jsx`
 
 Decision:
-Numeric classroom Codeforces sources use three ordered access stages: anonymous `contest.standings` with exactly `contestId`, signed `contest.standings` with the trainer's saved API key/secret when anonymous access is insufficient, and the constrained authenticated friends-standings HTML crawler as the final fallback. API credentials are per trainer, encrypted with AES-256-GCM under `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY`, returned to clients only as status and a short key hint, and loaded lazily only for a signed retry. EDU remains crawl-only, and JSESSIONID remains an ephemeral HTTP-only cookie. Codeforces OAuth is not part of this integration because the provider API uses key/secret request signatures.
+Numeric classroom Codeforces sources use three ordered access stages: anonymous `contest.standings` with exactly `contestId`, signed `contest.standings` with the trainer's saved API key/secret when anonymous access is insufficient, and the constrained authenticated friends-standings HTML crawler as the final fallback. API credentials are per trainer, encrypted with AES-256-GCM under `CODEFORCES_CREDENTIAL_ENCRYPTION_KEY`, returned to clients only as status and a short key hint, and loaded lazily only for a signed retry. EDU has no API path: its automatic path remains the crawler, with the browser-saved import above only for a server challenge. JSESSIONID remains an ephemeral HTTP-only cookie. Codeforces OAuth is not part of this integration because the provider API uses key/secret request signatures.
 
 Applies when:
 Changing classroom Codeforces access setup, numeric standings fetch ordering, signed API requests, provider credential storage, crawl fallback, or EDU fetching.
