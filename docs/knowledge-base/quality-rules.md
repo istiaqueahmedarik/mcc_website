@@ -1,5 +1,21 @@
 # Quality Rules
 
+## 2026-09-06 - Persistent report-focus controls
+
+Compact icon-only management controls require accessible names, hover/focus tooltips, visible focus, and disabled states. A collapsible navigation rail must leave a discoverable restore action in the expanded report workspace. Initialize optional rail visibility to shown, treat malformed or unavailable local storage as the default, update the current tab immediately, and synchronize valid changes from other tabs.
+
+## 2026-09-06 - Contest room sorting and responsive rail
+
+Room display sorting must never mutate API data or persisted contest order. Use deterministic name and ID tie-breaks, retain selection by room ID, and validate room IDs restored from URLs. Bound the desktop rail independently; on mobile stack the rail before the report and preserve 44px controls plus a labeled focusable horizontal source/report region. Room readiness may use only configured contests and existing snapshot timestamps. Preserve the last successful report during stale or failed refresh states.
+
+## 2026-09-05 - Classroom interior interaction safety
+
+Trainer-only layout changes must preserve student navigation and all server authorization boundaries. Treat a class as live only when its persisted status is started. Validate meeting links before rendering them. New mobile controls need 44px targets; dialogs need bounded scrolling and focus restoration. When a trainer has unsaved note or hint text, closing the guidance dialog, switching selected work, or leaving Live must require an explicit discard decision and clear drafts only after confirmation. Keep one visible destructive session-end action and retain busy-state guards on destructive room actions.
+
+## 2026-09-05 - Dashboard state and responsive action containment
+
+A saved meeting URL is not evidence of an active session. Keep load failures, genuinely empty classrooms, and no filter matches distinct. When the classroom workspace is the primary dashboard task, do not let an empty scheduling hero displace it; place bounded attention work in a secondary right column that stacks in document order below the workspace on smaller screens. Hidden expanded hitboxes can cause horizontal scrolling even when pointer events are disabled; remove closed hitboxes from layout and reserve sufficient space for desktop expansion. Use a contained menu on mobile. Verify 390px, laptop and wide layouts with tools both closed and open, and restore keyboard focus after co-trainer dialogs. Dashboard fixture screenshots do not establish authenticated production success.
+
 ## 2026-09-04 - Saved Provider HTML Must Fail Closed
 
 Source:

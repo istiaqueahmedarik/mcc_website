@@ -8,6 +8,8 @@ import {
   ArrowUpDown,
   BarChart3,
   Calculator,
+  ChevronDown,
+  ChevronRight,
   Check,
   Eye,
   EyeOff,
@@ -20,6 +22,9 @@ import {
   Lock,
   Medal,
   Minus,
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -49,6 +54,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -72,10 +85,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { apiGet, apiPost, apiRequest } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import {
+  ROOM_SORT,
+  ROOM_SORT_OPTIONS,
+  sortContestRooms,
+} from "./classroom-contest-room-sort.mjs";
 
 const EMPTY_ROOM_FORM = {
   name: "",
 };
+
+const ROOM_RAIL_STORAGE_KEY = "mcc_classroom_contest_room_rail_visible";
 
 const EMPTY_CONTEST_FORM = {
   provider: "vjudge",
@@ -471,13 +491,13 @@ function StudentContestProgress({ rows, studentRow }) {
   );
 }
 
-function ClassroomShareControl({ report, onToggle, loading }) {
+function ClassroomShareControl({ report, onToggle, loading, className = "" }) {
   const visible = Boolean(report?.visibleToStudents);
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className={cn("gap-1.5", pressableClass)}>
+        <Button size="sm" variant="outline" className={cn("gap-1.5", pressableClass, className)}>
           {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
           Share
         </Button>
@@ -522,6 +542,8 @@ export function ClassroomContestPanel({
 }) {
   const [rooms, setRooms] = useState([]);
   const [selectedRoomId, setSelectedRoomId] = useState("");
+  const [roomSort, setRoomSort] = useState(ROOM_SORT.NAME_ASC);
+  const [roomRailVisible, setRoomRailVisible] = useState(true);
   const [report, setReport] = useState(null);
   const [scoringConfig, setScoringConfig] = useState(null);
   const [scoringLoading, setScoringLoading] = useState(false);
@@ -530,6 +552,8 @@ export function ClassroomContestPanel({
   const [reportLoading, setReportLoading] = useState(false);
   const [busyKey, setBusyKey] = useState("");
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [scoringDialogOpen, setScoringDialogOpen] = useState(false);
   const [contestDialogOpen, setContestDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [codeforcesSessionDialogOpen, setCodeforcesSessionDialogOpen] = useState(false);
@@ -567,6 +591,10 @@ export function ClassroomContestPanel({
   const selectedRoom = useMemo(
     () => rooms.find((room) => room.id === selectedRoomId) || null,
     [rooms, selectedRoomId],
+  );
+  const sortedRooms = useMemo(
+    () => sortContestRooms(rooms, roomSort),
+    [roomSort, rooms],
   );
   const eduImportSource = codeforcesEduSource(eduImportContest);
   const eduImportStandingsUrl = codeforcesEduStandingsUrl(eduImportContest);
@@ -635,6 +663,28 @@ export function ClassroomContestPanel({
     () => Boolean(selectedRoom?.contests?.some((contest) => contestProvider(contest) === "vjudge")),
     [selectedRoom],
   );
+
+  useEffect(() => {
+    try {
+      const storedPreference = window.localStorage.getItem(ROOM_RAIL_STORAGE_KEY);
+      if (storedPreference !== null) setRoomRailVisible(storedPreference !== "false");
+    } catch {}
+
+    const syncRoomRailPreference = (event) => {
+      if (event.key !== ROOM_RAIL_STORAGE_KEY || event.newValue === null) return;
+      setRoomRailVisible(event.newValue !== "false");
+    };
+
+    window.addEventListener("storage", syncRoomRailPreference);
+    return () => window.removeEventListener("storage", syncRoomRailPreference);
+  }, []);
+
+  const updateRoomRailVisibility = (visible) => {
+    setRoomRailVisible(visible);
+    try {
+      window.localStorage.setItem(ROOM_RAIL_STORAGE_KEY, String(visible));
+    } catch {}
+  };
   const selectedRoomHasCodeforces = useMemo(
     () => Boolean(selectedRoom?.contests?.some((contest) => contestProvider(contest) === "codeforces")),
     [selectedRoom],
@@ -702,7 +752,9 @@ export function ClassroomContestPanel({
       setCodeforcesSession({ connected: Boolean(codeforcesSessionRes?.connected) });
       setSelectedRoomId((current) => {
         if (current && nextRooms.some((room) => room.id === current)) return current;
-        return nextRooms[0]?.id || "";
+        const requestedRoom = new URLSearchParams(window.location.search).get("room");
+        if (requestedRoom && nextRooms.some((room) => room.id === requestedRoom)) return requestedRoom;
+        return (isTrainer ? sortContestRooms(nextRooms)[0] : nextRooms[0])?.id || "";
       });
     } catch (error) {
       toast.error(error?.message || "Failed to load classroom contests");
@@ -805,7 +857,7 @@ export function ClassroomContestPanel({
   };
 
   const deleteRoom = async () => {
-    if (!selectedRoom) return;
+    if (!selectedRoom || busyKey) return;
     setBusyKey(`delete-room:${selectedRoom.id}`);
     try {
       await apiRequest(contestApi(classroomId, `rooms/${selectedRoom.id}`), { method: "DELETE" });
@@ -1586,80 +1638,125 @@ export function ClassroomContestPanel({
   return (
     <TooltipProvider delayDuration={150}>
       <section className="space-y-4">
-        <div className="rounded-lg border bg-card">
-          <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="border-b p-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-muted-foreground" />
                 <h2 className="text-lg font-bold">Contests</h2>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{rooms.length} rooms</span>
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                <span>{rooms.length} {rooms.length === 1 ? "room" : "rooms"}</span>
+                <span aria-hidden="true">·</span>
                 <span>{selectedRoom?.contests?.length || 0} contests</span>
-                <span>VJ {providerCounts.vjudge}</span>
-                <span>CF {providerCounts.codeforces}</span>
+                <span aria-hidden="true">·</span>
+                <span>VJudge {providerCounts.vjudge}</span>
+                <span aria-hidden="true">·</span>
+                <span>Codeforces {providerCounts.codeforces}</span>
+                <span aria-hidden="true">·</span>
                 <span>{mappingSummary ? `${mappingSummary.matchedRows}/${mappingSummary.totalRows} mapped` : "No report mapping"}</span>
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={refreshWorkspace} disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                Refresh
-              </Button>
-              {hasVjudgeContests && (
-                <Button size="sm" variant={vjSession.connected ? "outline" : "default"} className="gap-1.5" onClick={() => setSessionDialogOpen(true)}>
-                  <KeyRound className="h-4 w-4" />
-                  {vjSession.connected ? "VJudge Ready" : "Connect VJudge"}
-                </Button>
-              )}
-              <Button
-                size="sm"
-                variant={codeforcesCredentialStatus.configured || codeforcesSession.connected ? "outline" : hasCodeforcesContests ? "default" : "outline"}
-                className="gap-1.5"
-                onClick={() => setCodeforcesSessionDialogOpen(true)}
-              >
-                <KeyRound className="h-4 w-4" />
-                {codeforcesCredentialStatus.configured || codeforcesSession.connected ? "Codeforces Ready" : "Codeforces Access"}
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMappingDialogOpen(true)}>
-                <Users className="h-4 w-4" />
-                Mappings
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={openContestOrder} disabled={!selectedRoom || selectedRoom.contests.length < 2}>
-                <ArrowUpDown className="h-4 w-4" />
-                Sort
-              </Button>
-              <Button size="sm" className="gap-1.5" onClick={openCreateRoom}>
-                <Plus className="h-4 w-4" />
-                Room
-              </Button>
-            </div>
           </div>
 
-          <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
-            <aside className="border-b p-3 lg:border-b-0 lg:border-r">
-              <ScrollArea className="h-[360px] pr-2">
+          <div className={cn("grid min-w-0", roomRailVisible && "lg:grid-cols-[280px_minmax(0,1fr)]")}>
+            {roomRailVisible && <aside className="border-b bg-muted/10 p-4 lg:border-b-0 lg:border-r" aria-label="Contest rooms">
+              <div className="flex items-center gap-1">
+                <h3 className="mr-auto text-sm font-semibold">Rooms</h3>
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" size="icon" variant="ghost" className="h-11 w-11 sm:h-9 sm:w-9" aria-label="Sort rooms">
+                          <ArrowUpDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Sort rooms</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuLabel>Sort rooms</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {ROOM_SORT_OPTIONS.map((option) => (
+                      <DropdownMenuItem key={option.value} onSelect={() => setRoomSort(option.value)}>
+                        <Check className={cn("mr-2 h-4 w-4", roomSort !== option.value && "opacity-0")} />
+                        {option.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" size="icon" variant="ghost" className="h-11 w-11 sm:h-9 sm:w-9" onClick={openCreateRoom} aria-label="Add room">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Add room</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" size="icon" variant="ghost" className="h-11 w-11 sm:h-9 sm:w-9" onClick={openEditRoom} disabled={!selectedRoom} aria-label="Edit selected room">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit selected room</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" size="icon" variant="ghost" className="h-11 w-11 text-destructive hover:text-destructive sm:h-9 sm:w-9" onClick={deleteRoom} disabled={!selectedRoom || Boolean(busyKey)} aria-label="Delete selected room">
+                      {selectedRoom && busyKey === `delete-room:${selectedRoom.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete selected room</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" size="icon" variant="ghost" className="h-11 w-11 sm:h-9 sm:w-9" onClick={() => updateRoomRailVisibility(false)} aria-label="Hide rooms panel">
+                      <PanelLeftClose className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Hide rooms panel</TooltipContent>
+                </Tooltip>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{rooms.length} available</p>
+
+              <ScrollArea className="mt-3 h-[min(18rem,45vh)] pr-3 lg:h-[calc(100vh-19rem)] lg:min-h-[24rem] lg:max-h-[40rem]">
                 <div className="space-y-2">
-                  {rooms.map((room) => (
-                    <button
-                      key={room.id}
-                      type="button"
-                      onClick={() => setSelectedRoomId(room.id)}
-                      className={cn(
-                        "w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/60",
-                        selectedRoomId === room.id ? "border-foreground bg-muted" : "bg-background",
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="min-w-0 truncate text-sm font-semibold">{room.name}</span>
-                      </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{room.contests?.length || 0} contests</span>
-                        <span>{room.report?.visibleToStudents ? "Shared" : "Private"}</span>
-                      </div>
-                    </button>
-                  ))}
+                  {sortedRooms.map((room) => {
+                    const roomContests = Array.isArray(room.contests) ? room.contests : [];
+                    const pendingFetches = roomContests.filter((contest) => !(contest.latestSnapshotAt || contest.lastFetchedAt)).length;
+                    const readinessLabel = roomContests.length === 0
+                      ? "Add a contest"
+                      : pendingFetches > 0
+                        ? `${pendingFetches} need fetching`
+                        : "Ready for report";
+                    const roomSelected = selectedRoomId === room.id;
+
+                    return (
+                      <button
+                        key={room.id}
+                        type="button"
+                        onClick={() => setSelectedRoomId(room.id)}
+                        aria-pressed={roomSelected}
+                        className={cn(
+                          "min-h-11 w-full rounded-lg border px-3 py-3 text-left transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                          roomSelected ? "border-primary/50 bg-primary/10" : "bg-background hover:bg-muted/60",
+                        )}
+                      >
+                        <span className="block truncate text-sm font-semibold">{room.name}</span>
+                        <span className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>{roomContests.length} {roomContests.length === 1 ? "contest" : "contests"}</span>
+                          <span>{room.report?.visibleToStudents ? "Shared" : "Private"}</span>
+                        </span>
+                        <span className={cn(
+                          "mt-2 block text-xs font-medium",
+                          pendingFetches === 0 && roomContests.length > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400",
+                        )}>
+                          {readinessLabel}
+                        </span>
+                      </button>
+                    );
+                  })}
 
                   {!loading && rooms.length === 0 && (
                     <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -1668,91 +1765,85 @@ export function ClassroomContestPanel({
                   )}
                 </div>
               </ScrollArea>
-            </aside>
+
+            </aside>}
 
             <div className="min-w-0 space-y-4 p-4">
               {!selectedRoom ? (
                 <div className="rounded-lg border border-dashed p-8 text-center">
                   <Trophy className="mx-auto h-8 w-8 text-muted-foreground" />
                   <p className="mt-3 text-sm font-semibold">Create a contest room</p>
+                  <Button size="sm" className={cn("mt-4 min-h-11 gap-1.5", pressableClass)} onClick={openCreateRoom}>
+                    <Plus className="h-4 w-4" /> Add room
+                  </Button>
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-base font-bold">{selectedRoom.name}</h3>
-                      <p className="text-xs text-muted-foreground">Last report: {formatDate(selectedRoom.report?.updatedAt)}</p>
+                  <div className="flex flex-col gap-3 border-b border-border/60 pb-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="flex min-w-0 items-start gap-2">
+                      {!roomRailVisible && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" size="icon" variant="ghost" className="h-11 w-11 shrink-0 sm:h-9 sm:w-9" onClick={() => updateRoomRailVisibility(true)} aria-label="Show rooms panel">
+                              <PanelLeftOpen className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Show rooms panel</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="text-lg font-bold tracking-tight text-balance">{selectedRoom.name}</h3>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant="outline">{selectedRoom.report?.visibleToStudents ? "Shared" : "Private"}</Badge>
+                          <span>{selectedRoom.contests.length} {selectedRoom.contests.length === 1 ? "contest" : "contests"}</span>
+                          <span>Last report: {formatDate(selectedRoom.report?.updatedAt)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button size="icon" variant="outline" className="h-9 w-9" onClick={openEditRoom} aria-label="Edit room">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit room</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-9 w-9 text-destructive hover:text-destructive"
-                            onClick={deleteRoom}
-                            disabled={busyKey === `delete-room:${selectedRoom.id}`}
-                            aria-label="Delete room"
-                          >
-                            {busyKey === `delete-room:${selectedRoom.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete room</TooltipContent>
-                      </Tooltip>
-                      <Button size="sm" variant="outline" className="gap-1.5" onClick={openCreateContest}>
-                        <Plus className="h-4 w-4" />
-                        Contest
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap xl:shrink-0 xl:justify-end">
+                      <Button size="sm" variant="outline" className={cn("min-h-11 gap-1.5", pressableClass)} onClick={refreshWorkspace} disabled={loading}>
+                        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                        Refresh
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5"
-                        onClick={openContestOrder}
-                        disabled={selectedRoom.contests.length < 2}
-                      >
-                        <ArrowUpDown className="h-4 w-4" />
-                        Sort
+                      <Button size="sm" className={cn("min-h-11 gap-1.5", pressableClass)} onClick={generateReport} disabled={busyKey === "generate-report" || selectedRoom.contests.length === 0}>
+                        {busyKey === "generate-report" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                        Generate report
                       </Button>
+                      {report && (
+                        <ClassroomShareControl
+                          report={report}
+                          loading={busyKey === "share"}
+                          onToggle={toggleShare}
+                          className="min-h-11 w-full sm:w-auto"
+                        />
+                      )}
                       <ContestScoringDialog
                         apiBasePath={contestApi(classroomId, `rooms/${selectedRoom.id}`)}
                         contests={selectedRoom.contests || []}
                         roomName={selectedRoom.name}
+                        open={scoringDialogOpen}
+                        onOpenChange={setScoringDialogOpen}
                         onSaved={async () => {
                           await refreshWorkspace();
                           await refreshScoring();
                           await refreshReport();
                         }}
-                        trigger={
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1.5"
-                            disabled={selectedRoom.contests.length === 0}
-                          >
-                            <Calculator className="h-4 w-4" />
-                            Scoring & Merge
-                          </Button>
-                        }
+                        trigger={<span className="hidden" />}
                       />
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={generateReport}
-                        disabled={busyKey === "generate-report" || selectedRoom.contests.length === 0}
-                      >
-                        {busyKey === "generate-report" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                        Generate
-                      </Button>
                     </div>
                   </div>
+
+                  {report?.isStale && (
+                    <div className="flex flex-col gap-3 rounded-lg border border-amber-500/35 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">Report needs refresh</p>
+                        <p className="mt-1 text-xs">Contest data changed after the last report. The previous report remains available below.</p>
+                      </div>
+                      <Button size="sm" variant="outline" className={cn("min-h-11 shrink-0 border-amber-500/40 bg-background/70", pressableClass)} onClick={generateReport} disabled={busyKey === "generate-report" || selectedRoom.contests.length === 0}>
+                        Generate again
+                      </Button>
+                    </div>
+                  )}
 
                   {selectedRoomHasVjudge && !vjSession.connected && (
                     <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-700">
@@ -1767,7 +1858,7 @@ export function ClassroomContestPanel({
                         type="button"
                         size="sm"
                         variant="outline"
-                        className={cn("h-8 shrink-0 border-amber-500/30 bg-background/70 text-amber-800 hover:text-amber-900", pressableClass)}
+                        className={cn("min-h-11 shrink-0 border-amber-500/30 bg-background/70 text-amber-800 hover:text-amber-900 sm:min-h-8 sm:h-8", pressableClass)}
                         onClick={() => setCodeforcesSessionDialogOpen(true)}
                       >
                         Connect session
@@ -1775,13 +1866,42 @@ export function ClassroomContestPanel({
                     </div>
                   )}
 
-                  <ContestMergeOverview
-                    contests={selectedRoom.contests || []}
-                    groups={scoringConfig?.groups || []}
-                    title={scoringLoading ? "Loading merge groups" : "Merge groups"}
-                  />
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSourcesOpen((open) => !open)} aria-expanded={sourcesOpen} aria-controls="contest-sources">
+                      <span className="min-w-0"><span className="font-semibold">Contest sources</span><span className="ml-2 text-xs text-muted-foreground">{selectedRoom.contests.length} configured</span></span>
+                      {sourcesOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    </button>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                      <Button size="sm" variant="outline" className={cn("min-h-11 gap-1.5", pressableClass)} onClick={openCreateContest}>
+                        <Plus className="h-4 w-4" /> Add contest
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="outline" className={cn("min-h-11 gap-1.5", pressableClass)}>
+                            <MoreHorizontal className="h-4 w-4" /> Tools
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-60">
+                          <DropdownMenuLabel>Room and provider tools</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem disabled={selectedRoom.contests.length < 2} onSelect={openContestOrder}><ArrowUpDown className="mr-2 h-4 w-4" />Order contests</DropdownMenuItem>
+                          <DropdownMenuItem disabled={selectedRoom.contests.length === 0} onSelect={() => setScoringDialogOpen(true)}><Calculator className="mr-2 h-4 w-4" />Scoring &amp; merge</DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setMappingDialogOpen(true)}><Users className="mr-2 h-4 w-4" />Handle mappings</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {hasVjudgeContests && <DropdownMenuItem onSelect={() => setSessionDialogOpen(true)}><KeyRound className="mr-2 h-4 w-4" />VJudge access</DropdownMenuItem>}
+                          <DropdownMenuItem onSelect={() => setCodeforcesSessionDialogOpen(true)}><KeyRound className="mr-2 h-4 w-4" />Codeforces access</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
 
-                  <div className="overflow-hidden rounded-lg border">
+                  {sourcesOpen && <div id="contest-sources" className="space-y-4">
+                    <ContestMergeOverview
+                      contests={selectedRoom.contests || []}
+                      groups={scoringConfig?.groups || []}
+                      title={scoringLoading ? "Loading merge groups" : "Merge groups"}
+                    />
+                  <div className="overflow-x-auto rounded-lg border" tabIndex={0} role="region" aria-label="Contest sources table">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1820,7 +1940,7 @@ export function ClassroomContestPanel({
                                         type="button"
                                         size="icon"
                                         variant="outline"
-                                        className={cn("h-8 w-8 shrink-0", pressableClass)}
+                                        className={cn("h-11 w-11 shrink-0 sm:h-8 sm:w-8", pressableClass)}
                                         onClick={() => openEduImport(contest)}
                                         aria-label={`Import saved standings for ${contest.title}`}
                                       >
@@ -1833,28 +1953,28 @@ export function ClassroomContestPanel({
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className={cn("gap-1", pressableClass)}
+                                  className={cn("min-h-11 gap-1 sm:min-h-8 sm:h-8", pressableClass)}
                                   onClick={() => fetchContest(contest)}
                                   disabled={busyKey === `fetch:${contest.id}`}
                                 >
                                   {busyKey === `fetch:${contest.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                                   Fetch
                                 </Button>
-                                <Button size="sm" variant="outline" className="gap-1" onClick={() => openSolveOverrides(contest)}>
+                                <Button size="sm" variant="outline" className="min-h-11 gap-1 sm:min-h-8 sm:h-8" onClick={() => openSolveOverrides(contest)}>
                                   <ListChecks className="h-3.5 w-3.5" />
                                   Solves
                                 </Button>
-                                <Button size="sm" variant="outline" className="gap-1" onClick={() => openDemerits(contest)}>
+                                <Button size="sm" variant="outline" className="min-h-11 gap-1 sm:min-h-8 sm:h-8" onClick={() => openDemerits(contest)}>
                                   <AlertCircle className="h-3.5 w-3.5" />
                                   Demerits
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditContest(contest)} aria-label="Edit contest">
+                                <Button size="icon" variant="ghost" className="h-11 w-11 sm:h-8 sm:w-8" onClick={() => openEditContest(contest)} aria-label="Edit contest">
                                   <Pencil className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  className="h-11 w-11 text-destructive hover:text-destructive sm:h-8 sm:w-8"
                                   onClick={() => deleteContest(contest)}
                                   disabled={busyKey === `delete-contest:${contest.id}`}
                                   aria-label="Delete contest"
@@ -1876,44 +1996,37 @@ export function ClassroomContestPanel({
                       </TableBody>
                     </Table>
                   </div>
+                  </div>}
+
+                  <div className="border-t pt-4">
+                    {reportLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading report
+                      </div>
+                    ) : reportData ? (
+                      <ReportTable
+                        merged={orderedReportData}
+                        liveReportId={`classroom_${classroomId}_${selectedRoom.id}`}
+                        name={selectedRoom.name}
+                        showLiveShare={false}
+                        solveOnly={!reportData?.scoring}
+                        contestOrder={selectedRoomContestOrder}
+                        enableViewModes
+                      />
+                    ) : (
+                      <div className="rounded-lg border border-dashed p-8 text-center">
+                        <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
+                        <p className="mt-3 text-sm font-semibold">No generated report</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Fetch contest sources, then generate this room&apos;s report.</p>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
           </div>
         </div>
-
-        {selectedRoom && (
-          <div className="space-y-4">
-            {reportLoading ? (
-              <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading report
-              </div>
-            ) : reportData ? (
-              <ReportTable
-                merged={orderedReportData}
-                liveReportId={`classroom_${classroomId}_${selectedRoom.id}`}
-                name={selectedRoom.name}
-                showLiveShare={false}
-                solveOnly={!reportData?.scoring}
-                contestOrder={selectedRoomContestOrder}
-                enableViewModes
-                shareControl={
-                  <ClassroomShareControl
-                    report={report}
-                    loading={busyKey === "share"}
-                    onToggle={toggleShare}
-                  />
-                }
-              />
-            ) : (
-              <div className="rounded-lg border border-dashed p-8 text-center">
-                <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-3 text-sm font-semibold">No generated report</p>
-              </div>
-            )}
-          </div>
-        )}
 
         <Dialog open={roomDialogOpen} onOpenChange={setRoomDialogOpen}>
           <DialogContent className={formDialogClass}>

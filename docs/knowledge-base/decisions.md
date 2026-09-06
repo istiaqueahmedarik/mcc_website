@@ -1,5 +1,21 @@
 # Decisions
 
+## 2026-09-06 - Contest report focus mode and wider trainer shell
+
+The contest room rail defaults to visible and stores its visibility in browser local storage. Sort, add, edit, delete, and hide are icon actions beside the Rooms heading, with accessible names and hover tooltips. When hidden, Show rooms remains beside the selected report title. The trainer classroom shell expands from 1600px to 1800px; the student shell keeps its previous width.
+
+## 2026-09-06 - Contest room rail and lexicographic sorting approved
+
+The user approved page `05 · Contests v2 - review` in `/home/arik/Documents/Classroom Interior Design.tldraw`. Trainer Contests retains the established left room rail on desktop and stacks it above the selected-room workspace on mobile. The room list offers Name A-Z, Name Z-A, Most contests, and Fewest contests; Name A-Z is the default. Sorting is client-only, non-mutating, and keeps URL/current selection tied to room ID. Add room remains in the rail; report generation, sharing, source recovery, scoring, mappings, and provider access retain their existing handlers and authorization.
+
+## 2026-09-05 - Classroom interior implementation approved and delivered locally
+
+The user requested a GPT-5.6 Sol subagent at medium reasoning to implement the classroom interior design in `docs/rsd/classroom-interior-design-20260905-rsd.md`. The delivered local scope updates trainer shell/Updates/Live/Contests/Topics/People presentation while preserving student UI, existing handlers, permissions, scoring/provider behavior, and the latest dashboard navigation. No backend or database change was needed. Verification and limits are recorded in `docs/reviews/classroom-interior-design-20260905-implementation-review.md`.
+
+## 2026-09-05 - Approved dashboard hierarchy and truthful summaries
+
+The user approved `Trainer Dashboard Update.tldraw` for implementation, then revised the hierarchy after reviewing the rendered page. New classroom and Forms stay visibly labeled; the separate Next Session hero and top-right overflow rail are omitted; account-link/stale-report attention sits to the right of searchable classrooms on wide screens. The desktop content shell is capped at 1440px. Only a persisted started class means Live; `live_url` alone means a meeting link exists. Label the most recently updated topic Latest topic. Pins/recents are user-scoped browser preferences; URL controls cover search/filter/view/sort. Trainer classroom back navigation returns to `/trainer/dashboard`; student back navigation retains `/classroom/list`. No database migration was needed. The classroom interior was subsequently approved and implemented under the decision above.
+
 ## 2026-09-04 - Codeforces EDU Challenge Recovery Uses Browser-Saved HTML
 
 Decision:

@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import { Context } from 'hono';
 import sql from '../db';
+import { getTrainerDashboardSummaries } from '../utils/trainerDashboardSummary';
 import * as cheerio from 'cheerio';
 import {
   closeClassroomBoardRoom,
@@ -3202,6 +3203,13 @@ export const getClassrooms = async (c: Context) => {
         )
         ORDER BY c.created_at DESC
       `;
+    }
+    if (c.req.query('dashboard') === 'true') {
+      if (!userCheck[0]?.admin && !userCheck[0]?.trainer) {
+        return c.json({ error: 'Trainer access required' }, 403);
+      }
+      const summaries = await getTrainerDashboardSummaries(result.map((room) => room.id));
+      result = result.map((room) => ({ ...room, dashboard: summaries.get(room.id) }));
     }
     return c.json({ result });
   } catch (error: any) {

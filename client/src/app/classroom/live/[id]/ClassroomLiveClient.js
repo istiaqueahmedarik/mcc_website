@@ -9,8 +9,11 @@ import { PrioritySettings } from '@/components/PrioritySettings';
 import { ClassroomThreadsTab } from '@/components/ClassroomThreadsTab';
 import { ClassroomDiscordSettingsCard } from '@/components/ClassroomDiscordSettingsCard';
 import ClassroomContestPanel from '@/components/ClassroomContestPanel';
+import ClassroomTabUrlSync from '@/components/ClassroomTabUrlSync';
 import DiscordConnectionRequiredCard from '@/components/DiscordConnectionRequiredCard';
 import { StudentThreadBubbleDock, getStudentThreadBubbleKey } from '@/components/StudentThreadBubbleDock';
+import { ClassroomArrivalPanel, LiveSessionToolbar } from './TrainerClassroomInterior';
+import { getNextScheduledClass } from './trainer-interior-model.mjs';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -952,8 +955,8 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <nav aria-label={navigationLabel} className="flex min-h-12 w-full items-end gap-3 border-b border-border/70">
-          <TabsList id={tabsId} className="flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground">
+        <nav aria-label={navigationLabel} className={trainer ? "grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 border-b border-border/70" : "flex min-h-12 w-full items-end gap-3 border-b border-border/70"}>
+          <TabsList id={tabsId} className={trainer ? "grid h-auto min-w-0 grid-cols-3 justify-start gap-0 bg-transparent p-0 text-muted-foreground sm:flex sm:flex-1" : "flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground"}>
             {primaryItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -961,7 +964,7 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                   key={item.value}
                   id={item.tourId}
                   value={item.value}
-                  className="h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"
+                  className={trainer ? "h-11 min-w-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-xs shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:h-12 sm:shrink-0 sm:px-3 sm:text-sm" : "h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -975,7 +978,7 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
               <button
                 id={moreId}
                 type="button"
-                className={`inline-flex h-12 min-w-0 shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 text-sm font-medium outline-none ring-offset-background transition-[border-color,color,background-color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:px-3 ${
+                className={`inline-flex min-w-0 shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 font-medium outline-none ring-offset-background transition-[border-color,color,background-color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:px-3 ${trainer ? 'h-11 text-xs sm:h-12 sm:text-sm' : 'h-12 text-sm'} ${
                   activeSecondaryItem
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -1000,45 +1003,12 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
   );
 }
 
-function ClassroomOverviewCard({ icon: Icon, title, description, badge, actionLabel, actionIcon: ActionIcon = Info, onAction }) {
-  return (
-    <article className="flex min-h-24 items-start justify-between gap-4 rounded-lg border border-border/80 bg-card/70 p-5 shadow-[0_14px_36px_rgba(0,0,0,0.14),0_0_0_1px_rgba(255,255,255,0.02)]">
-      <div className="flex min-w-0 items-start gap-3">
-        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 space-y-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold leading-5 text-foreground">{title}</h3>
-            {badge && (
-              <Badge variant="secondary" className="h-5 rounded-md px-2 text-[11px] font-medium">
-                {badge}
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm leading-5 text-muted-foreground">{description}</p>
-        </div>
-      </div>
-      {onAction && (
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          className="h-10 w-10 shrink-0 rounded-md border-border/80 bg-background/70 text-foreground shadow-none active:scale-[0.97]"
-          onClick={onAction}
-          aria-label={actionLabel}
-        >
-          <ActionIcon className="h-4 w-4" />
-        </Button>
-      )}
-    </article>
-  );
-}
-
 function PeopleModeSwitch({ value, onChange, options, ariaLabel }) {
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className="inline-flex min-h-10 items-center gap-1 rounded-md bg-muted/60 p-1 text-sm"
+      className="inline-flex min-h-11 items-center gap-1 rounded-md bg-muted/60 p-1 text-sm"
     >
       {options.map((option) => {
         const active = value === option.value;
@@ -1049,7 +1019,7 @@ function PeopleModeSwitch({ value, onChange, options, ariaLabel }) {
             role="tab"
             aria-selected={active}
             onClick={(event) => onChange(option.value, event)}
-            className={`inline-flex min-h-8 items-center gap-1.5 rounded px-3 text-sm font-medium transition-[background-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] ${
+            className={`inline-flex min-h-11 items-center gap-1.5 rounded px-3 text-sm font-medium transition-[background-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:min-h-8 ${
               active
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -1090,7 +1060,7 @@ function PeopleSearchInput({ value, onChange, placeholder, className = '' }) {
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-10 min-w-0 pl-9 text-sm"
+        className="h-11 min-w-0 pl-9 text-sm sm:h-10"
       />
     </div>
   );
@@ -3204,6 +3174,11 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [problemImport, setProblemImport] = useState(emptyProblemImportState);
   const [problemImportLoading, setProblemImportLoading] = useState(false);
   const [assignPanelOpen, setAssignPanelOpen] = useState(false);
+  const [liveProgressFilter, setLiveProgressFilter] = useState('all');
+  const [liveProgressSearch, setLiveProgressSearch] = useState('');
+  const [selectedLiveProblemId, setSelectedLiveProblemId] = useState('');
+  const [wideLiveInspector, setWideLiveInspector] = useState(false);
+  const [liveGuidanceDialogOpen, setLiveGuidanceDialogOpen] = useState(false);
   const [topics, setTopics] = useState([]);
   const [topicAssignments, setTopicAssignments] = useState([]);
   const [topicAnalytics, setTopicAnalytics] = useState([]);
@@ -3252,7 +3227,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [boardSession, setBoardSession] = useState(null);
   const [boardLoading, setBoardLoading] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({
-    liveProgress: false,
+    liveProgress: true,
     scheduleClass: true,
     schedules: true,
     students: true,
@@ -3285,6 +3260,14 @@ export default function ClassroomLiveClient({ classroomId }) {
   const trackedIdeStudentIdRef = useRef('');
   const peoplePanelAnimateRef = useRef(false);
 
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const update = () => setWideLiveInspector(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
   const classroom = data?.classroom;
   const students = data?.students || EMPTY_LIST;
   const classes = data?.classes || EMPTY_LIST;
@@ -3308,6 +3291,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     ? buildProblemImportPreview(problemImport, students, teams)
     : { rows: [], rowErrors: [] };
   const completedClasses = getCompletedClasses(classes);
+  const nextScheduledClass = getNextScheduledClass(classes);
   const selectedPastClass = completedClasses.find((classItem) => classItem.id === selectedPastClassId) || null;
 
   const pendingSubmissionsList = useMemo(() => {
@@ -3460,6 +3444,14 @@ export default function ClassroomLiveClient({ classroomId }) {
   const visibleClassroomResources = classroomResources.slice(0, visibleResourceCount);
   const visibleActiveResources = activeClassResources.slice(0, visibleResourceCount);
   const visibleProblems = problems.slice(0, visibleProblemCount);
+  const filteredLiveProblems = problems.filter((problem) => {
+    if (liveProgressFilter === 'review' && problem.status !== 'pending_approval') return false;
+    const query = normalizeSearchText(liveProgressSearch);
+    if (!query) return true;
+    return normalizeSearchText(`${problem.student_name || ''} ${problem.title || ''} ${problem.platform || ''}`).includes(query);
+  });
+  const visibleLiveProblems = filteredLiveProblems.slice(0, visibleProblemCount);
+  const selectedLiveProblem = problems.find((problem) => String(problem.id) === String(selectedLiveProblemId)) || null;
   const liveProgressStats = problems.reduce((stats, problem) => {
     const status = problem.status || 'not_solved';
     stats.total += 1;
@@ -4185,12 +4177,27 @@ export default function ClassroomLiveClient({ classroomId }) {
 
   const selectClassroomTab = (setTab, nextTab) => {
     setTab(nextTab);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('tab') !== nextTab) {
+      url.searchParams.set('tab', nextTab);
+      url.searchParams.delete('room');
+      window.history.pushState(null, '', url);
+    }
     if (nextTab === 'attendance-summary') {
       fetchAttendanceSummary();
     }
   };
 
-  const handleTrainerTabChange = (nextTab) => selectClassroomTab(setTrainerTab, nextTab);
+  const handleTrainerTabChange = (nextTab) => {
+    if (nextTab !== trainerTab && (noteText.trim() || hintText.trim()) && !window.confirm('Discard the unsaved note or hint?')) return;
+    if (nextTab !== 'live') {
+      setSelectedLiveProblemId('');
+      setLiveGuidanceDialogOpen(false);
+      setNoteText('');
+      setHintText('');
+    }
+    selectClassroomTab(setTrainerTab, nextTab);
+  };
   const handleStudentTabChange = (nextTab) => selectClassroomTab(setStudentTab, nextTab);
 
   const openAttendanceModal = async (classItem) => {
@@ -4886,6 +4893,7 @@ export default function ClassroomLiveClient({ classroomId }) {
         setAssignTarget({ type: 'student', id: '' });
         fetchProblemTags();
         fetchProblems(activeClass.id);
+        setAssignPanelOpen(false);
         toast.success('Problem assigned', { id: toastId });
       } else {
         setAssignProblemError(res?.error || 'Failed to assign problem');
@@ -4970,10 +4978,12 @@ export default function ClassroomLiveClient({ classroomId }) {
   };
 
   // Notes & Hints Dialog logic
-  const handleOpenProblemConfig = async (probId) => {
+  const handleOpenProblemConfig = async (probId, { preserveDrafts = false } = {}) => {
     setActiveProblemId(probId);
-    setNoteText('');
-    setHintText('');
+    if (!preserveDrafts) {
+      setNoteText('');
+      setHintText('');
+    }
     const res = await get_with_token(`classroom/problem/${probId}/notes-hints`);
     if (res && !res.error) {
       setProblemDetails(res);
@@ -4986,7 +4996,7 @@ export default function ClassroomLiveClient({ classroomId }) {
     const res = await post_with_token(`classroom/problem/${activeProblemId}/add-note`, { noteText });
     if (res && res.success) {
       setNoteText('');
-      handleOpenProblemConfig(activeProblemId);
+      handleOpenProblemConfig(activeProblemId, { preserveDrafts: true });
     }
   };
 
@@ -4999,9 +5009,96 @@ export default function ClassroomLiveClient({ classroomId }) {
     });
     if (res && res.success) {
       setHintText('');
-      handleOpenProblemConfig(activeProblemId);
+      handleOpenProblemConfig(activeProblemId, { preserveDrafts: true });
     }
   };
+
+  const hasLiveInspectorDraft = Boolean(noteText.trim() || hintText.trim());
+
+  const closeLiveInspector = () => {
+    if (hasLiveInspectorDraft && !window.confirm('Discard the unsaved note or hint?')) return;
+    const triggerId = selectedLiveProblemId ? `live-problem-inspect-${selectedLiveProblemId}` : '';
+    setSelectedLiveProblemId('');
+    setLiveGuidanceDialogOpen(false);
+    setNoteText('');
+    setHintText('');
+    if (triggerId) window.requestAnimationFrame(() => document.getElementById(triggerId)?.focus());
+  };
+
+  const selectLiveProblem = (problemId) => {
+    if (String(problemId) === String(selectedLiveProblemId)) {
+      closeLiveInspector();
+      return;
+    }
+    if (hasLiveInspectorDraft && !window.confirm('Discard the unsaved note or hint?')) return;
+    setLiveGuidanceDialogOpen(false);
+    setNoteText('');
+    setHintText('');
+    setSelectedLiveProblemId(problemId);
+  };
+
+  const openLiveGuidance = (problemId) => {
+    if (hasLiveInspectorDraft && activeProblemId !== problemId && !window.confirm('Discard the unsaved note or hint?')) return;
+    if (activeProblemId !== problemId) {
+      setNoteText('');
+      setHintText('');
+    }
+    handleOpenProblemConfig(problemId);
+    setLiveGuidanceDialogOpen(true);
+  };
+
+  const setLiveGuidanceOpen = (open) => {
+    if (open) {
+      setLiveGuidanceDialogOpen(true);
+      return;
+    }
+    if (hasLiveInspectorDraft && !window.confirm('Discard the unsaved note or hint?')) return;
+    setLiveGuidanceDialogOpen(false);
+    setNoteText('');
+    setHintText('');
+  };
+
+  const renderLiveProblemInspector = (problem, mobile = false) => (
+    <div className={mobile ? "min-h-0 overflow-y-auto px-1 pb-2" : "min-h-0 flex-1 overflow-y-auto px-4 pb-4"}>
+      {!mobile && (
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border/60 bg-card px-0 py-4">
+          <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Selected work</p><h3 className="mt-1 truncate font-semibold">{problem.student_name || 'Student'}</h3></div>
+          <Button type="button" variant="ghost" size="icon" className="min-h-11 min-w-11" onClick={closeLiveInspector} aria-label="Close selected work"><X className="h-4 w-4" /></Button>
+        </div>
+      )}
+      <div className="space-y-5 py-4">
+        <section>
+          <p className="text-xs font-medium text-muted-foreground">Problem</p>
+          <a href={problem.problem_link} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 font-semibold text-primary hover:underline">{problem.title}<ExternalLink className="h-3.5 w-3.5" /></a>
+        </section>
+        <section>
+          <label htmlFor={`inspector-status-${problem.id}`} className="text-xs font-medium text-muted-foreground">Verification status</label>
+          <select id={`inspector-status-${problem.id}`} value={problem.status} onChange={(event) => handleTrainerSetStatus(problem.id, event.target.value)} className={`mt-1 min-h-11 w-full rounded-md border px-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${statusTone[problem.status] || statusTone.not_solved}`}>
+            <option value="pending_approval" disabled>Pending Approval</option>
+            <option value="not_solved">Not Solved</option>
+            <option value="tried">Tried</option>
+            <option value="solved">Solved</option>
+          </select>
+        </section>
+        <section>
+          <h4 className="text-xs font-medium text-muted-foreground">Submitted proof</h4>
+          <div className="mt-2"><SubmissionReviewContent solutionLink={problem.solution_link} solutionCode={problem.solution_code} submissionNotes={problem.submission_notes} /></div>
+        </section>
+        <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+          {renderLiveSubmissionThreadButton(problem)}
+          <ProblemThreadDialog classroomId={classroomId} problemId={problem.id} problemType="class_problem" classId={problem.class_id || activeClass?.id} currentUser={currentUser} onOpenThread={openThreadBubble} title={problem.title || 'Problem thread'} description={`${problem.student_name || 'Student'} problem discussion.`} buttonClassName="min-h-11 gap-1 text-xs font-semibold" />
+          <Dialog open={liveGuidanceDialogOpen && activeProblemId === problem.id} onOpenChange={setLiveGuidanceOpen}>
+            <DialogTrigger asChild><Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => openLiveGuidance(problem.id)}>Notes &amp; hints</Button></DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px]">
+              <DialogHeader><DialogTitle>Notes &amp; hints</DialogTitle><DialogDescription>Private guidance for {problem.student_name || 'this student'}.</DialogDescription></DialogHeader>
+              <form onSubmit={handleAddNote} className="space-y-2 border-b pb-4"><label className="text-sm font-semibold" htmlFor={`inspector-note-${problem.id}`}>Trainer note</label><Textarea id={`inspector-note-${problem.id}`} value={noteText} onChange={(event) => setNoteText(event.target.value)} placeholder="Add a private note" required /><Button type="submit" size="sm" className="min-h-11">Add note</Button>{problemDetails.notes.map((note) => <div key={note.id} className="rounded-md border bg-muted/40 p-2 text-xs">{note.note_text}</div>)}</form>
+              <form onSubmit={handleAddHint} className="space-y-2"><label className="text-sm font-semibold" htmlFor={`inspector-hint-${problem.id}`}>Time-locked hint</label><Textarea id={`inspector-hint-${problem.id}`} value={hintText} onChange={(event) => setHintText(event.target.value)} placeholder="Hint content" required /><label className="text-xs text-muted-foreground" htmlFor={`inspector-hint-delay-${problem.id}`}>Unlock delay (minutes)</label><Input id={`inspector-hint-delay-${problem.id}`} type="number" value={hintTimer} onChange={(event) => setHintTimer(event.target.value)} required /><Button type="submit" size="sm" className="min-h-11">Add hint</Button>{problemDetails.hints?.map((hint) => <div key={hint.id} className="flex justify-between gap-3 rounded-md border bg-muted/40 p-2 text-xs"><span>{hint.hint_text}</span><Badge variant="outline">{Math.floor(hint.unlock_after_seconds / 60)}m</Badge></div>)}</form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+    </div>
+  );
 
 
   const renderTrainerRosterStudent = (s) => {
@@ -5137,21 +5234,21 @@ export default function ClassroomLiveClient({ classroomId }) {
     );
   }
   return (
-    <div className="dark min-h-screen bg-[#111111] text-foreground">
-      <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8">
-      <ProgressLink href="/classroom/list" className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
-        <ArrowLeft className="h-4 w-4" /> Classrooms
+    <div className={isTrainer ? "min-h-screen bg-background text-foreground" : "dark min-h-screen bg-[#111111] text-foreground"}>
+      <main className={isTrainer ? "mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8" : "mx-auto flex w-full max-w-[1600px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8"}>
+      <ProgressLink href={isTrainer ? "/trainer/dashboard" : "/classroom/list"} className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
+        <ArrowLeft className="h-4 w-4" /> {isTrainer ? "Trainer dashboard" : "Classrooms"}
       </ProgressLink>
 
-      <section id="classroom-tour-header" className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0 space-y-3">
-          <h1 className="truncate text-3xl font-semibold leading-tight text-foreground">{classroom.name}</h1>
-          <p className="max-w-2xl text-base leading-6 text-muted-foreground">
-            {classroom.description || 'No description provided.'}
-          </p>
+      <section id="classroom-tour-header" className={isTrainer ? "flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-end lg:justify-between" : "flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"}>
+        <div className={isTrainer ? "min-w-0 space-y-1.5" : "min-w-0 space-y-3"}>
+          <h1 className={isTrainer ? "text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl" : "truncate text-3xl font-semibold leading-tight text-foreground"}>{classroom.name}</h1>
+          {!isTrainer && <p className="max-w-2xl text-base leading-6 text-muted-foreground">{classroom.description || 'No description provided.'}</p>}
           <p className="text-sm text-muted-foreground">
             Trainer <span className="font-semibold text-foreground">{classroom.trainer_name || 'Trainer'}</span>
+            {isTrainer && <><span aria-hidden="true"> · </span>{students.length} roster member{students.length === 1 ? '' : 's'}</>}
           </p>
+          {isTrainer && classroom.description && <details className="max-w-2xl text-sm text-muted-foreground"><summary className="cursor-pointer select-none text-xs font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Classroom details</summary><p className="mt-2 leading-6">{classroom.description}</p></details>}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:justify-end">
@@ -5160,14 +5257,14 @@ export default function ClassroomLiveClient({ classroomId }) {
               type="button"
               variant="outline"
               size="sm"
-              className="h-10 max-w-full gap-2 border-border/80 bg-card/70 px-3 text-sm font-medium shadow-sm active:scale-[0.98]"
+              className={`${isTrainer ? 'min-h-11' : 'h-10'} max-w-full gap-2 border-border/80 bg-card/70 px-3 text-sm font-medium shadow-sm active:scale-[0.98]`}
               onClick={() => (isTrainer ? handleTrainerTabChange('live') : handleStudentTabChange('live'))}
             >
               <Radio className="h-4 w-4 text-red-500" />
               <span className="truncate">Live: {activeClass.name}</span>
             </Button>
           ) : (
-            <span className="inline-flex h-10 items-center gap-2 rounded-md border border-border/80 bg-card/70 px-3 text-sm font-medium text-muted-foreground shadow-sm">
+            <span className={`inline-flex ${isTrainer ? 'min-h-11' : 'h-10'} items-center gap-2 rounded-md border border-border/80 bg-card/70 px-3 text-sm font-medium text-muted-foreground shadow-sm`}>
               <VideoOff className="h-4 w-4" />
               No live session
             </span>
@@ -5177,7 +5274,7 @@ export default function ClassroomLiveClient({ classroomId }) {
               type="button"
               variant="outline"
               size="sm"
-              className="h-10 gap-2 border-border/80 bg-card/70 px-3 text-sm font-semibold shadow-sm active:scale-[0.98]"
+              className="min-h-11 gap-2 border-border/80 bg-card/70 px-3 text-sm font-semibold shadow-sm active:scale-[0.98]"
               onClick={openClassroomEditDialog}
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -5195,28 +5292,23 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* TRAINER BOARD PANELS                                      */
             /* ========================================================= */
             <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className="space-y-7">
+              <ClassroomTabUrlSync allowedValues={[...TRAINER_PRIMARY_NAVIGATION, ...TRAINER_SECONDARY_NAVIGATION].map((item) => item.value)} onSelect={handleTrainerTabChange} />
               <ClassroomRoleNavigation role="trainer" value={trainerTab} onSelect={handleTrainerTabChange} />
 
             <TabsContent value="updates" className="space-y-7">
+              <ClassroomArrivalPanel
+                activeClass={activeClass}
+                nextClass={nextScheduledClass}
+                pendingSubmissionCount={pendingSubmissionsList.length}
+                pendingJoinCount={trainerLinkPendingCount}
+                onOpenLive={() => handleTrainerTabChange('live')}
+                onOpenSchedule={() => handleTrainerTabChange('schedule')}
+                onOpenHistory={() => setHistoryDetailsOpen(true)}
+                onOpenResources={() => setResourcesDetailsOpen(true)}
+                onOpenPeople={() => handleTrainerTabChange('students')}
+                onOpenTopics={() => handleTrainerTabChange('topics')}
+              />
               <UpdatesTab classroomId={classroomId} isTrainer={true} token={token} currentUser={currentUser} active={trainerTab === 'updates'} />
-              <div className="grid gap-4 md:grid-cols-2">
-                <ClassroomOverviewCard
-                  icon={Clock}
-                  title="History"
-                  badge={`${completedClasses.length} completed`}
-                  description="Completed sessions and progress."
-                  actionLabel="Open history details"
-                  onAction={() => setHistoryDetailsOpen(true)}
-                />
-                <ClassroomOverviewCard
-                  icon={Library}
-                  title="Resources"
-                  description="Study material and reader pages."
-                  actionLabel="Open resources"
-                  actionIcon={Plus}
-                  onAction={() => setResourcesDetailsOpen(true)}
-                />
-              </div>
             </TabsContent>
 
               <TabsContent value="threads" className="mt-4">
@@ -5235,55 +5327,34 @@ export default function ClassroomLiveClient({ classroomId }) {
               {/* LIVE PRACTICE PANEL */}
               <TabsContent value="live" className="space-y-6">
                 {!activeClass ? (
-                  <Card className="rounded-lg border border-dashed bg-card p-10 text-center">
-                    <CardContent className="space-y-4 p-0">
-                      <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-muted">
-                        <Play className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <h3 className="text-lg font-bold">No live practice</h3>
-                      <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                        Start a scheduled class to assign problems and track progress.
-                      </p>
-                      <div className="pt-2">
-                        {classes.filter(c => c.status === 'scheduled').length === 0 ? (
-                          <p className="text-xs text-muted-foreground">Go to &quot;Schedules &amp; Setup&quot; tab to schedule a class.</p>
-                        ) : (
-                          <div className="flex flex-col items-center gap-2">
-                            <p className="text-xs text-muted-foreground mb-1">Start scheduled class</p>
-                            {classes.filter(c => c.status === 'scheduled').map(c => (
-                              <Button key={c.id} onClick={() => handleStartClass(c.id)} size="sm" className="font-semibold gap-1">
-                                <Play className="h-4 w-4" /> Start: {c.name}
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="rounded-xl border border-dashed border-border bg-card/70 p-8 text-center">
+                    <div className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-muted"><Play className="h-5 w-5 text-muted-foreground" /></div>
+                    <h3 className="mt-4 text-lg font-semibold">No live session</h3>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{nextScheduledClass ? `${nextScheduledClass.name} is the next scheduled class.` : 'Schedule a class before opening the teaching workspace.'}</p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-2">
+                      {nextScheduledClass && <Button className="gap-2" onClick={() => handleStartClass(nextScheduledClass.id)}><Play className="h-4 w-4" />Start {nextScheduledClass.name}</Button>}
+                      <Button variant={nextScheduledClass ? 'outline' : 'default'} className="gap-2" onClick={() => handleTrainerTabChange('schedule')}><Calendar className="h-4 w-4" />Schedule session</Button>
+                    </div>
+                  </div>
                 ) : (
                   <>
+                    <LiveSessionToolbar activeClass={activeClass} meetingUrl={classroom.live_url} onAssign={() => setAssignPanelOpen(true)} onBoard={() => handleTrainerTabChange('board')} onEnd={() => handleCompleteClass(activeClass.id)} />
                     {/* ASSIGN PROBLEM FORM */}
-                    <Card className="rounded-lg border">
-                      <CardHeader className="py-3">
-                        <button
-                          type="button"
-                          onClick={() => setAssignPanelOpen((open) => !open)}
-                          className="flex w-full items-center justify-between gap-3 text-left"
-                          aria-expanded={assignPanelOpen}
-                        >
-                          <div>
-                            <CardTitle className="flex items-center gap-2 text-lg font-bold">
-                              <Plus className="h-5 w-5 text-muted-foreground" /> Assign problem
-                            </CardTitle>
-                            <CardDescription className="mt-1">
-                              Add target, link, trainer difficulty, tags, and preview.
-                            </CardDescription>
-                          </div>
-                          <ChevronRight className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${assignPanelOpen ? 'rotate-90' : ''}`} />
-                        </button>
-                      </CardHeader>
-                      {assignPanelOpen && (
-                      <CardContent>
+                    <Dialog open={assignPanelOpen} onOpenChange={setAssignPanelOpen}>
+                      <DialogContent
+                        className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-[860px]"
+                        onCloseAutoFocus={(event) => {
+                          const trigger = document.getElementById('live-assign-problem-trigger');
+                          if (!trigger) return;
+                          event.preventDefault();
+                          window.requestAnimationFrame(() => trigger.focus());
+                        }}
+                      >
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" />Assign problem</DialogTitle>
+                          <DialogDescription>Add a problem for one student or group in {activeClass.name}.</DialogDescription>
+                        </DialogHeader>
+                      <div className="min-h-0 overflow-y-auto pr-1">
                         <form onSubmit={handleAssignProblem} className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
                           <div className="min-w-0 space-y-1">
                             <label className="text-xs font-semibold">Assign To</label>
@@ -5510,9 +5581,9 @@ export default function ClassroomLiveClient({ classroomId }) {
                             timer={problemTimer}
                           />
                         </form>
-                      </CardContent>
-                      )}
-                    </Card>
+                      </div>
+                      </DialogContent>
+                    </Dialog>
 
                     {/* TRAINER TRACKING DASHBOARD */}
                     <Card className="rounded-lg border">
@@ -5522,11 +5593,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         title="Live progress"
                         description="Status, notes, and hints."
                         Icon={Target}
-                      >
-                        <Button variant="outline" size="sm" className="gap-1 text-red-600 hover:text-red-700" onClick={() => handleCompleteClass(activeClass.id)}>
-                          <Square className="h-4 w-4" /> End live class
-                        </Button>
-                      </CollapsibleSectionHeader>
+                      />
                       {sectionOpen.liveProgress && (
                       <CardContent className="space-y-4">
                         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -5537,11 +5604,24 @@ export default function ClassroomLiveClient({ classroomId }) {
                             </div>
                           ))}
                         </div>
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="inline-flex rounded-lg bg-muted/60 p-1" aria-label="Live progress filter">
+                            <Button type="button" size="sm" variant={liveProgressFilter === 'all' ? 'secondary' : 'ghost'} className="min-h-11 sm:min-h-8 sm:h-8" aria-pressed={liveProgressFilter === 'all'} onClick={() => setLiveProgressFilter('all')}>All</Button>
+                            <Button type="button" size="sm" variant={liveProgressFilter === 'review' ? 'secondary' : 'ghost'} className="min-h-11 sm:min-h-8 sm:h-8" aria-pressed={liveProgressFilter === 'review'} onClick={() => setLiveProgressFilter('review')}>Awaiting review</Button>
+                          </div>
+                          <div className="relative w-full sm:max-w-xs">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input value={liveProgressSearch} onChange={(event) => setLiveProgressSearch(event.target.value)} className="h-11 pl-9 sm:h-9" placeholder="Search student or problem" aria-label="Search live progress" />
+                          </div>
+                        </div>
                         {problems.length === 0 ? (
                           <p className="text-center text-sm text-muted-foreground py-8">No problems assigned in this live class yet.</p>
+                        ) : filteredLiveProblems.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No assigned work matches this search and filter.</div>
                         ) : (
-                          <div className="overflow-hidden rounded-xl border bg-background shadow-sm">
-                            <div className="max-h-[560px] overflow-auto">
+                          <div className={`grid min-w-0 gap-4 ${selectedLiveProblem && wideLiveInspector ? 'lg:grid-cols-[minmax(0,1fr)_22rem]' : ''}`}>
+                          <div className="min-w-0 overflow-hidden rounded-xl border bg-background shadow-sm">
+                            <div className="max-h-[560px] overflow-auto" tabIndex={0} role="region" aria-label="Live assigned work">
                               <table className="w-full min-w-[1040px] table-fixed text-sm">
                                 <colgroup>
                                   <col className="w-[18%]" />
@@ -5562,8 +5642,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 </tr>
                               </thead>
                               <tbody>
-                                {visibleProblems.map((prob) => (
-                                  <tr key={prob.id} className={`border-b transition last:border-b-0 hover:bg-muted/30 ${prob.status === 'pending_approval' ? 'bg-amber-500/[0.04]' : ''}`}>
+                                {visibleLiveProblems.map((prob) => (
+                                  <tr key={prob.id} className={`border-b transition-colors last:border-b-0 hover:bg-muted/30 ${prob.status === 'pending_approval' ? 'bg-amber-500/[0.04]' : ''}`}>
                                     <td className="px-5 py-4 align-top">
                                       <div className="flex min-w-0 items-center gap-3">
                                         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border bg-muted text-xs font-black">
@@ -5591,19 +5671,12 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     </td>
                                     <td className="px-5 py-4 align-top font-mono text-sm text-muted-foreground">{prob.timer_minutes ? `${prob.timer_minutes}m` : 'N/A'}</td>
                                     <td className="px-5 py-4 align-top">
-                                      <select
-                                        value={prob.status}
-                                        onChange={(e) => handleTrainerSetStatus(prob.id, e.target.value)}
-                                        className={`h-8 w-full max-w-[170px] rounded-full border px-3 text-xs font-bold outline-none ${statusTone[prob.status] || statusTone.not_solved}`}
-                                      >
-                                        <option value="pending_approval" disabled>Pending Approval</option>
-                                        <option value="not_solved">Not Solved</option>
-                                        <option value="tried">Tried</option>
-                                        <option value="solved">Solved</option>
-                                      </select>
+                                      <Badge variant="outline" className={`min-h-8 px-3 text-xs font-semibold capitalize ${statusTone[prob.status] || statusTone.not_solved}`}>{String(prob.status || 'not_solved').replaceAll('_', ' ')}</Badge>
                                     </td>
                                     <td className="px-5 py-4 align-top">
                                       <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button id={`live-problem-inspect-${prob.id}`} type="button" variant={selectedLiveProblemId === prob.id ? 'secondary' : 'ghost'} size="sm" className="min-h-11 text-xs font-semibold sm:min-h-8 sm:h-8" onClick={() => selectLiveProblem(prob.id)} aria-expanded={selectedLiveProblemId === prob.id}>Inspect</Button>
+                                        <div className="hidden">
                                         {(prob.solution_link || prob.solution_code || prob.submission_notes) && (
                                           <>
                                             <Dialog>
@@ -5708,6 +5781,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                           </div>
                                           </DialogContent>
                                         </Dialog>
+                                        </div>
                                       </div>
                                     </td>
                                   </tr>
@@ -5716,8 +5790,16 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </table>
                             </div>
                           </div>
+                          {selectedLiveProblem && wideLiveInspector && <aside className="flex max-h-[560px] min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card" aria-label="Selected work inspector">{renderLiveProblemInspector(selectedLiveProblem)}</aside>}
+                          </div>
                         )}
-                        {problems.length > visibleProblemCount && (
+                        <Dialog open={Boolean(selectedLiveProblem && !wideLiveInspector)} onOpenChange={(open) => { if (!open) closeLiveInspector(); }}>
+                          <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-[680px] lg:hidden" onCloseAutoFocus={(event) => { const trigger = selectedLiveProblemId ? document.getElementById(`live-problem-inspect-${selectedLiveProblemId}`) : null; if (!trigger) return; event.preventDefault(); window.requestAnimationFrame(() => trigger.focus()); }}>
+                            <DialogHeader><DialogTitle>{selectedLiveProblem?.student_name || 'Selected work'}</DialogTitle><DialogDescription>{selectedLiveProblem?.title || 'Review submitted work'}</DialogDescription></DialogHeader>
+                            {selectedLiveProblem && renderLiveProblemInspector(selectedLiveProblem, true)}
+                          </DialogContent>
+                        </Dialog>
+                        {filteredLiveProblems.length > visibleProblemCount && (
                           <Button
                             type="button"
                             variant="outline"
@@ -5726,7 +5808,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                             onClick={() => setVisibleProblemCount((count) => count + PROBLEM_BATCH_SIZE)}
                           >
                             <RefreshCw className="h-4 w-4" />
-                            Show more problems ({problems.length - visibleProblemCount} left)
+                            Show more problems ({filteredLiveProblems.length - visibleProblemCount} left)
                           </Button>
                         )}
                       </CardContent>
@@ -5746,7 +5828,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </div>
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl font-semibold leading-6 tracking-normal text-foreground">Topic Studio</h2>
+                          <h2 className="text-xl font-semibold leading-6 tracking-tight text-foreground">Topics</h2>
                           <Badge variant="outline" className="h-6 rounded-md border-primary/25 bg-primary/10 px-2 text-[11px] font-semibold text-primary">
                             Group assignments
                           </Badge>
@@ -5776,7 +5858,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-10 gap-2 border-border/80 bg-background/60 px-3 text-sm font-semibold active:scale-[0.97]"
+                      className="min-h-11 gap-2 border-border/80 bg-background/60 px-3 text-sm font-semibold active:scale-[0.97]"
                       onClick={fetchTopicData}
                       disabled={topicDataLoading}
                     >
@@ -5787,14 +5869,14 @@ export default function ClassroomLiveClient({ classroomId }) {
                     <Button
                       type="button"
                       size="sm"
-                      className="h-10 gap-2 px-3 text-sm font-semibold shadow-[0_12px_24px_rgba(10,132,255,0.22)] active:scale-[0.97]"
+                      className="min-h-11 gap-2 px-3 text-sm font-semibold shadow-none active:scale-[0.97]"
                       onClick={() => {
                         setTopicForm({ title: '', module: '', description: '' });
                         setCreateTopicModalOpen(true);
                       }}
                     >
                       <Plus className="h-4 w-4" />
-                      Build Topic
+                      Create topic
                     </Button>
                   </div>
                 </section>
@@ -5833,7 +5915,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           placeholder="Search topics"
                           value={topicSearchQuery}
                           onChange={(e) => setTopicSearchQuery(e.target.value)}
-                          className="h-10 rounded-md border-border/80 bg-background/60 pl-9 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]"
+                          className="h-11 rounded-md border-border/80 bg-background/60 pl-9 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:h-10"
                         />
                       </div>
                       <p className="shrink-0 text-xs font-medium text-muted-foreground">
@@ -7588,7 +7670,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         <Users className="h-4 w-4" />
                         People
                       </div>
-                      <h2 className="text-xl font-semibold tracking-tight text-foreground">Roster desk</h2>
+                      <h2 className="text-xl font-semibold tracking-tight text-foreground">People</h2>
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
                         Add students, review account links, and shape groups without keeping every tool open at once.
                       </p>
@@ -8156,6 +8238,7 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* STUDENT BOARD VIEWS                                       */
             /* ========================================================= */
             <Tabs value={studentTab} onValueChange={handleStudentTabChange} className="space-y-5">
+              <ClassroomTabUrlSync allowedValues={[...STUDENT_PRIMARY_NAVIGATION, ...STUDENT_SECONDARY_NAVIGATION].map((item) => item.value)} onSelect={handleStudentTabChange} />
               <ClassroomRoleNavigation role="student" value={studentTab} onSelect={handleStudentTabChange} />
 
             <TabsContent value="updates" className="mt-4 space-y-4">

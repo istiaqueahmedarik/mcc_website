@@ -1,5 +1,13 @@
 # Patterns
 
+## 2026-09-05 - Trainer classroom task hierarchy
+
+Keep shared classroom role behavior stable while composing trainer-only presentation around existing handlers. Arrival panels must use real persisted session and pending-work data. A selected live submission belongs beside the progress list on wide screens and in a focus-managed dialog on mobile; guard unsaved notes and hints across dialog close, row changes, and tab navigation. For contest rooms, preserve the bounded left rail when room context helps the trainer compare workspaces; stack it before the report on mobile. Derive display sorting from a copied room list, keep selection keyed by room ID, and default to deterministic case-insensitive Name A-Z. Group Refresh, Generate report, and Share with the selected-room identity. Group Add contest and Tools with the Contest sources disclosure. Keep provider/scoring controls in the labeled Tools menu and Add room in the room rail.
+
+## 2026-09-05 - Authorized dashboard summaries and destination links
+
+Enrich an already-authorized classroom list in batched read queries and return operational counts instead of roster records. Use distinct query keys for enriched and ordinary list data, and reject missing summary contracts rather than displaying fake zeros. Next list proxies must preserve `dashboard=true`; direct Hono routes require the same contract. Build classroom detail links from the selected classroom ID. A navigation link with `?tab=` is complete only when the destination restores a role-allowed tab through its existing handlers; validate requested contest rooms against authorized fetched rooms. Back navigation may be role-aware when trainers and students enter the same detail route from different parent workspaces.
+
 ## 2026-09-04 - Browser-Assisted Import for Server-Blocked Provider HTML
 
 Source:

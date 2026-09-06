@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { getServerJsonWithToken } from '@/lib/server-api';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -20,5 +21,5 @@ export default async function Page() {
   // Only trainers and admins may access the trainer dashboard.
   if (!profile.trainer && !profile.admin) redirect('/');
 
-  return <TrainerDashboardClient />;
+  return <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading dashboard…</p>}><TrainerDashboardClient /></Suspense>;
 }
