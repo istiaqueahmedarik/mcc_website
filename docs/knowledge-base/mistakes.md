@@ -1,3 +1,18 @@
+## 2026-09-09 - Browser-Saved Absolute Profile Links Were Dropped
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+What happened:
+The Codeforces EDU saved-HTML parser selected only profile anchors whose `href` began with `/profile/`. Browser-saved HTML rewrote those links to absolute `https://codeforces.com/profile/...` URLs, so valid classroom handles such as `Istiaque_ahmed` were discarded and the import incorrectly returned `CODEFORCES_EDU_IMPORT_NO_CLASSROOM_HANDLES`.
+
+Detection:
+The supplied saved page contained a valid standings row for `Istiaque_ahmed`, but its absolute profile URL did not match the parser selector. Replaying that document through the import service reproduced the false no-handle result.
+
+Prevention:
+Resolve provider links against the fixed Codeforces origin before classifying them. Accept relative and absolute same-origin profile URLs, reject other origins and malformed URLs, and cover real browser-saved link rewriting with focused positive and negative tests.
+
 ## 2026-09-04 - Session Retry Guidance Could Not Resolve an EDU Server Challenge
 
 What happened:

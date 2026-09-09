@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-09 - Saved Codeforces Links May Be Absolute
+
+Browser-saved Codeforces HTML may rewrite relative links to absolute URLs. Parse profile links by resolving them against the fixed `https://codeforces.com` base and then require the exact Codeforces origin and `/profile/{handle}` path shape. Do not rely only on relative-link CSS selectors, and do not accept lookalike external origins.
+
 ## 2026-09-06 - Persistent report-focus controls
 
 Compact icon-only management controls require accessible names, hover/focus tooltips, visible focus, and disabled states. A collapsible navigation rail must leave a discoverable restore action in the expanded report workspace. Initialize optional rail visibility to shown, treat malformed or unavailable local storage as the default, update the current tab immediately, and synchronize valid changes from other tabs.

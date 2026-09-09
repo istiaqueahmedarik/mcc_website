@@ -170,6 +170,21 @@ describe('Codeforces web standings sources', () => {
     expect(parsed.teams[0].username).toBe('Alice');
   });
 
+  test('parses absolute Codeforces profile links from browser-saved EDU pages', () => {
+    const savedRow = eduAliceRow.replace('/profile/Alice', 'https://codeforces.com/profile/Alice');
+    const parsed = parseCodeforcesEduStandingsPage(eduPage(savedRow), ['alice']);
+
+    expect(parsed.teams).toHaveLength(1);
+    expect(parsed.teams[0].username).toBe('Alice');
+  });
+
+  test('ignores absolute profile links from non-Codeforces origins', () => {
+    const externalRow = eduAliceRow.replace('/profile/Alice', 'https://example.com/profile/Alice');
+    const parsed = parseCodeforcesEduStandingsPage(eduPage(externalRow), ['alice']);
+
+    expect(parsed.teams).toHaveLength(0);
+  });
+
   test('parses Gym solved and native penalty columns', () => {
     const bobRow = gymAliceRow.replaceAll('Alice', 'Bob').replace('<td>37</td>', '<td>51</td>');
     const parsed = parseCodeforcesNumericStandingsPage(

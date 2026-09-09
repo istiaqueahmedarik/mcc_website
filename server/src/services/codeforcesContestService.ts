@@ -618,6 +618,23 @@ function parsePageCount($: cheerio.CheerioAPI) {
   }).get());
 }
 
+function codeforcesProfileHandle($: cheerio.CheerioAPI, cell: cheerio.Cheerio<any>) {
+  let handle = '';
+  cell.find('a[href]').each((_, element) => {
+    if (handle) return;
+    try {
+      const link = $(element);
+      const href = normalizeText(link.attr('href'), 500);
+      const url = new URL(href, CODEFORCES_WEB_BASE);
+      if (url.origin !== CODEFORCES_WEB_BASE || !/^\/profile\/[^/]+\/?$/i.test(url.pathname)) return;
+      handle = normalizeText(link.text(), 120);
+    } catch {
+      // Ignore malformed and non-Codeforces links in provider HTML.
+    }
+  });
+  return handle;
+}
+
 export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: string[]): HtmlStandingsPageParseResult {
   const $ = cheerio.load(html);
   const table = $('table.standings').first();
@@ -654,7 +671,7 @@ export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: st
 
   const teams = table.find('tr').slice(1).not('.standingsStatisticsRow').map((rowIndex, element) => {
     const cells = $(element).find('td');
-    const handle = normalizeText(cells.eq(1).find('a[href^="/profile/"]').first().text(), 120);
+    const handle = codeforcesProfileHandle($, cells.eq(1));
     if (!handle || (targetSet && !targetSet.has(handle.toLowerCase()))) return null;
 
     const rank = parseFirstNumber(cells.eq(0).text(), rowIndex + 1);
