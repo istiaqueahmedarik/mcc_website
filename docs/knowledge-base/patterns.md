@@ -1,5 +1,11 @@
 # Patterns
 
+## 2026-09-10 - Trainer classroom glass dock
+
+Floating trainer chrome reserves safe-area-aware bottom content clearance and focused-element scroll margin. Keep Radix tab/menu primitives, place the dock below modal portals, and bound upward menus to available viewport height. Use a scoped CSS module so student navigation retains its layout.
+
+For compact bottom navigation, preserve at least 44px control width while reducing visual height through outer padding, icon size, and icon-label gap. Give every destination the same interaction radius. When the dock itself already defines the surface, use icon/label color plus a slightly stronger label weight for the active state instead of a selected background, icon circle, or position dot.
+
 ## 2026-09-05 - Trainer classroom task hierarchy
 
 Keep shared classroom role behavior stable while composing trainer-only presentation around existing handlers. Arrival panels must use real persisted session and pending-work data. A selected live submission belongs beside the progress list on wide screens and in a focus-managed dialog on mobile; guard unsaved notes and hints across dialog close, row changes, and tab navigation. For contest rooms, preserve the bounded left rail when room context helps the trainer compare workspaces; stack it before the report on mobile. Derive display sorting from a copied room list, keep selection keyed by room ID, and default to deterministic case-insensitive Name A-Z. Group Refresh, Generate report, and Share with the selected-room identity. Group Add contest and Tools with the Contest sources disclosure. Keep provider/scoring controls in the labeled Tools menu and Add room in the room rail.
@@ -1002,3 +1008,11 @@ Adding another scoring correction field, operation, scope, or trace renderer.
 
 Do not overgeneralize:
 Do not apply these adjustments in report components, provider snapshots, or manual solve/de-merit persistence.
+
+## 2026-09-11 - Activity beside ranked results
+
+Attach additive activity summaries by the existing mapped participant identity after scoring. Calculate from original source records and deduplicate problems within each contest; do not derive activity from merged totals. Preserve absolute provider times and source freshness, and disclose incomplete timing.
+
+2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
+
+2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.

@@ -13,6 +13,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import LiveShareModal from "./LiveShareModal"
+import ContestPerformance from "./ContestPerformance"
 import { ScrollArea } from "./ui/scroll-area"
 
 function normalizeProvider(value) {
@@ -109,6 +110,7 @@ function ReportTable({
   highlightVjudgeId = "",
   highlightGroupIds = [],
   enableViewModes = false,
+  showPerformance = false,
 }) {
   const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
   const isScoredSnapshot = Boolean(merged?.snapshotVersion === 2 || merged?.scoring)
@@ -1270,6 +1272,9 @@ function ReportTable({
               {!isCompactView && !solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
               <TableHead className={cn(isCompactView && "h-9 w-[240px] min-w-[240px] px-3")}>{isCompactView ? "Name / ID" : "Name"}</TableHead>
               {!isCompactView && <TableHead>Contests</TableHead>}
+              {showPerformance && <TableHead className="px-3 text-center">
+                <div className="text-xs font-medium">Performance</div>
+              </TableHead>}
               {isCompactView ? (
                 <TableHead className="h-9 px-3 text-center">Solved (Penalty)</TableHead>
               ) : solveOnly ? (
@@ -1532,6 +1537,7 @@ function ReportTable({
                   </TableCell>
                   
                   {!isCompactView && <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>}
+                  {showPerformance && <TableCell className="px-3 py-1 text-center align-middle"><ContestPerformance performance={u.recentPerformance} name={u.realName || u.username} /></TableCell>}
                   {isCompactView ? (
                     <TableCell className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">
                       {formatCompactNumber(compactSolved)}<span className="font-normal text-muted-foreground">({formatCompactNumber(compactPenalty)})</span>

@@ -121,6 +121,7 @@ type HtmlStandingsPageParseResult = {
 
 type CodeforcesWebSubmission = {
   id: number;
+  creationTimeSeconds?: number;
   handle: string;
   problem: { index: string };
   verdict: string;
@@ -1233,7 +1234,7 @@ async function fetchCodeforcesApiUpsolveSubmissions(
       const problemIndex = normalizeText(submission?.problem?.index, 20);
       const verdict = normalizeText(submission?.verdict, 80).toUpperCase();
       if (!handle || !id || !problemIndex || !verdict) return;
-      submissions.push({ id, handle, problem: { index: problemIndex }, verdict });
+      submissions.push({ id, handle, problem: { index: problemIndex }, verdict, creationTimeSeconds: createdAt });
     });
 
     if (reachedContestWindow || raw.length < pageSize) return submissions;
@@ -1347,6 +1348,7 @@ export function applyCodeforcesWebUpsolves(
       penalty: additionalFailures,
       rejectedAttemptCount: state.officialRejected + additionalFailures,
       acceptedSubmissionId: String(submission.id),
+      acceptedAtSeconds: submission.creationTimeSeconds || null,
       type: 'UPSOLVE',
       isUpsolve: true,
     };

@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-10 - Trainer classroom glass dock
+
+Glass navigation must retain readable semantic foregrounds, a non-color active cue, visible focus, 44px targets, opaque backdrop-filter fallback, reduced-transparency and reduced-motion variants. Distinguish isolated component browser evidence from authenticated classroom QA. Source: `docs/reviews/trainer-liquid-glass-dock-20260910-review.md`.
+
 ## 2026-09-09 - Saved Codeforces Links May Be Absolute
 
 Browser-saved Codeforces HTML may rewrite relative links to absolute URLs. Parse profile links by resolving them against the fixed `https://codeforces.com` base and then require the exact Codeforces origin and `/profile/{handle}` path shape. Do not rely only on relative-link CSS selectors, and do not accept lookalike external origins.
@@ -930,3 +934,13 @@ Changing scoring configuration, correction rules, result-unit construction, prev
 
 Do not overgeneralize:
 Do not add arbitrary code, participant targeting, client-side authoritative scoring, or provider-snapshot mutation without a separate approved decision.
+
+## 2026-09-11 - Snapshot activity truthfulness
+
+Recent-activity counts must state their reference time and source freshness. Never substitute fetch time, manual-override time, or epoch defaults for acceptance time. Unknown/future acceptance times are incomplete data, not zero evidence. Provide keyboard/tap alternatives for hover breakdowns.
+
+2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
+
+Center Performance body cells under the centered heading, including em-dash empty states; inline buttons otherwise inherit the table body's left alignment.
+
+2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.

@@ -1,4 +1,5 @@
 import sql from '../db';
+import { buildContestPerformance } from '../services/contestPerformance';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import {
   buildContestKey,
@@ -2663,6 +2664,7 @@ async function buildClassroomScoredReportSnapshot(
           provider,
           externalContestId,
           title: item.title || snapshot.rank_data?.contestInfo?.title || `Contest ${externalContestId}`,
+          fetchedAt: snapshot.fetched_at,
         },
       }, maps, provider, true),
       contestDemerits,
@@ -2725,6 +2727,10 @@ async function buildClassroomScoredReportSnapshot(
   applySolveOverridesToMergedReport(merged, solveOverrides, rosterMaps);
 
   const scoringSources = classroomItemsToScoringSources(items, merged);
+  const performanceByIdentity = new Map(merged.users.map((user: any) => [
+    user.identityKey,
+    buildContestPerformance(user, merged.contestMetaById, merged.generatedAt, missingContests.length > 0),
+  ]));
   const savedScoring = await loadClassroomScoringConfig(classroomId, roomId, roomType, items);
   const config = configOverride
     ? normalizeScoringConfig(configOverride, savedScoring.config)
@@ -2756,6 +2762,10 @@ async function buildClassroomScoredReportSnapshot(
     merged,
     scored: {
       ...scored,
+      users: scored.users.map((user: any) => ({
+        ...user,
+        recentPerformance: performanceByIdentity.get(user.identityKey) || null,
+      })),
       mappingSummary: merged.mappingSummary,
       manualSolveOverrideCount: merged.manualSolveOverrideCount || 0,
       tscConfig: merged.tscConfig || null,

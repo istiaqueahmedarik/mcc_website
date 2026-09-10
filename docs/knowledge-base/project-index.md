@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-10 - Trainer classroom glass dock
+
+Trainer classroom navigation now uses `TrainerClassroomDock.module.css` and `TrainerGlassFilter.jsx` alongside `ClassroomLiveClient.js` for the trainer-only bottom glass dock. Review: `docs/reviews/trainer-liquid-glass-dock-20260910-review.md`.
+
 ## 2026-09-05 - Trainer dashboard and classroom teaching workspaces
 
 The approved dashboard implementation is in `client/src/app/trainer/dashboard/TrainerDashboardClient.js`, `TrainerDashboardWorkspace.jsx`, and `dashboard-model.mjs`. The final hierarchy uses a 1440px desktop shell, omits the separate Next Session hero and top-right overflow rail, and places Needs attention beside the searchable classroom workspace on wide screens. `classroom/list?dashboard=true` uses the existing role-filtered list plus `server/src/utils/trainerDashboardSummary.ts` for counts, actual sessions, latest topic and stale reports. `client/src/app/api/classroom/list/route.js` preserves the query through Next. Dashboard classroom links include the selected classroom ID; the classroom back-link returns trainers to `/trainer/dashboard` while students retain `/classroom/list`. `ClassroomTabUrlSync.jsx` and the small classroom/contest adapters make dashboard section/report links resolve correctly. Fresh local browser fixture checks passed after the hierarchy revision, although the retained repository screenshots predate it; hosted deployment remains unverified. Review: `docs/reviews/trainer-dashboard-update-20260905-implementation-review.md`.
@@ -1221,3 +1225,11 @@ Maintaining contest scoring configuration, previews, generation, traces, or the 
 
 Do not overgeneralize:
 Apply `docs/sql/contest-score-adjustment-rules-20260902.sql` and then `docs/sql/contest-score-adjustment-trainer-default-20260902.sql` before deploying the matching controllers. This change was not applied to a live database or deployed to production.
+
+## 2026-09-11 - Trainer report performance
+
+Trainer-only recent activity is rendered by `ContestPerformance.jsx` through the optional `ReportTable.showPerformance` prop. `contestPerformance.ts` builds cumulative 24/48/72-hour summaries at report generation; `classroomContestController.ts` attaches them by mapped identity. See `docs/reviews/trainer-report-performance-20260911-review.md`.
+
+2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
+
+2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.

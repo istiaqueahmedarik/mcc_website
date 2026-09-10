@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-09-10 - Trainer classroom glass dock
+
+The direct user request authorizes replacing the screenshot's trainer classroom tab bar with a bottom glass dock: Updates, Live, Topics, People, Contests, More. Preserve tab values, URL sync, permissions, and student navigation. The user subsequently specified clear glass rather than frost: use a 12% surface tint, minimal blur, and static SVG edge refraction in Chromium with clear CSS glass elsewhere. The follow-up Apple Music reference calls for soft directional reflections rather than a noticeable white outline; the dock uses a 7% theme-aware border and stronger edge refraction. Later refinements make the dock roughly 60px tall and give every destination the same 1.25rem interaction radius. Active state uses primary icon/label color and slightly stronger label weight, without a selected background, icon circle, or position dot. Scope: `docs/rsd/trainer-liquid-glass-dock-20260910-rsd.md`.
+
 ## 2026-09-06 - Contest report focus mode and wider trainer shell
 
 The contest room rail defaults to visible and stores its visibility in browser local storage. Sort, add, edit, delete, and hide are icon actions beside the Rooms heading, with accessible names and hover tooltips. When hidden, Show rooms remains beside the selected report title. The trainer classroom shell expands from 1600px to 1800px; the student shell keeps its previous width.
@@ -1130,3 +1134,11 @@ Changing admin student-profile analytics, batch completeness rules, or the batch
 
 Do not overgeneralize:
 This does not authorize profile edits, handle verification, public access, schema/RLS changes, Storage exports, or exposing email/phone/internal user IDs.
+
+## 2026-09-11 - Recent solve semantics
+
+Performance is source-reported accepted-problem activity in cumulative windows at report generation, computed from original contests before composite scoring. Keep existing upsolve opt-ins. Manual corrections and missing timing cannot manufacture activity; show partial data. Fetch and regenerate to refresh.
+
+2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
+
+2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.

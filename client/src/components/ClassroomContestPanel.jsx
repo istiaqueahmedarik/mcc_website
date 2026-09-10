@@ -2013,6 +2013,7 @@ export function ClassroomContestPanel({
                         solveOnly={!reportData?.scoring}
                         contestOrder={selectedRoomContestOrder}
                         enableViewModes
+                        showPerformance
                       />
                     ) : (
                       <div className="rounded-lg border border-dashed p-8 text-center">

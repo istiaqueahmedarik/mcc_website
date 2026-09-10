@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { Fragment, useCallback, useEffect, useState, useRef, useMemo, useId } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
@@ -14,6 +14,8 @@ import DiscordConnectionRequiredCard from '@/components/DiscordConnectionRequire
 import { StudentThreadBubbleDock, getStudentThreadBubbleKey } from '@/components/StudentThreadBubbleDock';
 import { ClassroomArrivalPanel, LiveSessionToolbar } from './TrainerClassroomInterior';
 import { getNextScheduledClass } from './trainer-interior-model.mjs';
+import dockStyles from './TrainerClassroomDock.module.css';
+import TrainerGlassFilter from './TrainerGlassFilter';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -938,6 +940,12 @@ function ContextActionContent({ actions, label }) {
 
 function ClassroomRoleNavigation({ role, value, onSelect }) {
   const trainer = role === 'trainer';
+  const glassId = useId();
+  const [refractiveGlass, setRefractiveGlass] = useState(false);
+  useEffect(() => {
+    // SVG backdrop displacement is not interoperable yet; keep clear CSS glass elsewhere.
+    setRefractiveGlass(/(?:Chrome|Chromium|Edg)\//.test(navigator.userAgent));
+  }, []);
   const primaryItems = trainer ? TRAINER_PRIMARY_NAVIGATION : STUDENT_PRIMARY_NAVIGATION;
   const secondaryItems = trainer ? TRAINER_SECONDARY_NAVIGATION : STUDENT_SECONDARY_NAVIGATION;
   const activeSecondaryItem = secondaryItems.find((item) => item.value === value);
@@ -955,8 +963,9 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <nav aria-label={navigationLabel} className={trainer ? "grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 border-b border-border/70" : "flex min-h-12 w-full items-end gap-3 border-b border-border/70"}>
-          <TabsList id={tabsId} className={trainer ? "grid h-auto min-w-0 grid-cols-3 justify-start gap-0 bg-transparent p-0 text-muted-foreground sm:flex sm:flex-1" : "flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground"}>
+        <nav aria-label={navigationLabel} style={trainer && refractiveGlass ? { "--dock-refraction": `url("#${glassId}")` } : undefined} className={trainer ? dockStyles.dock : "flex min-h-12 w-full items-end gap-3 border-b border-border/70"}>
+          {trainer && <TrainerGlassFilter id={glassId} />}
+          <TabsList aria-label={navigationLabel} id={tabsId} className={trainer ? dockStyles.tabs : "flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground"}>
             {primaryItems.map((item) => {
               const Icon = item.icon;
               return (
@@ -964,9 +973,9 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                   key={item.value}
                   id={item.tourId}
                   value={item.value}
-                  className={trainer ? "h-11 min-w-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-xs shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:h-12 sm:shrink-0 sm:px-3 sm:text-sm" : "h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"}
+                  className={trainer ? dockStyles.item : "h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
+                  <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
                 </TabsTrigger>
               );
@@ -978,7 +987,7 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
               <button
                 id={moreId}
                 type="button"
-                className={`inline-flex min-w-0 shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 font-medium outline-none ring-offset-background transition-[border-color,color,background-color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:px-3 ${trainer ? 'h-11 text-xs sm:h-12 sm:text-sm' : 'h-12 text-sm'} ${
+                className={trainer ? dockStyles.item : `inline-flex min-w-0 shrink-0 items-center justify-center gap-1.5 border-b-2 px-2 font-medium outline-none ring-offset-background transition-[border-color,color,background-color,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98] sm:px-3 h-12 text-sm ${
                   activeSecondaryItem
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -986,11 +995,11 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                 aria-label={moreLabel}
                 aria-current={activeSecondaryItem ? 'page' : undefined}
               >
-                <MoreHorizontal className="h-4 w-4 shrink-0" />
+                <MoreHorizontal aria-hidden="true" className="h-4 w-4 shrink-0" />
                 <span>More</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={6} className="w-60 data-[state=open]:animate-none data-[state=closed]:animate-none motion-reduce:transition-none">
+            <DropdownMenuContent align="end" side={trainer ? "top" : "bottom"} sideOffset={trainer ? 14 : 6} collisionPadding={12} className={`w-60 data-[state=open]:animate-none data-[state=closed]:animate-none motion-reduce:transition-none ${trainer ? dockStyles.menu : ""}`}>
               <DropdownMenuLabel>{activeSecondaryItem ? `Current: ${activeSecondaryItem.label}` : 'More classroom sections'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <ActionMenuItems actions={actions} ItemComponent={DropdownMenuItem} SeparatorComponent={DropdownMenuSeparator} />
@@ -5291,7 +5300,7 @@ export default function ClassroomLiveClient({ classroomId }) {
             /* ========================================================= */
             /* TRAINER BOARD PANELS                                      */
             /* ========================================================= */
-            <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className="space-y-7">
+            <Tabs value={trainerTab} onValueChange={handleTrainerTabChange} className={`space-y-7 ${dockStyles.workspace}`}>
               <ClassroomTabUrlSync allowedValues={[...TRAINER_PRIMARY_NAVIGATION, ...TRAINER_SECONDARY_NAVIGATION].map((item) => item.value)} onSelect={handleTrainerTabChange} />
               <ClassroomRoleNavigation role="trainer" value={trainerTab} onSelect={handleTrainerTabChange} />
 

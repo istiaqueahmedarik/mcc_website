@@ -484,6 +484,7 @@ describe('fetchCodeforcesContestRank', () => {
     expect(result.body.teams[0].submissions[1].isUpsolve).toBe(true);
     expect(result.body.teams[0].submissions[1].rejectedAttemptCount).toBe(2);
     expect(result.body.providerMeta.upsolveSource).toBe('contest-status-api');
+    expect(result.body.teams[0].submissions[1].acceptedAtSeconds).toBeGreaterThan(contestEnd);
     expect(result.body.providerMeta.upsolveAuthenticated).toBe(false);
   });
 

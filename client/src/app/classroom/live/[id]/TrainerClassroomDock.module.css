@@ -1,0 +1,160 @@
+/* Keep the final content and keyboard-focused controls clear of floating chrome. */
+.workspace {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
+.workspace :where(button, a, input, textarea, select, [tabindex]) {
+  scroll-margin-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
+.dock {
+  --trainer-feature-radius: 1.25rem;
+  position: fixed;
+  z-index: 40;
+  inset-inline: 0;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 1fr);
+  align-items: center;
+  width: min(34rem, calc(100% - 1rem));
+  margin-inline: auto;
+  padding: 0.25rem;
+  border: 1px solid hsl(var(--foreground) / 0.07);
+  border-radius: 1.75rem;
+  background: hsl(var(--background));
+  box-shadow: 0 12px 36px -12px rgb(0 0 0 / 0.3),
+    0 3px 8px -3px rgb(0 0 0 / 0.16),
+    inset 0 1px 2px rgb(255 255 255 / 0.14),
+    inset 0 -1px 2px hsl(var(--foreground) / 0.05);
+}
+
+/* The reflections sit above the material and never intercept a control. */
+.dock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 20% 0%, rgb(255 255 255 / 0.12), transparent 48%),
+    radial-gradient(ellipse at 85% 100%, rgb(255 255 255 / 0.06), transparent 40%);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dock {
+    background: hsl(var(--background) / 0.12);
+    -webkit-backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.7px) saturate(125%);
+    backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.7px) saturate(125%);
+  }
+}
+
+.dock .tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: auto;
+  min-width: 0;
+  gap: 0.25rem;
+  padding: 0;
+  background: transparent;
+}
+
+.dock .item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  min-width: 44px;
+  min-height: 52px;
+  padding: 0.25rem 0.125rem;
+  border: 1px solid transparent;
+  border-radius: var(--trainer-feature-radius);
+  background: transparent;
+  color: hsl(var(--foreground));
+  text-shadow: 0 1px 3px hsl(var(--background) / 0.9);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+  touch-action: manipulation;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* A narrow halo protects labels without frosting the clear material. */
+.dock .item span {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 2px hsl(var(--background) / 0.9);
+}
+
+.dock .item svg {
+  position: relative;
+  z-index: 1;
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke-width: 1.8;
+}
+
+.dock .item[data-state='active'],
+.dock .item[aria-current='page'] {
+  color: hsl(var(--primary));
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 650;
+}
+
+.dock .item:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  box-shadow: none;
+  transition: none;
+}
+
+.dock .item:active:not(:focus-visible) {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dock .item:hover {
+    color: hsl(var(--primary));
+    background-color: hsl(var(--primary) / 0.08);
+  }
+}
+
+.menu {
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.menu [role="menuitem"] {
+  min-height: 44px;
+}
+
+@media (max-width: 380px) {
+  .dock { padding: 0.1875rem; border-radius: 1.625rem; }
+  .dock .tabs { gap: 0; }
+  .dock .item { font-size: 0.625rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock .item { transition: none; }
+  .dock .item:active { transform: none; }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .dock {
+    background: hsl(var(--background));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: hsl(var(--foreground));
+  }
+  .dock::before { display: none; }
+  .dock .item { color: hsl(var(--foreground)); }
+}
+
+@media (forced-colors: active) {
+  .dock .item[data-state='active'],
+  .dock .item[aria-current='page'] { border: 2px solid Highlight; }
+}
