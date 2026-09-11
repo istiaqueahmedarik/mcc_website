@@ -651,24 +651,29 @@ export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: st
   const targetSet = targetHandles
     ? new Set(targetHandles.map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean))
     : null;
-  const problems = table.find('tr').first().find('th').slice(3).map((index, element) => {
+  const problemColumns = table.find('tr').first().find('th').map((columnIndex, element) => {
     const header = $(element);
     const link = header.find('a').first();
     const href = normalizeText(link.attr('href'), 500);
     const pathMatch = href.match(/\/lesson\/(\d+)\/(\d+)\/practice\/contest\/(\d+)\/problem\/([^/?#]+)/i);
-    const label = normalizeText(link.text() || header.text() || String(index + 1), 20);
+    if (!pathMatch) return null;
+    const label = normalizeText(link.text() || header.text() || String(columnIndex + 1), 20);
     const fullTitle = normalizeText(link.attr('title') || label, 300);
     return {
-      contestId: pathMatch?.[3] ? Number(pathMatch[3]) : null,
-      problemId: null,
-      index: label,
-      name: removeProblemLabelPrefix(fullTitle, label),
-      type: 'PROGRAMMING',
-      points: 1,
-      eduStep: pathMatch?.[2] ? Number(pathMatch[2]) : null,
-      href,
+      columnIndex,
+      problem: {
+        contestId: Number(pathMatch[3]),
+        problemId: null,
+        index: label,
+        name: removeProblemLabelPrefix(fullTitle, label),
+        type: 'PROGRAMMING',
+        points: 1,
+        eduStep: Number(pathMatch[2]),
+        href,
+      },
     };
-  }).get();
+  }).get().filter(Boolean) as Array<{ columnIndex: number; problem: any }>;
+  const problems = problemColumns.map(({ problem }) => problem);
 
   const teams = table.find('tr').slice(1).not('.standingsStatisticsRow').map((rowIndex, element) => {
     const cells = $(element).find('td');
@@ -677,8 +682,8 @@ export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: st
 
     const rank = parseFirstNumber(cells.eq(0).text(), rowIndex + 1);
     const declaredSolved = parseFirstNumber(cells.eq(2).text(), 0);
-    const submissions = cells.slice(3).map((problemIndex, cellElement) => {
-      const cell = $(cellElement);
+    const submissions = problemColumns.map(({ columnIndex }, problemIndex) => {
+      const cell = cells.eq(columnIndex);
       const text = normalizeText(cell.text(), 80);
       const accepted = cell.find('.cell-accepted').length > 0 || text.startsWith('+');
       const rejected = cell.find('.cell-rejected').length > 0 || text.startsWith('-');
@@ -697,7 +702,7 @@ export function parseCodeforcesEduStandingsPage(html: string, targetHandles?: st
         acceptedSubmissionId: normalizeText(cell.attr('acceptedsubmissionid'), 40) || null,
         type: accepted ? 'FINAL' : rejected ? 'REJECTED' : null,
       };
-    }).get();
+    });
     const solvedCount = submissions.filter((submission: any) => submission.status === 1).length;
     const penalty = submissions.reduce((sum: number, submission: any) => sum + submission.rejectedAttemptCount, 0);
 

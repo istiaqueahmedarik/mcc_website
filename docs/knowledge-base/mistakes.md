@@ -1,3 +1,18 @@
+## 2026-09-11 - EDU Hacks Column Was Treated As A Problem
+
+Source:
+- `server/src/services/codeforcesContestService.ts`
+- `server/src/services/codeforcesContestService.test.ts`
+
+What happened:
+The EDU standings parser assumed every column after rank, participant, and solved count was a problem. A valid friends-filtered page included a Hacks aggregate column before its problems, so the parser created a source-less fake problem and the saved-HTML import returned `CODEFORCES_EDU_IMPORT_WRONG_SOURCE`.
+
+Detection:
+The supplied page contained `#`, `Who`, `=`, and `*`/Hacks before 22 valid lesson problem headers. Handle parsing succeeded for 80 rows, including `Istiaque_ahmed`, but source validation correctly rejected the fake problem created from the Hacks header.
+
+Prevention:
+Identify EDU problem columns from their lesson problem links and read each row using those exact column indexes. Never infer provider table columns from a fixed offset; retain exact source validation for every selected problem.
+
 ## 2026-09-09 - Browser-Saved Absolute Profile Links Were Dropped
 
 Source:

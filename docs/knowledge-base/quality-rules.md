@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-11 - EDU Problem Columns Are Link-Identified
+
+Codeforces EDU friends standings may include aggregate columns such as Hacks between the solved count and problem results. Identify problem headers by their EDU lesson problem-link shape, retain their original table indexes when reading row cells, and source-validate every selected problem. Do not use a fixed metadata-column offset.
+
 ## 2026-09-10 - Trainer classroom glass dock
 
 Glass navigation must retain readable semantic foregrounds, a non-color active cue, visible focus, 44px targets, opaque backdrop-filter fallback, reduced-transparency and reduced-motion variants. Distinguish isolated component browser evidence from authenticated classroom QA. Source: `docs/reviews/trainer-liquid-glass-dock-20260910-review.md`.

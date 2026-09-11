@@ -185,6 +185,18 @@ describe('Codeforces web standings sources', () => {
     expect(parsed.teams).toHaveLength(0);
   });
 
+  test('skips an EDU Hacks column before the problem columns', () => {
+    const html = eduPage(eduAliceRow)
+      .replace('<th><a href="/edu/', '<th title="Hacks">*</th><th><a href="/edu/')
+      .replace('<td>2</td>\n  <td problemid=', '<td>2</td><td></td>\n  <td problemid=');
+    const result = importCodeforcesEduStandingsHtml('edu:2:6', html, undefined, ['alice']);
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body.problems.map((problem: any) => problem.index)).toEqual(['A', '*']);
+    expect(result.body.teams[0].submissions).toHaveLength(2);
+    expect(result.body.teams[0].solvedCount).toBe(2);
+  });
+
   test('parses Gym solved and native penalty columns', () => {
     const bobRow = gymAliceRow.replaceAll('Alice', 'Bob').replace('<td>37</td>', '<td>51</td>');
     const parsed = parseCodeforcesNumericStandingsPage(
