@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-09-11 - Shared classroom navigation identity
+
+Shared ViewTransition names must exist in the same navigation commit. A client-fetched destination therefore needs a matching route/client loading header, not only a named final heading. Carry only previously displayed ID/name in transient context; clear it after loading/errors/gates and unrelated navigation. Give the source card and title distinct names, avoid duplicate boundaries in attention links, and use default none so unrelated updates stay quiet. Verify actual shared geometry keyframes, not just transition-ready completion.
+
 ## 2026-09-10 - Trainer classroom glass dock
 
 Floating trainer chrome reserves safe-area-aware bottom content clearance and focused-element scroll margin. Keep Radix tab/menu primitives, place the dock below modal portals, and bound upward menus to available viewport height. Use a scoped CSS module so student navigation retains its layout.

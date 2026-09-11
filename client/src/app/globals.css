@@ -1176,3 +1176,65 @@
 #nprogress .peg {
   display: none;
 }
+
+/* Trainer navigation: animate only the named content, leaving chrome steady. */
+:root:has([data-trainer-transitions])::view-transition-old(root) {
+  display: none;
+}
+:root:has([data-trainer-transitions])::view-transition-new(root) {
+  animation: none;
+}
+:root:has([data-trainer-transitions])::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(.trainer-fade) {
+  animation-duration: 160ms;
+}
+::view-transition-old(.trainer-fade) {
+  animation: trainer-content-out 160ms ease-out both;
+}
+::view-transition-new(.trainer-fade) {
+  animation: trainer-content-in 160ms ease-out both;
+}
+@keyframes trainer-content-out {
+  to { opacity: 0; }
+}
+@keyframes trainer-content-in {
+  from { opacity: 0; }
+}
+/* Keyboard navigation stays immediate. */
+:root:has(:focus-visible)::view-transition-group(.trainer-fade),
+:root:has(:focus-visible)::view-transition-old(.trainer-fade),
+:root:has(:focus-visible)::view-transition-new(.trainer-fade) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.trainer-fade),
+  ::view-transition-old(.trainer-fade),
+  ::view-transition-new(.trainer-fade) {
+    animation: none;
+  }
+}
+
+/* The clicked classroom surface and its title travel into the header. */
+::view-transition-group(.classroom-morph) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-old(.classroom-morph),
+::view-transition-new(.classroom-morph) {
+  animation-duration: 280ms;
+  animation-timing-function: ease-out;
+}
+:root:has(:focus-visible)::view-transition-group(.classroom-morph),
+:root:has(:focus-visible)::view-transition-old(.classroom-morph),
+:root:has(:focus-visible)::view-transition-new(.classroom-morph) {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.classroom-morph),
+  ::view-transition-old(.classroom-morph),
+  ::view-transition-new(.classroom-morph) {
+    animation: none;
+  }
+}

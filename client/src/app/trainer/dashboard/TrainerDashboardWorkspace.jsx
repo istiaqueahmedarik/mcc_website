@@ -21,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ClassroomCardTransition, useClassroomNavigation } from "@/components/ClassroomCardTransition";
 import ProgressLink from "@/components/ProgressLink";
 import {
   DASHBOARD_FILTERS,
@@ -64,6 +65,7 @@ const RoomLink = forwardRef(function RoomLink(
   },
   ref,
 ) {
+  const { setPreview } = useClassroomNavigation();
   const params = new URLSearchParams({ tab });
   if (contestRoom) params.set("room", contestRoom);
   return (
@@ -73,7 +75,13 @@ const RoomLink = forwardRef(function RoomLink(
       className={className}
       onClick={(event) => {
         onClick?.(event);
-        if (!event.defaultPrevented) onVisit(room.id);
+        if (!event.defaultPrevented) {
+          if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && (!props.target || props.target === "_self")) {
+            // Only display identity travels; never cache classroom data or permissions.
+            setPreview({ id: String(room.id), name: room.name });
+          }
+          onVisit(room.id);
+        }
       }}
       {...props}
     >
@@ -483,6 +491,7 @@ function ClassroomCard({
   const session = sessionFor(room);
   const status = roomStatus(room);
   return (
+    <ClassroomCardTransition classroomId={room.id}>
     <article
       id={first ? "trainer-tour-classroom-card" : undefined}
       className={`trainer-panel p-4 sm:p-5 ${status === "Live now" ? "border-primary/40" : ""} ${view === "list" ? "lg:flex lg:items-center lg:gap-6" : ""}`}
@@ -501,6 +510,7 @@ function ClassroomCard({
                     : "Admin access"}
               </span>
             </div>
+            <ClassroomCardTransition classroomId={room.id} title>
             <h3 className="break-words text-lg font-semibold leading-6">
               <RoomLink
                 room={room}
@@ -510,6 +520,7 @@ function ClassroomCard({
                 {room.name}
               </RoomLink>
             </h3>
+            </ClassroomCardTransition>
           </div>
           <Button
             variant="ghost"
@@ -598,5 +609,6 @@ function ClassroomCard({
         </DropdownMenu>
       </div>
     </article>
+    </ClassroomCardTransition>
   );
 }

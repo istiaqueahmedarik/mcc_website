@@ -1,3 +1,4 @@
+import { ClassroomNavigationProvider } from "@/components/ClassroomCardTransition";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import QueryProvider from "@/components/query-provider";
@@ -81,7 +82,7 @@ export default function RootLayout({ children }) {
         >
           <QueryProvider>
             <Navbar />
-            {children}
+            <ClassroomNavigationProvider>{children}</ClassroomNavigationProvider>
             <Footer />
           </QueryProvider>
         </ThemeProvider>

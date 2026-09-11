@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-11 - Trainer view transitions
+
+`TrainerViewTransition.jsx` and `app/trainer/layout.js` provide named trainer page crossfades using the existing Next.js App Router React integration. Loaded trainer classrooms and classroom/form response tabs opt into separate boundaries; CSS is scoped by transition class in globals.css. Review: `docs/reviews/trainer-view-transitions-20260911-review.md`. The approved card-to-header extension uses `ClassroomCardTransition.jsx` and the classroom `ClassroomOpening.jsx`/`loading.js` to pair the dashboard card/title with a labeled opening header during cold loads. Only display ID/name is carried in transient context and cleared after loading; authenticated browser coverage remains unverified.
+
 ## 2026-09-10 - Trainer classroom glass dock
 
 Trainer classroom navigation now uses `TrainerClassroomDock.module.css` and `TrainerGlassFilter.jsx` alongside `ClassroomLiveClient.js` for the trainer-only bottom glass dock. Review: `docs/reviews/trainer-liquid-glass-dock-20260910-review.md`.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { ViewTransition, startTransition, useEffect, useMemo, useState } from "react";
 import { apiGet, apiPut } from "@/lib/api-client";
 import ProgressLink from "@/components/ProgressLink";
 import { Button } from "@/components/ui/button";
@@ -308,20 +308,22 @@ export default function TrainerFormDetailClient({ formId }) {
         </section>
 
         <div className="trainer-command-bar flex flex-wrap gap-1 p-1" role="tablist" aria-label="Form response views">
-          <TabButton active={activeTab === "visualize"} onClick={() => setActiveTab("visualize")}>
+          <TabButton active={activeTab === "visualize"} onClick={() => startTransition(() => setActiveTab("visualize"))}>
             <BarChart3 className="h-4 w-4" />
             Visualize
           </TabButton>
-          <TabButton active={activeTab === "explore"} onClick={() => setActiveTab("explore")}>
+          <TabButton active={activeTab === "explore"} onClick={() => startTransition(() => setActiveTab("explore"))}>
             <Search className="h-4 w-4" />
             Explore
           </TabButton>
-          <TabButton active={activeTab === "json"} onClick={() => setActiveTab("json")}>
+          <TabButton active={activeTab === "json"} onClick={() => startTransition(() => setActiveTab("json"))}>
             <FileJson className="h-4 w-4" />
             JSON
           </TabButton>
         </div>
 
+        <ViewTransition name="trainer-form-tab" default="none" update="trainer-fade">
+        <div className="min-w-0">
         {activeTab === "visualize" && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
             <section className="trainer-panel p-4">
@@ -497,6 +499,8 @@ export default function TrainerFormDetailClient({ formId }) {
             </div>
           </section>
         )}
+        </div>
+        </ViewTransition>
       </main>
     </div>
   );

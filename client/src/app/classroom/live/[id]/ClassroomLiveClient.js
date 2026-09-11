@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState, useRef, useMemo, useId } from 'react';
+import { Fragment, ViewTransition, startTransition, useCallback, useEffect, useState, useRef, useMemo, useId } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { delete_with_token, get_with_token, post_with_token } from '@/lib/action';
@@ -16,6 +16,9 @@ import { ClassroomArrivalPanel, LiveSessionToolbar } from './TrainerClassroomInt
 import { getNextScheduledClass } from './trainer-interior-model.mjs';
 import dockStyles from './TrainerClassroomDock.module.css';
 import TrainerGlassFilter from './TrainerGlassFilter';
+import ClassroomOpening from './ClassroomOpening';
+import TrainerViewTransition from '@/components/TrainerViewTransition';
+import { ClassroomCardTransition, useClassroomPreview } from '@/components/ClassroomCardTransition';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -3109,6 +3112,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   // Common states
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const classroomPreview = useClassroomPreview(classroomId, loading);
   const [error, setError] = useState('');
   const [discordGate, setDiscordGate] = useState(null);
   const [activeClass, setActiveClass] = useState(null);
@@ -4205,7 +4209,7 @@ export default function ClassroomLiveClient({ classroomId }) {
       setNoteText('');
       setHintText('');
     }
-    selectClassroomTab(setTrainerTab, nextTab);
+    selectClassroomTab((value) => startTransition(() => setTrainerTab(value)), nextTab);
   };
   const handleStudentTabChange = (nextTab) => selectClassroomTab(setStudentTab, nextTab);
 
@@ -5204,6 +5208,8 @@ export default function ClassroomLiveClient({ classroomId }) {
     );
   };
 
+  if (loading && classroomPreview) return <ClassroomOpening />;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-20 min-h-screen bg-background">
@@ -5243,15 +5249,19 @@ export default function ClassroomLiveClient({ classroomId }) {
     );
   }
   return (
+    <TrainerViewTransition enabled={isTrainer}>
     <div className={isTrainer ? "min-h-screen bg-background text-foreground" : "dark min-h-screen bg-[#111111] text-foreground"}>
       <main className={isTrainer ? "mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8" : "mx-auto flex w-full max-w-[1600px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8"}>
       <ProgressLink href={isTrainer ? "/trainer/dashboard" : "/classroom/list"} className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
         <ArrowLeft className="h-4 w-4" /> {isTrainer ? "Trainer dashboard" : "Classrooms"}
       </ProgressLink>
 
+      <ClassroomCardTransition classroomId={classroomId} enabled={isTrainer}>
       <section id="classroom-tour-header" className={isTrainer ? "flex flex-col gap-4 border-b border-border/60 pb-4 lg:flex-row lg:items-end lg:justify-between" : "flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"}>
         <div className={isTrainer ? "min-w-0 space-y-1.5" : "min-w-0 space-y-3"}>
-          <h1 className={isTrainer ? "text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl" : "truncate text-3xl font-semibold leading-tight text-foreground"}>{classroom.name}</h1>
+          <ClassroomCardTransition classroomId={classroomId} title enabled={isTrainer}>
+          <h1 className={isTrainer ? "break-words text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-3xl" : "truncate text-3xl font-semibold leading-tight text-foreground"}>{classroom.name}</h1>
+          </ClassroomCardTransition>
           {!isTrainer && <p className="max-w-2xl text-base leading-6 text-muted-foreground">{classroom.description || 'No description provided.'}</p>}
           <p className="text-sm text-muted-foreground">
             Trainer <span className="font-semibold text-foreground">{classroom.trainer_name || 'Trainer'}</span>
@@ -5292,6 +5302,7 @@ export default function ClassroomLiveClient({ classroomId }) {
           )}
         </div>
       </section>
+      </ClassroomCardTransition>
 
       <div className="grid grid-cols-1 gap-7">
         {/* Main interactive panel */}
@@ -5304,6 +5315,8 @@ export default function ClassroomLiveClient({ classroomId }) {
               <ClassroomTabUrlSync allowedValues={[...TRAINER_PRIMARY_NAVIGATION, ...TRAINER_SECONDARY_NAVIGATION].map((item) => item.value)} onSelect={handleTrainerTabChange} />
               <ClassroomRoleNavigation role="trainer" value={trainerTab} onSelect={handleTrainerTabChange} />
 
+            <ViewTransition name="trainer-tab" default="none" update="trainer-fade">
+            <div className="min-w-0">
             <TabsContent value="updates" className="space-y-7">
               <ClassroomArrivalPanel
                 activeClass={activeClass}
@@ -8241,6 +8254,8 @@ export default function ClassroomLiveClient({ classroomId }) {
                   </Dialog>
                 </section>
               </TabsContent>
+            </div>
+            </ViewTransition>
             </Tabs>
           ) : (
             /* ========================================================= */
@@ -9605,5 +9620,6 @@ export default function ClassroomLiveClient({ classroomId }) {
       </button>
       </main>
     </div>
+    </TrainerViewTransition>
   );
 }
