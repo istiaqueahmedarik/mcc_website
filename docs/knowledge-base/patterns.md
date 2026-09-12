@@ -1,5 +1,19 @@
 # Patterns
 
+## 2026-09-12 - Prototype and integrate GPU effects on operational navigation
+
+When evaluating a GPU-driven effect for operational navigation, first isolate it behind an unlinked route. Keep semantic controls in HTML and make every rendering layer pointer-transparent. For production, put fine icon and label strokes above the shader; combine a small material-only WebGL pass with CSS backdrop displacement when live DOM refraction is needed. Cap pixel ratio, render on demand, dispose GPU resources, and keep a complete CSS fallback for context loss and accessibility preferences.
+
+For a moving refractive selection lens, measure the target with `getBoundingClientRect()` relative to the dock instead of assuming equal columns. Spring position, width, and height together: pointer hover can expand beyond the shell while pointer exit contracts to a fitted selected state. Give the canvas enough transparent padding to render that overflow. Fine labels can fade while the icon moves toward the calm center. Preserve the full accessible name on the control. Pointer entry may start a restrained icon animation; keyboard focus should reposition the fitted lens immediately without triggering decorative motion.
+
+Clicked tabs retain browser focus. When a dock supports both keyboard focus and pointer previews, an active pointer hover must temporarily take precedence over that retained focus; otherwise the lens appears stuck on the clicked tab. Once hover ends, return to the focused or selected destination.
+
+Do not clear hover when an item-level pointer-leave event is moving into another dock item. Check `relatedTarget` first; clearing between sibling enter/leave events makes the lens detour through the selected tab instead of moving directly across the dock.
+
+For a pointer-driven glass light, pass local pointer coordinates to the shader and calculate distance falloff plus surface-normal facing there. Smooth position and intensity only while values change, fade intensity on pointer exit, and let the render loop sleep once the light settles. Keep the highlight localized so it does not recreate a permanent white rim.
+
+When selection and hover share a moving indicator, update the imperative resting index in the click handler before React state commits. Pointer leave may occur within the same event sequence and must return to the new selection instead of a stale render closure.
+
 ## 2026-09-11 - Shared classroom navigation identity
 
 Shared ViewTransition names must exist in the same navigation commit. A client-fetched destination therefore needs a matching route/client loading header, not only a named final heading. Carry only previously displayed ID/name in transient context; clear it after loading/errors/gates and unrelated navigation. Give the source card and title distinct names, avoid duplicate boundaries in attention links, and use default none so unrelated updates stay quiet. Verify actual shared geometry keyframes, not just transition-ready completion.
@@ -1020,3 +1034,9 @@ Attach additive activity summaries by the existing mapped participant identity a
 2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
 
 2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.
+
+## 2026-09-13 - In-flow action lenses
+
+Reuse `TrainerActionGroup` for adjacent trainer buttons, keeping native children and their handlers. The group returns the original div outside `TrainerVisualProvider`. Mount per-group WebGL only while hovered/focused, dispose on exit, and measure both coordinates for wrapping. Keep action hover separate from persistent selection. Inline upstream animated icons must use span wrappers, inherit the parent's target, and respect reduced motion.
+
+For classroom disclosures, keep the existing semantic trigger and state owner, then wrap content in `AnimatedCollapsibleContent`. The shared component animates height, opacity, and vertical position with `initial={false}` so an initially open panel does not animate on page load, and removes duration for reduced motion.

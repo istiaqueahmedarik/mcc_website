@@ -287,7 +287,7 @@ export default function TrainerDashboardClient() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <Button asChild variant="outline" className="min-h-11 gap-2">
+            <Button asChild variant="outline" className="rounded-2xl min-h-11 gap-2">
               <ProgressLink id="trainer-tour-form-btn" href="/trainer/forms">
                 <ClipboardList className="h-4 w-4" />
                 Forms
@@ -296,7 +296,7 @@ export default function TrainerDashboardClient() {
             <Button
               id="trainer-tour-new-classroom-btn"
               onClick={() => setModalOpen(true)}
-              className="min-h-11 gap-2"
+              className="rounded-2xl min-h-11 gap-2"
             >
               <Plus className="h-4 w-4" />
               New classroom
@@ -423,7 +423,7 @@ export default function TrainerDashboardClient() {
                     placeholder="Search trainers by name or email…"
                     value={subSearch}
                     onChange={(e) => setSubSearch(e.target.value)}
-                    className="mb-2 h-10 text-base md:text-sm"
+                    className="rounded-2xl mb-2 h-10 text-base md:text-sm"
                   />
                   <ul className="trainer-panel-soft max-h-48 divide-y overflow-y-auto">
                     {allTrainers
@@ -455,7 +455,7 @@ export default function TrainerDashboardClient() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-9 shrink-0 gap-1 text-xs"
+                            className="rounded-2xl h-9 shrink-0 gap-1 text-xs"
                             onClick={() => handleAddSub(t.id)}
                             disabled={addSubstituteMutation.isPending}
                           >

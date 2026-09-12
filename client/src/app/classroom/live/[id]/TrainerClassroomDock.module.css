@@ -19,32 +19,109 @@
   width: min(34rem, calc(100% - 1rem));
   margin-inline: auto;
   padding: 0.25rem;
-  border: 1px solid hsl(var(--foreground) / 0.07);
+  border: 1px solid hsl(var(--foreground) / 0.09);
   border-radius: 1.75rem;
   background: hsl(var(--background));
-  box-shadow: 0 12px 36px -12px rgb(0 0 0 / 0.3),
-    0 3px 8px -3px rgb(0 0 0 / 0.16),
-    inset 0 1px 2px rgb(255 255 255 / 0.14),
-    inset 0 -1px 2px hsl(var(--foreground) / 0.05);
+  isolation: isolate;
+  box-shadow: 0 14px 34px -18px rgb(0 0 0 / 0.42),
+    0 3px 9px -5px rgb(0 0 0 / 0.24),
+    inset 0 -1px 2px hsl(var(--foreground) / 0.035);
 }
 
-/* The reflections sit above the material and never intercept a control. */
+/* A faint cool cast adds depth without a bright outline. */
 .dock::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: radial-gradient(ellipse at 20% 0%, rgb(255 255 255 / 0.12), transparent 48%),
-    radial-gradient(ellipse at 85% 100%, rgb(255 255 255 / 0.06), transparent 40%);
+  background: radial-gradient(ellipse at 18% 0%, hsl(var(--primary) / 0.045), transparent 46%),
+    radial-gradient(ellipse at 84% 100%, hsl(var(--foreground) / 0.025), transparent 42%);
+  z-index: 0;
 }
 
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dock {
-    background: hsl(var(--background) / 0.12);
-    -webkit-backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.7px) saturate(125%);
-    backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.7px) saturate(125%);
+    background: hsl(var(--background) / 0.075);
+    -webkit-backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.9px) saturate(132%);
+    backdrop-filter: var(--dock-refraction, blur(0px)) blur(0.9px) saturate(132%);
   }
+}
+
+.dockBackdrop,
+.lensBackdrop,
+.webglCanvas {
+  position: absolute;
+  pointer-events: none;
+}
+
+.dockBackdrop {
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: hsl(var(--background) / 0.085);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dockBackdrop {
+    -webkit-backdrop-filter: var(--dock-refraction, blur(0px)) blur(2.4px) saturate(138%);
+    backdrop-filter: var(--dock-refraction, blur(0px)) blur(2.4px) saturate(138%);
+  }
+}
+
+.lensBackdrop {
+  z-index: 1;
+  top: 0.25rem;
+  left: 0;
+  width: 4rem;
+  height: calc(100% - 0.5rem);
+  border: 0;
+  border-radius: 999px;
+  background: hsl(var(--background) / 0.065);
+  box-shadow: 0 12px 26px -20px rgb(0 0 0 / 0.62);
+  opacity: 1;
+  will-change: transform, width;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lensBackdrop {
+    -webkit-backdrop-filter: var(--lens-refraction, blur(0px)) blur(1.2px) saturate(142%);
+    backdrop-filter: var(--lens-refraction, blur(0px)) blur(1.2px) saturate(142%);
+  }
+}
+
+.webglCanvas {
+  z-index: 2;
+  inset: -0.75rem;
+  width: calc(100% + 1.5rem);
+  height: calc(100% + 1.5rem);
+}
+
+.dock[data-webgl='loading'] .dockBackdrop,
+.dock[data-webgl='loading'] .lensBackdrop,
+.dock[data-webgl='loading'] .webglCanvas,
+.dock[data-webgl='fallback'] .webglCanvas {
+  opacity: 0;
+}
+
+.dock[data-webgl='active'] {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: 0 16px 36px -26px rgb(0 0 0 / 0.56);
+}
+
+.dock[data-webgl='active']::before {
+  display: none;
+}
+
+.dock[data-webgl='fallback'] .lensBackdrop {
+  border: 1px solid hsl(var(--foreground) / 0.105);
+}
+
+.dock[data-webgl='fallback'] .dockBackdrop {
+  display: none;
 }
 
 .dock .tabs {
@@ -55,6 +132,8 @@
   gap: 0.25rem;
   padding: 0;
   background: transparent;
+  position: relative;
+  z-index: 3;
 }
 
 .dock .item {
@@ -81,18 +160,44 @@
   transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.dock > .item {
+  z-index: 3;
+}
+
 /* A narrow halo protects labels without frosting the clear material. */
-.dock .item span {
+.dock .label {
   paint-order: stroke fill;
   -webkit-text-stroke: 2px hsl(var(--background) / 0.9);
+  transition: opacity 140ms ease, transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.animatedIcon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: none;
+  transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .dock .item svg {
-  position: relative;
-  z-index: 1;
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
   stroke-width: 1.8;
+}
+
+.dock .item[data-lens-active='true'] .label {
+  opacity: 0;
+  transform: translateY(0.2rem) scale(0.94);
+}
+
+.dock .item[data-lens-active='true'] .animatedIcon {
+  transform: translateY(0.55rem) scale(1.12);
+}
+
+.dock[data-lens-immediate='true'] .label,
+.dock[data-lens-immediate='true'] .animatedIcon {
+  transition: none;
 }
 
 .dock .item[data-state='active'],
@@ -118,7 +223,7 @@
 @media (hover: hover) and (pointer: fine) {
   .dock .item:hover {
     color: hsl(var(--primary));
-    background-color: hsl(var(--primary) / 0.08);
+    background-color: transparent;
   }
 }
 
@@ -139,7 +244,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dock .item { transition: none; }
+  .dock .item,
+  .dock .label,
+  .animatedIcon { transition: none; }
   .dock .item:active { transform: none; }
 }
 
@@ -151,10 +258,26 @@
     border-color: hsl(var(--foreground));
   }
   .dock::before { display: none; }
+  .dockBackdrop,
+  .lensBackdrop,
+  .webglCanvas { display: none; }
   .dock .item { color: hsl(var(--foreground)); }
+  .dock .item[data-lens-active='true'] .label {
+    opacity: 1;
+    transform: none;
+  }
+  .dock .item[data-lens-active='true'] .animatedIcon { transform: none; }
 }
 
 @media (forced-colors: active) {
+  .dockBackdrop,
+  .lensBackdrop,
+  .webglCanvas { display: none; }
+  .dock .item[data-lens-active='true'] .label {
+    opacity: 1;
+    transform: none;
+  }
+  .dock .item[data-lens-active='true'] .animatedIcon { transform: none; }
   .dock .item[data-state='active'],
   .dock .item[aria-current='page'] { border: 2px solid Highlight; }
 }

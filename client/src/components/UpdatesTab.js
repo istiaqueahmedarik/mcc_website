@@ -1,7 +1,9 @@
 "use client";
 
+import TrainerActionGroup from "@/app/classroom/live/[id]/TrainerActionGroup";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, CheckCheck, Clock, Inbox, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, CheckCheck, Clock, Inbox, RefreshCw } from "@/components/ui/heroicons-animated/TrainerClassroomIcons";
 import { get_with_token, post_with_token } from "@/lib/action";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -198,7 +200,7 @@ export function UpdatesTab({ classroomId, active = true }) {
             {lastLoadedAt ? `Last checked ${lastLoadedAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Last checked when updates load."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <TrainerActionGroup className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -221,7 +223,7 @@ export function UpdatesTab({ classroomId, active = true }) {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-        </div>
+        </TrainerActionGroup>
       </div>
 
       <Card className="overflow-hidden rounded-lg border border-border/80 bg-card/70 shadow-[0_18px_45px_rgba(0,0,0,0.18),0_0_0_1px_rgba(255,255,255,0.02)]">

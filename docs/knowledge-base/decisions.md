@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-09-12 - Trainer moving dock lens and animated icons
+
+The user approved a separate WebGL prototype after reviewing feasibility, then approved integration into the production trainer classroom dock. The integrated lens uses WebGL for material lighting and dispersion, a moving CSS backdrop layer for live refraction, and crisp DOM artwork above both layers. Requested Heroicons Animated icons map to Inbox, Academic Cap, Rectangle Stack, Users, Trophy, and Squares Plus. Navigation state, Radix controls, permissions, URLs, and student surfaces retain their existing behavior.
+
+The user-approved legibility refinement fades the covered label and moves its icon into the calm vertical center with a small scale increase. Pointer hover uses the spring, starts the icon study, and expands the lens beyond the dock; pointer exit contracts it inside the dock around the selected control. The full dock and lens share a padded shader pass with separate backdrop-refraction strengths. Use cool low-contrast edges and soft dark depth instead of a permanent white glow. While the pointer is over the dock, it acts as a localized white shader light with distance falloff and directional dispersion; fade it completely on exit and stop rendering at rest. Keyboard focus moves the fitted lens immediately and retains visible focus without decorative motion. Reduced transparency and increased contrast remove the optical layers and restore every visible label.
+
 ## 2026-09-10 - Trainer classroom glass dock
 
 The direct user request authorizes replacing the screenshot's trainer classroom tab bar with a bottom glass dock: Updates, Live, Topics, People, Contests, More. Preserve tab values, URL sync, permissions, and student navigation. The user subsequently specified clear glass rather than frost: use a 12% surface tint, minimal blur, and static SVG edge refraction in Chromium with clear CSS glass elsewhere. The follow-up Apple Music reference calls for soft directional reflections rather than a noticeable white outline; the dock uses a 7% theme-aware border and stronger edge refraction. Later refinements make the dock roughly 60px tall and give every destination the same 1.25rem interaction radius. Active state uses primary icon/label color and slightly stronger label weight, without a selected background, icon circle, or position dot. Scope: `docs/rsd/trainer-liquid-glass-dock-20260910-rsd.md`.
@@ -1142,3 +1148,21 @@ Performance is source-reported accepted-problem activity in cumulative windows a
 2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
 
 2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.
+
+## 2026-09-12 - Website SF Pro Display
+
+The user supplied `sf-pro-display.zip` and requested applying it site-wide, superseding the earlier Inter default. Root `next/font/local`, Tailwind sans, and the trainer typography rule share `--font-sf-pro-display`. Bundle the nine supplied faces with their actual weights/styles; use swap and demand loading. Preserve Geist Mono and explicit code-editor monospace fonts. Source: `docs/rsd/website-sf-pro-display-20260912-rsd.md`.
+
+## 2026-09-12 - Trainer dashboard reference corners
+
+User-supplied button reference sets dashboard action and field corners to 16px, matching existing classroom panels. Summary chips use 12px, and the padded view-switch wrapper uses 20px. These are explicit dashboard utilities; shared buttons and other trainer routes keep their own styles. Scope and review: `docs/rsd/trainer-dashboard-radius-20260912-rsd.md`, `docs/reviews/trainer-dashboard-radius-20260912-review.md`.
+
+The radius follow-up also covers the trainer classroom header's No live session/active-session status and Manage controls in `ClassroomLiveClient.js`, where the reference labels actually occur. Student header corners remain unchanged.
+
+The user then expanded the reference radius to other trainer classroom surfaces. `TrainerClassroomRadius.module.css` scopes the shared radius token to the trainer root and its Radix portal surfaces: standard controls and panels resolve to 16px. Circular elements and custom dock radii retain their existing geometry; student rendering does not receive the scope.
+
+## 2026-09-13 - Trainer grouped action lenses and animated icons
+
+The user requested heroicons-animated throughout the trainer classroom and dock-style shader lenses for grouped action rows, explicitly including Refresh / Generate report / Share. Thirty action rows share `TrainerActionGroup`; the trainer context preserves original student presentation. Old grouped-button hover backgrounds, shadows and movement are suppressed so the lens is the sole hover surface. Source and verification: `docs/reviews/trainer-classroom-action-lenses-20260913-review.md`.
+
+Follow-up: grouped action shells retain the persistent rounded rim but use no shadow layer. Trainer classroom disclosures, including Contest sources, share the requested shadcn-animated height/fade/vertical transition with reduced-motion handling.

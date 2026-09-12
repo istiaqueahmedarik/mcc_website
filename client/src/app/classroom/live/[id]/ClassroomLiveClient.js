@@ -1,5 +1,7 @@
 "use client";
 
+import TrainerActionGroup from "@/app/classroom/live/[id]/TrainerActionGroup";
+
 import { Fragment, ViewTransition, startTransition, useCallback, useEffect, useState, useRef, useMemo, useId } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
@@ -15,16 +17,27 @@ import { StudentThreadBubbleDock, getStudentThreadBubbleKey } from '@/components
 import { ClassroomArrivalPanel, LiveSessionToolbar } from './TrainerClassroomInterior';
 import { getNextScheduledClass } from './trainer-interior-model.mjs';
 import dockStyles from './TrainerClassroomDock.module.css';
+import { TrainerVisualProvider } from '@/components/TrainerVisualContext';
+import radiusStyles from './TrainerClassroomRadius.module.css';
 import TrainerGlassFilter from './TrainerGlassFilter';
 import ClassroomOpening from './ClassroomOpening';
 import TrainerViewTransition from '@/components/TrainerViewTransition';
 import { ClassroomCardTransition, useClassroomPreview } from '@/components/ClassroomCardTransition';
+import {
+  AcademicCapIcon,
+  InboxIcon,
+  RectangleStackIcon,
+  SquaresPlusIcon,
+  TrophyIcon,
+  UsersIcon,
+} from '@/components/ui/heroicons-animated/TrainerDockIcons';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedCollapsibleContent } from "@/components/ui/animated-collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -68,7 +81,7 @@ import {
   Check, ChevronsUpDown, X,
   Eye, Loader2, MoreHorizontal, RefreshCw, FilePlus2, Library,
   Layers3, BarChart3, Radio, PenTool, Code2, Pencil, Search, UserCheck, Timer, Save, Info, Archive, Bell, SlidersHorizontal, VideoOff
-} from 'lucide-react';
+} from '@/components/ui/heroicons-animated/TrainerClassroomIcons';
 import {
   Dialog,
   DialogContent,
@@ -86,12 +99,14 @@ import { toast } from 'sonner';
 
 const LEGACY_PROBLEM_THREADS_VISIBLE = false;
 
+const TrainerDockLens = dynamic(() => import('./TrainerDockLens'), { ssr: false });
+
 const TRAINER_PRIMARY_NAVIGATION = [
-  { value: 'updates', label: 'Updates', icon: Bell },
-  { value: 'live', label: 'Live', icon: Target, tourId: 'classroom-tour-tab-live' },
-  { value: 'topics', label: 'Topics', icon: Layers3, tourId: 'classroom-tour-tab-topics' },
-  { value: 'students', label: 'People', icon: Users, tourId: 'classroom-tour-tab-students' },
-  { value: 'contests', label: 'Contests', icon: Trophy },
+  { value: 'updates', label: 'Updates', icon: InboxIcon },
+  { value: 'live', label: 'Live', icon: AcademicCapIcon, tourId: 'classroom-tour-tab-live' },
+  { value: 'topics', label: 'Topics', icon: RectangleStackIcon, tourId: 'classroom-tour-tab-topics' },
+  { value: 'students', label: 'People', icon: UsersIcon, tourId: 'classroom-tour-tab-students' },
+  { value: 'contests', label: 'Contests', icon: TrophyIcon },
 ];
 
 const TRAINER_SECONDARY_NAVIGATION = [
@@ -943,8 +958,14 @@ function ContextActionContent({ actions, label }) {
 
 function ClassroomRoleNavigation({ role, value, onSelect }) {
   const trainer = role === 'trainer';
-  const glassId = useId();
+  const glassId = useId().replaceAll(':', '');
+  const dockGlassId = `${glassId}-dock`;
+  const lensGlassId = `${glassId}-lens`;
   const [refractiveGlass, setRefractiveGlass] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [focusedIndex, setFocusedIndex] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const trainerIconRefs = useRef([]);
   useEffect(() => {
     // SVG backdrop displacement is not interoperable yet; keep clear CSS glass elsewhere.
     setRefractiveGlass(/(?:Chrome|Chromium|Edg)\//.test(navigator.userAgent));
@@ -962,14 +983,49 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
   const tabsId = trainer ? 'classroom-tour-tabs' : 'student-tour-tabs';
   const navigationLabel = trainer ? 'Trainer classroom sections' : 'Student classroom sections';
   const moreLabel = activeSecondaryItem ? `More, current section: ${activeSecondaryItem.label}` : 'More classroom sections';
+  const selectedTrainerIndex = activeSecondaryItem
+    ? TRAINER_PRIMARY_NAVIGATION.length
+    : Math.max(0, TRAINER_PRIMARY_NAVIGATION.findIndex((item) => item.value === value));
+  const lensIndex = hoveredIndex ?? focusedIndex ?? (moreOpen ? TRAINER_PRIMARY_NAVIGATION.length : selectedTrainerIndex);
+  const lensImmediate = hoveredIndex === null && focusedIndex !== null;
+
+  const handleTrainerPointerEnter = (index, event) => {
+    if (!trainer || event.pointerType === 'touch') return;
+    setHoveredIndex(index);
+    trainerIconRefs.current[index]?.startAnimation?.();
+  };
+
+  const handleTrainerPointerLeave = (index, event) => {
+    if (!trainer) return;
+    trainerIconRefs.current[index]?.stopAnimation?.();
+    const nextDockItem = event.relatedTarget?.closest?.('[data-dock-index]');
+    if (!nextDockItem) setHoveredIndex(null);
+  };
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <nav aria-label={navigationLabel} style={trainer && refractiveGlass ? { "--dock-refraction": `url("#${glassId}")` } : undefined} className={trainer ? dockStyles.dock : "flex min-h-12 w-full items-end gap-3 border-b border-border/70"}>
-          {trainer && <TrainerGlassFilter id={glassId} />}
+        <nav
+          aria-label={navigationLabel}
+          style={trainer && refractiveGlass ? {
+            "--dock-refraction": `url("#${dockGlassId}")`,
+            "--lens-refraction": `url("#${lensGlassId}")`,
+          } : undefined}
+          className={trainer ? dockStyles.dock : "flex min-h-12 w-full items-end gap-3 border-b border-border/70"}
+          data-lens-immediate={trainer && lensImmediate ? 'true' : undefined}
+          data-webgl={trainer ? 'loading' : undefined}
+        >
+          {trainer && <TrainerGlassFilter id={dockGlassId} scale={17} />}
+          {trainer && <TrainerGlassFilter id={lensGlassId} scale={18} />}
+          {trainer && (
+            <TrainerDockLens
+              targetIndex={lensIndex}
+              immediate={lensImmediate}
+              expanded={hoveredIndex !== null}
+            />
+          )}
           <TabsList aria-label={navigationLabel} id={tabsId} className={trainer ? dockStyles.tabs : "flex h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto bg-transparent p-0 text-muted-foreground"}>
-            {primaryItems.map((item) => {
+            {primaryItems.map((item, index) => {
               const Icon = item.icon;
               return (
                 <TabsTrigger
@@ -977,15 +1033,30 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                   id={item.tourId}
                   value={item.value}
                   className={trainer ? dockStyles.item : "h-12 shrink-0 gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-2 text-sm shadow-none transition-[border-color,color,background-color] hover:bg-transparent hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none sm:px-3"}
+                  data-dock-index={trainer ? index : undefined}
+                  data-lens-active={trainer && lensIndex === index ? 'true' : undefined}
+                  onPointerEnter={(event) => handleTrainerPointerEnter(index, event)}
+                  onPointerLeave={(event) => handleTrainerPointerLeave(index, event)}
+                  onFocus={() => trainer && setFocusedIndex(index)}
+                  onBlur={() => trainer && setFocusedIndex(null)}
                 >
-                  <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  {trainer ? (
+                    <Icon
+                      ref={(node) => { trainerIconRefs.current[index] = node; }}
+                      aria-hidden="true"
+                      className={dockStyles.animatedIcon}
+                      size={22}
+                    />
+                  ) : (
+                    <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className={trainer ? dockStyles.label : 'truncate'}>{item.label}</span>
                 </TabsTrigger>
               );
             })}
           </TabsList>
 
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={trainer ? setMoreOpen : undefined}>
             <DropdownMenuTrigger asChild>
               <button
                 id={moreId}
@@ -997,9 +1068,24 @@ function ClassroomRoleNavigation({ role, value, onSelect }) {
                 }`}
                 aria-label={moreLabel}
                 aria-current={activeSecondaryItem ? 'page' : undefined}
+                data-dock-index={trainer ? TRAINER_PRIMARY_NAVIGATION.length : undefined}
+                data-lens-active={trainer && lensIndex === TRAINER_PRIMARY_NAVIGATION.length ? 'true' : undefined}
+                onPointerEnter={(event) => handleTrainerPointerEnter(TRAINER_PRIMARY_NAVIGATION.length, event)}
+                onPointerLeave={(event) => handleTrainerPointerLeave(TRAINER_PRIMARY_NAVIGATION.length, event)}
+                onFocus={() => trainer && setFocusedIndex(TRAINER_PRIMARY_NAVIGATION.length)}
+                onBlur={() => trainer && setFocusedIndex(null)}
               >
-                <MoreHorizontal aria-hidden="true" className="h-4 w-4 shrink-0" />
-                <span>More</span>
+                {trainer ? (
+                  <SquaresPlusIcon
+                    ref={(node) => { trainerIconRefs.current[TRAINER_PRIMARY_NAVIGATION.length] = node; }}
+                    aria-hidden="true"
+                    className={dockStyles.animatedIcon}
+                    size={22}
+                  />
+                ) : (
+                  <MoreHorizontal aria-hidden="true" className="h-4 w-4 shrink-0" />
+                )}
+                <span className={trainer ? dockStyles.label : undefined}>More</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side={trainer ? "top" : "bottom"} sideOffset={trainer ? 14 : 6} collisionPadding={12} className={`w-60 data-[state=open]:animate-none data-[state=closed]:animate-none motion-reduce:transition-none ${trainer ? dockStyles.menu : ""}`}>
@@ -1561,7 +1647,7 @@ function CollapsibleSectionHeader({
           className="flex min-w-0 flex-1 items-start gap-3 text-left"
           aria-expanded={open}
         >
-          <ChevronRight className={`mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`mt-0.5 h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? 'rotate-90' : ''}`} />
           <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-lg font-bold">
               {Icon && <Icon className="h-5 w-5 text-muted-foreground" />}
@@ -1956,14 +2042,14 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
               </Button>
             )}
             {isTrainer && onVerify && (
-              <div className="flex items-center gap-1 mt-1">
+              <TrainerActionGroup className="flex items-center gap-1 mt-1">
                 <Button type="button" size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold" onClick={() => onVerify(progress?.id, problem?.id, 'approve')}>
                   <Check className="h-3 w-3" /> Approve
                 </Button>
                 <Button type="button" variant="outline" size="sm" className="h-7 text-xs text-red-600 border-red-500/30 hover:bg-red-500/10 gap-1 font-semibold" onClick={() => onVerify(progress?.id, problem?.id, 'reject')}>
                   <X className="h-3 w-3" /> Reject
                 </Button>
-              </div>
+              </TrainerActionGroup>
             )}
           </div>
         )}
@@ -2059,7 +2145,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
                 onChange={(e) => setTrainerNotesInput(e.target.value)}
                 className="text-xs"
               />
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <TrainerActionGroup className="flex items-center justify-end gap-2 pt-1">
                 <Button
                   type="button"
                   variant="outline"
@@ -2083,7 +2169,7 @@ function TopicProblemMini({ problem, progress, onStatusChange, onVerify, isTrain
                 >
                   <Check className="h-3.5 w-3.5" /> Approve Solution
                 </Button>
-              </div>
+              </TrainerActionGroup>
             </div>
           )}
 
@@ -2689,7 +2775,7 @@ function TeamDashboardPanel({
 
         <div className="flex flex-wrap items-center gap-2">
           {/* CATEGORY SELECTOR BUTTONS */}
-          <div className="flex items-center rounded-lg bg-muted/40 p-1 gap-1 text-xs">
+          <TrainerActionGroup className="flex items-center rounded-lg bg-muted/40 p-1 gap-1 text-xs">
             <button
               type="button"
               onClick={() => setTargetCategoryTab('all')}
@@ -2719,7 +2805,7 @@ function TeamDashboardPanel({
               <UserCheck className="h-3.5 w-3.5" />
               Persons ({assignedStudentRows.length})
             </button>
-          </div>
+          </TrainerActionGroup>
 
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -3056,7 +3142,7 @@ function ClassroomBoardPanel({ classroomId, isTrainer, activeClass, boardSession
               {boardSession ? `Live share started ${dateTimeOf(boardSession.started_at)}` : 'No active board broadcast.'}
             </CardDescription>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <TrainerActionGroup className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={onRefresh} disabled={boardLoading}>
               <RefreshCw className={`h-4 w-4 ${boardLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -3067,7 +3153,7 @@ function ClassroomBoardPanel({ classroomId, isTrainer, activeClass, boardSession
                   Stop broadcast
                 </Button>
             )}
-          </div>
+          </TrainerActionGroup>
         </div>
       </CardHeader>
       <CardContent className="p-0">
@@ -3240,6 +3326,7 @@ export default function ClassroomLiveClient({ classroomId }) {
   const [boardSession, setBoardSession] = useState(null);
   const [boardLoading, setBoardLoading] = useState(false);
   const [sectionOpen, setSectionOpen] = useState({
+    classroomDetails: false,
     liveProgress: true,
     scheduleClass: true,
     schedules: true,
@@ -5167,7 +5254,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 items-center justify-end gap-1">
+            <TrainerActionGroup className="flex shrink-0 items-center justify-end gap-1">
               {status === 'link_pending' && (
                 <>
                   <Button
@@ -5200,7 +5287,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                 triggerId={triggerId}
                 triggerLabel={`More actions for ${getStudentDisplayName(s)}`}
               />
-            </div>
+            </TrainerActionGroup>
           </div>
         </ContextMenuTrigger>
         <ContextActionContent actions={actions} label="Student actions" />
@@ -5249,8 +5336,9 @@ export default function ClassroomLiveClient({ classroomId }) {
     );
   }
   return (
+    <TrainerVisualProvider enabled={isTrainer}>
     <TrainerViewTransition enabled={isTrainer}>
-    <div className={isTrainer ? "min-h-screen bg-background text-foreground" : "dark min-h-screen bg-[#111111] text-foreground"}>
+    <div className={isTrainer ? `${radiusStyles.surface} min-h-screen bg-background text-foreground` : "dark min-h-screen bg-[#111111] text-foreground"}>
       <main className={isTrainer ? "mx-auto flex w-full max-w-[1800px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8" : "mx-auto flex w-full max-w-[1600px] flex-col gap-7 px-5 py-11 sm:px-6 lg:px-8"}>
       <ProgressLink href={isTrainer ? "/trainer/dashboard" : "/classroom/list"} className="inline-flex h-8 w-fit items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/85">
         <ArrowLeft className="h-4 w-4" /> {isTrainer ? "Trainer dashboard" : "Classrooms"}
@@ -5267,7 +5355,23 @@ export default function ClassroomLiveClient({ classroomId }) {
             Trainer <span className="font-semibold text-foreground">{classroom.trainer_name || 'Trainer'}</span>
             {isTrainer && <><span aria-hidden="true"> · </span>{students.length} roster member{students.length === 1 ? '' : 's'}</>}
           </p>
-          {isTrainer && classroom.description && <details className="max-w-2xl text-sm text-muted-foreground"><summary className="cursor-pointer select-none text-xs font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Classroom details</summary><p className="mt-2 leading-6">{classroom.description}</p></details>}
+          {isTrainer && classroom.description && (
+            <div className="max-w-2xl text-sm text-muted-foreground">
+              <button
+                type="button"
+                className="flex min-h-11 items-center gap-1.5 text-xs font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => toggleSection('classroomDetails')}
+                aria-expanded={sectionOpen.classroomDetails}
+                aria-controls="classroom-details"
+              >
+                <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ease-out motion-reduce:transition-none ${sectionOpen.classroomDetails ? 'rotate-90' : ''}`} />
+                Classroom details
+              </button>
+              <AnimatedCollapsibleContent open={sectionOpen.classroomDetails} id="classroom-details">
+                <p className="pb-1 leading-6">{classroom.description}</p>
+              </AnimatedCollapsibleContent>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3 lg:justify-end">
@@ -5276,14 +5380,14 @@ export default function ClassroomLiveClient({ classroomId }) {
               type="button"
               variant="outline"
               size="sm"
-              className={`${isTrainer ? 'min-h-11' : 'h-10'} max-w-full gap-2 border-border/80 bg-card/70 px-3 text-sm font-medium shadow-sm active:scale-[0.98]`}
+              className={`${isTrainer ? 'min-h-11 rounded-2xl' : 'h-10'} max-w-full gap-2 border-border/80 bg-card/70 px-3 text-sm font-medium shadow-sm active:scale-[0.98]`}
               onClick={() => (isTrainer ? handleTrainerTabChange('live') : handleStudentTabChange('live'))}
             >
               <Radio className="h-4 w-4 text-red-500" />
               <span className="truncate">Live: {activeClass.name}</span>
             </Button>
           ) : (
-            <span className={`inline-flex ${isTrainer ? 'min-h-11' : 'h-10'} items-center gap-2 rounded-md border border-border/80 bg-card/70 px-3 text-sm font-medium text-muted-foreground shadow-sm`}>
+            <span className={`inline-flex ${isTrainer ? 'min-h-11 rounded-2xl' : 'h-10 rounded-md'} items-center gap-2 border border-border/80 bg-card/70 px-3 text-sm font-medium text-muted-foreground shadow-sm`}>
               <VideoOff className="h-4 w-4" />
               No live session
             </span>
@@ -5293,7 +5397,7 @@ export default function ClassroomLiveClient({ classroomId }) {
               type="button"
               variant="outline"
               size="sm"
-              className="min-h-11 gap-2 border-border/80 bg-card/70 px-3 text-sm font-semibold shadow-sm active:scale-[0.98]"
+              className="min-h-11 rounded-2xl gap-2 border-border/80 bg-card/70 px-3 text-sm font-semibold shadow-sm active:scale-[0.98]"
               onClick={openClassroomEditDialog}
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -5353,10 +5457,10 @@ export default function ClassroomLiveClient({ classroomId }) {
                     <div className="mx-auto grid h-11 w-11 place-items-center rounded-lg bg-muted"><Play className="h-5 w-5 text-muted-foreground" /></div>
                     <h3 className="mt-4 text-lg font-semibold">No live session</h3>
                     <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{nextScheduledClass ? `${nextScheduledClass.name} is the next scheduled class.` : 'Schedule a class before opening the teaching workspace.'}</p>
-                    <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    <TrainerActionGroup className="mt-5 flex flex-wrap justify-center gap-2">
                       {nextScheduledClass && <Button className="gap-2" onClick={() => handleStartClass(nextScheduledClass.id)}><Play className="h-4 w-4" />Start {nextScheduledClass.name}</Button>}
                       <Button variant={nextScheduledClass ? 'outline' : 'default'} className="gap-2" onClick={() => handleTrainerTabChange('schedule')}><Calendar className="h-4 w-4" />Schedule session</Button>
-                    </div>
+                    </TrainerActionGroup>
                   </div>
                 ) : (
                   <>
@@ -5482,7 +5586,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                             />
                           </div>
 
-                          <div className="grid min-w-0 grid-cols-1 items-end gap-2 sm:grid-cols-3 md:col-span-2">
+                          <TrainerActionGroup className="grid min-w-0 grid-cols-1 items-end gap-2 sm:grid-cols-3 md:col-span-2">
                             <Button
                               type="button"
                               variant="outline"
@@ -5590,7 +5694,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               {assignProblemLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                               <span className="truncate">{assignProblemLoading ? 'Assigning...' : 'Assign'}</span>
                             </Button>
-                          </div>
+                          </TrainerActionGroup>
 
                           <ProblemPreviewPanel
                             error={problemPreviewError}
@@ -5616,7 +5720,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         description="Status, notes, and hints."
                         Icon={Target}
                       />
-                      {sectionOpen.liveProgress && (
+                      <AnimatedCollapsibleContent open={sectionOpen.liveProgress}>
                       <CardContent className="space-y-4">
                         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                           {liveProgressMetricItems.map((item) => (
@@ -5627,10 +5731,10 @@ export default function ClassroomLiveClient({ classroomId }) {
                           ))}
                         </div>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="inline-flex rounded-lg bg-muted/60 p-1" aria-label="Live progress filter">
+                          <TrainerActionGroup className="inline-flex rounded-lg bg-muted/60 p-1" aria-label="Live progress filter">
                             <Button type="button" size="sm" variant={liveProgressFilter === 'all' ? 'secondary' : 'ghost'} className="min-h-11 sm:min-h-8 sm:h-8" aria-pressed={liveProgressFilter === 'all'} onClick={() => setLiveProgressFilter('all')}>All</Button>
                             <Button type="button" size="sm" variant={liveProgressFilter === 'review' ? 'secondary' : 'ghost'} className="min-h-11 sm:min-h-8 sm:h-8" aria-pressed={liveProgressFilter === 'review'} onClick={() => setLiveProgressFilter('review')}>Awaiting review</Button>
-                          </div>
+                          </TrainerActionGroup>
                           <div className="relative w-full sm:max-w-xs">
                             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input value={liveProgressSearch} onChange={(event) => setLiveProgressSearch(event.target.value)} className="h-11 pl-9 sm:h-9" placeholder="Search student or problem" aria-label="Search live progress" />
@@ -5834,7 +5938,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           </Button>
                         )}
                       </CardContent>
-                      )}
+                      </AnimatedCollapsibleContent>
                     </Card>
                   </>
                 )}
@@ -5875,7 +5979,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     </div>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <TrainerActionGroup className="mt-5 flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -5900,7 +6004,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       <Plus className="h-4 w-4" />
                       Create topic
                     </Button>
-                  </div>
+                  </TrainerActionGroup>
                 </section>
 
                 {topics.length === 0 ? (
@@ -6046,7 +6150,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                               </div>
                             </div>
 
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
+                            <TrainerActionGroup className="flex shrink-0 flex-wrap items-center gap-2">
                               <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5 border-border/80 bg-card/70 text-xs font-semibold active:scale-[0.97]" onClick={() => openTopicEditDialog(selectedTopic)}>
                                 <Pencil className="h-3.5 w-3.5 text-primary" />
                                 Edit
@@ -6075,7 +6179,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                 <Target className="h-3.5 w-3.5" />
                                 Assign
                               </Button>
-                            </div>
+                            </TrainerActionGroup>
                           </div>
 
                           <div className="mt-5 grid overflow-hidden rounded-lg border border-border/70 bg-card/45 text-center sm:grid-cols-3">
@@ -6287,7 +6391,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                             </a>
                                           )}
                                         </div>
-                                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                                        <TrainerActionGroup className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                                           <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 text-xs active:scale-[0.97]" onClick={() => openTopicResourceDialog(selectedTopic, resource)}>
                                             <Pencil className="h-3.5 w-3.5" />
                                             Edit
@@ -6302,7 +6406,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                               Read
                                             </Button>
                                           </ProgressLink>
-                                        </div>
+                                        </TrainerActionGroup>
                                       </div>
                                       {resource.content && (
                                         <div className="mt-3 max-h-36 overflow-y-auto rounded-md border border-border/70 bg-background/40 p-3 text-xs">
@@ -6616,7 +6720,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                               <div className="flex items-center gap-2">
                                                 {renderSubmissionThreadButton(item)}
                                               </div>
-                                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                              <TrainerActionGroup className="flex flex-wrap items-center justify-end gap-2">
                                                 <Button
                                                   type="button"
                                                   variant="outline"
@@ -6642,7 +6746,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                                 >
                                                   <Check className="h-3.5 w-3.5" /> Approve Solution
                                                 </Button>
-                                              </div>
+                                              </TrainerActionGroup>
                                             </div>
                                             {renderSubmissionThreadPanel(item)}
                                           </div>
@@ -7026,7 +7130,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       {/* Target Type Toggle */}
                       <div className="space-y-1.5">
                         <label className="text-sm font-semibold">Assignment Target Type</label>
-                        <div className="flex rounded-lg border bg-muted/40 p-1 text-xs">
+                        <TrainerActionGroup className="flex rounded-lg border bg-muted/40 p-1 text-xs">
                           <button
                             type="button"
                             onClick={() => setTopicAssignmentForm((curr) => ({ ...curr, targetType: 'group' }))}
@@ -7049,7 +7153,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           >
                             👤 Target Individual Students ({students.length})
                           </button>
-                        </div>
+                        </TrainerActionGroup>
                       </div>
 
                       {(topicAssignmentForm.targetType || 'group') === 'group' ? (
@@ -7299,7 +7403,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                     <div className="flex items-center gap-2">
                                       {renderSubmissionThreadButton(item)}
                                     </div>
-                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <TrainerActionGroup className="flex flex-wrap items-center justify-end gap-2">
                                       <Button
                                         type="button"
                                         variant="outline"
@@ -7325,7 +7429,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       >
                                         <Check className="h-3.5 w-3.5" /> Approve Solution
                                       </Button>
-                                    </div>
+                                    </TrainerActionGroup>
                                   </div>
                                   {renderSubmissionThreadPanel(item)}
                                 </div>
@@ -7415,7 +7519,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     description="Set the next practice session."
                     Icon={Calendar}
                   />
-                  {sectionOpen.scheduleClass && (
+                  <AnimatedCollapsibleContent open={sectionOpen.scheduleClass}>
                   <CardContent>
                     <form onSubmit={handleScheduleClass} className="space-y-4">
                       <div className="space-y-1">
@@ -7475,7 +7579,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       <Button type="submit" className="w-full font-semibold">Schedule class</Button>
                     </form>
                   </CardContent>
-                  )}
+                  </AnimatedCollapsibleContent>
                 </Card>
 
                 {/* SCHEDULED CLASSES LIST */}
@@ -7486,7 +7590,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     title="Schedules & Attendance"
                     Icon={Clock}
                   />
-                  {sectionOpen.schedules && (
+                  <AnimatedCollapsibleContent open={sectionOpen.schedules}>
                   <CardContent className="space-y-4">
                     {classes.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No classes scheduled yet.</p>
@@ -7542,7 +7646,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                       </Badge>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-1.5 ml-auto">
+                                  <TrainerActionGroup className="flex items-center gap-1.5 ml-auto">
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -7568,7 +7672,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                                         <Play className="h-3.5 w-3.5" /> Start
                                       </Button>
                                     )}
-                                  </div>
+                                  </TrainerActionGroup>
                                 </div>
                               </div>
                             );
@@ -7577,7 +7681,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       </ScrollArea>
                     )}
                   </CardContent>
-                  )}
+                  </AnimatedCollapsibleContent>
                 </Card>
               </TabsContent>
 
@@ -7596,7 +7700,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       Refresh
                     </Button>
                   </CollapsibleSectionHeader>
-                  {(sectionOpen.attendanceSummary ?? true) && (
+                  <AnimatedCollapsibleContent open={sectionOpen.attendanceSummary ?? true}>
                     <CardContent>
                       {attendanceSummaryLoading ? (
                         <div className="flex items-center justify-center py-10 gap-2 text-sm text-muted-foreground">
@@ -7679,7 +7783,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </div>
                       )}
                     </CardContent>
-                  )}
+                  </AnimatedCollapsibleContent>
                 </Card>
               </TabsContent>
 
@@ -8315,7 +8419,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                       Refresh
                     </Button>
                   </CollapsibleSectionHeader>
-                  {sectionOpen.studentTopics && (
+                  <AnimatedCollapsibleContent open={sectionOpen.studentTopics}>
                     <CardContent>
                       <TopicAssignmentsPanel
                         assignments={topicAssignments}
@@ -8327,7 +8431,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         onOpenThread={openThreadBubble}
                       />
                     </CardContent>
-                  )}
+                  </AnimatedCollapsibleContent>
                 </Card>
               </TabsContent>
 
@@ -8361,7 +8465,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                     description="Problems assigned for the current live session with perceived difficulty ratings."
                     Icon={Award}
                   />
-                  {sectionOpen.studentChallenges && (
+                  <AnimatedCollapsibleContent open={sectionOpen.studentChallenges}>
                     <CardContent>
                       {!activeClass ? (
                         <Card className="rounded-lg border bg-card p-8 text-center text-muted-foreground">
@@ -8548,7 +8652,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                         </Button>
                       )}
                     </CardContent>
-                  )}
+                  </AnimatedCollapsibleContent>
                 </Card>
               </TabsContent>
 
@@ -9534,7 +9638,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           <p className="text-sm font-semibold truncate">{getStudentLabelWithId(student)}</p>
                           <p className="text-xs text-muted-foreground truncate">{student.email} • ID: {student.mist_id || 'N/A'}</p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1 shrink-0">
+                        <TrainerActionGroup className="flex flex-wrap items-center gap-1 shrink-0">
                           <Button
                             type="button"
                             size="sm"
@@ -9580,7 +9684,7 @@ export default function ClassroomLiveClient({ classroomId }) {
                           >
                             Excused
                           </Button>
-                        </div>
+                        </TrainerActionGroup>
                       </div>
                     );
                   })
@@ -9621,5 +9725,6 @@ export default function ClassroomLiveClient({ classroomId }) {
       </main>
     </div>
     </TrainerViewTransition>
+    </TrainerVisualProvider>
   );
 }

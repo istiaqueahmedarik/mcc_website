@@ -1,5 +1,7 @@
 "use client";
 
+import TrainerActionGroup from "@/app/classroom/live/[id]/TrainerActionGroup";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
@@ -8,7 +10,6 @@ import {
   ArrowUpDown,
   BarChart3,
   Calculator,
-  ChevronDown,
   ChevronRight,
   Check,
   Eye,
@@ -34,13 +35,14 @@ import {
   Trash2,
   Trophy,
   Users,
-} from "lucide-react";
+} from "@/components/ui/heroicons-animated/TrainerClassroomIcons";
 import { toast } from "sonner";
 
 import ReportTable from "@/components/ReportTable";
 import ContestScoringDialog from "@/components/ContestScoringDialog";
 import ContestMergeOverview from "@/components/ContestMergeOverview";
 import { Badge } from "@/components/ui/badge";
+import { AnimatedCollapsibleContent } from "@/components/ui/animated-collapsible";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -1800,7 +1802,7 @@ export function ClassroomContestPanel({
                         </div>
                       </div>
                     </div>
-                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap xl:shrink-0 xl:justify-end">
+                    <TrainerActionGroup className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap xl:shrink-0 xl:justify-end">
                       <Button size="sm" variant="outline" className={cn("min-h-11 gap-1.5", pressableClass)} onClick={refreshWorkspace} disabled={loading}>
                         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                         Refresh
@@ -1830,7 +1832,7 @@ export function ClassroomContestPanel({
                         }}
                         trigger={<span className="hidden" />}
                       />
-                    </div>
+                    </TrainerActionGroup>
                   </div>
 
                   {report?.isStale && (
@@ -1869,9 +1871,9 @@ export function ClassroomContestPanel({
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <button type="button" className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => setSourcesOpen((open) => !open)} aria-expanded={sourcesOpen} aria-controls="contest-sources">
                       <span className="min-w-0"><span className="font-semibold">Contest sources</span><span className="ml-2 text-xs text-muted-foreground">{selectedRoom.contests.length} configured</span></span>
-                      {sourcesOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                      <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none ${sourcesOpen ? "rotate-90" : ""}`} />
                     </button>
-                    <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+                    <TrainerActionGroup className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
                       <Button size="sm" variant="outline" className={cn("min-h-11 gap-1.5", pressableClass)} onClick={openCreateContest}>
                         <Plus className="h-4 w-4" /> Add contest
                       </Button>
@@ -1892,10 +1894,11 @@ export function ClassroomContestPanel({
                           <DropdownMenuItem onSelect={() => setCodeforcesSessionDialogOpen(true)}><KeyRound className="mr-2 h-4 w-4" />Codeforces access</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
+                    </TrainerActionGroup>
                   </div>
 
-                  {sourcesOpen && <div id="contest-sources" className="space-y-4">
+                  <AnimatedCollapsibleContent open={sourcesOpen} id="contest-sources">
+                    <div className="space-y-4">
                     <ContestMergeOverview
                       contests={selectedRoom.contests || []}
                       groups={scoringConfig?.groups || []}
@@ -1996,7 +1999,8 @@ export function ClassroomContestPanel({
                       </TableBody>
                     </Table>
                   </div>
-                  </div>}
+                    </div>
+                  </AnimatedCollapsibleContent>
 
                   <div className="border-t pt-4">
                     {reportLoading ? (
@@ -2371,7 +2375,7 @@ export function ClassroomContestPanel({
                       </p>
                     )}
 
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <TrainerActionGroup className="flex flex-wrap justify-end gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -2400,7 +2404,7 @@ export function ClassroomContestPanel({
                         {busyKey === "cf-credentials" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                         Save credentials
                       </Button>
-                    </div>
+                    </TrainerActionGroup>
                   </div>
 
                   <div className="space-y-3">
@@ -2443,7 +2447,7 @@ export function ClassroomContestPanel({
                         Copy it from Codeforces cookie storage while signed in and able to access the target contest, Gym, or EDU course. It is never written to the database or returned in report data.
                       </p>
                     </div>
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <TrainerActionGroup className="flex flex-wrap justify-end gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -2463,7 +2467,7 @@ export function ClassroomContestPanel({
                         {busyKey === "cf-session" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
                         Connect session
                       </Button>
-                    </div>
+                    </TrainerActionGroup>
                   </div>
                 </div>
               </div>
@@ -2653,7 +2657,7 @@ export function ClassroomContestPanel({
                     onChange={(event) => setHandleForm((form) => ({ ...form, note: event.target.value }))}
                   />
                 </div>
-                <div className="flex gap-2">
+                <TrainerActionGroup className="flex gap-2">
                   <Button type="submit" className={cn("flex-1", pressableClass)} disabled={busyKey === "handle"}>
                     {busyKey === "handle" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     Save
@@ -2671,7 +2675,7 @@ export function ClassroomContestPanel({
                       Reset
                     </Button>
                   )}
-                </div>
+                </TrainerActionGroup>
               </form>
 
               <div className="space-y-4">
@@ -2710,7 +2714,7 @@ export function ClassroomContestPanel({
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex justify-end gap-1">
+                                <TrainerActionGroup className="flex justify-end gap-1">
                                   <Button size="sm" variant="outline" className={cn("h-8", pressableClass)} onClick={() => prefillHandleMapping(row, "student")}>
                                     Map
                                   </Button>
@@ -2724,7 +2728,7 @@ export function ClassroomContestPanel({
                                     {busyKey === busyIgnoreKey ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
                                     Ignore
                                   </Button>
-                                </div>
+                                </TrainerActionGroup>
                               </TableCell>
                             </TableRow>
                           );
@@ -2771,7 +2775,7 @@ export function ClassroomContestPanel({
                             <div className="text-xs text-muted-foreground">{override.targetType}</div>
                           </TableCell>
                           <TableCell>
-                            <div className="flex justify-end gap-1">
+                            <TrainerActionGroup className="flex justify-end gap-1">
                               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => editHandleOverride(override)} aria-label="Edit mapping">
                                 <Pencil className="h-4 w-4" />
                               </Button>
@@ -2785,7 +2789,7 @@ export function ClassroomContestPanel({
                               >
                                 {busyKey === `delete-handle:${override.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                               </Button>
-                            </div>
+                            </TrainerActionGroup>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2867,7 +2871,7 @@ export function ClassroomContestPanel({
                     onChange={(event) => setSolveOverrideForm((form) => ({ ...form, note: event.target.value }))}
                   />
                 </div>
-                <div className="flex gap-2">
+                <TrainerActionGroup className="flex gap-2">
                   <Button type="submit" className={cn("flex-1", pressableClass)} disabled={busyKey === "solve-override"}>
                     {busyKey === "solve-override" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     Save
@@ -2885,7 +2889,7 @@ export function ClassroomContestPanel({
                       Reset
                     </Button>
                   )}
-                </div>
+                </TrainerActionGroup>
               </form>
 
               <ScrollArea className="h-[min(62vh,560px)] rounded-lg border bg-background/80 shadow-sm">
@@ -2912,7 +2916,7 @@ export function ClassroomContestPanel({
                           {override.note || "—"}
                         </TableCell>
                         <TableCell>
-                          <div className="flex justify-end gap-1">
+                          <TrainerActionGroup className="flex justify-end gap-1">
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => editSolveOverride(override)} aria-label="Edit manual solves">
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -2926,7 +2930,7 @@ export function ClassroomContestPanel({
                             >
                               {busyKey === `delete-solve:${override.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                             </Button>
-                          </div>
+                          </TrainerActionGroup>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -2986,7 +2990,7 @@ export function ClassroomContestPanel({
                     required
                   />
                 </div>
-                <div className="flex gap-2">
+                <TrainerActionGroup className="flex gap-2">
                   <Button type="submit" className={cn("flex-1", pressableClass)} disabled={busyKey === "demerit"}>
                     {busyKey === "demerit" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     Save
@@ -3004,7 +3008,7 @@ export function ClassroomContestPanel({
                       Reset
                     </Button>
                   )}
-                </div>
+                </TrainerActionGroup>
               </form>
 
               <ScrollArea className="h-[min(62vh,560px)] rounded-lg border bg-background/80 shadow-sm">
@@ -3030,7 +3034,7 @@ export function ClassroomContestPanel({
                         </TableCell>
                         <TableCell className="max-w-[240px] whitespace-normal text-sm">{demerit.reason}</TableCell>
                         <TableCell>
-                          <div className="flex justify-end gap-1">
+                          <TrainerActionGroup className="flex justify-end gap-1">
                             <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => editDemerit(demerit)} aria-label="Edit demerit">
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -3044,7 +3048,7 @@ export function ClassroomContestPanel({
                             >
                               {busyKey === `delete-demerit:${demerit.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                             </Button>
-                          </div>
+                          </TrainerActionGroup>
                         </TableCell>
                       </TableRow>
                     ))}

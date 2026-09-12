@@ -1,0 +1,13 @@
+/* Scope the reference corners to trainer content, including portalled controls. */
+.surface,
+:global(body):has(.surface) :global([role="dialog"]),
+:global(body):has(.surface) :global([role="alertdialog"]),
+:global(body):has(.surface) :global([data-radix-popper-content-wrapper]) {
+  --radius: 1.125rem;
+}
+
+.surface :is(:global(.rounded-lg), :global(.rounded-xl)),
+:global(body):has(.surface) :is(:global([role="dialog"]), :global([role="alertdialog"])),
+:global(body):has(.surface) :is(:global([role="dialog"]), :global([role="alertdialog"]), :global([data-radix-popper-content-wrapper])) :is(:global(.rounded-lg), :global(.rounded-xl)) {
+  border-radius: 1rem;
+}

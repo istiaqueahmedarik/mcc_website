@@ -209,7 +209,7 @@ export default function TrainerDashboardWorkspace({
         aria-label="Loading trainer dashboard"
       >
         <div className="h-8 w-72 max-w-full rounded-md bg-muted motion-safe:animate-pulse" />
-        <div className="h-11 rounded-md bg-muted/40" />
+        <div className="h-11 rounded-2xl bg-muted/40" />
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="grid gap-4 lg:grid-cols-2">
             {[0, 1, 2, 3].map((i) => (
@@ -237,7 +237,7 @@ export default function TrainerDashboardWorkspace({
         <Button
           onClick={onRetry}
           disabled={refreshing}
-          className="mt-4 min-h-11"
+          className="rounded-2xl mt-4 min-h-11"
         >
           {refreshing ? "Retrying…" : "Retry"}
         </Button>
@@ -258,7 +258,7 @@ export default function TrainerDashboardWorkspace({
             variant="outline"
             onClick={onRetry}
             disabled={refreshing}
-            className="min-h-11"
+            className="rounded-2xl min-h-11"
           >
             {refreshing ? "Retrying…" : "Retry"}
           </Button>
@@ -275,7 +275,7 @@ export default function TrainerDashboardWorkspace({
         ].map((label, i) => (
           <span
             key={label}
-            className={`rounded-md border px-3 py-2 ${i === 2 && pendingCount ? "border-amber-500/40 bg-amber-500/10 text-foreground" : "border-border bg-muted/30 text-muted-foreground"}`}
+            className={`rounded-xl border px-3 py-2 ${i === 2 && pendingCount ? "border-amber-500/40 bg-amber-500/10 text-foreground" : "border-border bg-muted/30 text-muted-foreground"}`}
           >
             {label}
           </span>
@@ -313,17 +313,17 @@ export default function TrainerDashboardWorkspace({
                     value={query}
                     onChange={(e) => changeQuery({ q: e.target.value })}
                     placeholder="Search classrooms…"
-                    className="h-11 pl-10 text-base sm:text-sm"
+                    className="rounded-2xl h-11 pl-10 text-base sm:text-sm"
                   />
                 </div>
                 <div
-                  className="flex gap-1 rounded-lg border p-1"
+                  className="flex gap-1 rounded-[20px] border p-1"
                   role="group"
                   aria-label="Classroom display"
                 >
                   <Button
                     size="sm"
-                    className="min-h-11 gap-2"
+                    className="rounded-2xl min-h-11 gap-2"
                     variant={view === "cards" ? "secondary" : "ghost"}
                     aria-pressed={view === "cards"}
                     onClick={() => changeQuery({ view: null })}
@@ -333,7 +333,7 @@ export default function TrainerDashboardWorkspace({
                   </Button>
                   <Button
                     size="sm"
-                    className="min-h-11 gap-2"
+                    className="rounded-2xl min-h-11 gap-2"
                     variant={view === "list" ? "secondary" : "ghost"}
                     aria-pressed={view === "list"}
                     onClick={() => changeQuery({ view: "list" })}
@@ -354,7 +354,7 @@ export default function TrainerDashboardWorkspace({
                       key={value}
                       variant={filter === value ? "secondary" : "ghost"}
                       size="sm"
-                      className="min-h-11"
+                      className="rounded-2xl min-h-11"
                       aria-pressed={filter === value}
                       onClick={() =>
                         changeQuery({ filter: value === "all" ? null : value })
@@ -369,7 +369,7 @@ export default function TrainerDashboardWorkspace({
                   <select
                     value={sort}
                     onChange={(e) => changeQuery({ sort: e.target.value })}
-                    className="min-h-11 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                    className="min-h-11 rounded-2xl border border-border bg-background px-2 text-sm text-foreground"
                   >
                     <option value="recent">Pinned, then recent</option>
                     <option value="name">Pinned, then name</option>
@@ -391,7 +391,7 @@ export default function TrainerDashboardWorkspace({
               <p className="mt-2 text-sm text-muted-foreground">
                 Create your first classroom to start preparing sessions.
               </p>
-              <Button onClick={onCreate} className="mt-5 min-h-11 gap-2">
+              <Button onClick={onCreate} className="rounded-2xl mt-5 min-h-11 gap-2">
                 <Plus className="h-4 w-4" />
                 Create classroom
               </Button>
@@ -404,7 +404,7 @@ export default function TrainerDashboardWorkspace({
               </p>
               <Button
                 variant="outline"
-                className="mt-4 min-h-11"
+                className="rounded-2xl mt-4 min-h-11"
                 onClick={() => changeQuery({ q: null, filter: null })}
               >
                 Clear filters
@@ -525,7 +525,7 @@ function ClassroomCard({
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 shrink-0"
+            className="rounded-2xl h-11 w-11 shrink-0"
             aria-label={`${pinned ? "Unpin" : "Pin"} ${room.name}`}
             aria-pressed={pinned}
             onClick={onPin}
@@ -560,7 +560,7 @@ function ClassroomCard({
       <div
         className={`flex flex-wrap items-center gap-2 ${view === "cards" ? "mt-4 border-t border-border/60 pt-4" : "mt-4 lg:mt-0 lg:max-w-xs lg:justify-end"}`}
       >
-        <Button asChild className="min-h-11">
+        <Button asChild className="rounded-2xl min-h-11">
           <RoomLink
             room={room}
             tab={status === "Live now" ? "live" : "updates"}
@@ -583,7 +583,7 @@ function ClassroomCard({
             <Button
               variant="ghost"
               size="icon"
-              className="ml-auto h-11 w-11"
+              className="rounded-2xl ml-auto h-11 w-11"
               aria-label={`Actions for ${room.name}`}
             >
               <MoreHorizontal className="h-4 w-4" />

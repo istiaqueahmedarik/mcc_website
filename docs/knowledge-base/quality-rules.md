@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-12 - WebGL decoration must preserve operational controls
+
+For GPU decoration on navigation, retain native focusable controls and accessible names outside the canvas. Canvas and backdrop layers must not receive pointer input. Keep fine icon strokes as DOM/SVG content above high-dispersion material, measure lens centers from real control rectangles, and pad the canvas when a hover state crosses the shell boundary. Avoid a permanent white glow as a glass substitute; use restrained edge tint, backdrop displacement, and shadow depth. A user-requested pointer light must stay localized with distance falloff, fade on exit, and sleep at rest. Provide setup/context-loss and reduced-transparency/contrast fallbacks, cap render resolution, stop idle animation, and distinguish a local shader prototype from authenticated production navigation evidence. Decorative icon motion runs on pointer hover only and honors reduced motion.
+
 ## 2026-09-11 - EDU Problem Columns Are Link-Identified
 
 Codeforces EDU friends standings may include aggregate columns such as Hacks between the solved count and problem results. Identify problem headers by their EDU lesson problem-link shape, retain their original table indexes when reading row cells, and source-validate every selected problem. Do not use a fixed metadata-column offset.
@@ -948,3 +952,11 @@ Recent-activity counts must state their reference time and source freshness. Nev
 Center Performance body cells under the centered heading, including em-dash empty states; inline buttons otherwise inherit the table body's left alignment.
 
 2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.
+
+## 2026-09-13 - One hover surface per action group
+
+When adding a shader hover lens, remove competing button hover paint/shadow/movement in that scope while preserving focus outlines and semantic primary/destructive colors. Do not animate icon feedback from keyboard focus. Keep spring timing on one monotonic clock with a nonnegative bounded timestep; verify finite settled geometry in a browser, including wrapped rows. Avoid eager GPU contexts per repeated list item.
+
+Keep the rounded action-group boundary in a separate pointer-transparent layer above the shader. Do not rely on the host border because the active WebGL state intentionally makes that border transparent.
+
+If an action group must be shadowless, override every inherited shell state and decorative lens layer; removing only the resting shadow allows it to return when WebGL becomes active.

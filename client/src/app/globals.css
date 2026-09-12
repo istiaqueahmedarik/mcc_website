@@ -833,7 +833,7 @@
   }
 
   .trainer-page :is(h1, h2, h3, h4, p, span, label, button, a, input, textarea, select, summary, th, td) {
-    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-sf-pro-display), ui-sans-serif, system-ui, sans-serif;
     letter-spacing: 0;
   }
 

@@ -1,6 +1,8 @@
 "use client";
 
-import { AlertCircle, Calendar, Clock, History, Library, Play, Radio, ShieldCheck } from "lucide-react";
+import TrainerActionGroup from "@/app/classroom/live/[id]/TrainerActionGroup";
+
+import { AlertCircle, Calendar, Clock, History, Library, Play, Radio, ShieldCheck } from "@/components/ui/heroicons-animated/TrainerClassroomIcons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,11 +53,11 @@ export function ClassroomArrivalPanel({
             <Button className="min-h-11 shrink-0 gap-2" onClick={onOpenSchedule}><Calendar className="h-4 w-4" />Schedule session</Button>
           )}
         </div>
-        <div className="mt-5 flex flex-wrap gap-2 border-t border-border/60 pt-4">
+        <TrainerActionGroup className="mt-5 flex flex-wrap gap-2 border-t border-border/60 pt-4">
           <Button variant="ghost" size="sm" className="min-h-11 gap-2" onClick={onOpenHistory}><History className="h-4 w-4" />History</Button>
           <Button variant="ghost" size="sm" className="min-h-11 gap-2" onClick={onOpenResources}><Library className="h-4 w-4" />Resources</Button>
           <Button variant="ghost" size="sm" className="min-h-11 gap-2" onClick={onOpenSchedule}><Calendar className="h-4 w-4" />Schedule</Button>
-        </div>
+        </TrainerActionGroup>
       </div>
 
       <div className="rounded-xl border border-border/70 bg-card/75 p-5 shadow-sm">
@@ -88,12 +90,12 @@ export function LiveSessionToolbar({ activeClass, meetingUrl, onAssign, onBoard,
         <div className="flex items-center gap-2 text-sm font-semibold"><Radio className="h-4 w-4 text-red-500" /><span className="truncate">{activeClass.name}</span></div>
         <p className="mt-1 text-xs text-muted-foreground">Started {sessionTime(activeClass)}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <TrainerActionGroup className="flex flex-wrap items-center gap-2">
         <Button id="live-assign-problem-trigger" size="sm" className="min-h-11 gap-2" onClick={onAssign}><Play className="h-4 w-4" />Assign problem</Button>
         {safeMeetingUrl && <Button size="sm" variant="outline" className="min-h-11" asChild><a href={safeMeetingUrl} target="_blank" rel="noreferrer">Open meeting</a></Button>}
         <Button size="sm" variant="outline" className="min-h-11" onClick={onBoard}>Open board</Button>
         <Button size="sm" variant="ghost" className="min-h-11 text-destructive hover:text-destructive" onClick={onEnd}>End session</Button>
-      </div>
+      </TrainerActionGroup>
     </section>
   );
 }

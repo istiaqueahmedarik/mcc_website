@@ -146,7 +146,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-inter)", ...defaultTheme.fontFamily.sans],
+        sans: ["var(--font-sf-pro-display)", ...defaultTheme.fontFamily.sans],
         mono: ["var(--font-geist-mono)"],
       },
       borderRadius: {

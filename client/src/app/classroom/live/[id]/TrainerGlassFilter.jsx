@@ -19,13 +19,13 @@ const displacementImage = `data:image/svg+xml,${encodeURIComponent(`
   <rect width="544" height="60" fill="url(#y)" style="mix-blend-mode:screen"/>
 </svg>`)}`;
 
-export default function TrainerGlassFilter({ id }) {
+export default function TrainerGlassFilter({ id, scale = 32 }) {
   return (
     <svg aria-hidden="true" focusable="false" width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
       <defs>
         <filter id={id} x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
           <feImage href={displacementImage} x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="lens" />
-          <feDisplacementMap in="SourceGraphic" in2="lens" scale="32" xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="lens" scale={scale} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
     </svg>

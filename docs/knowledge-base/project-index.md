@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-12 - Trainer WebGL dock lens and animated icons
+
+`client/src/app/trainer/dock-lens-prototype/` retains the unlinked study that approved the moving optical direction. Production integration lives in `ClassroomLiveClient.js`, `TrainerDockLens.jsx`, and `TrainerClassroomDock.module.css`; it keeps real Radix/HTML controls, renders a pointer-transparent WebGL material above a moving CSS refraction layer, and keeps the requested Heroicons Animated SVGs crisp above the lens. The copied MIT components and notice live under `client/src/components/ui/heroicons-animated/`. Reviews: `docs/reviews/trainer-webgl-dock-prototype-20260912-review.md` and `docs/reviews/trainer-webgl-dock-integration-20260912-review.md`.
+
 ## 2026-09-11 - Trainer view transitions
 
 `TrainerViewTransition.jsx` and `app/trainer/layout.js` provide named trainer page crossfades using the existing Next.js App Router React integration. Loaded trainer classrooms and classroom/form response tabs opt into separate boundaries; CSS is scoped by transition class in globals.css. Review: `docs/reviews/trainer-view-transitions-20260911-review.md`. The approved card-to-header extension uses `ClassroomCardTransition.jsx` and the classroom `ClassroomOpening.jsx`/`loading.js` to pair the dashboard card/title with a labeled opening header during cold loads. Only display ID/name is carried in transient context and cleared after loading; authenticated browser coverage remains unverified.
@@ -1237,3 +1241,7 @@ Trainer-only recent activity is rendered by `ContestPerformance.jsx` through the
 2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
 
 2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.
+
+## 2026-09-13 - Trainer action group presentation
+
+`TrainerVisualContext.jsx` scopes trainer-only visuals. `TrainerActionGroup.jsx` and its CSS module reuse `TrainerDockLens.jsx` for in-flow button rows. `ui/heroicons-animated/TrainerClassroomIcons.jsx` adapts local upstream icon sources for shared classroom components. Isolated QA route: `/trainer/dock-lens-prototype/actions`.
