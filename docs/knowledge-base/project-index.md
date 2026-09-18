@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-19 - Global contest reports support VJudge and Codeforces
+
+Global/admin contest rooms under `/contests_report` now store a provider on each `Contest_room_contests` item and generate reports through the shared provider adapter. The server path is `contestRoomContestsController.ts` → `contestRoomController.ts` → `classroomContestRankService.ts` → the existing VJudge or Codeforces service; scoring still enters the unchanged `buildScoredContestReport` pipeline. Codeforces keeps the trainer order of anonymous API, encrypted per-user signed API retry, then transient JSESSIONID crawl fallback. The UI no longer blocks room access on a VJudge login; `details/[id]/page.js` shows only the access controls required by providers in that room. Rollout SQL is `docs/sql/global-contest-report-codeforces-provider-20260919.sql` and review is `docs/reviews/global-contest-report-codeforces-provider-20260919-implementation-review.md`.
+
 ## 2026-09-12 - Trainer WebGL dock lens and animated icons
 
 `client/src/app/trainer/dock-lens-prototype/` retains the unlinked study that approved the moving optical direction. Production integration lives in `ClassroomLiveClient.js`, `TrainerDockLens.jsx`, and `TrainerClassroomDock.module.css`; it keeps real Radix/HTML controls, renders a pointer-transparent WebGL material above a moving CSS refraction layer, and keeps the requested Heroicons Animated SVGs crisp above the lens. The copied MIT components and notice live under `client/src/components/ui/heroicons-animated/`. Reviews: `docs/reviews/trainer-webgl-dock-prototype-20260912-review.md` and `docs/reviews/trainer-webgl-dock-integration-20260912-review.md`.

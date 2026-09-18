@@ -1,5 +1,20 @@
 # Doc Usage
 
+## 2026-09-19 - global-contest-report-codeforces-provider - Implementation Docs Used
+
+Source:
+- `docs/rsd/global-contest-report-codeforces-provider-20260919-rsd.md`
+- `docs/reviews/global-contest-report-codeforces-provider-20260919-implementation-review.md`
+
+Fact:
+This task used `AGENTS.md`, the provider/report knowledge base, the required interface/Apple/Emil design skills, Context7 Next.js 16.1.1 cookie guidance, current Vercel Web Interface Guidelines, the Supabase/Postgres schema safety skills and changelog, a read-only live column-type check, and the existing classroom Codeforces provider implementation. These inputs kept provider credentials server-side, made the global item identity provider-aware, and reused the fetch adapter without duplicating scoring mathematics.
+
+Applies when:
+Auditing why global report rooms no longer require an up-front VJudge login, why Codeforces access is requested only for Codeforces items, or how the provider adapter joins the existing scoring pipeline.
+
+Do not overgeneralize:
+The SQL artifact was not applied, no real provider credential was replayed, and authenticated browser, production, and live mixed-provider report verification remain separate rollout checks.
+
 ## 2026-09-04 - classroom-codeforces-edu-browser-import - Implementation Docs Used
 
 Source:

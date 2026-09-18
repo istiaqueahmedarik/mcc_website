@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-19 - Provider-aware reports must fail visibly and publish completely
+
+Mixed-provider report generation may return a preview when at least one source succeeds, but the UI must list every missing source with provider-specific guidance. Publication must reject the report while any configured source is missing. Provider/external-ID pairs, provider-prefixed report keys, and stored item IDs must be used consistently so equal numeric IDs across VJudge and Codeforces cannot overwrite, select, or publish the wrong contest. Provider sessions remain transient HTTP-only cookies; API secrets remain encrypted server-side and never enter report payloads or logs.
+
 ## 2026-09-12 - WebGL decoration must preserve operational controls
 
 For GPU decoration on navigation, retain native focusable controls and accessible names outside the canvas. Canvas and backdrop layers must not receive pointer input. Keep fine icon strokes as DOM/SVG content above high-dispersion material, measure lens centers from real control rectangles, and pad the canvas when a hover state crosses the shell boundary. Avoid a permanent white glow as a glass substitute; use restrained edge tint, backdrop displacement, and shadow depth. A user-requested pointer light must stay localized with distance falloff, fade on exit, and sleep at rest. Provide setup/context-loss and reduced-transparency/contrast fallbacks, cap render resolution, stop idle animation, and distinguish a local shader prototype from authenticated production navigation evidence. Decorative icon motion runs on pointer hover only and honors reduced motion.

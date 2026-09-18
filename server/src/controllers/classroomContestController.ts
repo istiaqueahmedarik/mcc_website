@@ -5,6 +5,8 @@ import {
   buildContestKey,
   contestProviderLabel,
   fetchClassroomContestRank,
+  isValidExternalContestId,
+  normalizeExternalContestIdForProvider,
   normalizeContestProvider,
   type ClassroomContestProvider,
 } from '../services/classroomContestRankService';
@@ -17,9 +19,12 @@ import {
 import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from '../utils/classroomPreEnrollment';
 import {
   codeforcesApiKeyHint,
-  decryptCodeforcesCredential,
   encryptCodeforcesCredential,
 } from '../utils/codeforcesCredentialCrypto';
+import {
+  loadTrainerCodeforcesCredentialRow,
+  loadTrainerCodeforcesCredentials,
+} from '../services/trainerCodeforcesCredentialService';
 import { getCodeforcesSession, normalizeCodeforcesSession } from '../utils/codeforcesSession';
 import {
   BASE_SCORING_VARIABLES,
@@ -57,28 +62,6 @@ function normalizeUuid(value: unknown): string | null {
 function normalizeContestType(value: unknown): string {
   const normalized = normalizeText(value, 20).toUpperCase();
   return CONTEST_TYPES.has(normalized) ? normalized : 'TFC';
-}
-
-function normalizeExternalContestIdForProvider(provider: ClassroomContestProvider, value: unknown): string {
-  const text = normalizeText(value, 300);
-  if (provider !== 'codeforces') return normalizeText(text, 40);
-
-  const normalizedSource = normalizeCodeforcesContestSource(text);
-  if (parseCodeforcesContestSource(normalizedSource)) return normalizeText(normalizedSource, 300);
-
-  const urlMatch = text.match(/codeforces\.com\/(?:group\/[A-Za-z0-9]+\/contest|contest|gym)\/(\d+)/i);
-  if (urlMatch?.[1]) return urlMatch[1];
-
-  const pathMatch = text.match(/^(?:group\/[A-Za-z0-9]+\/contest|contest|gym)\/(\d+)/i);
-  if (pathMatch?.[1]) return pathMatch[1];
-
-  return normalizeText(text, 40);
-}
-
-function isValidExternalContestId(provider: ClassroomContestProvider, externalContestId: string) {
-  return provider === 'codeforces'
-    ? Boolean(parseCodeforcesContestSource(externalContestId))
-    : /^\d+$/.test(externalContestId);
 }
 
 function clampPercentage(value: unknown, fallback: number): number {
@@ -337,31 +320,6 @@ async function nextClassroomContestFormulaKey(classroomId: string, roomId: strin
     if (!used.has(candidate)) return candidate;
   }
   throw new Error('Unable to allocate a contest formula key');
-}
-
-async function loadTrainerCodeforcesCredentialRow(trainerId: string) {
-  const rows = await sql`
-    SELECT *
-    FROM public.classroom_codeforces_credentials
-    WHERE trainer_id = ${trainerId}
-    LIMIT 1
-  `;
-  return rows[0] || null;
-}
-
-async function loadTrainerCodeforcesCredentials(trainerId: string) {
-  const row = await loadTrainerCodeforcesCredentialRow(trainerId);
-  if (!row) return null;
-  const [apiKey, apiSecret] = await Promise.all([
-    decryptCodeforcesCredential(row.api_key_ciphertext),
-    decryptCodeforcesCredential(row.api_secret_ciphertext),
-  ]);
-  await sql`
-    UPDATE public.classroom_codeforces_credentials
-    SET last_used_at = now()
-    WHERE trainer_id = ${trainerId}
-  `;
-  return { apiKey, apiSecret };
 }
 
 function roomToApi(row: any, contests: any[] = [], report: any = null) {

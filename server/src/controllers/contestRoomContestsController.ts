@@ -1,15 +1,23 @@
 import sql from '../db'
 import { isValidFormulaIdentifier } from '../services/contestFormula'
+import {
+    contestProviderLabel,
+    isValidExternalContestId,
+    normalizeContestProvider,
+    normalizeExternalContestIdForProvider,
+    type ClassroomContestProvider,
+} from '../services/classroomContestRankService'
 
 const normalizeText = (value: unknown, maxLength = 500) => String(value ?? '').trim().slice(0, maxLength)
 
-const formulaKeyForContest = (contestId: string) => {
-    const normalized = `c${contestId}`.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 48)
+const formulaKeyForContest = (provider: ClassroomContestProvider, contestId: string) => {
+    const prefix = provider === 'codeforces' ? 'cf_' : 'c'
+    const normalized = `${prefix}${contestId}`.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 48)
     return isValidFormulaIdentifier(normalized) ? normalized : 'contest'
 }
 
-async function nextContestFormulaKey(roomId: string, contestId: string) {
-    const base = formulaKeyForContest(contestId)
+async function nextContestFormulaKey(roomId: string, provider: ClassroomContestProvider, contestId: string) {
+    const base = formulaKeyForContest(provider, contestId)
     const rows = await sql`
         SELECT formula_key
         FROM public."Contest_room_contests"
@@ -40,18 +48,21 @@ export const insertContestRoomContest = async (c: any) => {
     if (user.length === 0) {
         return c.json({ error: 'Unauthorized' }, 401)
     }
-    const { room_id, contest_id, name } = await c.req.json()
+    const { room_id, contest_id, name, provider: providerValue } = await c.req.json()
 
     const normalizedRoomId = String(room_id || '').trim()
-    const normalizedContestId = String(contest_id || '').trim()
+    const provider = normalizeContestProvider(providerValue)
+    const normalizedContestId = normalizeExternalContestIdForProvider(provider, contest_id)
     const normalizedName = normalizeText(name, 180)
 
     if (!normalizedRoomId || !normalizedContestId || !normalizedName) {
         return c.json({ error: 'room_id, contest_id and name are required' }, 400)
     }
 
-    if (!/^\d+$/.test(normalizedContestId)) {
-        return c.json({ error: 'contest_id must be numeric' }, 400)
+    if (!isValidExternalContestId(provider, normalizedContestId)) {
+        return c.json({
+            error: `${contestProviderLabel(provider)} source must be a numeric contest id${provider === 'codeforces' ? ', contest URL, or EDU lesson standings URL' : ''}`,
+        }, 400)
     }
 
     try {
@@ -63,17 +74,19 @@ export const insertContestRoomContest = async (c: any) => {
         const existing = await sql`
             SELECT *
             FROM "Contest_room_contests"
-            WHERE room_id = ${normalizedRoomId} AND contest_id = ${normalizedContestId}
+            WHERE room_id = ${normalizedRoomId}
+              AND provider = ${provider}
+              AND contest_id = ${normalizedContestId}
             LIMIT 1
         `
         if (existing.length > 0) {
             return c.json({ result: existing, success: true })
         }
 
-        const formulaKey = await nextContestFormulaKey(normalizedRoomId, normalizedContestId)
+        const formulaKey = await nextContestFormulaKey(normalizedRoomId, provider, normalizedContestId)
         const result = await sql`
-            INSERT INTO "Contest_room_contests" (room_id, contest_id, contest_name, formula_key)
-            VALUES (${normalizedRoomId}, ${normalizedContestId}, ${normalizedName}, ${formulaKey})
+            INSERT INTO "Contest_room_contests" (room_id, provider, contest_id, contest_name, formula_key)
+            VALUES (${normalizedRoomId}, ${provider}, ${normalizedContestId}, ${normalizedName}, ${formulaKey})
             RETURNING *
         `
         return c.json({ result, success: true })

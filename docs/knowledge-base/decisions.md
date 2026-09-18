@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-09-19 - Global contest report access is provider-specific and just in time
+
+Global contest rooms remain available before any provider session is connected. Each item stores `vjudge` or `codeforces`; existing rows default to VJudge. Rooms request VJudge JSESSIONID only when a VJudge item exists and expose Codeforces signed credentials/JSESSIONID only when a Codeforces item exists. Public numeric Codeforces standings still try the anonymous API first. Report contest keys are provider-prefixed, and single-contest generation uses the stored item UUID so equal external IDs across providers cannot collide. The scoring engine and formula configuration are unchanged. Codeforces-specific global demerit authoring and automatic cross-provider identity mapping remain out of scope.
+
 ## 2026-09-12 - Trainer moving dock lens and animated icons
 
 The user approved a separate WebGL prototype after reviewing feasibility, then approved integration into the production trainer classroom dock. The integrated lens uses WebGL for material lighting and dispersion, a moving CSS backdrop layer for live refraction, and crisp DOM artwork above both layers. Requested Heroicons Animated icons map to Inbox, Academic Cap, Rectangle Stack, Users, Trophy, and Squares Plus. Navigation state, Radix controls, permissions, URLs, and student surfaces retain their existing behavior.

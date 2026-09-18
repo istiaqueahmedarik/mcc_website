@@ -1,5 +1,22 @@
 # Patterns
 
+## 2026-09-19 - Transfer provider adapters without transferring scoring logic
+
+Source:
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/services/classroomContestRankService.ts`
+- `client/src/app/contests_report/details/[id]/page.js`
+- `docs/sql/global-contest-report-codeforces-provider-20260919.sql`
+
+Pattern:
+When an existing report surface gains another contest provider, persist provider identity beside the external source ID and dispatch normalized rank data through the existing adapter before it enters the unchanged scoring pipeline. Make uniqueness and report keys provider-aware, address single items by their database ID, forward only the provider sessions needed by the request, and block publication when any configured source is missing. Ask for access after the user has configured a provider, not as a gate before rooms can be opened.
+
+Applies when:
+Adding a provider to global contest rooms, changing provider access prompts, or reusing classroom fetch adapters in another report surface.
+
+Do not overgeneralize:
+Adapter reuse does not authorize copying classroom roster filtering, saved snapshots, HTML import, demerit policy, or identity mappings into global reports.
+
 ## 2026-09-12 - Prototype and integrate GPU effects on operational navigation
 
 When evaluating a GPU-driven effect for operational navigation, first isolate it behind an unlinked route. Keep semantic controls in HTML and make every rendering layer pointer-transparent. For production, put fine icon and label strokes above the shader; combine a small material-only WebGL pass with CSS backdrop displacement when live DOM refraction is needed. Cap pixel ratio, render on demand, dispose GPU resources, and keep a complete CSS fallback for context loss and accessibility preferences.

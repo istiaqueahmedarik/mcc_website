@@ -16,7 +16,7 @@ function buildBackendPath(params) {
   return `contest-room/${path}`;
 }
 
-function shouldForwardVjudgeSession(params, method) {
+function shouldForwardProviderSessions(params, method) {
   if (method !== "POST" || !Array.isArray(params?.path)) return false;
   const last = params.path[params.path.length - 1];
   return last === "report" || last === "publish" || last === "preview";
@@ -49,10 +49,15 @@ async function forward(request, context, method) {
     Authorization: `Bearer ${token.value}`,
   };
 
-  if (shouldForwardVjudgeSession(params, method)) {
-    const session = (await cookies()).get("vj_session");
-    if (session?.value) {
-      headers["X-VJudge-Session"] = session.value;
+  if (shouldForwardProviderSessions(params, method)) {
+    const cookieStore = await cookies();
+    const vjudgeSession = cookieStore.get("vj_session");
+    const codeforcesSession = cookieStore.get("cf_session");
+    if (vjudgeSession?.value) {
+      headers["X-VJudge-Session"] = vjudgeSession.value;
+    }
+    if (codeforcesSession?.value) {
+      headers["X-Codeforces-Session"] = codeforcesSession.value;
     }
   }
 
@@ -83,4 +88,8 @@ export async function POST(request, context) {
 
 export async function PUT(request, context) {
   return forward(request, context, "PUT");
+}
+
+export async function DELETE(request, context) {
+  return forward(request, context, "DELETE");
 }

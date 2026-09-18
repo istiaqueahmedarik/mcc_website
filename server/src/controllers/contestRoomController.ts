@@ -1,5 +1,10 @@
 import sql from '../db'
-import { fetchVjudgeContestRank } from '../services/vjudgeContestService'
+import {
+    buildContestKey,
+    fetchClassroomContestRank,
+    normalizeContestProvider,
+    type ClassroomContestProvider,
+} from '../services/classroomContestRankService'
 import {
     BASE_SCORING_VARIABLES,
     buildScoredContestReport,
@@ -13,6 +18,13 @@ import {
 } from '../services/contestScoringService'
 import { isValidFormulaIdentifier, parseFormula } from '../services/contestFormula'
 import { getVjudgeSession } from '../utils/vjudgeSession'
+import { getCodeforcesSession, normalizeCodeforcesSession } from '../utils/codeforcesSession'
+import {
+    loadTrainerCodeforcesCredentialRow,
+    loadTrainerCodeforcesCredentials,
+} from '../services/trainerCodeforcesCredentialService'
+import { codeforcesApiKeyHint, encryptCodeforcesCredential } from '../utils/codeforcesCredentialCrypto'
+import { validateCodeforcesSession } from '../services/codeforcesContestService'
 
 function normalizeText(value: unknown, maxLength = 500) {
     return String(value ?? '').trim().slice(0, maxLength)
@@ -57,8 +69,9 @@ function normalizeSortRules(value: unknown, fallback: any[] = []) {
     })).filter((rule: any) => rule.key)
 }
 
-const formulaKeyForContest = (contestId: string) => {
-    const normalized = `c${contestId}`.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 48)
+const formulaKeyForContest = (provider: ClassroomContestProvider, contestId: string) => {
+    const prefix = provider === 'codeforces' ? 'cf_' : 'c'
+    const normalized = `${prefix}${contestId}`.replace(/[^a-z0-9_]/gi, '_').toLowerCase().slice(0, 48)
     return isValidFormulaIdentifier(normalized) ? normalized : 'contest'
 }
 
@@ -189,7 +202,11 @@ function sourceHandlesForGlobalRow(row: any) {
     ].map((value) => normalizeText(value, 160).toLowerCase()).filter(Boolean)
 }
 
-function applyGlobalDemeritsToRankData(rankData: any, contestDemerits: any[]) {
+function applyGlobalDemeritsToRankData(
+    rankData: any,
+    contestDemerits: any[],
+    provider: ClassroomContestProvider = 'vjudge',
+) {
     const cloned = JSON.parse(JSON.stringify(rankData || {}))
     const demeritsByHandle = new Map<string, any[]>()
     contestDemerits.forEach((demerit: any) => {
@@ -207,7 +224,12 @@ function applyGlobalDemeritsToRankData(rankData: any, contestDemerits: any[]) {
             Array.from(handles).flatMap((handle) => demeritsByHandle.get(handle) || []),
         ))
         const points = userDemerits.reduce((sum, item: any) => sum + Number(item?.demerit_point || 0), 0)
-        team.identityKey = team.identityKey || normalizeText(team.username, 180).toLowerCase()
+        const fallbackIdentity = normalizeText(team.username, 180).toLowerCase()
+        team.identityKey = team.identityKey || (
+            provider === 'codeforces' && fallbackIdentity
+                ? `codeforces:${fallbackIdentity}`
+                : fallbackIdentity
+        )
         team.sourceHandles = Array.from(handles)
         team.demeritPoints = Number(team.demeritPoints || 0) + points
         team.demerits = userDemerits
@@ -265,7 +287,7 @@ async function loadGlobalRoom(roomId: string) {
 
 async function loadGlobalRoomItems(roomId: string) {
     return sql`
-        SELECT id, room_id, contest_id, contest_name, weight, formula_key, merge_group_id, created_at
+        SELECT id, room_id, provider, contest_id, contest_name, weight, formula_key, merge_group_id, created_at
         FROM public."Contest_room_contests"
         WHERE room_id = ${roomId}
         ORDER BY created_at ASC, id ASC
@@ -274,23 +296,24 @@ async function loadGlobalRoomItems(roomId: string) {
 
 function globalItemsToScoringSources(items: any[], rankDataByItemId: Map<string, any> | null = null): ContestSourceInput[] {
     return items.map((item: any, index: number) => {
-        const contestId = normalizeText(item.contest_id, 80)
+        const contestId = normalizeText(item.contest_id, 300)
+        const provider = normalizeContestProvider(item.provider)
         const title = normalizeText(item.contest_name, 180) || `Contest ${contestId}`
         const rankData = rankDataByItemId?.get(String(item.id)) || {
             contestInfo: {
                 id: contestId,
                 title,
-                provider: 'vjudge',
+                provider,
                 externalContestId: contestId,
             },
             teams: [],
         }
         return {
             itemId: String(item.id),
-            contestKey: contestId || String(index + 1),
-            formulaKey: item.formula_key || formulaKeyForContest(contestId),
+            contestKey: contestId ? buildContestKey(provider, contestId) : String(index + 1),
+            formulaKey: item.formula_key || formulaKeyForContest(provider, contestId),
             title,
-            provider: 'vjudge',
+            provider,
             externalContestId: contestId,
             weight: Number(item.weight || 1),
             sortOrder: index,
@@ -356,7 +379,10 @@ async function loadGlobalScoringConfig(roomId: string, roomType: string, items: 
             LIMIT 1
         `,
     ])
-    const unitKeys = items.map((item: any) => item.formula_key || formulaKeyForContest(String(item.contest_id || '')))
+    const unitKeys = items.map((item: any) => item.formula_key || formulaKeyForContest(
+        normalizeContestProvider(item.provider),
+        String(item.contest_id || ''),
+    ))
     const fallback = defaultScoringConfigForScope('global', roomType, unitKeys)
     const config = rowToGlobalScoringConfig(configRows[0] || null, groups, fallback)
     return { config, groups, version: Number(configRows[0]?.version || 0), exists: configRows.length > 0 }
@@ -387,6 +413,15 @@ function normalizeGlobalScoringGroupPayload(group: any) {
     }
 }
 
+function codeforcesCredentialStatus(row: any) {
+    return {
+        configured: Boolean(row),
+        apiKeyHint: row?.api_key_hint || null,
+        lastUsedAt: row?.last_used_at || null,
+        updatedAt: row?.updated_at || null,
+    }
+}
+
 function normalizeGlobalScoringPayload(body: any, fallback: ContestScoringConfigInput): ContestScoringConfigInput {
     const source = body?.config && typeof body.config === 'object' ? body.config : body || {}
     const groups = parseJsonArray(source.groups).map(normalizeGlobalScoringGroupPayload)
@@ -412,24 +447,21 @@ function normalizeGlobalScoringPayload(body: any, fallback: ContestScoringConfig
 
 async function buildGlobalScoredReportSnapshot(
     roomId: string,
-    vjudgeSession: string | undefined,
+    actorId: string,
+    sessions: { vjudge?: string; codeforces?: string },
     configOverride: ContestScoringConfigInput | null = null,
-    options: { contestId?: string | null } = {},
+    options: { contestItemId?: string | null; contestId?: string | null } = {},
 ) {
     const room = await loadGlobalRoom(roomId)
     if (!room) throw Object.assign(new Error('Contest room not found'), { statusCode: 404 })
-    if (!vjudgeSession) {
-        throw Object.assign(new Error('VJudge session not provided'), {
-            statusCode: 401,
-            code: 'NO_VJUDGE_SESSION',
-        })
-    }
-
     const allItems = await loadGlobalRoomItems(roomId)
-    const requestedContestId = normalizeText(options.contestId, 80)
-    const items = requestedContestId
-        ? allItems.filter((item: any) => String(item.contest_id) === requestedContestId)
-        : allItems
+    const requestedContestItemId = normalizeText(options.contestItemId, 80)
+    const requestedContestId = normalizeText(options.contestId, 300)
+    const items = requestedContestItemId
+        ? allItems.filter((item: any) => String(item.id) === requestedContestItemId)
+        : requestedContestId
+          ? allItems.filter((item: any) => String(item.contest_id) === requestedContestId)
+          : allItems
     if (items.length === 0) {
         throw Object.assign(new Error('No contests found in this room'), { statusCode: 404 })
     }
@@ -437,48 +469,62 @@ async function buildGlobalScoredReportSnapshot(
     const rankDataByItemId = new Map<string, any>()
     const missingContests: any[] = []
     for (const item of items) {
-        const contestId = normalizeText(item.contest_id, 80)
+        const contestId = normalizeText(item.contest_id, 300)
+        const provider = normalizeContestProvider(item.provider)
         const title = normalizeText(item.contest_name, 180) || `Contest ${contestId}`
-        const demerits = await sql`
-            SELECT *
-            FROM public."Demerit"
-            WHERE contest_id = ${contestId}
-            ORDER BY created_at DESC
-        `
-        const fetched = await fetchVjudgeContestRank(contestId, vjudgeSession, undefined)
+        const demerits = provider === 'vjudge'
+            ? await sql`
+                SELECT *
+                FROM public."Demerit"
+                WHERE contest_id = ${contestId}
+                ORDER BY created_at DESC
+              `
+            : []
+        const fetched = await fetchClassroomContestRank({
+            provider,
+            externalContestId: contestId,
+            vjudgeSession: provider === 'vjudge' ? sessions.vjudge : undefined,
+            codeforcesSession: provider === 'codeforces' ? sessions.codeforces : undefined,
+            codeforcesCredentialProvider: provider === 'codeforces'
+                ? () => loadTrainerCodeforcesCredentials(actorId)
+                : undefined,
+        })
         if (fetched.statusCode !== 200 || !Array.isArray(fetched.body?.teams)) {
             missingContests.push({
                 id: item.id,
+                provider,
                 contestId,
                 title,
                 statusCode: fetched.statusCode,
+                code: fetched.body?.code || null,
                 error: fetched.body?.message || fetched.body?.error || 'Failed to fetch contest rank',
             })
             continue
         }
         rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData({
             ...(fetched.body || {}),
-            provider: 'vjudge',
+            provider,
             contestInfo: {
                 ...(fetched.body?.contestInfo || {}),
-                id: contestId,
-                provider: 'vjudge',
+                id: buildContestKey(provider, contestId),
+                provider,
                 externalContestId: contestId,
                 title,
             },
-        }, demerits))
+        }, demerits, provider))
     }
 
     if (rankDataByItemId.size === 0) {
         throw Object.assign(new Error('Fetch at least one contest before generating a report'), {
             statusCode: 400,
+            code: missingContests[0]?.code || undefined,
             missingContests,
         })
     }
 
     const roomType = normalizeContestType(room.contest_type)
     const sources = globalItemsToScoringSources(items, rankDataByItemId)
-    const saved = requestedContestId
+    const saved = requestedContestItemId || requestedContestId
         ? {
             config: defaultScoringConfigForScope('global', roomType, sources.map((source) => String(source.formulaKey || ''))),
             version: 0,
@@ -490,7 +536,7 @@ async function buildGlobalScoredReportSnapshot(
         tscPercentage?: number;
     } | null = null
 
-    if (!requestedContestId && roomType === 'TSC') {
+    if (!requestedContestItemId && !requestedContestId && roomType === 'TSC') {
         const referenceRows = room.tfc_room_id
             ? await sql`
                 SELECT *
@@ -686,6 +732,104 @@ export const deleteContestRoom = async (c: any) => {
     }
 }
 
+export const getContestReportCodeforcesCredentials = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    try {
+        const row = await loadTrainerCodeforcesCredentialRow(actor.id)
+        return c.json({ success: true, credential: codeforcesCredentialStatus(row) })
+    } catch (error: any) {
+        console.error('Error reading contest-report Codeforces credential status:', {
+            code: typeof error?.code === 'string' ? error.code : 'UNKNOWN',
+        })
+        return c.json({ error: 'Failed to load Codeforces API credential status' }, 500)
+    }
+}
+
+export const validateContestReportCodeforcesSession = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    const body = await readJsonBody(c)
+    const session = normalizeCodeforcesSession(body?.session ?? body?.jsessionid)
+    if (!session) return c.json({ error: 'Codeforces JSESSIONID is required' }, 400)
+    if (!(await validateCodeforcesSession(session))) {
+        return c.json({
+            error: 'Codeforces could not verify this JSESSIONID. Confirm you are signed in, wait briefly if Codeforces is blocking requests, then try again.',
+        }, 503)
+    }
+    return c.json({ success: true })
+}
+
+export const saveContestReportCodeforcesCredentials = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    try {
+        const body = await readJsonBody(c)
+        const apiKey = normalizeText(body?.apiKey ?? body?.api_key, 200)
+        const apiSecret = normalizeText(body?.apiSecret ?? body?.api_secret, 1000)
+        if (!apiKey || !apiSecret) {
+            return c.json({ error: 'Codeforces API key and secret are required' }, 400)
+        }
+        const [apiKeyCiphertext, apiSecretCiphertext] = await Promise.all([
+            encryptCodeforcesCredential(apiKey),
+            encryptCodeforcesCredential(apiSecret),
+        ])
+        const rows = await sql`
+            INSERT INTO public.classroom_codeforces_credentials (
+                trainer_id,
+                api_key_ciphertext,
+                api_secret_ciphertext,
+                api_key_hint,
+                created_by,
+                updated_by
+            ) VALUES (
+                ${actor.id},
+                ${apiKeyCiphertext},
+                ${apiSecretCiphertext},
+                ${codeforcesApiKeyHint(apiKey)},
+                ${actor.id},
+                ${actor.id}
+            )
+            ON CONFLICT (trainer_id)
+            DO UPDATE SET
+                api_key_ciphertext = EXCLUDED.api_key_ciphertext,
+                api_secret_ciphertext = EXCLUDED.api_secret_ciphertext,
+                api_key_hint = EXCLUDED.api_key_hint,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = now()
+            RETURNING *
+        `
+        return c.json({ success: true, credential: codeforcesCredentialStatus(rows[0]) })
+    } catch (error: any) {
+        const encryptionMissing = String(error?.message || '').includes('CODEFORCES_CREDENTIAL_ENCRYPTION_KEY')
+        console.error('Error saving contest-report Codeforces credentials:', {
+            code: typeof error?.code === 'string' ? error.code : encryptionMissing ? 'ENCRYPTION_MISSING' : 'UNKNOWN',
+        })
+        return c.json({
+            error: encryptionMissing
+                ? 'Codeforces credential encryption is not configured on the server'
+                : 'Failed to save Codeforces API credentials',
+        }, encryptionMissing ? 503 : 500)
+    }
+}
+
+export const deleteContestReportCodeforcesCredentials = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    try {
+        await sql`
+            DELETE FROM public.classroom_codeforces_credentials
+            WHERE trainer_id = ${actor.id}
+        `
+        return c.json({ success: true, credential: codeforcesCredentialStatus(null) })
+    } catch (error: any) {
+        console.error('Error deleting contest-report Codeforces credentials:', {
+            code: typeof error?.code === 'string' ? error.code : 'UNKNOWN',
+        })
+        return c.json({ error: 'Failed to remove Codeforces API credentials' }, 500)
+    }
+}
+
 export const getContestRoomScoring = async (c: any) => {
     const actor = await getAdminActor(c)
     if ('error' in actor) return c.json({ error: actor.error }, actor.status)
@@ -748,7 +892,11 @@ export const previewContestRoomScoring = async (c: any) => {
 
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            getVjudgeSession(c),
+            actor.id,
+            {
+                vjudge: getVjudgeSession(c),
+                codeforces: getCodeforcesSession(c),
+            },
             { ...requestedConfig, version: saved.version },
         )
         return c.json({
@@ -932,9 +1080,16 @@ export const generateContestRoomReport = async (c: any) => {
         const body = await readJsonBody(c)
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            getVjudgeSession(c),
+            actor.id,
+            {
+                vjudge: getVjudgeSession(c),
+                codeforces: getCodeforcesSession(c),
+            },
             null,
-            { contestId: body?.contestId ?? body?.contest_id },
+            {
+                contestItemId: body?.contestItemId ?? body?.contest_item_id,
+                contestId: body?.contestId ?? body?.contest_id,
+            },
         )
         return c.json({
             success: true,
@@ -959,8 +1114,18 @@ export const publishContestRoomReport = async (c: any) => {
         const roomId = c.req.param('roomId')
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
-            getVjudgeSession(c),
+            actor.id,
+            {
+                vjudge: getVjudgeSession(c),
+                codeforces: getCodeforcesSession(c),
+            },
         )
+        if (snapshot.missingContests.length > 0) {
+            return c.json({
+                error: 'All contest sources must be available before publishing this report',
+                missingContests: snapshot.missingContests,
+            }, 409)
+        }
         const jsonString = JSON.stringify(snapshot.scored)
         const result = await sql.begin(async (tx) => {
             const existing = await tx`

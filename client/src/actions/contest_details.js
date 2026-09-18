@@ -25,18 +25,10 @@ export async function loginToVJudge(email, pass) {
     if (jsessionid) {
       (await cookies()).set("vj_session", jsessionid, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
         path: "/",
         sameSite: "lax",
-      });
-      (await cookies()).set("vj_session_username", email, {
-        httpOnly: true,
-        path: "/",
-        sameSite: "lax",
-      });
-      (await cookies()).set("vj_session_password", pass, {
-        httpOnly: true,
-        path: "/",
-        sameSite: "lax",
+        maxAge: 60 * 60 * 12,
       });
       return jsessionid;
     }
@@ -47,12 +39,65 @@ export async function loginToVJudge(email, pass) {
   }
 }
 
-export async function revalidateVJudgeSession() {
-  const username = (await cookies)().get("vj_session_username")?.value;
-  const password = (await cookies)().get("vj_session_password")?.value;
-  if (!username || !password) return { status: "error" };
-  await loginToVJudge(username, password);
-  return { status: "success" };
+function normalizeProviderSession(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/(?:^|;\s*)JSESSIONID=([^;\s]+)/i);
+  const session = (match?.[1] || text.replace(/^JSESSIONID=/i, "").trim()).slice(0, 1000);
+  return /^[A-Za-z0-9._-]+$/.test(session) ? session : "";
+}
+
+export async function saveContestReportProviderSession(providerValue, value) {
+  const provider = providerValue === "codeforces" ? "codeforces" : "vjudge";
+  const session = normalizeProviderSession(value);
+  if (!session) {
+    return { success: false, error: `${provider === "codeforces" ? "Codeforces" : "VJudge"} JSESSIONID is invalid` };
+  }
+  if (provider === "codeforces") {
+    const token = (await cookies()).get("token")?.value;
+    if (!token) return { success: false, error: "Unauthorized" };
+    try {
+      const response = await fetch(`${API_URL}/contest-room/provider-access/codeforces-session/validate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session }),
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { success: false, error: data?.error || "Codeforces could not verify this JSESSIONID" };
+      }
+    } catch {
+      return { success: false, error: "Failed to verify the Codeforces JSESSIONID" };
+    }
+  }
+  const cookieStore = await cookies();
+  cookieStore.set(provider === "codeforces" ? "cf_session" : "vj_session", session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
+  if (provider === "vjudge") {
+    cookieStore.delete("vj_session_username");
+    cookieStore.delete("vj_session_password");
+  }
+  return { success: true };
+}
+
+export async function clearContestReportProviderSession(providerValue) {
+  const provider = providerValue === "codeforces" ? "codeforces" : "vjudge";
+  const cookieStore = await cookies();
+  cookieStore.delete(provider === "codeforces" ? "cf_session" : "vj_session");
+  if (provider === "vjudge") {
+    cookieStore.delete("vj_session_username");
+    cookieStore.delete("vj_session_password");
+  }
+  return { success: true };
 }
 
 export async function getContestStructuredRank(contestId, problemWeights) {
@@ -79,26 +124,6 @@ export async function getContestStructuredRank(contestId, problemWeights) {
     );
 
     if (!response.ok) {
-      if (response.status === 401) {
-        await revalidateVJudgeSession();
-        const newVjSession = (await cookies)().get("vj_session")?.value;
-        const retryResponse = await fetch(
-          `${API_URL}/vjudge/contest-rank/${contestId}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-VJudge-Session": newVjSession,
-            },
-            body: JSON.stringify({ problemWeights }),
-          }
-        );
-        if (!retryResponse.ok) {
-          const errorData = await retryResponse.json();
-          return { status: "error", ...errorData };
-        }
-        return await retryResponse.json();
-      }
       const errorData = await response.json();
       return { status: "error", ...errorData };
     }
@@ -145,29 +170,6 @@ export async function getContestStructuredRankWithDemerits(
     );
 
     if (!response.ok) {
-      if (response.status === 401) {
-        await revalidateVJudgeSession();
-        const newVjSession = (await cookies)().get("vj_session")?.value;
-        const retryResponse = await fetch(
-          `${API_URL}/vjudge/contest-rank/${contestId}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-VJudge-Session": newVjSession,
-            },
-            body: JSON.stringify({ problemWeights }),
-          }
-        );
-        if (!retryResponse.ok) {
-          const errorData = await retryResponse.json();
-          return { status: "error", ...errorData };
-        }
-        const contestData = await retryResponse.json();
-
-        // Fetch demerits and apply them to the contest data
-        return await applyDemeritsToContestData(contestData, contestId);
-      }
       const errorData = await response.json();
       return { status: "error", ...errorData };
     }
@@ -282,11 +284,12 @@ export async function deleteContestRoom(roomId) {
   return await post_with_token("contest-room/delete", { room_id: roomId });
 }
 
-export async function insertContestRoomContest(roomId, contestId, contestName) {
+export async function insertContestRoomContest(roomId, contestId, contestName, provider = "vjudge") {
   return await post_with_token("contest-room-contests/insert", {
     room_id: roomId,
     contest_id: contestId,
     name: contestName,
+    provider,
   });
 }
 
@@ -340,6 +343,7 @@ export async function updateContestRoomContestWithWeight(
 async function contestRoomBackendPost(roomId, path, body = {}) {
   const token = (await cookies()).get("token")?.value;
   const vjSession = (await cookies()).get("vj_session")?.value;
+  const cfSession = (await cookies()).get("cf_session")?.value;
   if (!token) {
     return { success: false, error: "Unauthorized" };
   }
@@ -350,6 +354,9 @@ async function contestRoomBackendPost(roomId, path, body = {}) {
   };
   if (vjSession) {
     headers["X-VJudge-Session"] = vjSession;
+  }
+  if (cfSession) {
+    headers["X-Codeforces-Session"] = cfSession;
   }
 
   try {
@@ -376,6 +383,39 @@ export async function generateContestRoomReport(roomId, options = {}) {
 
 export async function publishContestRoomReport(roomId) {
   return contestRoomBackendPost(roomId, "publish", {});
+}
+
+async function contestReportCredentialRequest(method, body) {
+  const token = (await cookies()).get("token")?.value;
+  if (!token) return { success: false, error: "Unauthorized" };
+  try {
+    const response = await fetch(`${API_URL}/contest-room/provider-access/codeforces-credentials`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    return { statusCode: response.status, ...data };
+  } catch (error) {
+    console.error("Error calling contest-report credential service:", error);
+    return { success: false, error: "Failed to reach contest-report service" };
+  }
+}
+
+export async function getContestReportCodeforcesCredentials() {
+  return contestReportCredentialRequest("GET");
+}
+
+export async function saveContestReportCodeforcesCredentials(apiKey, apiSecret) {
+  return contestReportCredentialRequest("PUT", { apiKey, apiSecret });
+}
+
+export async function clearContestReportCodeforcesCredentials() {
+  return contestReportCredentialRequest("DELETE");
 }
 
 // Demerit management functions
