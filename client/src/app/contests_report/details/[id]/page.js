@@ -590,12 +590,12 @@ async function Modal({ paramsBox }) {
               <Input
                 id="contest-id"
                 name="contest-id"
-                placeholder="Numeric ID or Codeforces contest/EDU URL"
+                placeholder="Numeric ID or full Codeforces group/EDU URL"
                 className="min-h-11 w-full"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                VJudge uses a numeric ID. Codeforces accepts a numeric contest/Gym ID or supported contest and EDU standings URLs.
+                VJudge uses a numeric ID. Codeforces accepts a numeric contest/Gym ID. Group contests require the full URL so the group code is preserved; EDU accepts its standings URL.
               </p>
             </div>
 

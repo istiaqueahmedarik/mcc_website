@@ -61,7 +61,7 @@ export const insertContestRoomContest = async (c: any) => {
 
     if (!isValidExternalContestId(provider, normalizedContestId)) {
         return c.json({
-            error: `${contestProviderLabel(provider)} source must be a numeric contest id${provider === 'codeforces' ? ', contest URL, or EDU lesson standings URL' : ''}`,
+            error: `${contestProviderLabel(provider)} source must be a numeric contest id${provider === 'codeforces' ? ', full group contest URL, or EDU lesson standings URL' : ''}`,
         }, 400)
     }
 

@@ -1,3 +1,7 @@
+## 2026-09-19 - Group Contest URL Was Collapsed To A Gym ID
+
+The global contest add flow accepted a Codeforces group URL but normalized it to only the numeric contest ID. Because high numeric IDs are otherwise treated as Gyms, fetch fallback requested `/gym/717234/...` instead of `/group/SxSYDasIfo/contest/717234/...`. Preserve compound provider identity and regression-test the exact fallback path.
+
 ## 2026-09-11 - EDU Hacks Column Was Treated As A Problem
 
 Source:

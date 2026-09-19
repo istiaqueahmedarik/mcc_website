@@ -20,6 +20,10 @@ describe('contest provider source normalization', () => {
     expect(normalizeExternalContestIdForProvider('codeforces', 'https://codeforces.com/gym/105001')).toBe('105001');
     expect(normalizeExternalContestIdForProvider(
       'codeforces',
+      'https://codeforces.com/group/SxSYDasIfo/contest/717234',
+    )).toBe('group:SxSYDasIfo:717234');
+    expect(normalizeExternalContestIdForProvider(
+      'codeforces',
       'https://codeforces.com/edu/course/2/lesson/9/standings?list=AbC123',
     )).toBe('edu:2:9:list:AbC123');
     const longListKey = 'A'.repeat(100);
@@ -28,6 +32,7 @@ describe('contest provider source normalization', () => {
       `https://codeforces.com/edu/course/2/lesson/9/standings?list=${longListKey}`,
     )).toBe(`edu:2:9:list:${longListKey}`);
     expect(isValidExternalContestId('codeforces', 'edu:2:9:friends')).toBe(true);
+    expect(isValidExternalContestId('codeforces', 'group:SxSYDasIfo:717234')).toBe(true);
     expect(isValidExternalContestId('codeforces', 'not-a-contest')).toBe(false);
   });
 

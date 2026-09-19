@@ -1,5 +1,17 @@
 # Doc Usage
 
+## 2026-09-19 - codeforces-group-contest-source - Implementation Docs Used
+
+Source:
+- `docs/rsd/codeforces-group-contest-source-20260919-rsd.md`
+- `docs/reviews/codeforces-group-contest-source-20260919-review.md`
+
+Fact:
+This fix used the provider/report knowledge base, current shared Codeforces adapter, a safe anonymous Codeforces API probe, and Context7 Next.js 16.1.1 form guidance. The supplied group URL was inaccessible to unauthenticated web tooling and returned a Cloudflare challenge; no session credential was replayed.
+
+Applies when:
+Adding or fetching Codeforces group contests in classroom or global report surfaces.
+
 ## 2026-09-19 - global-contest-report-codeforces-provider - Implementation Docs Used
 
 Source:

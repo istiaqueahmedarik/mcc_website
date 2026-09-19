@@ -53,6 +53,8 @@ function numericPage(
 
 const gymHeaders = `<th><a href="/gym/708543/problem/A" title="A - First">A</a></th>
   <th><a href="/gym/708543/problem/B" title="B - Second">B</a></th>`;
+const groupHeaders = `<th><a href="/group/SxSYDasIfo/contest/717234/problem/A" title="A - First">A</a></th>
+  <th><a href="/group/SxSYDasIfo/contest/717234/problem/B" title="B - Second">B</a></th>`;
 const gymAliceRow = `<tr><td>1</td><td><a href="/profile/Alice">Alice</a></td><td>1</td><td>37</td>
   <td problemid="10"><span class="cell-accepted">+2</span></td>
   <td problemid="11"><span class="cell-rejected">-1</span></td></tr>`;
@@ -158,6 +160,27 @@ describe('Codeforces web standings sources', () => {
       'https://codeforces.com/edu/course/2/lesson/6/standings?friends=true',
     )).toBe('edu:2:6:friends');
     expect(parseCodeforcesContestSource('2258')).toEqual({ kind: 'contest', contestId: '2258' });
+    expect(normalizeCodeforcesContestSource(
+      'https://codeforces.com/group/SxSYDasIfo/contest/717234',
+    )).toBe('group:SxSYDasIfo:717234');
+    expect(parseCodeforcesContestSource('group:SxSYDasIfo:717234')).toEqual({
+      kind: 'group',
+      groupCode: 'SxSYDasIfo',
+      contestId: '717234',
+    });
+  });
+
+  test('parses problem columns from a Codeforces group contest', () => {
+    const parsed = parseCodeforcesNumericStandingsPage(
+      numericPage('gym', '717234', 'Penalty', 'Penalty', groupHeaders, gymAliceRow),
+      '717234',
+      ['alice'],
+      'group',
+      'SxSYDasIfo',
+    );
+
+    expect(parsed.problems.map((problem) => problem.index)).toEqual(['A', 'B']);
+    expect(parsed.teams).toHaveLength(1);
   });
 
   test('parses EDU results literally and filters before returning rows', () => {
@@ -419,6 +442,34 @@ describe('fetchCodeforcesContestRank', () => {
     ]);
     expect(result.body.providerMeta.apiFallbackCode).toBe('CODEFORCES_CREDENTIALS_MISSING');
     expect(result.body.teams[0].penalty).toBe(37);
+  });
+
+  test('preserves the group code for authenticated group standings fallback', async () => {
+    const urls: string[] = [];
+    const result = await fetchCodeforcesContestRank('group:SxSYDasIfo:717234', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        if (String(url).includes('/api/contest.standings')) return apiFailed();
+        return new Response(numericPage('gym', '717234', 'Penalty', 'Penalty', groupHeaders, gymAliceRow));
+      }) as any,
+      webSession: 'session-token',
+      credentialProvider: async () => ({ apiKey: 'trainer-key', apiSecret: 'trainer-secret' }),
+      targetHandles: ['alice'],
+      nowSeconds: () => 1_000,
+      randomPrefix: () => 'abcdef',
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(new URL(urls[0]).searchParams.get('groupCode')).toBe('SxSYDasIfo');
+    expect(new URL(urls[1]).searchParams.get('groupCode')).toBe('SxSYDasIfo');
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/api/contest.standings',
+      '/group/SxSYDasIfo/contest/717234/standings/groupmates/true',
+    ]);
+    expect(result.body.providerMeta.groupCode).toBe('SxSYDasIfo');
+    expect(result.body.providerMeta.sourceType).toBe('group-web');
   });
 
   test('uses saved credentials for a signed API retry before crawl fallback', async () => {

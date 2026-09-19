@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-09-19 - Group contest routes require the group code
+
+Codeforces group contests must be stored from a full fixed-origin `/group/<alphanumeric-code>/contest/<numeric-id>` source. Build crawl and parser prefixes from both validated values. Numeric IDs alone may address ordinary contests/Gyms but must never be guessed into a group route. Provider sessions and group membership remain authorization requirements.
+
 ## 2026-09-19 - Provider-aware reports must fail visibly and publish completely
 
 Mixed-provider report generation may return a preview when at least one source succeeds, but the UI must list every missing source with provider-specific guidance. Publication must reject the report while any configured source is missing. Provider/external-ID pairs, provider-prefixed report keys, and stored item IDs must be used consistently so equal numeric IDs across VJudge and Codeforces cannot overwrite, select, or publish the wrong contest. Provider sessions remain transient HTTP-only cookies; API secrets remain encrypted server-side and never enter report payloads or logs.

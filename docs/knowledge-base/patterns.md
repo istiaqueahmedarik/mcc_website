@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-09-19 - Preserve compound provider source identity
+
+Provider source identifiers must retain every component required to reconstruct an authorized fixed-origin route. For Codeforces group contests, canonicalize a full URL to `group:<group-code>:<contest-id>`; use both values in API attempts and the group `groupmates` route and problem-link validation. Never collapse a group URL to its numeric ID or infer a group from a high contest number.
+
 ## 2026-09-19 - Transfer provider adapters without transferring scoring logic
 
 Source:

@@ -41,6 +41,7 @@ const CONTESTANT_TYPE = 'CONTESTANT';
 const CODEFORCES_WEB_BASE = 'https://codeforces.com';
 const CODEFORCES_BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 const EDU_SOURCE_REGEX = /^edu:(\d+):(\d+)(?::(friends)|:list:([A-Za-z0-9]+))?$/i;
+const GROUP_SOURCE_REGEX = /^group:([A-Za-z0-9]+):(\d+)$/i;
 const DEFAULT_WEB_CONCURRENCY = 6;
 const DEFAULT_WEB_MAX_PAGES = 250;
 const DEFAULT_UPSOLVE_CONCURRENCY = 3;
@@ -108,9 +109,10 @@ function normalizeWebSession(value: unknown): string {
 
 export type CodeforcesContestSource =
   | { kind: 'contest'; contestId: string }
+  | { kind: 'group'; groupCode: string; contestId: string }
   | { kind: 'edu'; courseId: string; lessonId: string; filter: 'friends' | 'list'; listKey?: string };
 
-type NumericSourceKind = 'contest' | 'gym';
+type NumericSourceKind = 'contest' | 'gym' | 'group';
 
 type HtmlStandingsPageParseResult = {
   title: string;
@@ -136,6 +138,11 @@ export function parseCodeforcesContestSource(value: unknown): CodeforcesContestS
   const text = normalizeText(value, 300);
   if (/^\d+$/.test(text)) return { kind: 'contest', contestId: text };
 
+  const groupMatch = text.match(GROUP_SOURCE_REGEX);
+  if (groupMatch) {
+    return { kind: 'group', groupCode: groupMatch[1], contestId: groupMatch[2] };
+  }
+
   const eduMatch = text.match(EDU_SOURCE_REGEX);
   if (!eduMatch) return null;
   return {
@@ -149,6 +156,10 @@ export function parseCodeforcesContestSource(value: unknown): CodeforcesContestS
 
 export function normalizeCodeforcesContestSource(value: unknown): string {
   const text = normalizeText(value, 300);
+  const groupMatch = text.match(/^https?:\/\/(?:www\.)?codeforces\.com\/group\/([A-Za-z0-9]+)\/contest\/(\d+)(?:[/?#]|$)/i)
+    || text.match(/^\/?group\/([A-Za-z0-9]+)\/contest\/(\d+)/i);
+  if (groupMatch) return `group:${groupMatch[1]}:${groupMatch[2]}`;
+
   const urlMatch = text.match(/codeforces\.com\/edu\/course\/(\d+)\/lesson\/(\d+)\/standings(?:\?([^#\s]*))?/i)
     || text.match(/^\/?edu\/course\/(\d+)\/lesson\/(\d+)\/standings(?:\?([^#\s]*))?/i);
   if (!urlMatch) return text;
@@ -294,10 +305,12 @@ function requestCodeforcesApiStandings(
   contestId: string,
   options: CodeforcesFetchOptions,
   signed = false,
+  groupCode?: string,
 ) {
+  const sourceParams = groupCode ? { contestId, groupCode } : { contestId };
   return requestCodeforcesApi(
     'contest.standings',
-    signed ? { contestId, showUnofficial: false } : { contestId },
+    signed ? { ...sourceParams, showUnofficial: false } : sourceParams,
     options,
     signed,
   );
@@ -742,6 +755,7 @@ export function parseCodeforcesNumericStandingsPage(
   contestId: string,
   targetHandles?: string[],
   sourceKind: NumericSourceKind = numericSourceKind(contestId),
+  groupCode?: string,
 ): HtmlStandingsPageParseResult {
   const $ = cheerio.load(html);
   const table = $('table.standings').first();
@@ -749,12 +763,14 @@ export function parseCodeforcesNumericStandingsPage(
   if (!table.length || !title) {
     throw new CodeforcesWebError(
       'CODEFORCES_WEB_SESSION_INVALID',
-      `The Codeforces web session expired or cannot access this ${sourceKind === 'gym' ? 'Gym' : 'contest'}.`,
+      `The Codeforces web session expired or cannot access this ${sourceKind === 'gym' ? 'Gym' : sourceKind === 'group' ? 'group contest' : 'contest'}.`,
       428,
     );
   }
 
-  const problemPrefix = `/${sourceKind}/${contestId}/problem/`;
+  const problemPrefix = sourceKind === 'group'
+    ? `/group/${groupCode}/contest/${contestId}/problem/`
+    : `/${sourceKind}/${contestId}/problem/`;
   const headerCells = table.find('tr').first().find('th');
   const problemColumnIndexes: number[] = [];
   headerCells.each((index, element) => {
@@ -955,9 +971,17 @@ function buildEduStandingsUrl(source: Extract<CodeforcesContestSource, { kind: '
   return url.toString();
 }
 
-function buildNumericStandingsUrl(contestId: string, sourceKind: NumericSourceKind, page: number) {
+function buildNumericStandingsUrl(
+  contestId: string,
+  sourceKind: NumericSourceKind,
+  page: number,
+  groupCode?: string,
+) {
   const pageSuffix = page > 1 ? `/page/${page}` : '';
-  return new URL(`/${sourceKind}/${contestId}/standings/friends/true${pageSuffix}`, CODEFORCES_WEB_BASE).toString();
+  const path = sourceKind === 'group'
+    ? `/group/${groupCode}/contest/${contestId}/standings/groupmates/true${pageSuffix}`
+    : `/${sourceKind}/${contestId}/standings/friends/true${pageSuffix}`;
+  return new URL(path, CODEFORCES_WEB_BASE).toString();
 }
 
 function buildSubmissionHistoryUrl(contestId: string, handle: string, page: number) {
@@ -1195,6 +1219,7 @@ async function fetchCodeforcesApiUpsolveSubmissions(
   contestEndSeconds: number,
   options: CodeforcesFetchOptions,
   signed: boolean,
+  groupCode?: string,
 ) {
   const targetSet = new Set(
     (options.targetHandles || []).map((handle) => normalizeText(handle, 120).toLowerCase()).filter(Boolean),
@@ -1215,7 +1240,12 @@ async function fetchCodeforcesApiUpsolveSubmissions(
   for (let page = 0; page < maxPages; page += 1) {
     const raw = await requestCodeforcesApi(
       'contest.status',
-      { contestId, from: page * pageSize + 1, count: pageSize },
+      {
+        contestId,
+        ...(groupCode ? { groupCode } : {}),
+        from: page * pageSize + 1,
+        count: pageSize,
+      },
       options,
       signed,
     );
@@ -1459,11 +1489,12 @@ async function fetchCodeforcesNumericWebRank(
   contestId: string,
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
+  groupCode?: string,
 ): Promise<CodeforcesServiceResult> {
   try {
-    const sourceKind = numericSourceKind(contestId);
+    const sourceKind = groupCode ? 'group' : numericSourceKind(contestId);
     const requestPage = (page: number) => requestCodeforcesHtml(
-      buildNumericStandingsUrl(contestId, sourceKind, page),
+      buildNumericStandingsUrl(contestId, sourceKind, page, groupCode),
       options,
     );
     const parsePage = (html: string) => parseCodeforcesNumericStandingsPage(
@@ -1471,6 +1502,7 @@ async function fetchCodeforcesNumericWebRank(
       contestId,
       options.targetHandles,
       sourceKind,
+      groupCode,
     );
     const firstPage = parsePage(await requestPage(1));
     const pages = await crawlRemainingPages(firstPage, options, requestPage, parsePage);
@@ -1485,7 +1517,7 @@ async function fetchCodeforcesNumericWebRank(
         length: null,
         end: null,
         provider: 'codeforces',
-        type: sourceKind === 'gym' ? 'GYM_WEB' : 'CONTEST_WEB',
+        type: sourceKind === 'gym' ? 'GYM_WEB' : sourceKind === 'group' ? 'GROUP_WEB' : 'CONTEST_WEB',
         phase: 'FINISHED',
         frozen: false,
       },
@@ -1499,13 +1531,14 @@ async function fetchCodeforcesNumericWebRank(
       providerMeta: {
         sourceType: `${sourceKind}-web`,
         contestId,
+        ...(groupCode ? { groupCode } : {}),
         filter: 'friends',
         crawledPages: pages.length,
         fullParticipantCount: teams.length,
         includeUpsolves: false,
       },
     };
-    if (options.includeUpsolves) {
+    if (options.includeUpsolves && sourceKind !== 'group') {
       const upsolveSubmissions = await fetchCodeforcesWebUpsolveSubmissions(contestId, sourceKind, teams, options);
       applyCodeforcesWebUpsolves(body, upsolveSubmissions, hasCustomWeights);
     }
@@ -1519,12 +1552,13 @@ async function fetchCodeforcesNumericRank(
   contestId: string,
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
+  groupCode?: string,
 ): Promise<CodeforcesServiceResult> {
   let normalized: any = null;
   let apiError: any = null;
   let usedSignedApi = false;
   try {
-    const raw = await requestCodeforcesApiStandings(contestId, options, false);
+    const raw = await requestCodeforcesApiStandings(contestId, options, false, groupCode);
     normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
     if (normalized.error) {
       throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
@@ -1532,7 +1566,7 @@ async function fetchCodeforcesNumericRank(
   } catch (error: any) {
     apiError = error;
     try {
-      const raw = await requestCodeforcesApiStandings(contestId, options, true);
+      const raw = await requestCodeforcesApiStandings(contestId, options, true, groupCode);
       normalized = normalizeCodeforcesApiStandings(raw, problemWeights, options.targetHandles);
       if (normalized.error) {
         throw new CodeforcesApiError('CODEFORCES_API_INVALID_PAYLOAD', normalized.error);
@@ -1549,7 +1583,7 @@ async function fetchCodeforcesNumericRank(
   }
 
   if (!normalized) {
-    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options);
+    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options, groupCode);
     if (fallback.statusCode === 200) {
       fallback.body.providerMeta = {
         ...(fallback.body.providerMeta || {}),
@@ -1579,6 +1613,14 @@ async function fetchCodeforcesNumericRank(
     return fallback;
   }
 
+  if (groupCode) {
+    normalized.providerMeta = {
+      ...(normalized.providerMeta || {}),
+      sourceType: 'group-api',
+      groupCode,
+    };
+  }
+
   try {
     if (options.includeUpsolves) {
       const contestStart = toFiniteNumber(normalized.contestInfo?.startTimeSeconds, 0);
@@ -1588,6 +1630,7 @@ async function fetchCodeforcesNumericRank(
         contestStart + contestDuration,
         options,
         usedSignedApi,
+        groupCode,
       );
       applyCodeforcesWebUpsolves(
         normalized,
@@ -1642,11 +1685,16 @@ export async function fetchCodeforcesContestRank(
       body: {
         status: 'error',
         code: 'CODEFORCES_INVALID_CONTEST_ID',
-        message: 'Codeforces source must be a numeric contest id or an EDU lesson standings URL.',
+        message: 'Codeforces source must be a numeric contest id, group contest URL, or EDU lesson standings URL.',
       },
     };
   }
   return source.kind === 'edu'
     ? fetchCodeforcesEduLessonRank(source, problemWeights, options)
-    : fetchCodeforcesNumericRank(source.contestId, problemWeights, options);
+    : fetchCodeforcesNumericRank(
+      source.contestId,
+      problemWeights,
+      options,
+      source.kind === 'group' ? source.groupCode : undefined,
+    );
 }

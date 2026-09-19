@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-19 - Codeforces group contest sources preserve group identity
+
+The shared Codeforces provider accepts full `/group/<code>/contest/<id>` URLs and persists them as `group:<code>:<id>`. API attempts use both values, while authenticated fallback uses the exact group `groupmates` standings path and problem-link parser prefix. Numeric-only input remains for ordinary contests/Gyms; group contests require the full URL. Review: `docs/reviews/codeforces-group-contest-source-20260919-review.md`.
+
 ## 2026-09-19 - Global contest reports support VJudge and Codeforces
 
 Global/admin contest rooms under `/contests_report` now store a provider on each `Contest_room_contests` item and generate reports through the shared provider adapter. The server path is `contestRoomContestsController.ts` → `contestRoomController.ts` → `classroomContestRankService.ts` → the existing VJudge or Codeforces service; scoring still enters the unchanged `buildScoredContestReport` pipeline. Codeforces keeps the trainer order of anonymous API, encrypted per-user signed API retry, then transient JSESSIONID crawl fallback. The UI no longer blocks room access on a VJudge login; `details/[id]/page.js` shows only the access controls required by providers in that room. Rollout SQL is `docs/sql/global-contest-report-codeforces-provider-20260919.sql` and review is `docs/reviews/global-contest-report-codeforces-provider-20260919-implementation-review.md`.
