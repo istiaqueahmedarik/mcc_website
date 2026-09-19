@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-09-19 - Keep semantic routing typed and orchestration deterministic
+
+Use one System One request to judge independent routing dimensions against the same compact task state. Return a small typed contract containing tier, role, confidence, and exact spawn settings; keep spawning, waiting, review, and integration in Codex. Send no secrets or unnecessary personal data, read the API key only from the process environment, cap input and timeout, sanitize errors, and retain a deterministic fallback for missing credentials or service failures. For user questions, map opaque Choice keys back to stable option IDs and use confidence only to decide whether to display the recommendation; never auto-answer.
+
 ## 2026-09-19 - Preserve compound provider source identity
 
 Provider source identifiers must retain every component required to reconstruct an authorized fixed-origin route. For Codeforces group contests, canonicalize a full URL to `group:<group-code>:<contest-id>`; use both values in API attempts and the group `groupmates` route and problem-link validation. Never collapse a group URL to its numeric ID or infer a group from a high contest number.

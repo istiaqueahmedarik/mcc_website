@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-09-19 - Jev selects subagent execution tiers, not authority
+
+For substantive repository tasks, the primary Codex task remains responsible for scope, user interaction, verification, integration, and the final response. TypeSafe Jev supplies two bounded Choice judgments: the execution tier and the subagent role. The fixed tier mapping is `best` = `gpt-5.6-sol` medium, `medium` = `gpt-5.5` xhigh, `normal` = `gpt-5.5` medium, and `low` = `gpt-5.5` low. Explicit-model spawns use `fork_turns: "none"` and receive the required context in a bounded task prompt. Jev may also recommend one finalized multiple-choice option, but it never selects for the user or authorizes an action. Authorization, safety, repository rules, and explicit user choices remain deterministic constraints. When Jev is unavailable or insufficiently confident, routing escalates or falls back conservatively rather than blocking work.
+
 ## 2026-09-19 - Global contest report access is provider-specific and just in time
 
 Global contest rooms remain available before any provider session is connected. Each item stores `vjudge` or `codeforces`; existing rows default to VJudge. Rooms request VJudge JSESSIONID only when a VJudge item exists and expose Codeforces signed credentials/JSESSIONID only when a Codeforces item exists. Public numeric Codeforces standings still try the anonymous API first. Report contest keys are provider-prefixed, and single-contest generation uses the stored item UUID so equal external IDs across providers cannot collide. The scoring engine and formula configuration are unchanged. Codeforces-specific global demerit authoring and automatic cross-provider identity mapping remain out of scope.

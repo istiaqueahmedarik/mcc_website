@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-19 - Jev-routed Codex subagent orchestration
+
+Repository Codex work now has a project-scoped `jev-subagent-router` skill. The main task remains the orchestrator; a dependency-free helper asks TypeSafe Jev to select one of four user-defined model/reasoning tiers and a `default`, `explorer`, or `worker` role, then returns explicit spawn settings with `fork_turns: "none"`. The same helper can select one recommended option before a multiple-choice user question without choosing for the user. Missing credentials, timeouts, and invalid responses fall back to conservative deterministic routing. The helper, tests, and workflow live under `.agents/skills/jev-subagent-router/`; repository activation is in `AGENTS.md`. A live non-sensitive route and recommendation request succeeded with `jev-1.13.0`; the local key is loaded from the Git-ignored, owner-readable `.env.local`. Review: `docs/reviews/jev-subagent-router-20260919-review.md`.
+
 ## 2026-09-19 - Codeforces group contest sources preserve group identity
 
 The shared Codeforces provider accepts full `/group/<code>/contest/<id>` URLs and persists them as `group:<code>:<id>`. API attempts use both values, while authenticated fallback uses the exact group `groupmates` standings path and problem-link parser prefix. Numeric-only input remains for ordinary contests/Gyms; group contests require the full URL. Codeforces API credentials are verified with a signed, data-discarding `user.friends` request before encryption, and report failures preserve a bounded web-fallback code. Review: `docs/reviews/codeforces-group-contest-source-20260919-review.md`.
@@ -1255,6 +1259,8 @@ Trainer-only recent activity is rendered by `ContestPerformance.jsx` through the
 Global report Codeforces sources now carry an explicit Public/Gym/Group/EDU type. `codeforcesIdentityService.ts` maps Public/Gym/EDU handles through `users.cf_id`; Group contests use either the numeric suffix after the last `=` or a replaceable `username,student_id` CSV. Mappings persist immutable `users.id` references in `contest_report_codeforces_identity_mappings`. VJudge and Codeforces rows merge on immutable MCC identity; participants without one unique eligible MCC mapping are omitted before scoring. Apply `docs/sql/global-codeforces-identity-resolution-20260919.sql` before the matching code.
 
 Mixed global reports also resolve raw VJudge usernames through `users.vjudge_id` before scoring. Both provider rows then share `student:<users.id>`, retain their own source handles, and expose both saved profile handles so one student renders once with correct VJudge and Codeforces links.
+
+The public `/contests_report/live/[id]` renderer consumes that same canonical mapped student projection. It keys rows and rank progress by immutable `identityKey`, displays the mapped MIST ID instead of raw Codeforces Group aliases, and uses the saved VJudge handle for optional public-profile hydration while remaining compatible with legacy VJudge-only reports.
 
 The Group contest card calls the suffix method `Student ID`. A compact `ID Mapping` action sits between Delete and Generate Report and opens the editor in a bounded, focus-managed Radix dialog. The card no longer expands to show the mapping form inline; the dialog uses the shared accessible Select and keeps CSV replacement behind the CSV method.
 

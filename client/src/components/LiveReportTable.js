@@ -43,6 +43,11 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  liveReportRowIdentity,
+  liveReportVjudgeLookupId,
+  resolveLiveReportParticipant,
+} from "./live-report-participant.mjs";
 import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 
 function ReportTable({ merged, lastUpdated }) {
@@ -79,14 +84,14 @@ function ReportTable({ merged, lastUpdated }) {
       return aPen - bPen;
     };
 
-    // For each contest, compute rank per username (1 is best)
+    // For each contest, compute rank per canonical participant identity (1 is best).
     merged.contestIds.forEach((cid) => {
       const participants = merged.users
         .filter((u) => u.contests && u.contests[cid])
         .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]));
       const rankMap = {};
       participants.forEach((u, idx) => {
-        rankMap[u.username] = idx + 1;
+        rankMap[liveReportRowIdentity(u)] = idx + 1;
       });
       contestRanks[cid] = rankMap;
     });
@@ -94,13 +99,14 @@ function ReportTable({ merged, lastUpdated }) {
     const lastId = merged.contestIds[merged.contestIds.length - 1];
     const progressByUser = {};
     merged.users.forEach((u) => {
-      const lastRank = contestRanks[lastId]?.[u.username];
+      const identity = liveReportRowIdentity(u);
+      const lastRank = contestRanks[lastId]?.[identity];
       // find the most recent previous contest the user attended
       let prevRank = undefined;
       for (let i = merged.contestIds.length - 2; i >= 0; i--) {
         const cid = merged.contestIds[i];
         if (u.contests && u.contests[cid]) {
-          prevRank = contestRanks[cid]?.[u.username];
+          prevRank = contestRanks[cid]?.[identity];
           if (prevRank !== undefined) break;
         }
       }
@@ -112,7 +118,7 @@ function ReportTable({ merged, lastUpdated }) {
         else if (delta <= -1) status = "down";
         else status = "neutral";
       }
-      progressByUser[u.username] = { status, delta, lastRank, prevRank };
+      progressByUser[identity] = { status, delta, lastRank, prevRank };
     });
 
     return { contestRanks, progressByUser };
@@ -132,7 +138,7 @@ function ReportTable({ merged, lastUpdated }) {
   const profileIds = useMemo(() => {
     const ids = new Set(
       users
-        .map((u) => String(u?.username || "").trim().toLowerCase())
+        .map(liveReportVjudgeLookupId)
         .filter(Boolean)
     );
     return Array.from(ids).sort();
@@ -524,48 +530,26 @@ function ReportTable({ merged, lastUpdated }) {
             <TableBody>
               {users.map((u, index) => {
                 const isTop = index === 0;
-                const profileKey = String(u.username || "").toLowerCase();
-                const hasResolvedLookup = Object.prototype.hasOwnProperty.call(
+                const identity = liveReportRowIdentity(u);
+                const profileKey = liveReportVjudgeLookupId(u);
+                const hasResolvedLookup = Boolean(profileKey) && Object.prototype.hasOwnProperty.call(
                   publicProfilesByVjudge,
                   profileKey
                 );
                 const profile = hasResolvedLookup
                   ? publicProfilesByVjudge[profileKey]
                   : null;
-                const hasDbProfile = !!profile;
-                const shouldUseFallback = hasResolvedLookup && !hasDbProfile;
-                const isResolving = isProfilesLoading && !hasResolvedLookup;
-                const dbAvatar = hasDbProfile
-                  ? resolveAvatarUrl(profile.profile_pic)
-                  : null;
-                const fallbackAvatar = resolveAvatarUrl(u.avatarUrl);
-
-                // Always prioritize DB profile image/name when available.
-                const resolvedAvatar = hasDbProfile
-                  ? dbAvatar || "/vercel.svg"
-                  : shouldUseFallback
-                  ? fallbackAvatar || "/vercel.svg"
-                  : "/vercel.svg";
-                const resolvedName = hasDbProfile
-                  ? profile.full_name || u.realName || u.username
-                  : shouldUseFallback
-                  ? u.realName || "—"
-                  : "Loading...";
-                const resolvedBatch = hasDbProfile
-                  ? profile.batch_name || null
-                  : null;
-                const resolvedVjudgeId = hasDbProfile
-                  ? profile.vjudge_id || u.username
-                  : u.username;
-                const resolvedMistId = hasDbProfile
-                  ? profile.mist_id || null
-                  : u.mist_id || u.mistId || null;
-                const resolvedCfId = hasDbProfile
-                  ? profile.cf_id || null
-                  : u.cf_id || u.cfId || null;
+                const isResolving = Boolean(profileKey) && isProfilesLoading && !hasResolvedLookup;
+                const participant = resolveLiveReportParticipant(u, profile);
+                const resolvedAvatar = resolveAvatarUrl(participant.profilePic) || "/vercel.svg";
+                const resolvedName = participant.name;
+                const resolvedBatch = participant.batch;
+                const resolvedVjudgeId = participant.vjudgeId;
+                const resolvedMistId = participant.mistId;
+                const resolvedCfId = participant.cfId;
                 return (
                   <TableRow
-                    key={u.username}
+                    key={identity || u.username}
                     className={cn(
                       "group transition-all duration-200 hover:bg-[hsl(var(--accent)/0.25)]",
                       index % 2 === 0
@@ -607,7 +591,7 @@ function ReportTable({ merged, lastUpdated }) {
                     {!isScoredSnapshot && (
                     <TableCell className="min-w-[90px]">
                       {(() => {
-                        const p = progressByUser[u.username] || {
+                        const p = progressByUser[identity] || {
                           status: "neutral",
                           delta: 0,
                         };

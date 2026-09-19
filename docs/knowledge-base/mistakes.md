@@ -504,3 +504,11 @@ Codeforces group participants were resolved to immutable MCC students while VJud
 
 Prevention:
 Resolve every supported provider through its authoritative saved account handle before shared scoring. Carry both saved provider handles in the mapped student projection, aggregate on `student:<users.id>`, and omit unmatched or ambiguous provider rows rather than showing a raw alias or guessing.
+
+## 2026-09-19 - Public live reports cannot treat `username` as the student ID
+
+Incident:
+The generated global report used the canonical mapped student projection, but the legacy public `LiveReportTable` queried profiles and rendered fallback identity from `user.username`. For Codeforces Group rows that field can be a raw alias such as `g21927=202614009`, so the public live page showed the alias even though the published snapshot contained the correct `identityKey` and `classroomMapping.student`.
+
+Prevention:
+Render published reports from `classroomMapping.student` first: use its name, `mistId`, profile image, VJudge ID, and Codeforces ID. Use `identityKey` for row/rank identity, query the public profile endpoint only with the mapped VJudge ID, and retain `username` only as a compatibility fallback for legacy VJudge-only snapshots.

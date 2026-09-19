@@ -30,6 +30,12 @@ For any new interface design, including new pages, new product surfaces, reusabl
 2. Read the knowledge base under `docs/knowledge-base/` if present.
 3. Use context7 for proper documentation
 
+## Jev-Orchestrated Subagents
+
+For substantive project tasks, load and follow `.agents/skills/jev-subagent-router/SKILL.md`. The main task acts as orchestrator: use Jev to select the configured model/reasoning tier and agent role, delegate the bounded work, then review and integrate the result. Keep greetings, status checks, tiny factual replies, and questions blocked on required user input in the main task.
+
+Before presenting a multiple-choice question, use the same skill's recommendation mode to select one recommended option from the finalized choices. Put that option first and mark it as recommended only when the router reports sufficient confidence; never answer or authorize an action on the user's behalf.
+
 ## Project Memory
 
 Keep durable project memory in `docs/knowledge-base/`:
