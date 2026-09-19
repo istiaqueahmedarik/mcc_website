@@ -919,8 +919,7 @@ function ReportTable({ merged, lastUpdated }) {
                             )}
                             <div className="space-y-0.5 rounded-md bg-[hsl(var(--background)/0.7)] p-1 opacity-70">
                               <p className="text-xs">Solved: 0</p>
-                              <p className="text-xs">Penalty: 0.00</p>
-                              <p className="text-xs">Score: 0.00</p>
+                              <p className="text-xs">Score: 0.00 (0.00)</p>
                             </div>
                           </TableCell>
                         );
@@ -955,18 +954,12 @@ function ReportTable({ merged, lastUpdated }) {
                             </p>
                             <p className="text-xs">
                               <span className="font-medium text-[hsl(var(--foreground))]">
-                                Penalty:
-                              </span>{" "}
-                              <span className="font-semibold">
-                                {perf.penalty.toFixed(2)}
-                              </span>
-                            </p>
-                            <p className="text-xs">
-                              <span className="font-medium text-[hsl(var(--foreground))]">
                                 Score:
                               </span>{" "}
                               <span className="font-semibold">
                                 {formatScore(perf.finalScore ?? perf.rawScore, 2)}
+                                {" "}
+                                ({formatScore(perf.penalty, 2)})
                               </span>
                             </p>
                           </div>

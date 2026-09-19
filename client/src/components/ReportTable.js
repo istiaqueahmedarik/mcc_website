@@ -1686,8 +1686,7 @@ function ReportTable({
                               )}
                             </div>
                             <div>Solved: {Number(perf?.solved || 0)}</div>
-                            <div>Penalty: {formatScore(perf?.penalty, 2)}</div>
-                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)}</div>
+                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)} ({formatScore(perf?.penalty, 2)})</div>
                             {sourceBreakdown.length > 1 && (
                               <Dialog>
                                 <DialogTrigger asChild>
@@ -1739,8 +1738,7 @@ function ReportTable({
                             <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                           )}
                           <div>Solved: 0</div>
-                          <div>Penalty: 0.00</div>
-                          <div>Score: 0.00</div>
+                          <div>Score: 0.00 (0.00)</div>
                         </TableCell>
                       )
                     }
@@ -1760,8 +1758,7 @@ function ReportTable({
                             <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                           )}
                           <div>Solved: {perf.solved}</div>
-                          <div>Penalty: {perf.penalty.toFixed(2)}</div>
-                          <div>Score: {perf.finalScore.toFixed(2)}</div>
+                          <div>Score: {perf.finalScore.toFixed(2)} ({perf.penalty.toFixed(2)})</div>
                         </div>
                       </TableCell>
                     )
