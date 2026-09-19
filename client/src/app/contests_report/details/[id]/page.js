@@ -522,7 +522,7 @@ async function page({ params, searchParams }) {
         </p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid items-start grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {res.result && res.result.length > 0 ? (
           res.result.map((contest, idx) => (
             <Card
@@ -589,27 +589,29 @@ async function page({ params, searchParams }) {
               <Separator className="mx-6 bg-border dark:bg-border" />
 
               <CardFooter className="flex flex-col gap-4 pt-4 pb-6 px-6">
-                {contest.provider === "codeforces" && contest.codeforces_source_type === "group" && (
-                  <CodeforcesGroupMappingForm
-                    currentMode={contest.codeforces_group_identity_mode}
-                    mappingCount={contest.codeforces_mapping_count}
-                    action={async (formData) => {
-                      "use server";
-                      await handleReplaceCodeforcesIdentityMapping(formData, paramsBox.id, contest.id);
-                    }}
-                  />
-                )}
-                <div className="flex w-full gap-3">
+                <div className={`grid w-full gap-2 ${contest.provider === "codeforces" && contest.codeforces_source_type === "group" ? "grid-cols-2 2xl:grid-cols-3" : "grid-cols-2"}`}>
                   <DeleteContestButton
                     contestRoomContestId={contest.id}
                     contestName={contest?.contest_name}
-                    className="rounded-full w-1/2 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive dark:hover:bg-destructive/20 bg-card"
+                    className="min-h-11 w-full rounded-full border-destructive bg-card px-3 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.98] motion-reduce:transform-none dark:border-destructive dark:hover:bg-destructive/20"
                   />
+
+                  {contest.provider === "codeforces" && contest.codeforces_source_type === "group" && (
+                    <CodeforcesGroupMappingForm
+                      currentMode={contest.codeforces_group_identity_mode}
+                      mappingCount={contest.codeforces_mapping_count}
+                      triggerClassName="min-h-11 w-full rounded-full px-3 active:scale-[0.98] motion-reduce:transform-none"
+                      action={async (formData) => {
+                        "use server";
+                        await handleReplaceCodeforcesIdentityMapping(formData, paramsBox.id, contest.id);
+                      }}
+                    />
+                  )}
 
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="rounded-full w-1/2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border-0 dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/70"
+                    className={`min-h-11 w-full rounded-full border-0 bg-secondary px-3 text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98] motion-reduce:transform-none dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-secondary/70 ${contest.provider === "codeforces" && contest.codeforces_source_type === "group" ? "col-span-2 2xl:col-span-1" : ""}`}
                     asChild
                   >
                     <Link
@@ -618,7 +620,7 @@ async function page({ params, searchParams }) {
                         : `/contests_report/details/${paramsBox.id}/generate_report?item=${contest.id}`}
                       className="flex items-center w-full justify-center"
                     >
-                      <FileText className="w-4 h-4 mr-2" />
+                      <FileText className="h-4 w-4" />
                       {contest.provider !== "codeforces" && !vjudgeConnected ? "Connect VJudge" : "Generate Report"}
                     </Link>
                   </Button>

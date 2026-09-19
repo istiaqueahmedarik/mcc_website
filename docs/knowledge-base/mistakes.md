@@ -496,3 +496,11 @@ A numeric Codeforces ID was historically classified as Gym when it was at least 
 
 Prevention:
 Persist the trainer-selected source type. Use `contest:<id>`, `gym:<id>`, `group:<code>:<id>`, or `edu:...` for new global report items while retaining bare numeric sources only as a compatibility path.
+
+## 2026-09-19 - Mapping only one provider duplicates mixed-report students
+
+Incident:
+Codeforces group participants were resolved to immutable MCC students while VJudge participants still used raw usernames. Mixed reports therefore produced separate rows for the same person, and a Codeforces group alias could appear in the fixed VJudge profile slot.
+
+Prevention:
+Resolve every supported provider through its authoritative saved account handle before shared scoring. Carry both saved provider handles in the mapped student projection, aggregate on `student:<users.id>`, and omit unmatched or ambiguous provider rows rather than showing a raw alias or guessing.

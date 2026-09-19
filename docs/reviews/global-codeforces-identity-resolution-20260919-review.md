@@ -25,15 +25,17 @@ Global report configuration now distinguishes Codeforces Public, Gym, Group, and
    - Leaves legacy numeric classroom sources supported.
 5. `server/src/controllers/contestRoomController.ts`
    - Resolves Codeforces identities after fetch and before the unchanged shared scorer.
+   - Resolves VJudge usernames through `users.vjudge_id` at the same point, so VJudge and Codeforces rows for one MCC account share `student:<users.id>` and merge once.
    - Uses `student:<users.id>` for matched identity while retaining the provider handle.
-   - Returns bounded unresolved-identity warnings and prevents publishing a report with unresolved participants.
+   - Excludes unresolved or ambiguous provider participants before the shared scorer, so only eligible MCC accounts appear or affect rank.
 6. `client/src/components/GlobalContestSourceForm.jsx`
    - Adds the provider/source/identity sequence, accessible native controls, the suffix mapping example, and bounded CSV input.
    - Adds the later mapping-replacement form on existing Group contest cards.
+   - Follow-up: presents the saved Group mapping as a compact settings table using the existing Radix Select. The trainer-facing method is named simply `Student ID`; the supporting format row explains the `=` convention without putting it in the option label.
 7. `client/src/app/contests_report/details/[id]/page.js`
    - Transports bounded CSV text through server actions and renders source/mapping status.
 8. `client/src/app/contests_report/details/[id]/generate_report/page.js`
-   - Explains unresolved rows, lists the affected contest/username, links back to identity settings, and withholds publishing until resolution.
+   - Publishes the mapped subset when every contest source is available; excluded provider identities are not exposed in the report UI.
 
 ## Security and Privacy Review
 
@@ -41,6 +43,7 @@ Global report configuration now distinguishes Codeforces Public, Gym, Group, and
 - Uploaded CSV content is validated server-side, never persisted as a file/blob, and never logged.
 - Only eligible non-admin, non-trainer, non-placeholder MCC accounts can be mapping targets.
 - Student IDs must resolve to exactly one account; ambiguous records fail closed.
+- VJudge and Codeforces handles require one unique eligible MCC account; unresolved or ambiguous provider rows are omitted before scoring and are never exposed as fallback identities.
 - Provider sessions and API credentials remain on the existing transient/encrypted paths.
 - The mapping table has no `anon` or `authenticated` Data API grants or policies.
 
@@ -59,7 +62,7 @@ The SQL migration was authored and statically reviewed but was not applied to a 
 1. Apply `docs/sql/global-codeforces-identity-resolution-20260919.sql`.
 2. Deploy server and client together.
 3. Open each existing Codeforces Group contest and confirm or replace its default suffix rule.
-4. Generate a report and resolve every warning before publishing.
+4. Generate a report and confirm that only MCC-mapped students are present before publishing.
 
 ## Rollback
 

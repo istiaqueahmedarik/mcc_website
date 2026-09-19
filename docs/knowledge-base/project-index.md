@@ -1252,7 +1252,13 @@ Trainer-only recent activity is rendered by `ContestPerformance.jsx` through the
 
 ## 2026-09-19 - Global Codeforces MCC identity resolution
 
-Global report Codeforces sources now carry an explicit Public/Gym/Group/EDU type. `codeforcesIdentityService.ts` maps Public/Gym/EDU handles through `users.cf_id`; Group contests use either the numeric suffix after the last `=` or a replaceable `username,student_id` CSV. Mappings persist immutable `users.id` references in `contest_report_codeforces_identity_mappings`. Report rows show MCC full name and student ID, while unresolved identities block publishing. Apply `docs/sql/global-codeforces-identity-resolution-20260919.sql` before the matching code.
+Global report Codeforces sources now carry an explicit Public/Gym/Group/EDU type. `codeforcesIdentityService.ts` maps Public/Gym/EDU handles through `users.cf_id`; Group contests use either the numeric suffix after the last `=` or a replaceable `username,student_id` CSV. Mappings persist immutable `users.id` references in `contest_report_codeforces_identity_mappings`. VJudge and Codeforces rows merge on immutable MCC identity; participants without one unique eligible MCC mapping are omitted before scoring. Apply `docs/sql/global-codeforces-identity-resolution-20260919.sql` before the matching code.
+
+Mixed global reports also resolve raw VJudge usernames through `users.vjudge_id` before scoring. Both provider rows then share `student:<users.id>`, retain their own source handles, and expose both saved profile handles so one student renders once with correct VJudge and Codeforces links.
+
+The Group contest card calls the suffix method `Student ID`. A compact `ID Mapping` action sits between Delete and Generate Report and opens the editor in a bounded, focus-managed Radix dialog. The card no longer expands to show the mapping form inline; the dialog uses the shared accessible Select and keeps CSV replacement behind the CSV method.
+
+Global report generation is persisted in service-only `global_contest_report_snapshots` through `globalContestReportSnapshotService.ts`. Normal report requests return the saved full-room or contest-item JSONB row without provider calls; explicit Refresh replaces it after a successful fetch/score pass, and Publish copies the current non-stale full-room snapshot. Contest, mapping, demerit, room, and scoring mutations mark cached and published reports stale. Apply `docs/sql/global-contest-report-snapshot-cache-20260919.sql` before deploying the matching server code.
 
 ## 2026-09-13 - Trainer action group presentation
 

@@ -19,6 +19,7 @@ export type MccIdentityAccount = {
   full_name?: string | null;
   mist_id?: string | number | null;
   cf_id?: string | null;
+  vjudge_id?: string | null;
   profile_pic?: string | null;
 };
 
@@ -169,6 +170,10 @@ function accountCodeforcesHandle(account: MccIdentityAccount) {
   return normalizeCodeforcesUsername(account.cf_id);
 }
 
+function accountVjudgeHandle(account: MccIdentityAccount) {
+  return normalizeCodeforcesUsername(account.vjudge_id);
+}
+
 function uniqueAccountMap(accounts: MccIdentityAccount[], keyFor: (account: MccIdentityAccount) => string) {
   const grouped = new Map<string, MccIdentityAccount[]>();
   accounts.forEach((account) => {
@@ -200,6 +205,7 @@ function mappedStudent(account: MccIdentityAccount) {
     name: boundedText(account.full_name, 180) || boundedText(account.cf_id, 160) || `Student ${accountStudentId(account)}`,
     mistId: accountStudentId(account),
     cfId: boundedText(account.cf_id, 160) || null,
+    vjudgeId: boundedText(account.vjudge_id, 160) || null,
     profilePic: boundedText(account.profile_pic, 500) || null,
   };
 }
@@ -219,7 +225,7 @@ export function enrichCodeforcesRankIdentities(input: {
       mapping.account,
     ]),
   );
-  const warnings: Array<{ username: string; code: string; message: string }> = [];
+  const excluded: Array<{ username: string; provider: 'codeforces'; code: string }> = [];
 
   const teams = (Array.isArray(input.teams) ? input.teams : []).map((team) => {
     const handles = teamHandles(team);
@@ -266,12 +272,12 @@ export function enrichCodeforcesRankIdentities(input: {
 
     if (!account) {
       const username = boundedText(team?.username || handles[0], 160);
-      warnings.push({
+      excluded.push({
         username,
+        provider: 'codeforces',
         code: warningCode,
-        message: 'This Codeforces participant could not be matched to exactly one eligible MCC account.',
       });
-      return { ...team, identityResolution: { status: 'unresolved', code: warningCode } };
+      return null;
     }
 
     const student = mappedStudent(account);
@@ -292,7 +298,63 @@ export function enrichCodeforcesRankIdentities(input: {
       },
       identityResolution: { status: 'matched', matchedBy },
     };
-  });
+  }).filter(Boolean) as any[];
 
-  return { teams, warnings };
+  return { teams, warnings: [], excluded };
+}
+
+export function enrichVjudgeRankIdentities(input: {
+  teams: any[];
+  accounts: MccIdentityAccount[];
+}) {
+  const byHandle = uniqueAccountMap(input.accounts, accountVjudgeHandle);
+  const excluded: Array<{ username: string; provider: 'vjudge'; code: string }> = [];
+  const teams = (Array.isArray(input.teams) ? input.teams : []).map((team) => {
+    const handles = teamHandles(team);
+    const ambiguous = handles.some((handle) => (
+      byHandle.grouped.get(normalizeCodeforcesUsername(handle)) || []
+    ).length > 1);
+    const candidates = Array.from(new Map(handles
+      .map((handle) => byHandle.unique.get(normalizeCodeforcesUsername(handle)))
+      .filter(Boolean)
+      .map((candidate) => [String(candidate!.id), candidate!] as const)).values());
+    const account = !ambiguous && candidates.length === 1 ? candidates[0] : undefined;
+    const warningCode = ambiguous
+      ? 'MCC_VJUDGE_HANDLE_AMBIGUOUS'
+      : candidates.length > 1
+        ? 'VJUDGE_TEAM_MAPS_TO_MULTIPLE_STUDENTS'
+        : 'MCC_VJUDGE_HANDLE_NOT_FOUND';
+
+    if (!account) {
+      const username = boundedText(team?.username || handles[0], 160);
+      excluded.push({
+        username,
+        provider: 'vjudge',
+        code: warningCode,
+      });
+      return null;
+    }
+
+    const student = mappedStudent(account);
+    return {
+      ...team,
+      identityKey: `student:${student.id}`,
+      studentId: student.id,
+      realName: student.name,
+      mist_id: student.mistId,
+      cf_id: student.cfId,
+      vjudge_id: student.vjudgeId,
+      sourceHandles: handles,
+      classroomMapping: {
+        targetType: 'student',
+        studentId: student.id,
+        student,
+        matchedBy: 'vjudge_handle',
+        isClassroomParticipant: false,
+      },
+      identityResolution: { status: 'matched', matchedBy: 'vjudge_handle' },
+    };
+  }).filter(Boolean) as any[];
+
+  return { teams, warnings: [], excluded };
 }

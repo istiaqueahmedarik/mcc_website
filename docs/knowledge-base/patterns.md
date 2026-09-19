@@ -1067,3 +1067,11 @@ For classroom disclosures, keep the existing semantic trigger and state owner, t
 ## 2026-09-19 - Provider aliases to immutable MCC identity
 
 Resolve provider-visible aliases before shared scoring. Keep the original provider handle in `sourceHandles`, but assign matched rows `identityKey=student:<users.id>` and attach the current MCC profile projection for display. Match only eligible student accounts and require exactly one result. For user-maintained alias files, validate bounded CSV on the server, resolve student IDs to immutable user IDs, and atomically replace normalized mappings without retaining the uploaded file.
+
+For mixed global reports, resolve both `users.vjudge_id` and `users.cf_id` before scoring. Each provider row must retain its own raw handle while sharing the same `student:<users.id>` aggregation key and a profile projection containing both saved handles; otherwise the report duplicates students and fixed provider-link slots can inherit the wrong alias.
+
+Global reports contain eligible MCC students, not a provider roster. Drop provider rows that do not resolve to exactly one eligible MCC account before shared scoring; they must not appear under a raw handle, contribute points, or block publication of the mapped subset.
+
+Keep infrequent Group identity configuration out of the contest card's primary reading flow. Place a visible neutral `ID Mapping` action between destructive Delete and outcome-oriented Generate Report, then open the existing editor in a focus-managed, viewport-bounded dialog with a fixed save area and independently scrollable body.
+
+Global generated reports are cache-first. Persist normalized scored output in the private `global_contest_report_snapshots` table by full-room or contest-item scope, return it before touching providers, and reserve provider fetching for first generation or explicit Refresh. Keep network work outside transactions, atomically replace the snapshot after success, preserve the prior row on refresh failure, and publish by copying the saved full-room snapshot rather than fetching again.

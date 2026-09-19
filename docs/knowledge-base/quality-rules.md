@@ -973,4 +973,6 @@ If an action group must be shadowless, override every inherited shell state and 
 
 ## 2026-09-19 - Contest identity resolution must fail closed
 
-Do not merge a provider participant into an MCC account from a non-unique handle or student ID. Multi-member provider teams that resolve to more than one MCC student remain unresolved. Surface bounded warnings and prevent authoritative report publication until every Codeforces row has exactly one eligible MCC identity. Provider aliases are audit data; immutable `users.id` is the aggregation key.
+Do not merge a provider participant into an MCC account from a non-unique handle or student ID. Omit provider rows that do not resolve to exactly one eligible MCC student before scoring, including multi-member teams that resolve to multiple students. Provider aliases are audit data; immutable `users.id` is the aggregation key.
+
+Do not contact contest providers merely to view or publish a previously generated global report. Read the private saved snapshot first; only first generation or explicit Refresh may fetch providers. Preserve the prior snapshot when refresh fails, keep network calls outside transactions, mark snapshots stale after authoritative inputs change, and require a fresh full-room snapshot before publication.

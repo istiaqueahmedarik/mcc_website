@@ -1,5 +1,6 @@
 import { Context } from 'hono'
 import sql from '../db'
+import { markGlobalContestReportsStaleForVjudgeContests } from '../services/globalContestReportSnapshotService'
 
 export const getDemeritsByContest = async (c: Context) => {
     try {
@@ -66,11 +67,15 @@ export const createDemerit = async (c: Context) => {
             return c.json({ error: 'All fields are required' }, 400)
         }
 
-        const demerit = await sql`
-            INSERT INTO "Demerit" (contest_id, vjudge_id, demerit_point, reason)
-            VALUES (${contest_id}, ${vjudge_id}, ${demerit_point}, ${reason})
-            RETURNING *
-        `
+        const demerit = await sql.begin(async (tx) => {
+            const inserted = await tx`
+                INSERT INTO "Demerit" (contest_id, vjudge_id, demerit_point, reason)
+                VALUES (${contest_id}, ${vjudge_id}, ${demerit_point}, ${reason})
+                RETURNING *
+            `
+            await markGlobalContestReportsStaleForVjudgeContests(tx, [String(contest_id)])
+            return inserted
+        })
 
         return c.json({ success: true, data: demerit[0] })
     } catch (error) {
@@ -102,13 +107,27 @@ export const updateDemerit = async (c: Context) => {
             return c.json({ error: 'All fields are required' }, 400)
         }
 
-        const demerit = await sql`
-            UPDATE "Demerit" 
-            SET contest_id = ${contest_id}, vjudge_id = ${vjudge_id}, 
-                demerit_point = ${demerit_point}, reason = ${reason}
-            WHERE id = ${demerit_id}
-            RETURNING *
-        `
+        const demerit = await sql.begin(async (tx) => {
+            const current = await tx`
+                SELECT contest_id
+                FROM "Demerit"
+                WHERE id = ${demerit_id}
+                FOR UPDATE
+            `
+            if (current.length === 0) return []
+            const updated = await tx`
+                UPDATE "Demerit"
+                SET contest_id = ${contest_id}, vjudge_id = ${vjudge_id},
+                    demerit_point = ${demerit_point}, reason = ${reason}
+                WHERE id = ${demerit_id}
+                RETURNING *
+            `
+            await markGlobalContestReportsStaleForVjudgeContests(tx, [
+                String(current[0].contest_id),
+                String(contest_id),
+            ])
+            return updated
+        })
 
         if (demerit.length === 0) {
             return c.json({ error: 'Demerit not found' }, 404)
@@ -144,11 +163,17 @@ export const deleteDemerit = async (c: Context) => {
             return c.json({ error: 'Demerit ID is required' }, 400)
         }
 
-        const deletedDemerit = await sql`
-            DELETE FROM "Demerit" 
-            WHERE id = ${demerit_id}
-            RETURNING *
-        `
+        const deletedDemerit = await sql.begin(async (tx) => {
+            const deleted = await tx`
+                DELETE FROM "Demerit"
+                WHERE id = ${demerit_id}
+                RETURNING *
+            `
+            if (deleted.length > 0) {
+                await markGlobalContestReportsStaleForVjudgeContests(tx, [String(deleted[0].contest_id)])
+            }
+            return deleted
+        })
 
         if (deletedDemerit.length === 0) {
             return c.json({ error: 'Demerit not found' }, 404)

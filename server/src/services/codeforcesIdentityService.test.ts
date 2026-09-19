@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   enrichCodeforcesRankIdentities,
+  enrichVjudgeRankIdentities,
   extractStudentIdFromGroupUsername,
   normalizeCodeforcesSourceForType,
   parseCodeforcesIdentityCsv,
@@ -44,6 +45,7 @@ describe('Codeforces report identity enrichment', () => {
     full_name: 'MCC Student',
     mist_id: '202314022',
     cf_id: 'SavedHandle',
+    vjudge_id: 'SavedVjudge',
   };
 
   test('maps group suffix usernames to immutable MCC accounts', () => {
@@ -57,7 +59,19 @@ describe('Codeforces report identity enrichment', () => {
     expect(result.teams[0].identityKey).toBe(`student:${account.id}`);
     expect(result.teams[0].realName).toBe('MCC Student');
     expect(result.teams[0].classroomMapping.student.mistId).toBe('202314022');
+    expect(result.teams[0].classroomMapping.student.vjudgeId).toBe('SavedVjudge');
     expect(result.teams[0].sourceHandles).toEqual(['g21927=202314022']);
+  });
+
+  test('maps VJudge usernames to the same immutable MCC student identity', () => {
+    const result = enrichVjudgeRankIdentities({
+      teams: [{ username: 'savedvjudge', sourceHandles: ['savedvjudge'] }],
+      accounts: [account],
+    });
+    expect(result.warnings).toEqual([]);
+    expect(result.teams[0].identityKey).toBe(`student:${account.id}`);
+    expect(result.teams[0].classroomMapping.student.vjudgeId).toBe('SavedVjudge');
+    expect(result.teams[0].classroomMapping.student.cfId).toBe('SavedHandle');
   });
 
   test('maps ordinary contests by the saved MCC Codeforces handle', () => {
@@ -70,13 +84,28 @@ describe('Codeforces report identity enrichment', () => {
     expect(result.teams[0].classroomMapping.matchedBy).toBe('cf_handle');
   });
 
-  test('does not guess when one provider team maps to multiple MCC students', () => {
+  test('omits a provider team that does not map to exactly one MCC student', () => {
     const result = enrichCodeforcesRankIdentities({
       teams: [{ username: 'team', sourceHandles: ['SavedHandle', 'OtherHandle'] }],
       sourceType: 'gym',
       accounts: [account, { ...account, id: '22222222-2222-4222-8222-222222222222', cf_id: 'OtherHandle', mist_id: '202314023' }],
     });
-    expect(result.teams[0].identityResolution.status).toBe('unresolved');
-    expect(result.warnings[0].code).toBe('CODEFORCES_TEAM_MAPS_TO_MULTIPLE_STUDENTS');
+    expect(result.teams).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(result.excluded[0].code).toBe('CODEFORCES_TEAM_MAPS_TO_MULTIPLE_STUDENTS');
+  });
+
+  test('omits VJudge participants without an eligible MCC account mapping', () => {
+    const result = enrichVjudgeRankIdentities({
+      teams: [{ username: 'not-saved', sourceHandles: ['not-saved'] }],
+      accounts: [account],
+    });
+    expect(result.teams).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(result.excluded).toEqual([{
+      username: 'not-saved',
+      provider: 'vjudge',
+      code: 'MCC_VJUDGE_HANDLE_NOT_FOUND',
+    }]);
   });
 });

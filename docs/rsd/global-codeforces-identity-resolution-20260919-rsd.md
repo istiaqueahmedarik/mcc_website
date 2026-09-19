@@ -12,13 +12,14 @@ Global Codeforces report rows currently use the provider handle as the participa
 - Let trainers classify a Codeforces source as Public, Gym, Group, or EDU when adding it.
 - Keep VJudge entry behavior unchanged.
 - Resolve Public, Gym, and EDU participants by the Codeforces handle saved on an eligible MCC student account.
+- Resolve VJudge participants by the VJudge ID saved on the same eligible MCC account so mixed-provider rows merge by immutable student identity.
 - For Group contests, support either:
   - a username suffix convention where the numeric text after the last `=` is the MCC student ID, for example `g21927=202314022`; or
   - a CSV with the exact headers `username,student_id`.
 - Let trainers replace a Group contest's identity rule or CSV later.
 - Resolve student IDs to exactly one eligible MCC account and persist the immutable `users.id`, not the uploaded CSV or a mutable display name.
 - Display the MCC full name with student ID underneath while retaining the original Codeforces handle for provider links and audit.
-- Never silently merge an ambiguous or unresolved participant into an MCC student.
+- Omit participants that do not resolve to exactly one eligible MCC student account.
 - Keep report scoring, formulas, weights, merges, and demerit mathematics unchanged.
 
 ## Data Design
@@ -46,7 +47,8 @@ The mapping table is service-only: enable and force RLS, revoke Data API roles, 
 3. Group suffix: take the text after the last `=`, require digits, normalize leading zeroes, match `users.mist_id`, and accept only a unique account.
 4. Group CSV: normalize the returned username and look up the stored `student_user_id` mapping.
 5. Enrich matched rank rows with `identityKey=student:<users.id>`, MCC full name, MCC student ID, saved Codeforces handle, and the original provider handle.
-6. Leave unmatched rows separate under their provider identity and return bounded identity warnings. Never guess when lookup is missing or ambiguous.
+6. Apply the same immutable identity to a uniquely matched `users.vjudge_id`, including both saved provider handles in the report profile projection.
+7. Exclude unmatched or ambiguous provider rows before scoring. Never show the raw provider identity or guess an MCC student when lookup is missing or non-unique.
 
 ## Input and Mutation Safety
 

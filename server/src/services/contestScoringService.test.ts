@@ -6,7 +6,7 @@ const source = (overrides: any) => ({
   contestKey: overrides.contestKey,
   formulaKey: overrides.formulaKey,
   title: overrides.title || overrides.contestKey,
-  provider: 'vjudge',
+  provider: overrides.provider || 'vjudge',
   externalContestId: overrides.externalContestId || overrides.contestKey.replace(/^c/, ''),
   weight: overrides.weight ?? 1,
   sortOrder: overrides.sortOrder ?? 0,
@@ -31,6 +31,45 @@ const team = (username: string, solved: number, finalScore: number, penalty = 0,
 });
 
 describe('buildScoredContestReport', () => {
+  test('merges VJudge and Codeforces rows that resolve to the same MCC student', () => {
+    const studentId = '11111111-1111-4111-8111-111111111111';
+    const mappedTeam = (username: string, solved: number) => ({
+      ...team(username, solved, solved),
+      identityKey: `student:${studentId}`,
+      studentId,
+      realName: 'MCC Student',
+      classroomMapping: {
+        targetType: 'student',
+        studentId,
+        student: {
+          id: studentId,
+          name: 'MCC Student',
+          mistId: '202314022',
+          vjudgeId: 'SavedVjudge',
+          cfId: 'SavedCodeforces',
+        },
+      },
+    });
+    const report = buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [
+        source({ itemId: 'vj', contestKey: 'vjudge:1', formulaKey: 'vj', provider: 'vjudge', teams: [mappedTeam('SavedVjudge', 2)] }),
+        source({ itemId: 'cf', contestKey: 'codeforces:2', formulaKey: 'cf', provider: 'codeforces', teams: [mappedTeam('g21927=202314022', 4)] }),
+      ],
+      config: {
+        solvedScoreFormula: 'sum(solved)',
+        penaltyScoreFormula: 'sum(penalty)',
+        sortRules: [{ key: 'solved_score', direction: 'desc' }],
+      },
+    });
+    expect(report.users).toHaveLength(1);
+    expect(report.users[0].identityKey).toBe(`student:${studentId}`);
+    expect(report.users[0].providers.sort()).toEqual(['codeforces', 'vjudge']);
+    expect(report.users[0].solvedScore).toBe(6);
+    expect(report.users[0].classroomMapping.student.vjudgeId).toBe('SavedVjudge');
+  });
+
   test('aggregates composite source contests and leaves breakdown inspectable', () => {
     const report = buildScoredContestReport({
       roomId: 'room-1',

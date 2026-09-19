@@ -16,6 +16,7 @@ import {
     type CodeforcesIdentityCsvRow,
     type CodeforcesSourceType,
 } from '../services/codeforcesIdentityService'
+import { markGlobalContestReportsStale } from '../services/globalContestReportSnapshotService'
 
 const normalizeText = (value: unknown, maxLength = 500) => String(value ?? '').trim().slice(0, maxLength)
 
@@ -217,6 +218,7 @@ export const insertContestRoomContest = async (c: any) => {
             if (groupIdentityMode === 'csv') {
                 await replaceCodeforcesMappings(tx, String(inserted[0].id), String(id), resolvedMappings)
             }
+            await markGlobalContestReportsStale(tx, [normalizedRoomId])
             return inserted
         })
         return c.json({ result, success: true })
@@ -291,7 +293,7 @@ export const replaceContestCodeforcesIdentityMapping = async (c: any) => {
     if (!contestItemId || !mode) return c.json({ error: 'Contest and group identity rule are required' }, 400)
 
     const items = await sql`
-        SELECT id
+        SELECT id, room_id
         FROM public."Contest_room_contests"
         WHERE id=${contestItemId}
           AND provider='codeforces'
@@ -311,6 +313,7 @@ export const replaceContestCodeforcesIdentityMapping = async (c: any) => {
                 WHERE id=${contestItemId}
             `
             await replaceCodeforcesMappings(tx, contestItemId, String(id), resolvedMappings)
+            await markGlobalContestReportsStale(tx, [String(items[0].room_id)])
         })
         return c.json({ success: true, mappingCount: resolvedMappings.length, mode })
     } catch (error: any) {
@@ -332,7 +335,29 @@ export const updateContestRoomContest = async (c: any) => {
     const { contest_room_contest_id, room_id, contest_id, weight } = await c.req.json()
 
     try {
-        const result = await sql`UPDATE "Contest_room_contests" SET room_id = ${room_id}, contest_id = ${contest_id}, weight = ${weight} WHERE id = ${contest_room_contest_id} RETURNING *`
+        const result = await sql.begin(async (tx) => {
+            const current = await tx`
+                SELECT room_id
+                FROM public."Contest_room_contests"
+                WHERE id = ${contest_room_contest_id}
+                FOR UPDATE
+            `
+            if (current.length === 0) return []
+            const updated = await tx`
+                UPDATE "Contest_room_contests"
+                SET room_id = ${room_id}, contest_id = ${contest_id}, weight = ${weight}
+                WHERE id = ${contest_room_contest_id}
+                RETURNING *
+            `
+            if (String(current[0].room_id) !== String(room_id)) {
+                await tx`
+                    DELETE FROM public.global_contest_report_snapshots
+                    WHERE contest_item_id = ${contest_room_contest_id}
+                `
+            }
+            await markGlobalContestReportsStale(tx, [String(current[0].room_id), String(room_id)])
+            return updated
+        })
         return c.json({ result, success: true })
     } catch (error) {
         return c.json({ error: 'error' }, 400)
@@ -350,7 +375,17 @@ export const deleteContestRoomContest = async (c: any) => {
     }
     const { contest_room_contest_id } = await c.req.json()
     try {
-        const result = await sql`DELETE FROM "Contest_room_contests" WHERE id = ${contest_room_contest_id} RETURNING *`
+        const result = await sql.begin(async (tx) => {
+            const deleted = await tx`
+                DELETE FROM "Contest_room_contests"
+                WHERE id = ${contest_room_contest_id}
+                RETURNING *
+            `
+            if (deleted.length > 0) {
+                await markGlobalContestReportsStale(tx, [String(deleted[0].room_id)])
+            }
+            return deleted
+        })
         return c.json({ result, success: true })
     } catch (error) {
         return c.json({ error: 'Something went wrong' }, 400)

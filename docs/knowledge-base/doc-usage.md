@@ -90,6 +90,13 @@ This task used `AGENTS.md`, the classroom contest knowledge base, the required i
 Applies when:
 Auditing the restored Codeforces API credential input, signed request order, encrypted storage, or the combined provider access dialog.
 
+## 2026-09-19 - Global report snapshot cache
+
+This task used `AGENTS.md`, the contest-report knowledge base, the Supabase and Postgres schema/RLS/index/upsert/short-transaction guidance, current Supabase table/RLS/changelog documentation, Next.js 16.1.1 Server Action redirect/refresh guidance through Context7, and the required interface/Apple/Emil design skills. The new cache is a service-only Postgres table; schema application, authenticated browser QA, and live proof that repeat views make no provider request remain deployment checks.
+
+Applies when:
+Maintaining cache-first global report generation, explicit provider refresh, snapshot invalidation, or publishing from saved report data.
+
 Do not overgeneralize:
 No real trainer credential was replayed, no live signed Codeforces request was made, no database row was mutated, and production deployment/browser verification remain pending.
 

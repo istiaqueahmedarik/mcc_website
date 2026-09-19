@@ -30,11 +30,17 @@ import {
 } from '../services/codeforcesContestService'
 import {
     enrichCodeforcesRankIdentities,
+    enrichVjudgeRankIdentities,
     extractStudentIdFromGroupUsername,
     normalizeCodeforcesUsername,
     type CodeforcesGroupIdentityMode,
     type CodeforcesSourceType,
 } from '../services/codeforcesIdentityService'
+import {
+    loadGlobalContestReportSnapshot,
+    markGlobalContestReportsStale,
+    saveGlobalContestReportSnapshot,
+} from '../services/globalContestReportSnapshotService'
 
 function normalizeText(value: unknown, maxLength = 500) {
     return String(value ?? '').trim().slice(0, maxLength)
@@ -327,6 +333,7 @@ async function resolveGlobalCodeforcesIdentities(item: any, rankData: any) {
                    account.full_name,
                    account.mist_id,
                    account.cf_id,
+                   account.vjudge_id,
                    account.profile_pic
             FROM public.contest_report_codeforces_identity_mappings mapping
             JOIN public.users account ON account.id = mapping.student_user_id
@@ -349,7 +356,7 @@ async function resolveGlobalCodeforcesIdentities(item: any, rankData: any) {
             team?.username,
         ]).map(extractStudentIdFromGroupUsername).filter(Boolean)))
         accounts = studentIds.length > 0 ? await sql`
-            SELECT id, full_name, mist_id, cf_id, profile_pic
+            SELECT id, full_name, mist_id, cf_id, vjudge_id, profile_pic
             FROM public.users
             WHERE mist_id::text = ANY(${studentIds})
               AND COALESCE(admin, false) = false
@@ -360,7 +367,7 @@ async function resolveGlobalCodeforcesIdentities(item: any, rankData: any) {
         ` : []
     } else {
         accounts = handles.length > 0 ? await sql`
-            SELECT id, full_name, mist_id, cf_id, profile_pic
+            SELECT id, full_name, mist_id, cf_id, vjudge_id, profile_pic
             FROM public.users
             WHERE lower(btrim(cf_id)) = ANY(${handles})
               AND COALESCE(admin, false) = false
@@ -381,7 +388,26 @@ async function resolveGlobalCodeforcesIdentities(item: any, rankData: any) {
     return {
         ...rankData,
         teams: resolved.teams,
-        identityWarnings: resolved.warnings,
+    }
+}
+
+async function resolveGlobalVjudgeIdentities(rankData: any) {
+    const teams = Array.isArray(rankData?.teams) ? rankData.teams : []
+    const handles = codeforcesRankHandles(teams)
+    const accounts = handles.length > 0 ? await sql`
+        SELECT id, full_name, mist_id, cf_id, vjudge_id, profile_pic
+        FROM public.users
+        WHERE lower(btrim(vjudge_id)) = ANY(${handles})
+          AND COALESCE(admin, false) = false
+          AND COALESCE(trainer, false) = false
+          AND COALESCE(is_pre_enrolled, false) = false
+          AND mist_id IS NOT NULL
+          AND NULLIF(btrim(full_name), '') IS NOT NULL
+    ` : []
+    const resolved = enrichVjudgeRankIdentities({ teams, accounts })
+    return {
+        ...rankData,
+        teams: resolved.teams,
     }
 }
 
@@ -559,7 +585,6 @@ async function buildGlobalScoredReportSnapshot(
 
     const rankDataByItemId = new Map<string, any>()
     const missingContests: any[] = []
-    const identityWarnings: any[] = []
     const needsSavedCodeforcesHandles = items.some((item: any) => (
         normalizeContestProvider(item.provider) === 'codeforces'
         && normalizeText(item.codeforces_source_type, 20) !== 'group'
@@ -630,15 +655,7 @@ async function buildGlobalScoredReportSnapshot(
         }
         const identityResolved = provider === 'codeforces'
             ? await resolveGlobalCodeforcesIdentities(item, fetched.body || {})
-            : fetched.body || {}
-        if (Array.isArray(identityResolved.identityWarnings)) {
-            identityWarnings.push(...identityResolved.identityWarnings.map((warning: any) => ({
-                ...warning,
-                contestItemId: String(item.id),
-                contestId,
-                contestName: title,
-            })))
-        }
+            : await resolveGlobalVjudgeIdentities(fetched.body || {})
         rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData({
             ...identityResolved,
             provider,
@@ -706,8 +723,6 @@ async function buildGlobalScoredReportSnapshot(
         legacyTsc,
         missingContests,
     })
-    ;(scored as any).identityWarnings = identityWarnings
-
     return {
         room,
         items,
@@ -715,7 +730,50 @@ async function buildGlobalScoredReportSnapshot(
         config,
         configVersion: saved.version,
         missingContests,
-        identityWarnings,
+    }
+}
+
+async function resolveGlobalReportContestItemId(
+    roomId: string,
+    options: { contestItemId?: string | null; contestId?: string | null },
+) {
+    const requestedContestItemId = normalizeText(options.contestItemId, 80)
+    const requestedContestId = normalizeText(options.contestId, 300)
+    if (!requestedContestItemId && !requestedContestId) return null
+
+    const items = await loadGlobalRoomItems(roomId)
+    const matches = requestedContestItemId
+        ? items.filter((item: any) => String(item.id) === requestedContestItemId)
+        : items.filter((item: any) => String(item.contest_id) === requestedContestId)
+    if (matches.length === 0) {
+        throw Object.assign(new Error('Contest source not found in this room'), { statusCode: 404 })
+    }
+    if (matches.length > 1) {
+        throw Object.assign(new Error('Choose a specific contest item before generating this report'), { statusCode: 409 })
+    }
+    return String(matches[0].id)
+}
+
+function generatedReportResponse(
+    snapshot: {
+        report: any;
+        missingContests: any[];
+        scoringConfigVersion: number;
+        isStale: boolean;
+        generatedAt: string;
+    },
+    status: 'saved' | 'generated' | 'refreshed',
+) {
+    return {
+        success: true,
+        merged: snapshot.report,
+        missingContests: snapshot.missingContests,
+        cache: {
+            status,
+            generatedAt: snapshot.generatedAt,
+            isStale: snapshot.isStale,
+            scoringConfigVersion: snapshot.scoringConfigVersion,
+        },
     }
 }
 
@@ -819,17 +877,21 @@ export const updateContestRoom = async (c: any) => {
     }
 
     try {
-        const result = await sql`
-            UPDATE "Contest_report_room"
-            SET
-                "Room Name" = ${nextRoomName},
-                contest_type = ${settings.contestType},
-                tfc_room_id = ${settings.tfcRoomId},
-                tfc_percentage = ${settings.tfcPercentage},
-                tsc_percentage = ${settings.tscPercentage}
-            WHERE id = ${room_id}
-            RETURNING *
-        `
+        const result = await sql.begin(async (tx) => {
+            const updated = await tx`
+                UPDATE "Contest_report_room"
+                SET
+                    "Room Name" = ${nextRoomName},
+                    contest_type = ${settings.contestType},
+                    tfc_room_id = ${settings.tfcRoomId},
+                    tfc_percentage = ${settings.tfcPercentage},
+                    tsc_percentage = ${settings.tscPercentage}
+                WHERE id = ${room_id}
+                RETURNING *
+            `
+            await markGlobalContestReportsStale(tx, [String(room_id)])
+            return updated
+        })
         return c.json({ result, success: true })
     } catch (error) {
         return c.json({ error: 'error' }, 400)
@@ -1189,12 +1251,7 @@ export const updateContestRoomScoring = async (c: any) => {
                     updated_by = EXCLUDED.updated_by,
                     updated_at = now()
             `
-            await tx`
-                UPDATE public."Public_contest_report"
-                SET is_stale = true,
-                    "Updated_at" = now()
-                WHERE "Shared_contest_id" = ${roomId}
-            `
+            await markGlobalContestReportsStale(tx, [roomId])
 
             return { conflict: false, version: nextVersion }
         })
@@ -1227,6 +1284,16 @@ export const generateContestRoomReport = async (c: any) => {
     try {
         const roomId = c.req.param('roomId')
         const body = await readJsonBody(c)
+        const contestItemId = await resolveGlobalReportContestItemId(roomId, {
+            contestItemId: body?.contestItemId ?? body?.contest_item_id,
+            contestId: body?.contestId ?? body?.contest_id,
+        })
+        const refresh = body?.refresh === true
+        const savedSnapshot = await loadGlobalContestReportSnapshot(roomId, contestItemId)
+        if (savedSnapshot && !refresh) {
+            return c.json(generatedReportResponse(savedSnapshot, 'saved'))
+        }
+
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
             actor.id,
@@ -1236,16 +1303,18 @@ export const generateContestRoomReport = async (c: any) => {
             },
             null,
             {
-                contestItemId: body?.contestItemId ?? body?.contest_item_id,
-                contestId: body?.contestId ?? body?.contest_id,
+                contestItemId,
             },
         )
-        return c.json({
-            success: true,
-            merged: snapshot.scored,
+        const persisted = await saveGlobalContestReportSnapshot({
+            roomId,
+            contestItemId,
+            report: snapshot.scored,
             missingContests: snapshot.missingContests,
-            identityWarnings: snapshot.identityWarnings,
+            scoringConfigVersion: snapshot.configVersion,
+            generatedBy: actor.id,
         })
+        return c.json(generatedReportResponse(persisted, refresh ? 'refreshed' : 'generated'))
     } catch (error: any) {
         console.error('Error generating contest room report:', error)
         return c.json({
@@ -1262,27 +1331,20 @@ export const publishContestRoomReport = async (c: any) => {
 
     try {
         const roomId = c.req.param('roomId')
-        const snapshot = await buildGlobalScoredReportSnapshot(
-            roomId,
-            actor.id,
-            {
-                vjudge: getVjudgeSession(c),
-                codeforces: getCodeforcesSession(c),
-            },
-        )
+        const snapshot = await loadGlobalContestReportSnapshot(roomId, null)
+        if (!snapshot) {
+            return c.json({ error: 'Generate the full report before publishing it' }, 409)
+        }
+        if (snapshot.isStale) {
+            return c.json({ error: 'Refresh the saved report before publishing it' }, 409)
+        }
         if (snapshot.missingContests.length > 0) {
             return c.json({
                 error: 'All contest sources must be available before publishing this report',
                 missingContests: snapshot.missingContests,
             }, 409)
         }
-        if (snapshot.identityWarnings.length > 0) {
-            return c.json({
-                error: 'Resolve every Codeforces participant to an MCC account before publishing this report',
-                identityWarnings: snapshot.identityWarnings,
-            }, 409)
-        }
-        const jsonString = JSON.stringify(snapshot.scored)
+        const jsonString = JSON.stringify(snapshot.report)
         const result = await sql.begin(async (tx) => {
             const existing = await tx`
                 SELECT id
@@ -1296,7 +1358,7 @@ export const publishContestRoomReport = async (c: any) => {
                 return tx`
                     UPDATE public."Public_contest_report"
                     SET "JSON_string" = ${jsonString},
-                        scoring_config_version = ${snapshot.configVersion},
+                        scoring_config_version = ${snapshot.scoringConfigVersion},
                         is_stale = false,
                         "Updated_at" = now()
                     WHERE id = ${existing[0].id}
@@ -1313,7 +1375,7 @@ export const publishContestRoomReport = async (c: any) => {
                 VALUES (
                     ${roomId},
                     ${jsonString},
-                    ${snapshot.configVersion},
+                    ${snapshot.scoringConfigVersion},
                     false
                 )
                 RETURNING *
@@ -1324,9 +1386,8 @@ export const publishContestRoomReport = async (c: any) => {
             success: true,
             result,
             report: result[0] || null,
-            merged: snapshot.scored,
+            merged: snapshot.report,
             missingContests: snapshot.missingContests,
-            identityWarnings: snapshot.identityWarnings,
         })
     } catch (error: any) {
         console.error('Error publishing contest room report:', error)

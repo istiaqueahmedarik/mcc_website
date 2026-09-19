@@ -1,9 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, FileUp } from "lucide-react";
+import { ArrowRight, FileUp, Hash, Rows3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import ContestReportSubmitButton from "@/components/ContestReportSubmitButton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const sourceHelp = {
   public: {
@@ -108,7 +124,7 @@ export default function GlobalContestSourceForm({ action }) {
                 className="mt-1"
               />
               <span>
-                <span className="block text-sm font-medium">Student ID after =</span>
+                <span className="block text-sm font-medium">Student ID</span>
                 <span className="mt-1 block text-xs text-muted-foreground">Use this when names follow the group convention.</span>
               </span>
             </label>
@@ -168,32 +184,94 @@ export default function GlobalContestSourceForm({ action }) {
   );
 }
 
-export function CodeforcesGroupMappingForm({ action, currentMode, mappingCount }) {
+export function CodeforcesGroupMappingForm({ action, currentMode, mappingCount, triggerClassName }) {
   const [mode, setMode] = useState(currentMode || "student_id_suffix");
+  const usesCsv = mode === "csv";
+
   return (
-    <form action={action} className="w-full space-y-3 rounded-xl border bg-muted/20 p-4">
-      <div>
-        <p className="text-sm font-medium">Group identity rule</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {currentMode === "csv" ? `${mappingCount || 0} mapped students. Uploading replaces the current mapping.` : "Student IDs are read from the text after the last = sign."}
-        </p>
-      </div>
-      <select
-        name="codeforces-group-identity-mode"
-        value={mode}
-        onChange={(event) => setMode(event.target.value)}
-        aria-label="Group identity rule"
-        className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-base text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
-      >
-        <option value="student_id_suffix">Student ID after =</option>
-        <option value="csv">Username mapping CSV</option>
-      </select>
-      {mode === "csv" && (
-        <input name="codeforces-mapping-csv" type="file" accept=".csv,text/csv" required className="min-h-11 w-full rounded-md border border-dashed bg-background px-3 py-2 text-sm" />
-      )}
-      <ContestReportSubmitButton pendingLabel="Saving…" className="min-h-11 w-full" variant="outline">
-        Save identity rule
-      </ContestReportSubmitButton>
-    </form>
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={triggerClassName}
+        >
+          <Hash className="h-4 w-4" aria-hidden="true" />
+          ID Mapping
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md flex-col gap-0 overflow-hidden rounded-2xl p-0 motion-reduce:duration-0 sm:max-w-md">
+        <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12 text-left">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border bg-muted/40 text-muted-foreground">
+              <Hash className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <DialogTitle>Student ID mapping</DialogTitle>
+                <span className="rounded-full border bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground tabular-nums">
+                  {currentMode === "csv" ? `${mappingCount || 0} mapped` : "Student ID"}
+                </span>
+              </div>
+              <DialogDescription className="mt-1 leading-5">
+                Match Codeforces group usernames to MCC students.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form action={action} className="flex min-h-0 flex-col">
+          <div className="min-h-0 overflow-y-auto">
+            <div className="space-y-2.5 px-5 py-4">
+              <div>
+                <label htmlFor="group-student-id-method" className="text-xs font-medium text-foreground">Method</label>
+                <p className="mt-0.5 text-xs text-muted-foreground">Choose where the Student ID comes from.</p>
+              </div>
+              <Select name="codeforces-group-identity-mode" value={mode} onValueChange={setMode}>
+                <SelectTrigger id="group-student-id-method" className="min-h-11 rounded-xl bg-muted/30 px-3 focus:ring-offset-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-border/80 p-1">
+                  <SelectItem value="student_id_suffix" className="min-h-10 rounded-lg">Student ID</SelectItem>
+                  <SelectItem value="csv" className="min-h-10 rounded-lg">CSV mapping</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {usesCsv && (
+              <div className="space-y-2.5 border-t px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Rows3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <div>
+                    <label htmlFor="group-student-id-csv" className="text-xs font-medium text-foreground">Mapping file</label>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Uploading replaces the current mapping.</p>
+                  </div>
+                </div>
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed bg-muted/20 px-3 text-sm focus-within:ring-2 focus-within:ring-ring">
+                  <FileUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <input
+                    id="group-student-id-csv"
+                    name="codeforces-mapping-csv"
+                    type="file"
+                    accept=".csv,text/csv"
+                    required
+                    className="min-w-0 flex-1 text-xs file:mr-2 file:border-0 file:bg-transparent file:text-xs file:font-medium"
+                  />
+                </label>
+                <p className="text-[11px] text-muted-foreground">Required columns: username, student_id</p>
+              </div>
+            )}
+          </div>
+
+          <div className="shrink-0 border-t bg-muted/15 p-4">
+            <ContestReportSubmitButton pendingLabel="Saving…" className="min-h-11 w-full rounded-xl active:scale-[0.98] motion-reduce:transform-none">
+              Save mapping
+            </ContestReportSubmitButton>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
