@@ -5,6 +5,7 @@ export type GlobalContestReportSnapshot = {
     roomId: string;
     contestItemId: string | null;
     report: any;
+    sourceSnapshots: Record<string, any>;
     missingContests: any[];
     scoringConfigVersion: number;
     isStale: boolean;
@@ -26,11 +27,15 @@ export function globalContestReportSnapshotFromRow(row: any): GlobalContestRepor
     const report = parseJsonValue(row.snapshot, null)
     if (!report || typeof report !== 'object' || Array.isArray(report)) return null
     const missingContests = parseJsonValue(row.missing_contests, [])
+    const sourceSnapshots = parseJsonValue(row.source_snapshots, {})
     return {
         id: String(row.id),
         roomId: String(row.room_id),
         contestItemId: row.contest_item_id ? String(row.contest_item_id) : null,
         report,
+        sourceSnapshots: sourceSnapshots && typeof sourceSnapshots === 'object' && !Array.isArray(sourceSnapshots)
+            ? sourceSnapshots
+            : {},
         missingContests: Array.isArray(missingContests) ? missingContests : [],
         scoringConfigVersion: Number(row.scoring_config_version || 0),
         isStale: Boolean(row.is_stale),
@@ -44,7 +49,7 @@ export async function loadGlobalContestReportSnapshot(
 ): Promise<GlobalContestReportSnapshot | null> {
     const rows = contestItemId
         ? await sql`
-            SELECT id, room_id, contest_item_id, snapshot, missing_contests,
+            SELECT id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
                    scoring_config_version, is_stale, generated_at
             FROM public.global_contest_report_snapshots
             WHERE room_id = ${roomId}
@@ -52,7 +57,7 @@ export async function loadGlobalContestReportSnapshot(
             LIMIT 1
         `
         : await sql`
-            SELECT id, room_id, contest_item_id, snapshot, missing_contests,
+            SELECT id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
                    scoring_config_version, is_stale, generated_at
             FROM public.global_contest_report_snapshots
             WHERE room_id = ${roomId}
@@ -66,6 +71,7 @@ export async function saveGlobalContestReportSnapshot(input: {
     roomId: string;
     contestItemId: string | null;
     report: any;
+    sourceSnapshots?: Record<string, any>;
     missingContests: any[];
     scoringConfigVersion: number;
     generatedBy: string;
@@ -76,6 +82,7 @@ export async function saveGlobalContestReportSnapshot(input: {
                 room_id,
                 contest_item_id,
                 snapshot,
+                source_snapshots,
                 missing_contests,
                 scoring_config_version,
                 is_stale,
@@ -86,6 +93,7 @@ export async function saveGlobalContestReportSnapshot(input: {
                 ${input.roomId},
                 ${input.contestItemId},
                 ${sql.json(input.report)},
+                ${sql.json(input.sourceSnapshots || {})},
                 ${sql.json(input.missingContests || [])},
                 ${input.scoringConfigVersion},
                 false,
@@ -95,12 +103,13 @@ export async function saveGlobalContestReportSnapshot(input: {
             ON CONFLICT (room_id, contest_item_id) WHERE contest_item_id IS NOT NULL
             DO UPDATE SET
                 snapshot = EXCLUDED.snapshot,
+                source_snapshots = EXCLUDED.source_snapshots,
                 missing_contests = EXCLUDED.missing_contests,
                 scoring_config_version = EXCLUDED.scoring_config_version,
                 is_stale = false,
                 generated_by = EXCLUDED.generated_by,
                 generated_at = now()
-            RETURNING id, room_id, contest_item_id, snapshot, missing_contests,
+            RETURNING id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
                       scoring_config_version, is_stale, generated_at
         `
         : await sql`
@@ -108,6 +117,7 @@ export async function saveGlobalContestReportSnapshot(input: {
                 room_id,
                 contest_item_id,
                 snapshot,
+                source_snapshots,
                 missing_contests,
                 scoring_config_version,
                 is_stale,
@@ -118,6 +128,7 @@ export async function saveGlobalContestReportSnapshot(input: {
                 ${input.roomId},
                 NULL,
                 ${sql.json(input.report)},
+                ${sql.json(input.sourceSnapshots || {})},
                 ${sql.json(input.missingContests || [])},
                 ${input.scoringConfigVersion},
                 false,
@@ -127,12 +138,13 @@ export async function saveGlobalContestReportSnapshot(input: {
             ON CONFLICT (room_id) WHERE contest_item_id IS NULL
             DO UPDATE SET
                 snapshot = EXCLUDED.snapshot,
+                source_snapshots = EXCLUDED.source_snapshots,
                 missing_contests = EXCLUDED.missing_contests,
                 scoring_config_version = EXCLUDED.scoring_config_version,
                 is_stale = false,
                 generated_by = EXCLUDED.generated_by,
                 generated_at = now()
-            RETURNING id, room_id, contest_item_id, snapshot, missing_contests,
+            RETURNING id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
                       scoring_config_version, is_stale, generated_at
         `
     const snapshot = globalContestReportSnapshotFromRow(rows[0])

@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-09-20 - Global contest report per-source refresh fallback
+
+Global contest report snapshots now persist server-only normalized source rank data in `source_snapshots`. A refresh uses live provider data when available and reuses the prior source snapshot independently when that source fails, while retaining the failure diagnostic and blocking publish until all sources are live. The rollout migration is `docs/sql/global-contest-report-source-fallback-20260920.sql`; rollback is the matching `-rollback.sql`. Older snapshots remain readable but cannot provide per-source fallback until a successful post-migration refresh stores source data.
+
 ## 2026-09-19 - Jev-routed Codex subagent orchestration
 
 Repository Codex work now has a project-scoped `jev-subagent-router` skill. The main task remains the orchestrator; a dependency-free helper asks TypeSafe Jev to select one of four user-defined model/reasoning tiers and a `default`, `explorer`, or `worker` role, then returns explicit spawn settings with `fork_turns: "none"`. The same helper can select one recommended option before a multiple-choice user question without choosing for the user. Missing credentials, timeouts, and invalid responses fall back to conservative deterministic routing. The helper, tests, and workflow live under `.agents/skills/jev-subagent-router/`; repository activation is in `AGENTS.md`. A live non-sensitive route and recommendation request succeeded with `jev-1.13.0`; the local key is loaded from the Git-ignored, owner-readable `.env.local`. Review: `docs/reviews/jev-subagent-router-20260919-review.md`.

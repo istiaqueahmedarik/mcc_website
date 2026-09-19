@@ -567,7 +567,11 @@ async function buildGlobalScoredReportSnapshot(
     actorId: string,
     sessions: { vjudge?: string; codeforces?: string },
     configOverride: ContestScoringConfigInput | null = null,
-    options: { contestItemId?: string | null; contestId?: string | null } = {},
+    options: {
+        contestItemId?: string | null;
+        contestId?: string | null;
+        fallbackSourceSnapshots?: Record<string, any>;
+    } = {},
 ) {
     const room = await loadGlobalRoom(roomId)
     if (!room) throw Object.assign(new Error('Contest room not found'), { statusCode: 404 })
@@ -584,6 +588,7 @@ async function buildGlobalScoredReportSnapshot(
     }
 
     const rankDataByItemId = new Map<string, any>()
+    const sourceSnapshots: Record<string, any> = {}
     const missingContests: any[] = []
     const needsSavedCodeforcesHandles = items.some((item: any) => (
         normalizeContestProvider(item.provider) === 'codeforces'
@@ -641,6 +646,34 @@ async function buildGlobalScoredReportSnapshot(
                 : undefined,
         })
         if (fetched.statusCode !== 200 || !Array.isArray(fetched.body?.teams)) {
+            const savedSource = options.fallbackSourceSnapshots?.[String(item.id)]
+            if (savedSource?.rankData && Array.isArray(savedSource.rankData.teams)) {
+                const savedRankData = {
+                    ...savedSource.rankData,
+                    contestInfo: {
+                        ...(savedSource.rankData.contestInfo || {}),
+                        id: buildContestKey(provider, contestId),
+                        provider,
+                        externalContestId: contestId,
+                        title,
+                    },
+                }
+                rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData(savedRankData, demerits, provider))
+                sourceSnapshots[String(item.id)] = savedSource
+                missingContests.push({
+                    id: item.id,
+                    provider,
+                    contestId,
+                    title,
+                    statusCode: fetched.statusCode,
+                    code: fetched.body?.code || null,
+                    fallbackCode: fetched.body?.fallbackCode || null,
+                    error: fetched.body?.message || fetched.body?.error || 'Failed to fetch contest rank',
+                    usedSavedData: true,
+                    savedAt: savedSource.savedAt || null,
+                })
+                continue
+            }
             missingContests.push({
                 id: item.id,
                 provider,
@@ -656,7 +689,7 @@ async function buildGlobalScoredReportSnapshot(
         const identityResolved = provider === 'codeforces'
             ? await resolveGlobalCodeforcesIdentities(item, fetched.body || {})
             : await resolveGlobalVjudgeIdentities(fetched.body || {})
-        rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData({
+        const sourceRankData = {
             ...identityResolved,
             provider,
             contestInfo: {
@@ -666,7 +699,12 @@ async function buildGlobalScoredReportSnapshot(
                 externalContestId: contestId,
                 title,
             },
-        }, demerits, provider))
+        }
+        rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData(sourceRankData, demerits, provider))
+        sourceSnapshots[String(item.id)] = {
+            rankData: sourceRankData,
+            savedAt: new Date().toISOString(),
+        }
     }
 
     if (rankDataByItemId.size === 0) {
@@ -730,6 +768,7 @@ async function buildGlobalScoredReportSnapshot(
         config,
         configVersion: saved.version,
         missingContests,
+        sourceSnapshots,
     }
 }
 
@@ -758,6 +797,7 @@ function generatedReportResponse(
     snapshot: {
         report: any;
         missingContests: any[];
+        sourceSnapshots: Record<string, any>;
         scoringConfigVersion: number;
         isStale: boolean;
         generatedAt: string;
@@ -1304,12 +1344,14 @@ export const generateContestRoomReport = async (c: any) => {
             null,
             {
                 contestItemId,
+                fallbackSourceSnapshots: savedSnapshot?.sourceSnapshots,
             },
         )
         const persisted = await saveGlobalContestReportSnapshot({
             roomId,
             contestItemId,
             report: snapshot.scored,
+            sourceSnapshots: snapshot.sourceSnapshots,
             missingContests: snapshot.missingContests,
             scoringConfigVersion: snapshot.configVersion,
             generatedBy: actor.id,

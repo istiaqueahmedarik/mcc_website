@@ -23,6 +23,9 @@ async function refreshSavedContestReport(formData) {
 function providerFailureMessage(failure) {
   if (!failure) return null;
   const error = String(failure.error || "");
+  if (failure.usedSavedData) {
+    return `Live source unavailable; using saved data${failure.savedAt ? ` from ${new Date(failure.savedAt).toLocaleString()}` : ""}. ${error}`;
+  }
   const credentialsRejected = failure.code === "CODEFORCES_API_CREDENTIALS_INVALID"
     || /incorrect api key|rejected the saved api key/i.test(error);
   if (!credentialsRejected) return error || null;
@@ -99,7 +102,7 @@ async function page({ params, searchParams }) {
       )}
       {Array.isArray(response?.missingContests) && response.missingContests.length > 0 && (
         <div role="alert" className="mx-auto mt-4 max-w-5xl rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-          <p className="font-medium text-foreground">Report generated with missing sources</p>
+          <p className="font-medium text-foreground">Report includes sources that were unavailable during refresh</p>
           <ul className="mt-2 space-y-1 text-muted-foreground">
             {response.missingContests.map((contest) => (
               <li key={contest.id}>
