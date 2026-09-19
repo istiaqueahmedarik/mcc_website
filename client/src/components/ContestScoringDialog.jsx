@@ -801,7 +801,7 @@ export default function ContestScoringDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+      <DialogContent className="flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] min-h-0 w-[calc(100vw-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
         <TooltipProvider delayDuration={180}>
           <DialogHeader className="shrink-0 border-b px-5 py-4">
             <DialogTitle className="flex items-center gap-2 text-lg">

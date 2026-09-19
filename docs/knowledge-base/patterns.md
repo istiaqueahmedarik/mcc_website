@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-09-20 - Public live report index glass lens
+
+The public `/contests_report/live` index keeps its server-side shared-report fetch and `/contests_report/live/[id]` links unchanged while composing the list as a client-side operational broadcast wall. `LiveReportsGallery.jsx` owns one pointer-transparent Three.js lens over semantic report links, caps DPR, renders on demand, disposes GPU resources, and falls back for WebGL failure, reduced transparency, forced colors, high contrast, and reduced motion. Keep the effect scoped to the index; do not copy classroom roster, scoring, or provider authorization behavior into the public list.
+
 ## 2026-09-19 - Keep semantic routing typed and orchestration deterministic
 
 Use one System One request to judge independent routing dimensions against the same compact task state. Return a small typed contract containing tier, role, confidence, and exact spawn settings; keep spawning, waiting, review, and integration in Codex. Send no secrets or unnecessary personal data, read the API key only from the process environment, cap input and timeout, sanitize errors, and retain a deterministic fallback for missing credentials or service failures. For user questions, map opaque Choice keys back to stable option IDs and use confidence only to decide whether to display the recommendation; never auto-answer.

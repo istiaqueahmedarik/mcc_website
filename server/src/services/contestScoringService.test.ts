@@ -160,6 +160,28 @@ describe('buildScoredContestReport', () => {
     expect(report.users[0].scoreTrace.penaltyScoreFormula).toBe('sum(penalty) + sum(demerits)');
   });
 
+  test('applies contest weight to penalty before the final penalty score', () => {
+    const report = buildScoredContestReport({
+      roomId: 'room-1',
+      scope: 'global',
+      sources: [source({
+        itemId: 'item-1',
+        contestKey: 'c101',
+        formulaKey: 'alpha',
+        weight: 2,
+        teams: [team('alice', 3, 30, 40)],
+      })],
+      config: {
+        solvedScoreFormula: 'sum(raw_score)',
+        penaltyScoreFormula: 'sum(penalty)',
+        sortRules: [{ key: 'penalty_score', direction: 'asc' }],
+      },
+    });
+
+    expect(report.users[0].contests.alpha.penalty).toBe(80);
+    expect(report.users[0].penaltyScore).toBe(80);
+  });
+
   test('applies ordered field adjustments before final formulas and traces each change', () => {
     const report = buildScoredContestReport({
       roomId: 'room-1',

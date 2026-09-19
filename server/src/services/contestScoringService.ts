@@ -563,7 +563,7 @@ function sourceMetricForParticipant(source: ContestSourceInput, participant: Par
     : sourceDemerits.reduce((sum, demerit) => sum + numeric(demerit?.demerit_point ?? demerit?.points, 0), 0);
   const weight = numeric(source.weight, 1);
   const solved = matched ? numeric(matched.solvedCount ?? matched.solved, 0) : 0;
-  const penalty = matched ? numeric(matched.penalty, 0) : demeritPoints * 100;
+  const penalty = matched ? numeric(matched.penalty, 0) * weight : demeritPoints * 100;
   const finalScore = matched ? numeric(matched.finalScore, 0) * weight : 0;
   const attended = matched && (
     solved > 0
