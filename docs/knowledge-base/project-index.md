@@ -2,7 +2,7 @@
 
 ## 2026-09-19 - Codeforces group contest sources preserve group identity
 
-The shared Codeforces provider accepts full `/group/<code>/contest/<id>` URLs and persists them as `group:<code>:<id>`. API attempts use both values, while authenticated fallback uses the exact group `groupmates` standings path and problem-link parser prefix. Numeric-only input remains for ordinary contests/Gyms; group contests require the full URL. Review: `docs/reviews/codeforces-group-contest-source-20260919-review.md`.
+The shared Codeforces provider accepts full `/group/<code>/contest/<id>` URLs and persists them as `group:<code>:<id>`. API attempts use both values, while authenticated fallback uses the exact group `groupmates` standings path and problem-link parser prefix. Numeric-only input remains for ordinary contests/Gyms; group contests require the full URL. Codeforces API credentials are verified with a signed, data-discarding `user.friends` request before encryption, and report failures preserve a bounded web-fallback code. Review: `docs/reviews/codeforces-group-contest-source-20260919-review.md`.
 
 ## 2026-09-19 - Global contest reports support VJudge and Codeforces
 
@@ -1249,6 +1249,10 @@ Trainer-only recent activity is rendered by `ContestPerformance.jsx` through the
 2026-09-11 refinement: trainer Performance displays only the first positive window in 24h, 48h, 72h order, with one +x value and its window label. The popover shows that window only; no recent activity uses an em dash.
 
 2026-09-11: Performance hover card matches the trainer dock clear-glass lens through the existing TrainerGlassFilter and a scoped ContestPerformance.module.css. Dense details have an inner text backing; retain opaque unsupported-filter and reduced-transparency/high-contrast fallbacks.
+
+## 2026-09-19 - Global Codeforces MCC identity resolution
+
+Global report Codeforces sources now carry an explicit Public/Gym/Group/EDU type. `codeforcesIdentityService.ts` maps Public/Gym/EDU handles through `users.cf_id`; Group contests use either the numeric suffix after the last `=` or a replaceable `username,student_id` CSV. Mappings persist immutable `users.id` references in `contest_report_codeforces_identity_mappings`. Report rows show MCC full name and student ID, while unresolved identities block publishing. Apply `docs/sql/global-codeforces-identity-resolution-20260919.sql` before the matching code.
 
 ## 2026-09-13 - Trainer action group presentation
 

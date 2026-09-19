@@ -9,6 +9,7 @@ import {
   parseCodeforcesEduStandingsPage,
   parseCodeforcesNumericStandingsPage,
   parseCodeforcesSubmissionPage,
+  validateCodeforcesApiCredentials,
   validateCodeforcesSession,
 } from './codeforcesContestService';
 
@@ -148,6 +149,41 @@ function apiSubmission(
 }
 
 describe('Codeforces web standings sources', () => {
+  test('validates API credentials before they are stored', async () => {
+    const urls: string[] = [];
+    const valid = await validateCodeforcesApiCredentials(
+      { apiKey: 'trainer-key', apiSecret: 'trainer-secret' },
+      {
+        fetchImpl: (async (url: RequestInfo | URL) => {
+          urls.push(String(url));
+          return apiOk([]);
+        }) as any,
+        nowSeconds: () => 1_000,
+        randomPrefix: () => 'abcdef',
+        apiRateLimitMs: 0,
+      },
+    );
+
+    expect(valid.statusCode).toBe(200);
+    expect(new URL(urls[0]).pathname).toBe('/api/user.friends');
+    expect(new URL(urls[0]).searchParams.get('onlyOnline')).toBe('true');
+
+    const invalid = await validateCodeforcesApiCredentials(
+      { apiKey: 'trainer-key', apiSecret: 'trainer-secret' },
+      {
+        fetchImpl: (async () => apiFailed('apiKey: Incorrect API key trainer-key')) as any,
+        nowSeconds: () => 1_000,
+        randomPrefix: () => 'abcdef',
+        apiRateLimitMs: 0,
+      },
+    );
+
+    expect(invalid.statusCode).toBe(422);
+    expect(invalid.body.code).toBe('CODEFORCES_API_CREDENTIALS_INVALID');
+    expect(invalid.body.message).toBe('Codeforces rejected the saved API key or secret.');
+    expect(invalid.body.message).not.toContain('trainer-key');
+  });
+
   test('validates that a JSESSIONID reaches an authenticated Codeforces page', async () => {
     const authenticated = await validateCodeforcesSession('session-token', {
       fetchImpl: (async () => new Response('<a href="/profile/Trainer">Trainer</a>')) as any,
@@ -159,7 +195,9 @@ describe('Codeforces web standings sources', () => {
     expect(normalizeCodeforcesContestSource(
       'https://codeforces.com/edu/course/2/lesson/6/standings?friends=true',
     )).toBe('edu:2:6:friends');
-    expect(parseCodeforcesContestSource('2258')).toEqual({ kind: 'contest', contestId: '2258' });
+    expect(parseCodeforcesContestSource('2258')).toEqual({ kind: 'contest', contestId: '2258', explicit: false });
+    expect(parseCodeforcesContestSource('contest:2258')).toEqual({ kind: 'contest', contestId: '2258', explicit: true });
+    expect(parseCodeforcesContestSource('gym:105001')).toEqual({ kind: 'gym', contestId: '105001' });
     expect(normalizeCodeforcesContestSource(
       'https://codeforces.com/group/SxSYDasIfo/contest/717234',
     )).toBe('group:SxSYDasIfo:717234');
@@ -442,6 +480,33 @@ describe('fetchCodeforcesContestRank', () => {
     ]);
     expect(result.body.providerMeta.apiFallbackCode).toBe('CODEFORCES_CREDENTIALS_MISSING');
     expect(result.body.teams[0].penalty).toBe(37);
+  });
+
+  test('honors an explicit Public type instead of the legacy numeric Gym heuristic', async () => {
+    const urls: string[] = [];
+    const result = await fetchCodeforcesContestRank('contest:708543', undefined, {
+      fetchImpl: (async (url: RequestInfo | URL) => {
+        urls.push(String(url));
+        if (String(url).includes('/api/contest.standings')) return apiFailed();
+        return new Response(numericPage(
+          'contest',
+          '708543',
+          'Hacks',
+          'Hacks',
+          contestHeaders.replaceAll('2258', '708543'),
+          contestAliceRow,
+        ));
+      }) as any,
+      webSession: 'session-token',
+      targetHandles: ['alice'],
+      apiRateLimitMs: 0,
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(urls.map((url) => new URL(url).pathname)).toEqual([
+      '/api/contest.standings',
+      '/contest/708543/standings/friends/true',
+    ]);
   });
 
   test('preserves the group code for authenticated group standings fallback', async () => {

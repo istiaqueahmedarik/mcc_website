@@ -284,12 +284,23 @@ export async function deleteContestRoom(roomId) {
   return await post_with_token("contest-room/delete", { room_id: roomId });
 }
 
-export async function insertContestRoomContest(roomId, contestId, contestName, provider = "vjudge") {
+export async function insertContestRoomContest(roomId, contestId, contestName, provider = "vjudge", options = {}) {
   return await post_with_token("contest-room-contests/insert", {
     room_id: roomId,
     contest_id: contestId,
     name: contestName,
     provider,
+    codeforces_source_type: options.codeforcesSourceType || null,
+    codeforces_group_identity_mode: options.codeforcesGroupIdentityMode || null,
+    mapping_csv: options.mappingCsv || null,
+  });
+}
+
+export async function replaceContestCodeforcesIdentityMapping(contestRoomContestId, mode, mappingCsv = null) {
+  return await post_with_token("contest-room-contests/codeforces-identity-mapping/replace", {
+    contest_room_contest_id: contestRoomContestId,
+    codeforces_group_identity_mode: mode,
+    mapping_csv: mappingCsv,
   });
 }
 

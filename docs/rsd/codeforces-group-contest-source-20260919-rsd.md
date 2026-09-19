@@ -15,6 +15,7 @@ The global report add flow accepted `https://codeforces.com/group/SxSYDasIfo/con
 - Keep ordinary numeric contest/Gym and EDU behavior unchanged.
 - Tell trainers that group contests require their full URL; a numeric ID cannot identify the owning group.
 - Do not change report scoring mathematics or provider-secret handling.
+- Reject invalid Codeforces API credentials before storing them and expose only bounded provider/fallback diagnostics.
 
 ## Design
 
@@ -27,6 +28,7 @@ The global report add flow accepted `https://codeforces.com/group/SxSYDasIfo/con
 ## Verification
 
 - Unit coverage for URL normalization, canonical parsing, group problem columns, and exact fallback URL.
+- Unit coverage for signed credential validation and secret-safe invalid-key errors.
 - Existing Codeforces service and report-scoring suites.
 - Targeted client lint, server production bundle, and diff check.
 

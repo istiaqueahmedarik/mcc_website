@@ -24,7 +24,17 @@ import {
     loadTrainerCodeforcesCredentials,
 } from '../services/trainerCodeforcesCredentialService'
 import { codeforcesApiKeyHint, encryptCodeforcesCredential } from '../utils/codeforcesCredentialCrypto'
-import { validateCodeforcesSession } from '../services/codeforcesContestService'
+import {
+    validateCodeforcesApiCredentials,
+    validateCodeforcesSession,
+} from '../services/codeforcesContestService'
+import {
+    enrichCodeforcesRankIdentities,
+    extractStudentIdFromGroupUsername,
+    normalizeCodeforcesUsername,
+    type CodeforcesGroupIdentityMode,
+    type CodeforcesSourceType,
+} from '../services/codeforcesIdentityService'
 
 function normalizeText(value: unknown, maxLength = 500) {
     return String(value ?? '').trim().slice(0, maxLength)
@@ -287,11 +297,92 @@ async function loadGlobalRoom(roomId: string) {
 
 async function loadGlobalRoomItems(roomId: string) {
     return sql`
-        SELECT id, room_id, provider, contest_id, contest_name, weight, formula_key, merge_group_id, created_at
+        SELECT id, room_id, provider, contest_id, contest_name, weight, formula_key, merge_group_id,
+               codeforces_source_type, codeforces_group_identity_mode, created_at
         FROM public."Contest_room_contests"
         WHERE room_id = ${roomId}
         ORDER BY created_at ASC, id ASC
     `
+}
+
+function codeforcesRankHandles(teams: any[]) {
+    return Array.from(new Set((teams || []).flatMap((team: any) => [
+        ...(Array.isArray(team?.sourceHandles) ? team.sourceHandles : []),
+        team?.username,
+    ]).map(normalizeCodeforcesUsername).filter(Boolean)))
+}
+
+async function resolveGlobalCodeforcesIdentities(item: any, rankData: any) {
+    const teams = Array.isArray(rankData?.teams) ? rankData.teams : []
+    const sourceType = normalizeText(item?.codeforces_source_type, 20) as CodeforcesSourceType
+    const groupIdentityMode = normalizeText(item?.codeforces_group_identity_mode, 40) as CodeforcesGroupIdentityMode
+    const handles = codeforcesRankHandles(teams)
+    let accounts: any[] = []
+    let csvMappings: Array<{ provider_username_normalized: string; account: any }> = []
+
+    if (sourceType === 'group' && groupIdentityMode === 'csv') {
+        const rows = handles.length > 0 ? await sql`
+            SELECT mapping.provider_username_normalized,
+                   account.id,
+                   account.full_name,
+                   account.mist_id,
+                   account.cf_id,
+                   account.profile_pic
+            FROM public.contest_report_codeforces_identity_mappings mapping
+            JOIN public.users account ON account.id = mapping.student_user_id
+            WHERE mapping.contest_item_id = ${String(item.id)}
+              AND mapping.provider_username_normalized = ANY(${handles})
+              AND COALESCE(account.admin, false) = false
+              AND COALESCE(account.trainer, false) = false
+              AND COALESCE(account.is_pre_enrolled, false) = false
+              AND account.mist_id IS NOT NULL
+              AND NULLIF(btrim(account.full_name), '') IS NOT NULL
+        ` : []
+        csvMappings = rows.map((row: any) => ({
+            provider_username_normalized: row.provider_username_normalized,
+            account: row,
+        }))
+        accounts = rows
+    } else if (sourceType === 'group') {
+        const studentIds = Array.from(new Set(teams.flatMap((team: any) => [
+            ...(Array.isArray(team?.sourceHandles) ? team.sourceHandles : []),
+            team?.username,
+        ]).map(extractStudentIdFromGroupUsername).filter(Boolean)))
+        accounts = studentIds.length > 0 ? await sql`
+            SELECT id, full_name, mist_id, cf_id, profile_pic
+            FROM public.users
+            WHERE mist_id::text = ANY(${studentIds})
+              AND COALESCE(admin, false) = false
+              AND COALESCE(trainer, false) = false
+              AND COALESCE(is_pre_enrolled, false) = false
+              AND mist_id IS NOT NULL
+              AND NULLIF(btrim(full_name), '') IS NOT NULL
+        ` : []
+    } else {
+        accounts = handles.length > 0 ? await sql`
+            SELECT id, full_name, mist_id, cf_id, profile_pic
+            FROM public.users
+            WHERE lower(btrim(cf_id)) = ANY(${handles})
+              AND COALESCE(admin, false) = false
+              AND COALESCE(trainer, false) = false
+              AND COALESCE(is_pre_enrolled, false) = false
+              AND mist_id IS NOT NULL
+              AND NULLIF(btrim(full_name), '') IS NOT NULL
+        ` : []
+    }
+
+    const resolved = enrichCodeforcesRankIdentities({
+        teams,
+        sourceType,
+        groupIdentityMode: sourceType === 'group' ? groupIdentityMode : null,
+        accounts,
+        csvMappings,
+    })
+    return {
+        ...rankData,
+        teams: resolved.teams,
+        identityWarnings: resolved.warnings,
+    }
 }
 
 function globalItemsToScoringSources(items: any[], rankDataByItemId: Map<string, any> | null = null): ContestSourceInput[] {
@@ -468,10 +559,42 @@ async function buildGlobalScoredReportSnapshot(
 
     const rankDataByItemId = new Map<string, any>()
     const missingContests: any[] = []
+    const identityWarnings: any[] = []
+    const needsSavedCodeforcesHandles = items.some((item: any) => (
+        normalizeContestProvider(item.provider) === 'codeforces'
+        && normalizeText(item.codeforces_source_type, 20) !== 'group'
+    ))
+    const savedCodeforcesHandleRows = needsSavedCodeforcesHandles ? await sql`
+        SELECT DISTINCT lower(btrim(cf_id)) AS cf_id
+        FROM public.users
+        WHERE NULLIF(btrim(cf_id), '') IS NOT NULL
+          AND mist_id IS NOT NULL
+          AND NULLIF(btrim(full_name), '') IS NOT NULL
+          AND COALESCE(admin, false) = false
+          AND COALESCE(trainer, false) = false
+          AND COALESCE(is_pre_enrolled, false) = false
+    ` : []
+    const savedCodeforcesHandles = savedCodeforcesHandleRows.map((row: any) => String(row.cf_id)).filter(Boolean)
     for (const item of items) {
         const contestId = normalizeText(item.contest_id, 300)
         const provider = normalizeContestProvider(item.provider)
         const title = normalizeText(item.contest_name, 180) || `Contest ${contestId}`
+        if (
+            provider === 'codeforces'
+            && normalizeText(item.codeforces_source_type, 20) !== 'group'
+            && savedCodeforcesHandles.length === 0
+        ) {
+            missingContests.push({
+                id: item.id,
+                provider,
+                contestId,
+                title,
+                statusCode: 422,
+                code: 'MCC_CODEFORCES_HANDLES_MISSING',
+                error: 'No eligible MCC student account has both a saved Codeforces handle and complete name/student ID.',
+            })
+            continue
+        }
         const demerits = provider === 'vjudge'
             ? await sql`
                 SELECT *
@@ -488,6 +611,9 @@ async function buildGlobalScoredReportSnapshot(
             codeforcesCredentialProvider: provider === 'codeforces'
                 ? () => loadTrainerCodeforcesCredentials(actorId)
                 : undefined,
+            codeforcesTargetHandles: provider === 'codeforces' && normalizeText(item.codeforces_source_type, 20) !== 'group'
+                ? savedCodeforcesHandles
+                : undefined,
         })
         if (fetched.statusCode !== 200 || !Array.isArray(fetched.body?.teams)) {
             missingContests.push({
@@ -497,12 +623,24 @@ async function buildGlobalScoredReportSnapshot(
                 title,
                 statusCode: fetched.statusCode,
                 code: fetched.body?.code || null,
+                fallbackCode: fetched.body?.fallbackCode || null,
                 error: fetched.body?.message || fetched.body?.error || 'Failed to fetch contest rank',
             })
             continue
         }
+        const identityResolved = provider === 'codeforces'
+            ? await resolveGlobalCodeforcesIdentities(item, fetched.body || {})
+            : fetched.body || {}
+        if (Array.isArray(identityResolved.identityWarnings)) {
+            identityWarnings.push(...identityResolved.identityWarnings.map((warning: any) => ({
+                ...warning,
+                contestItemId: String(item.id),
+                contestId,
+                contestName: title,
+            })))
+        }
         rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData({
-            ...(fetched.body || {}),
+            ...identityResolved,
             provider,
             contestInfo: {
                 ...(fetched.body?.contestInfo || {}),
@@ -568,6 +706,7 @@ async function buildGlobalScoredReportSnapshot(
         legacyTsc,
         missingContests,
     })
+    ;(scored as any).identityWarnings = identityWarnings
 
     return {
         room,
@@ -576,6 +715,7 @@ async function buildGlobalScoredReportSnapshot(
         config,
         configVersion: saved.version,
         missingContests,
+        identityWarnings,
     }
 }
 
@@ -769,6 +909,15 @@ export const saveContestReportCodeforcesCredentials = async (c: any) => {
         const apiSecret = normalizeText(body?.apiSecret ?? body?.api_secret, 1000)
         if (!apiKey || !apiSecret) {
             return c.json({ error: 'Codeforces API key and secret are required' }, 400)
+        }
+        const validation = await validateCodeforcesApiCredentials({ apiKey, apiSecret })
+        if (validation.statusCode !== 200) {
+            return c.json({
+                error: validation.body?.code === 'CODEFORCES_API_CREDENTIALS_INVALID'
+                    ? 'Codeforces rejected this API key or secret. Copy both values again from Codeforces API settings.'
+                    : 'Codeforces could not verify these API credentials. Try again after confirming Codeforces is available.',
+                code: validation.body?.code || 'CODEFORCES_API_VALIDATION_FAILED',
+            }, validation.body?.code === 'CODEFORCES_API_CREDENTIALS_INVALID' ? 422 : 503)
         }
         const [apiKeyCiphertext, apiSecretCiphertext] = await Promise.all([
             encryptCodeforcesCredential(apiKey),
@@ -1095,6 +1244,7 @@ export const generateContestRoomReport = async (c: any) => {
             success: true,
             merged: snapshot.scored,
             missingContests: snapshot.missingContests,
+            identityWarnings: snapshot.identityWarnings,
         })
     } catch (error: any) {
         console.error('Error generating contest room report:', error)
@@ -1124,6 +1274,12 @@ export const publishContestRoomReport = async (c: any) => {
             return c.json({
                 error: 'All contest sources must be available before publishing this report',
                 missingContests: snapshot.missingContests,
+            }, 409)
+        }
+        if (snapshot.identityWarnings.length > 0) {
+            return c.json({
+                error: 'Resolve every Codeforces participant to an MCC account before publishing this report',
+                identityWarnings: snapshot.identityWarnings,
             }, 409)
         }
         const jsonString = JSON.stringify(snapshot.scored)
@@ -1170,6 +1326,7 @@ export const publishContestRoomReport = async (c: any) => {
             report: result[0] || null,
             merged: snapshot.scored,
             missingContests: snapshot.missingContests,
+            identityWarnings: snapshot.identityWarnings,
         })
     } catch (error: any) {
         console.error('Error publishing contest room report:', error)

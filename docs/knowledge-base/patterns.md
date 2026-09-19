@@ -4,6 +4,8 @@
 
 Provider source identifiers must retain every component required to reconstruct an authorized fixed-origin route. For Codeforces group contests, canonicalize a full URL to `group:<group-code>:<contest-id>`; use both values in API attempts and the group `groupmates` route and problem-link validation. Never collapse a group URL to its numeric ID or infer a group from a high contest number.
 
+Validate user-supplied API credentials with the narrowest authenticated provider call before encrypting them. Discard returned provider data, retain only configured metadata, and map rejected credentials to a stable internal code. If report generation tries an independent web-session fallback, carry its bounded failure code alongside the primary signed-API error so the UI can explain both recovery paths.
+
 ## 2026-09-19 - Transfer provider adapters without transferring scoring logic
 
 Source:
@@ -1061,3 +1063,7 @@ Attach additive activity summaries by the existing mapped participant identity a
 Reuse `TrainerActionGroup` for adjacent trainer buttons, keeping native children and their handlers. The group returns the original div outside `TrainerVisualProvider`. Mount per-group WebGL only while hovered/focused, dispose on exit, and measure both coordinates for wrapping. Keep action hover separate from persistent selection. Inline upstream animated icons must use span wrappers, inherit the parent's target, and respect reduced motion.
 
 For classroom disclosures, keep the existing semantic trigger and state owner, then wrap content in `AnimatedCollapsibleContent`. The shared component animates height, opacity, and vertical position with `initial={false}` so an initially open panel does not animate on page load, and removes duration for reduced motion.
+
+## 2026-09-19 - Provider aliases to immutable MCC identity
+
+Resolve provider-visible aliases before shared scoring. Keep the original provider handle in `sourceHandles`, but assign matched rows `identityKey=student:<users.id>` and attach the current MCC profile projection for display. Match only eligible student accounts and require exactly one result. For user-maintained alias files, validate bounded CSV on the server, resolve student IDs to immutable user IDs, and atomically replace normalized mappings without retaining the uploaded file.

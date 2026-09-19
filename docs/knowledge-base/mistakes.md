@@ -2,6 +2,8 @@
 
 The global contest add flow accepted a Codeforces group URL but normalized it to only the numeric contest ID. Because high numeric IDs are otherwise treated as Gyms, fetch fallback requested `/gym/717234/...` instead of `/group/SxSYDasIfo/contest/717234/...`. Preserve compound provider identity and regression-test the exact fallback path.
 
+The subsequent screenshot was not the same source bug: a read-only query showed the canonical group source was present. Codeforces rejected the stored API key, while the UI rendered the raw provider comment and omitted the JSESSIONID fallback code. Validate credentials before storage and translate both bounded failures into actionable, secret-safe guidance.
+
 ## 2026-09-11 - EDU Hacks Column Was Treated As A Problem
 
 Source:
@@ -486,3 +488,11 @@ Codeforces EDU standings parsing interpolated a provider-controlled problem labe
 
 Prevention:
 Use literal string prefix handling for provider-controlled labels. If a dynamic regular expression is genuinely required, escape every interpolated value and cover metacharacter input in a regression test.
+
+## 2026-09-19 - Numeric Codeforces IDs cannot express the selected source route
+
+Incident:
+A numeric Codeforces ID was historically classified as Gym when it was at least 100000. That heuristic cannot distinguish an explicitly selected Public contest and loses Group ownership entirely.
+
+Prevention:
+Persist the trainer-selected source type. Use `contest:<id>`, `gym:<id>`, `group:<code>:<id>`, or `edu:...` for new global report items while retaining bare numeric sources only as a compatibility path.

@@ -4,6 +4,8 @@
 
 Codeforces group contests must be stored from a full fixed-origin `/group/<alphanumeric-code>/contest/<numeric-id>` source. Build crawl and parser prefixes from both validated values. Numeric IDs alone may address ordinary contests/Gyms but must never be guessed into a group route. Provider sessions and group membership remain authorization requirements.
 
+Do not persist a Codeforces API key/secret until a signed provider validation succeeds. Never return the key, secret, signature, signed URL, validation payload, or raw provider response. Report failures may return the stable API error code plus one bounded web-fallback code; user-facing copy must translate these into separate credential/session actions.
+
 ## 2026-09-19 - Provider-aware reports must fail visibly and publish completely
 
 Mixed-provider report generation may return a preview when at least one source succeeds, but the UI must list every missing source with provider-specific guidance. Publication must reject the report while any configured source is missing. Provider/external-ID pairs, provider-prefixed report keys, and stored item IDs must be used consistently so equal numeric IDs across VJudge and Codeforces cannot overwrite, select, or publish the wrong contest. Provider sessions remain transient HTTP-only cookies; API secrets remain encrypted server-side and never enter report payloads or logs.
@@ -968,3 +970,7 @@ When adding a shader hover lens, remove competing button hover paint/shadow/move
 Keep the rounded action-group boundary in a separate pointer-transparent layer above the shader. Do not rely on the host border because the active WebGL state intentionally makes that border transparent.
 
 If an action group must be shadowless, override every inherited shell state and decorative lens layer; removing only the resting shadow allows it to return when WebGL becomes active.
+
+## 2026-09-19 - Contest identity resolution must fail closed
+
+Do not merge a provider participant into an MCC account from a non-unique handle or student ID. Multi-member provider teams that resolve to more than one MCC student remain unresolved. Surface bounded warnings and prevent authoritative report publication until every Codeforces row has exactly one eligible MCC identity. Provider aliases are audit data; immutable `users.id` is the aggregation key.

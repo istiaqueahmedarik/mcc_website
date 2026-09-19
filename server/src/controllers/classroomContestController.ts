@@ -14,6 +14,7 @@ import {
   importCodeforcesEduStandingsHtml,
   normalizeCodeforcesContestSource,
   parseCodeforcesContestSource,
+  validateCodeforcesApiCredentials,
   validateCodeforcesSession,
 } from '../services/codeforcesContestService';
 import { ENROLLMENT_ACTIVE, ensurePreEnrollmentSchema } from '../utils/classroomPreEnrollment';
@@ -764,6 +765,17 @@ export const saveClassroomCodeforcesCredentials = async (c: any) => {
         code: 'CODEFORCES_CREDENTIALS_REQUIRED',
         error: 'Codeforces API key and secret are required.',
       }, 400);
+    }
+
+    const validation = await validateCodeforcesApiCredentials({ apiKey, apiSecret });
+    if (validation.statusCode !== 200) {
+      return c.json({
+        status: 'error',
+        code: validation.body?.code || 'CODEFORCES_API_VALIDATION_FAILED',
+        error: validation.body?.code === 'CODEFORCES_API_CREDENTIALS_INVALID'
+          ? 'Codeforces rejected this API key or secret. Copy both values again from Codeforces API settings.'
+          : 'Codeforces could not verify these API credentials. Try again after confirming Codeforces is available.',
+      }, validation.body?.code === 'CODEFORCES_API_CREDENTIALS_INVALID' ? 422 : 503);
     }
 
     const [apiKeyCiphertext, apiSecretCiphertext] = await Promise.all([

@@ -1170,3 +1170,7 @@ The user then expanded the reference radius to other trainer classroom surfaces.
 The user requested heroicons-animated throughout the trainer classroom and dock-style shader lenses for grouped action rows, explicitly including Refresh / Generate report / Share. Thirty action rows share `TrainerActionGroup`; the trainer context preserves original student presentation. Old grouped-button hover backgrounds, shadows and movement are suppressed so the lens is the sole hover surface. Source and verification: `docs/reviews/trainer-classroom-action-lenses-20260913-review.md`.
 
 Follow-up: grouped action shells retain the persistent rounded rim but use no shadow layer. Trainer classroom disclosures, including Contest sources, share the requested shadcn-animated height/fade/vertical transition with reduced-motion handling.
+
+## 2026-09-19 - Global Codeforces participant identity
+
+Global Codeforces report configuration records an explicit Public, Gym, Group, or EDU source type. Public/Gym/EDU participants resolve through the Codeforces handle saved on an eligible MCC account. Group participants use either the numeric suffix after the last `=` or a replaceable `username,student_id` CSV. Any external alias resolves to immutable `users.id` before shared scoring; the alias remains provider/audit metadata. Missing, duplicate, ambiguous, or multi-student matches remain unresolved and prevent publication. The uploaded CSV is never retained. Source: `docs/rsd/global-codeforces-identity-resolution-20260919-rsd.md`.

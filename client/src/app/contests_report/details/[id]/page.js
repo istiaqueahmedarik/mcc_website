@@ -5,7 +5,18 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { PlusCircle, FileText, KeyRound, Scale } from "lucide-react";
+import {
+  Calculator,
+  ChevronDown,
+  CircleCheck,
+  FileText,
+  Globe2,
+  KeyRound,
+  LockKeyhole,
+  PlusCircle,
+  Scale,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -13,6 +24,7 @@ import {
   getContestRoomScoring,
   getContestReportCodeforcesCredentials,
   insertContestRoomContest,
+  replaceContestCodeforcesIdentityMapping,
   clearContestReportCodeforcesCredentials,
   clearContestReportProviderSession,
   saveContestReportCodeforcesCredentials,
@@ -28,22 +40,40 @@ import DeleteContestButton from "@/components/DeleteContestButton";
 import ContestScoringDialog from "@/components/ContestScoringDialog";
 import ContestMergeOverview from "@/components/ContestMergeOverview";
 import ContestReportSubmitButton from "@/components/ContestReportSubmitButton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import GlobalContestSourceForm, { CodeforcesGroupMappingForm } from "@/components/GlobalContestSourceForm";
+
+async function readMappingCsv(formData, required) {
+  const file = formData.get("codeforces-mapping-csv");
+  if (!file || typeof file.text !== "function" || file.size === 0) {
+    if (required) throw new Error("Choose a CSV containing username and student_id columns");
+    return null;
+  }
+  if (file.size > 512 * 1024) throw new Error("The mapping CSV must be 512 KiB or smaller");
+  return file.text();
+}
 
 async function handleAddContest(formData, paramsBox) {
   "use server";
   const contestId = formData.get("contest-id");
   const contestName = formData.get("contest-name");
   const provider = formData.get("provider");
+  const codeforcesSourceType = provider === "codeforces" ? formData.get("codeforces-source-type") : null;
+  const codeforcesGroupIdentityMode = codeforcesSourceType === "group"
+    ? formData.get("codeforces-group-identity-mode")
+    : null;
   const roomId = paramsBox;
 
-  const res = await insertContestRoomContest(roomId, contestId, contestName, provider);
+  let mappingCsv = null;
+  try {
+    mappingCsv = await readMappingCsv(formData, codeforcesGroupIdentityMode === "csv");
+  } catch (error) {
+    redirect(`/error/${encodeURIComponent(error?.message || "The mapping CSV is invalid")}`);
+  }
+  const res = await insertContestRoomContest(roomId, contestId, contestName, provider, {
+    codeforcesSourceType,
+    codeforcesGroupIdentityMode,
+    mappingCsv,
+  });
   if (res && (res.status === "success" || res.success)) {
     redirect(`/contests_report/details/${roomId}`);
   } else {
@@ -52,6 +82,22 @@ async function handleAddContest(formData, paramsBox) {
     );
     redirect(`/error/${msg}`);
   }
+}
+
+async function handleReplaceCodeforcesIdentityMapping(formData, roomId, contestItemId) {
+  "use server";
+  const mode = formData.get("codeforces-group-identity-mode");
+  let mappingCsv = null;
+  try {
+    mappingCsv = await readMappingCsv(formData, mode === "csv");
+  } catch (error) {
+    redirect(`/error/${encodeURIComponent(error?.message || "The mapping CSV is invalid")}`);
+  }
+  const result = await replaceContestCodeforcesIdentityMapping(contestItemId, mode, mappingCsv);
+  if (!result?.success) {
+    redirect(`/error/${encodeURIComponent(result?.error || "Failed to save the group identity mapping")}`);
+  }
+  redirect(`/contests_report/details/${roomId}?identityMapping=updated`);
 }
 
 async function handleProviderSession(formData, roomId) {
@@ -140,6 +186,8 @@ async function page({ params, searchParams }) {
   const codeforcesCredential = codeforcesCredentialRes?.credential || { configured: false };
   const scoringRes = await getContestRoomScoring(id);
   const scoringConfig = scoringRes?.config || null;
+  const roomName = roomMeta?.["Room Name"] || "Contest room";
+  const reportBlocked = needsVjudge && !vjudgeConnected;
   /**
        * {
     result: [
@@ -162,11 +210,11 @@ async function page({ params, searchParams }) {
   return (
     <div className="container mx-auto px-4 py-8">
       <header className="mb-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Your Room</h1>
-            <p className="text-muted-foreground mt-1">
-              Add and find report on contests
+            <h1 className="text-3xl font-bold tracking-tight text-foreground text-balance">{roomName}</h1>
+            <p className="mt-1 text-muted-foreground text-pretty">
+              Manage contest sources, provider access, and report generation.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold tracking-wide text-foreground">
@@ -174,7 +222,7 @@ async function page({ params, searchParams }) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               asChild
               className="bg-primary hover:bg-primary/90 rounded-full px-6"
@@ -204,184 +252,275 @@ async function page({ params, searchParams }) {
         </div>
       )}
 
-      {(needsVjudge || needsCodeforces) && (
-        <section id="provider-access" className="mb-6 scroll-mt-6 rounded-2xl border bg-card p-5 sm:p-6">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">Provider access</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Connect only the providers used by this room. Sessions stay in HTTP-only cookies for 12 hours.
+      <section id="provider-access" className="mb-6 scroll-mt-6 overflow-hidden rounded-2xl border bg-card">
+        {(needsVjudge || needsCodeforces) && (
+          <>
+            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+              <div className="max-w-2xl">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-primary">
+                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                  Access readiness
+                </div>
+                <h2 className="text-xl font-semibold tracking-tight text-balance">Connect only what this report needs</h2>
+                <p className="mt-1.5 text-sm leading-6 text-muted-foreground text-pretty">
+                  Public data is tried first. Private provider sessions stay in HTTP-only cookies for 12 hours.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2" aria-label="Providers used by this room">
+                {needsVjudge && (
+                  <Badge variant={vjudgeConnected ? "secondary" : "outline"} className="gap-1.5">
+                    {vjudgeConnected && <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />}
+                    VJudge
+                  </Badge>
+                )}
+                {needsCodeforces && (
+                  <Badge variant="secondary" className="gap-1.5">
+                    <CircleCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                    Codeforces public API
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="px-5 pb-5 sm:px-6 sm:pb-6">
+              {searchParamsBox?.access && (
+                <p role="status" className="mb-4 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-300">
+                  Provider access updated.
+                </p>
+              )}
+              {searchParamsBox?.accessError && (
+                <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                  {searchParamsBox.accessError}
+                </p>
+              )}
+              {needsCodeforces && codeforcesCredentialRes?.error && !searchParamsBox?.accessError && (
+                <p role="alert" className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+                  {codeforcesCredentialRes.error}
+                </p>
+              )}
+
+              <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                {needsVjudge && (
+                  <article className="rounded-xl border bg-muted/15 p-4 sm:p-5">
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="flex min-w-0 gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-foreground ring-1 ring-border">
+                          <KeyRound className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div>
+                          <h3 className="font-semibold">VJudge session</h3>
+                          <p className="mt-1 text-sm leading-5 text-muted-foreground text-pretty">
+                            Required for the VJudge contests in this room. Paste the session ID, never your password.
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={vjudgeConnected ? "secondary" : "outline"} className="w-fit shrink-0">
+                        {vjudgeConnected ? "Connected" : "Required"}
+                      </Badge>
+                    </div>
+                    <form action={async (formData) => {
+                      "use server";
+                      await handleProviderSession(formData, id);
+                    }} className="space-y-3">
+                      <input type="hidden" name="provider" value="vjudge" />
+                      <div className="space-y-2">
+                        <label htmlFor="vjudge-session" className="text-sm font-medium">JSESSIONID</label>
+                        <Input id="vjudge-session" name="session" type="password" autoComplete="off" placeholder="Paste JSESSIONID" required />
+                      </div>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {vjudgeConnected && (
+                          <Button formAction={async (formData) => {
+                            "use server";
+                            await handleClearProviderSession(formData, id);
+                          }} type="submit" formNoValidate variant="ghost" className="min-h-11">Clear</Button>
+                        )}
+                        <ContestReportSubmitButton pendingLabel="Connecting…" className="min-h-11 active:scale-[0.98] motion-reduce:transform-none">
+                          <KeyRound className="mr-2 h-4 w-4" />Connect VJudge
+                        </ContestReportSubmitButton>
+                      </div>
+                    </form>
+                  </article>
+                )}
+
+                {needsCodeforces && (
+                  <article className="rounded-xl border bg-muted/15 p-4 sm:p-5">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="flex min-w-0 gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-background text-foreground ring-1 ring-border">
+                          <Globe2 className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div>
+                          <h3 className="font-semibold">Codeforces access chain</h3>
+                          <p className="mt-1 text-sm leading-5 text-muted-foreground text-pretty">
+                            The public API runs first. Add a fallback only for private Gym, EDU, or blocked access.
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="w-fit shrink-0">Public ready</Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 rounded-lg bg-background/70 px-3 py-3 ring-1 ring-border/70">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                          <CircleCheck className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">Anonymous API</p>
+                          <p className="text-xs text-muted-foreground">Always attempted first. No setup needed.</p>
+                        </div>
+                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Ready</span>
+                      </div>
+
+                      <details className="group rounded-lg bg-background/70 ring-1 ring-border/70" open={!codeforcesCredential.configured}>
+                        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                            <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">Signed API retry</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {codeforcesCredential.configured
+                                ? `Encrypted key ${codeforcesCredential.apiKeyHint || "••••"} is saved.`
+                                : "For private contests when public access fails."}
+                            </span>
+                          </span>
+                          <Badge variant={codeforcesCredential.configured ? "secondary" : "outline"} className="hidden shrink-0 sm:inline-flex">
+                            {codeforcesCredential.configured ? "Configured" : "Optional"}
+                          </Badge>
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                        </summary>
+                        <form action={async (formData) => {
+                          "use server";
+                          await handleCodeforcesCredentials(formData, id);
+                        }} className="space-y-3 border-t border-border/70 p-3">
+                          <a
+                            href="https://codeforces.com/settings/api"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex text-xs font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                          >
+                            Open Codeforces API settings
+                          </a>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <label htmlFor="codeforces-api-key" className="text-sm font-medium">API key</label>
+                              <Input id="codeforces-api-key" name="api-key" autoComplete="off" required />
+                            </div>
+                            <div className="space-y-2">
+                              <label htmlFor="codeforces-api-secret" className="text-sm font-medium">API secret</label>
+                              <Input id="codeforces-api-secret" name="api-secret" type="password" autoComplete="off" required />
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {codeforcesCredential.configured && (
+                              <Button formAction={async () => {
+                                "use server";
+                                await handleClearCodeforcesCredentials(id);
+                              }} type="submit" formNoValidate variant="ghost" className="min-h-11">Clear key</Button>
+                            )}
+                            <ContestReportSubmitButton pendingLabel="Saving…" className="min-h-11 active:scale-[0.98] motion-reduce:transform-none">
+                              Save encrypted credentials
+                            </ContestReportSubmitButton>
+                          </div>
+                        </form>
+                      </details>
+
+                      <details className="group rounded-lg bg-background/70 ring-1 ring-border/70">
+                        <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-details-marker]:hidden">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                            <KeyRound className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">Web session fallback</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {codeforcesConnected ? "Connected for authenticated crawling." : "Used for EDU and blocked web access."}
+                            </span>
+                          </span>
+                          <Badge variant={codeforcesConnected ? "secondary" : "outline"} className="hidden shrink-0 sm:inline-flex">
+                            {codeforcesConnected ? "Connected" : "Optional"}
+                          </Badge>
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                        </summary>
+                        <form action={async (formData) => {
+                          "use server";
+                          await handleProviderSession(formData, id);
+                        }} className="space-y-3 border-t border-border/70 p-3">
+                          <input type="hidden" name="provider" value="codeforces" />
+                          <div className="space-y-2">
+                            <label htmlFor="codeforces-session" className="text-sm font-medium">Codeforces JSESSIONID</label>
+                            <Input id="codeforces-session" name="session" type="password" autoComplete="off" placeholder="Paste JSESSIONID" required />
+                          </div>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {codeforcesConnected && (
+                              <Button formAction={async (formData) => {
+                                "use server";
+                                await handleClearProviderSession(formData, id);
+                              }} type="submit" formNoValidate variant="ghost" className="min-h-11">Clear</Button>
+                            )}
+                            <ContestReportSubmitButton pendingLabel="Connecting…" className="min-h-11 active:scale-[0.98] motion-reduce:transform-none">
+                              <KeyRound className="mr-2 h-4 w-4" />Connect Codeforces
+                            </ContestReportSubmitButton>
+                          </div>
+                        </form>
+                      </details>
+                    </div>
+                  </article>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className={`flex flex-col gap-3 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 ${(needsVjudge || needsCodeforces) ? "border-t" : ""}`}>
+          <div className="flex min-w-0 items-center gap-3 px-1">
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${reportBlocked ? "bg-amber-500/10 text-amber-700 dark:text-amber-300" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"}`}>
+              {reportBlocked ? <KeyRound className="h-4 w-4" aria-hidden="true" /> : <CircleCheck className="h-4 w-4" aria-hidden="true" />}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{reportBlocked ? "One connection needed" : "Ready to generate"}</p>
+              <p className="text-xs text-muted-foreground">
+                {reportBlocked ? "Connect VJudge to unlock the full report." : `${contests.length} contest${contests.length === 1 ? "" : "s"} will be included.`}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {needsVjudge && <Badge variant="outline">VJudge</Badge>}
-              {needsCodeforces && <Badge variant="outline">Codeforces</Badge>}
-            </div>
           </div>
-
-          {searchParamsBox?.access && (
-            <p role="status" className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
-              Provider access updated.
-            </p>
-          )}
-          {searchParamsBox?.accessError && (
-            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {searchParamsBox.accessError}
-            </p>
-          )}
-          {needsCodeforces && codeforcesCredentialRes?.error && !searchParamsBox?.accessError && (
-            <p role="alert" className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {codeforcesCredentialRes.error}
-            </p>
-          )}
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            {needsVjudge && (
-              <div className="rounded-xl border bg-muted/20 p-4">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-medium">VJudge session</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Required for VJudge reports. Paste JSESSIONID; MCC does not collect your VJudge password here.
-                    </p>
-                  </div>
-                  <Badge variant={vjudgeConnected ? "secondary" : "outline"}>
-                    {vjudgeConnected ? "Connected" : "Required"}
-                  </Badge>
-                </div>
-                <form action={async (formData) => {
-                  "use server";
-                  await handleProviderSession(formData, id);
-                }} className="space-y-3">
-                  <input type="hidden" name="provider" value="vjudge" />
-                  <label htmlFor="vjudge-session" className="text-sm font-medium">JSESSIONID</label>
-                  <Input id="vjudge-session" name="session" type="password" autoComplete="off" placeholder="JSESSIONID=…" required />
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {vjudgeConnected && (
-                      <Button formAction={async (formData) => {
-                        "use server";
-                        await handleClearProviderSession(formData, id);
-                      }} type="submit" formNoValidate variant="outline" className="min-h-11">Clear</Button>
-                    )}
-                    <ContestReportSubmitButton pendingLabel="Connecting…" className="min-h-11">
-                      <KeyRound className="mr-2 h-4 w-4" />Connect VJudge
-                    </ContestReportSubmitButton>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            {needsCodeforces && (
-              <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-medium">Codeforces access</h3>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Public contests use the API anonymously first. Signed API credentials and JSESSIONID are fallbacks for private Gym, EDU, or blocked access.
-                    </p>
-                  </div>
-                  <Badge variant={codeforcesCredential.configured || codeforcesConnected ? "secondary" : "outline"}>
-                    {codeforcesCredential.configured || codeforcesConnected ? "Configured" : "Optional"}
-                  </Badge>
-                </div>
-
-                <form action={async (formData) => {
-                  "use server";
-                  await handleCodeforcesCredentials(formData, id);
-                }} className="space-y-3 rounded-lg border bg-background/70 p-3">
-                  <div>
-                    <p className="text-sm font-medium">Signed API retry</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {codeforcesCredential.configured
-                        ? `Encrypted key ${codeforcesCredential.apiKeyHint || "••••"} is saved.`
-                        : "Used only after the anonymous API cannot access the contest."}
-                    </p>
-                    <a
-                      href="https://codeforces.com/settings/api"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 inline-flex text-xs font-medium text-foreground underline underline-offset-2"
-                    >
-                      Open Codeforces API settings
-                    </a>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label htmlFor="codeforces-api-key" className="text-sm font-medium">API key</label>
-                      <Input id="codeforces-api-key" name="api-key" autoComplete="off" required />
-                    </div>
-                    <div className="space-y-2">
-                      <label htmlFor="codeforces-api-secret" className="text-sm font-medium">API secret</label>
-                      <Input id="codeforces-api-secret" name="api-secret" type="password" autoComplete="off" required />
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {codeforcesCredential.configured && (
-                      <Button formAction={async () => {
-                        "use server";
-                        await handleClearCodeforcesCredentials(id);
-                      }} type="submit" formNoValidate variant="outline" className="min-h-11">Clear key</Button>
-                    )}
-                    <ContestReportSubmitButton pendingLabel="Saving…" className="min-h-11">
-                      Save encrypted credentials
-                    </ContestReportSubmitButton>
-                  </div>
-                </form>
-
-                <form action={async (formData) => {
-                  "use server";
-                  await handleProviderSession(formData, id);
-                }} className="space-y-3 rounded-lg border bg-background/70 p-3">
-                  <input type="hidden" name="provider" value="codeforces" />
-                  <div>
-                    <label htmlFor="codeforces-session" className="text-sm font-medium">Web JSESSIONID</label>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {codeforcesConnected ? "Connected for crawl fallback." : "Optional for public API standings; needed for EDU and web fallback."}
-                    </p>
-                  </div>
-                  <Input id="codeforces-session" name="session" type="password" autoComplete="off" placeholder="JSESSIONID=…" required />
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {codeforcesConnected && (
-                      <Button formAction={async (formData) => {
-                        "use server";
-                        await handleClearProviderSession(formData, id);
-                      }} type="submit" formNoValidate variant="outline" className="min-h-11">Clear</Button>
-                    )}
-                    <ContestReportSubmitButton pendingLabel="Connecting…" className="min-h-11">
-                      <KeyRound className="mr-2 h-4 w-4" />Connect Codeforces
-                    </ContestReportSubmitButton>
-                  </div>
-                </form>
-              </div>
-            )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <ContestScoringDialog
+              apiBasePath={`contest-room/${paramsBox.id}`}
+              contests={res.result || []}
+              roomName={roomName}
+              trigger={(
+                <Button variant="outline" size="sm" className="min-h-11 rounded-lg px-4 active:scale-[0.98] motion-reduce:transform-none">
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Scoring &amp; Merge
+                </Button>
+              )}
+            />
+            <Button size="sm" className="min-h-11 rounded-lg px-5 active:scale-[0.98] motion-reduce:transform-none" asChild>
+              <Link
+                href={reportBlocked
+                  ? "#provider-access"
+                  : `/contests_report/details/${paramsBox.id}/generate_report`}
+                className="flex items-center justify-center"
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {reportBlocked ? "Connect VJudge" : "Generate Full Report"}
+              </Link>
+            </Button>
           </div>
-        </section>
-      )}
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <Button variant="secondary" size="sm" className="min-h-11 rounded-lg sm:flex-1" asChild>
-          <Link
-            href={needsVjudge && !vjudgeConnected
-              ? "#provider-access"
-              : `/contests_report/details/${paramsBox.id}/generate_report`}
-            className="flex items-center justify-center"
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            {needsVjudge && !vjudgeConnected ? "Connect VJudge to generate" : "Generate Full Report"}
-          </Link>
-        </Button>
-        <ContestScoringDialog
-          apiBasePath={`contest-room/${paramsBox.id}`}
-          contests={res.result || []}
-          roomName={roomMeta?.["Room Name"] || "Contest room"}
-        />
-      </div>
+        </div>
+      </section>
 
       <ContestMergeOverview
         className="mb-6"
         contests={res.result || []}
         groups={scoringConfig?.groups || []}
       />
+
+      {searchParamsBox?.identityMapping && (
+        <p role="status" className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-300">
+          Codeforces group identity rule updated.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {res.result && res.result.length > 0 ? (
@@ -416,6 +555,13 @@ async function page({ params, searchParams }) {
                       {contest.id.substring(0, 8)}...
                     </span>
 
+                    {contest.provider === "codeforces" && (
+                      <>
+                        <span className="font-medium text-muted-foreground">Source</span>
+                        <span className="text-right capitalize">{contest.codeforces_source_type || "Public"}</span>
+                      </>
+                    )}
+
                     <span className="font-medium text-muted-foreground">
                       Created
                     </span>
@@ -443,6 +589,16 @@ async function page({ params, searchParams }) {
               <Separator className="mx-6 bg-border dark:bg-border" />
 
               <CardFooter className="flex flex-col gap-4 pt-4 pb-6 px-6">
+                {contest.provider === "codeforces" && contest.codeforces_source_type === "group" && (
+                  <CodeforcesGroupMappingForm
+                    currentMode={contest.codeforces_group_identity_mode}
+                    mappingCount={contest.codeforces_mapping_count}
+                    action={async (formData) => {
+                      "use server";
+                      await handleReplaceCodeforcesIdentityMapping(formData, paramsBox.id, contest.id);
+                    }}
+                  />
+                )}
                 <div className="flex w-full gap-3">
                   <DeleteContestButton
                     contestRoomContestId={contest.id}
@@ -547,79 +703,10 @@ async function Modal({ paramsBox }) {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <div className="flex w-full flex-1 flex-col items-center justify-center p-8 md:w-1/2">
-        <form
-          action={async (formData) => {
-            "use server";
-            await handleAddContest(formData, paramsBox);
-          }}
-          className="mx-auto w-full max-w-md space-y-6"
-        >
-          <div className="space-y-2 text-center">
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-              Add New Contest
-            </h1>
-            <p className="text-muted-foreground">
-              Choose the provider, then enter its contest ID or supported Codeforces URL.
-            </p>
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="contest-provider"
-                className="text-sm font-medium leading-none"
-              >
-                Provider
-              </label>
-              <Select name="provider" defaultValue="vjudge" required>
-                <SelectTrigger id="contest-provider" className="min-h-11">
-                  <SelectValue placeholder="Choose provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vjudge">VJudge</SelectItem>
-                  <SelectItem value="codeforces">Codeforces</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="contest-id"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Contest Id
-              </label>
-              <Input
-                id="contest-id"
-                name="contest-id"
-                placeholder="Numeric ID or full Codeforces group/EDU URL"
-                className="min-h-11 w-full"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                VJudge uses a numeric ID. Codeforces accepts a numeric contest/Gym ID. Group contests require the full URL so the group code is preserved; EDU accepts its standings URL.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="contest-name"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Contest Name
-              </label>
-              <Input
-                id="contest-name"
-                name="contest-name"
-                placeholder="Enter Contest Name..."
-                className="min-h-11 w-full"
-                required
-              />
-            </div>
-
-            <ContestReportSubmitButton pendingLabel="Adding…" className="min-h-11 w-full rounded-md">
-              Add Contest
-            </ContestReportSubmitButton>
-          </div>
-        </form>
+        <GlobalContestSourceForm action={async (formData) => {
+          "use server";
+          await handleAddContest(formData, paramsBox);
+        }} />
       </div>
       <div className="relative hidden w-full md:block md:w-1/2">
         <div className="absolute inset-0">

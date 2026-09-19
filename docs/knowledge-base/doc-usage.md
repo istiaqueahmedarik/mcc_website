@@ -7,7 +7,7 @@ Source:
 - `docs/reviews/codeforces-group-contest-source-20260919-review.md`
 
 Fact:
-This fix used the provider/report knowledge base, current shared Codeforces adapter, a safe anonymous Codeforces API probe, and Context7 Next.js 16.1.1 form guidance. The supplied group URL was inaccessible to unauthenticated web tooling and returned a Cloudflare challenge; no session credential was replayed.
+This fix used the provider/report knowledge base, current shared Codeforces adapter, a safe anonymous Codeforces API probe, Context7 Next.js 16.1.1 form guidance, the Supabase safety checklist/changelog, and a read-only source query. The supplied group URL was inaccessible to unauthenticated web tooling and returned a Cloudflare challenge; no API secret or session credential was read or replayed. The follow-up screenshot established a rejected saved API key, so credential saves now validate before encryption and report errors retain only bounded fallback diagnostics.
 
 Applies when:
 Adding or fetching Codeforces group contests in classroom or global report surfaces.
@@ -503,6 +503,18 @@ This task used `AGENTS.md`, the contest-scoring knowledge base and prior score-p
 
 Applies when:
 Auditing why adjustments use ordered immutable UI state, existing accessible primitives, structured JSON, server validation, a version-locked write transaction, a global no-op default, a classroom penalty-zero default, and a viewport-bounded dialog.
+
+Do not overgeneralize:
+The migration was not applied live, and no authenticated browser or production deployment verification was performed.
+
+## 2026-09-19 - Global Codeforces identity resolution docs used
+
+Source:
+- `docs/rsd/global-codeforces-identity-resolution-20260919-rsd.md`
+- `docs/reviews/global-codeforces-identity-resolution-20260919-review.md`
+
+Fact:
+This task used `AGENTS.md`, existing global/classroom report identity patterns, the interface-design/Apple/Emil skill stack, Context7 Next.js Server Action and file-input guidance, Supabase/Postgres schema and RLS guidance, the current Supabase changelog, the current Vercel Web Interface Guidelines, and the live read-only user/index schema shape. Those inputs drove immutable user-ID mappings, server-side bounded CSV validation, atomic replacement, explicit source routes, accessible progressive fields, and fail-closed publication.
 
 Do not overgeneralize:
 The migration was not applied live, and no authenticated browser or production deployment verification was performed.

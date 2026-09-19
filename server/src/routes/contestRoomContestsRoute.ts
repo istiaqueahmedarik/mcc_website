@@ -6,6 +6,7 @@ import {
   getAllContestRoomContests,
   getContestRoomContest,
   insertContestRoomContest,
+  replaceContestCodeforcesIdentityMapping,
   updateContestRoomContest,
 } from "../controllers/contestRoomContestsController";
 
@@ -17,6 +18,7 @@ route.use(
 );
 
 route.post("/insert", insertContestRoomContest);
+route.post("/codeforces-identity-mapping/replace", replaceContestCodeforcesIdentityMapping);
 route.get("/all", getAllContestRoomContests);
 route.post("/get", getContestRoomContest);
 route.post("/update", updateContestRoomContest);

@@ -42,6 +42,8 @@ const CODEFORCES_WEB_BASE = 'https://codeforces.com';
 const CODEFORCES_BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36';
 const EDU_SOURCE_REGEX = /^edu:(\d+):(\d+)(?::(friends)|:list:([A-Za-z0-9]+))?$/i;
 const GROUP_SOURCE_REGEX = /^group:([A-Za-z0-9]+):(\d+)$/i;
+const PUBLIC_SOURCE_REGEX = /^contest:(\d+)$/i;
+const GYM_SOURCE_REGEX = /^gym:(\d+)$/i;
 const DEFAULT_WEB_CONCURRENCY = 6;
 const DEFAULT_WEB_MAX_PAGES = 250;
 const DEFAULT_UPSOLVE_CONCURRENCY = 3;
@@ -108,7 +110,8 @@ function normalizeWebSession(value: unknown): string {
 }
 
 export type CodeforcesContestSource =
-  | { kind: 'contest'; contestId: string }
+  | { kind: 'contest'; contestId: string; explicit: boolean }
+  | { kind: 'gym'; contestId: string }
   | { kind: 'group'; groupCode: string; contestId: string }
   | { kind: 'edu'; courseId: string; lessonId: string; filter: 'friends' | 'list'; listKey?: string };
 
@@ -136,7 +139,13 @@ type SubmissionPageParseResult = {
 
 export function parseCodeforcesContestSource(value: unknown): CodeforcesContestSource | null {
   const text = normalizeText(value, 300);
-  if (/^\d+$/.test(text)) return { kind: 'contest', contestId: text };
+  if (/^\d+$/.test(text)) return { kind: 'contest', contestId: text, explicit: false };
+
+  const publicMatch = text.match(PUBLIC_SOURCE_REGEX);
+  if (publicMatch) return { kind: 'contest', contestId: publicMatch[1], explicit: true };
+
+  const gymMatch = text.match(GYM_SOURCE_REGEX);
+  if (gymMatch) return { kind: 'gym', contestId: gymMatch[1] };
 
   const groupMatch = text.match(GROUP_SOURCE_REGEX);
   if (groupMatch) {
@@ -280,12 +289,18 @@ async function requestCodeforcesApi(
         if (literal) comment = comment.split(literal).join('[redacted]');
       });
       if (!response.ok || payload?.status !== 'OK') {
+        const credentialsRejected = signed
+          && /incorrect api key|invalid api signature|api key.*not found/i.test(comment);
         throw new CodeforcesApiError(
-          response.status === 429 || /call limit|too many requests/i.test(comment)
-            ? 'CODEFORCES_API_RATE_LIMIT'
-            : 'CODEFORCES_API_UNAVAILABLE',
-          comment || `Codeforces API returned HTTP ${response.status}.`,
-          response.status === 429 ? 429 : 502,
+          credentialsRejected
+            ? 'CODEFORCES_API_CREDENTIALS_INVALID'
+            : response.status === 429 || /call limit|too many requests/i.test(comment)
+              ? 'CODEFORCES_API_RATE_LIMIT'
+              : 'CODEFORCES_API_UNAVAILABLE',
+          credentialsRejected
+            ? 'Codeforces rejected the saved API key or secret.'
+            : comment || `Codeforces API returned HTTP ${response.status}.`,
+          credentialsRejected ? 422 : response.status === 429 ? 429 : 502,
           comment,
         );
       }
@@ -610,6 +625,23 @@ export async function validateCodeforcesSession(
     return $('a[href^="/profile/"]').length > 0 && $('a[href^="/enter"]').length === 0;
   } catch {
     return false;
+  }
+}
+
+export async function validateCodeforcesApiCredentials(
+  credentials: CodeforcesApiCredentials,
+  options: CodeforcesFetchOptions = {},
+): Promise<CodeforcesServiceResult> {
+  try {
+    await requestCodeforcesApi(
+      'user.friends',
+      { onlyOnline: true },
+      { ...options, apiKey: credentials.apiKey, apiSecret: credentials.apiSecret },
+      true,
+    );
+    return { statusCode: 200, body: { valid: true } };
+  } catch (error: any) {
+    return serviceErrorToResult(error);
   }
 }
 
@@ -1490,9 +1522,10 @@ async function fetchCodeforcesNumericWebRank(
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
   groupCode?: string,
+  forcedSourceKind?: Exclude<NumericSourceKind, 'group'>,
 ): Promise<CodeforcesServiceResult> {
   try {
-    const sourceKind = groupCode ? 'group' : numericSourceKind(contestId);
+    const sourceKind = groupCode ? 'group' : forcedSourceKind || numericSourceKind(contestId);
     const requestPage = (page: number) => requestCodeforcesHtml(
       buildNumericStandingsUrl(contestId, sourceKind, page, groupCode),
       options,
@@ -1553,6 +1586,7 @@ async function fetchCodeforcesNumericRank(
   problemWeights: number[] | undefined,
   options: CodeforcesFetchOptions,
   groupCode?: string,
+  forcedSourceKind?: Exclude<NumericSourceKind, 'group'>,
 ): Promise<CodeforcesServiceResult> {
   let normalized: any = null;
   let apiError: any = null;
@@ -1583,7 +1617,13 @@ async function fetchCodeforcesNumericRank(
   }
 
   if (!normalized) {
-    const fallback = await fetchCodeforcesNumericWebRank(contestId, problemWeights, options, groupCode);
+    const fallback = await fetchCodeforcesNumericWebRank(
+      contestId,
+      problemWeights,
+      options,
+      groupCode,
+      forcedSourceKind,
+    );
     if (fallback.statusCode === 200) {
       fallback.body.providerMeta = {
         ...(fallback.body.providerMeta || {}),
@@ -1696,5 +1736,10 @@ export async function fetchCodeforcesContestRank(
       problemWeights,
       options,
       source.kind === 'group' ? source.groupCode : undefined,
+      source.kind === 'gym'
+        ? 'gym'
+        : source.kind === 'contest' && source.explicit
+          ? 'contest'
+          : undefined,
     );
 }
