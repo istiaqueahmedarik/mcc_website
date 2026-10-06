@@ -1,0 +1,54 @@
+/* Match the trainer dock's clear material, with a halo for dense report text. */
+.glass.glass {
+  border: 1px solid hsl(var(--foreground) / 0.07);
+  border-radius: 1.25rem;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  box-shadow: 0 12px 36px -12px rgb(0 0 0 / 0.3),
+    0 3px 8px -3px rgb(0 0 0 / 0.16),
+    inset 0 1px 2px rgb(255 255 255 / 0.14),
+    inset 0 -1px 2px hsl(var(--foreground) / 0.05);
+  text-shadow: 0 1px 3px hsl(var(--background) / 0.9);
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 20% 0%, rgb(255 255 255 / 0.12), transparent 48%),
+    radial-gradient(ellipse at 85% 100%, rgb(255 255 255 / 0.06), transparent 40%);
+}
+
+.content {
+  position: relative;
+  border-radius: 0.875rem;
+  padding: 0.75rem;
+  background: hsl(var(--background) / 0.72);
+}
+
+.glass :where(p, span, summary) {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 2px hsl(var(--background) / 0.9);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass.glass {
+    background: hsl(var(--background) / 0.12);
+    -webkit-backdrop-filter: var(--performance-refraction, blur(0px)) blur(0.7px) saturate(125%);
+    backdrop-filter: var(--performance-refraction, blur(0px)) blur(0.7px) saturate(125%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .glass.glass {
+    background: hsl(var(--background));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-color: hsl(var(--foreground));
+    text-shadow: none;
+  }
+  .glass::before { display: none; }
+  .glass :where(p, span, summary) { -webkit-text-stroke: 0; }
+}

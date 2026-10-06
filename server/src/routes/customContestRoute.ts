@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   createCustomContest,
   deleteCustomContest,
@@ -14,10 +15,7 @@ route.get("/active", getActiveCustomContests);
 
 route.use(
   "/*",
-  jwt({
-    secret: process.env.SECRET || process.env.JWT_SECRET || "secret",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 route.get("/all", getAllCustomContests);

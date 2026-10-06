@@ -15,12 +15,16 @@ import demeritRoute from "./routes/demeritRoute";
 import icpcJourneyRoute from "./routes/icpcJourneyRoute";
 import landingRoute from "./routes/landingRoute";
 import publicContestReportRoute from "./routes/publicContestReportRoute";
+import savedStandingsRoute from "./routes/savedStandingsRoute";
 import teamCollectionRoute from "./routes/teamCollectionRoute";
 import userRoute from "./routes/userRoute";
 import vjudgeRoute from "./routes/vjudgeRoute";
 import wordRoute from "./routes/wordRoute";
 import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
+import classroomRoute from "./routes/classroomRoute";
+import trainerFormRoute from "./routes/trainerFormRoute";
+import { websocket } from "./utils/bunWebSocket";
 import {
   autoStartScheduledRooms,
   isDbConnectionError,
@@ -32,6 +36,12 @@ const AUTO_START_MAX_CONSECUTIVE_DB_FAILURES = 5;
 const app = new Hono<{ Variables: JwtVariables }>();
 
 app.use("/*", cors());
+
+// // console the endpoint hit for debugging
+// app.use("/*", async (c, next) => {
+//   console.log(`[${new Date().toISOString()}] ${c.req.method} ${c.req.url}`);
+//   await next();
+// });
 
 app.route("/achieve", achievementRoute);
 app.route("/auth", authRoute);
@@ -47,12 +57,15 @@ app.route("/public-contest-report", publicContestReportRoute);
 app.route("/vjudge", vjudgeRoute);
 app.route("/api/vjudge", vjudgeRoute);
 app.route("/custom-contests", customContestRoute);
+app.route("/saved-standings", savedStandingsRoute);
 app.route("/landing", landingRoute);
 app.route("/alumni", alumniRoute);
 app.route("/team-collection", teamCollectionRoute);
 app.route("/typing/words", wordRoute);
 app.route("/typing/rooms", typingRoomRoute);
 app.route("/typing/participants", typingParticipantRoute);
+app.route("/classroom", classroomRoute);
+app.route("/trainer-forms", trainerFormRoute);
 
 let autoStartSchedulerInFlight = false;
 let autoStartConsecutiveDbFailures = 0;
@@ -104,4 +117,5 @@ setInterval(async () => {
 export default {
   port: process.env.PORT || 5000,
   fetch: app.fetch,
+  websocket,
 };

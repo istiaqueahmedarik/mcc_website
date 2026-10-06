@@ -1,22 +1,33 @@
+import { ClassroomNavigationProvider } from "@/components/ClassroomCardTransition";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import QueryProvider from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import localFont from "next/font/local";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
+const sfProDisplay = localFont({
+  src: [
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYREGULAR.otf", weight: "400", style: "normal" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYMEDIUM.otf", weight: "500", style: "normal" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYBOLD.otf", weight: "700", style: "normal" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYULTRALIGHTITALIC.otf", weight: "100", style: "italic" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYTHINITALIC.otf", weight: "200", style: "italic" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYLIGHTITALIC.otf", weight: "300", style: "italic" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYSEMIBOLDITALIC.otf", weight: "600", style: "italic" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYHEAVYITALIC.otf", weight: "800", style: "italic" },
+    { path: "./fonts/sf-pro-display/SFPRODISPLAYBLACKITALIC.otf", weight: "900", style: "italic" },
+  ],
+  display: "swap",
+  // Load only faces used on the current page instead of preloading all nine.
+  preload: false,
+  variable: "--font-sf-pro-display",
 });
+
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
-});
-
-const Ubuntu_Medium = localFont({
-  src: "./fonts/Ubuntu_Medium.ttf",
-  variable: "--font-ubuntu-medium",
 });
 
 export const metadata = {
@@ -70,7 +81,7 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#1e40af" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${Ubuntu_Medium.className} font-[--font-ubuntu-medium]`}
+        className={`${sfProDisplay.variable} ${sfProDisplay.className} ${geistMono.variable} font-sans`}
         cz-shortcut-listen="true"
       >
         <Toaster />
@@ -80,9 +91,11 @@ export default function RootLayout({ children }) {
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar />
-          {children}
-          <Footer />
+          <QueryProvider>
+            <Navbar />
+            <ClassroomNavigationProvider>{children}</ClassroomNavigationProvider>
+            <Footer />
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,0 +1,170 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { useReducedMotion } from "framer-motion";
+import { Play as OriginalPlay, Square as OriginalSquare, BookOpen as OriginalBookOpen, Clock as OriginalClock, MessageSquare as OriginalMessageSquare, CheckCircle2 as OriginalCheckCircle2, AlertCircle as OriginalAlertCircle, Plus as OriginalPlus, Trash2 as OriginalTrash2, Award as OriginalAward, FileText as OriginalFileText, HelpCircle as OriginalHelpCircle, Trophy as OriginalTrophy, ChevronRight as OriginalChevronRight, Sparkles as OriginalSparkles, ShieldCheck as OriginalShieldCheck, Users as OriginalUsers, GraduationCap as OriginalGraduationCap, Calendar as OriginalCalendar, Target as OriginalTarget, ArrowLeft as OriginalArrowLeft, ExternalLink as OriginalExternalLink, Check as OriginalCheck, ChevronsUpDown as OriginalChevronsUpDown, X as OriginalX, Eye as OriginalEye, MoreHorizontal as OriginalMoreHorizontal, RefreshCw as OriginalRefreshCw, FilePlus2 as OriginalFilePlus2, Library as OriginalLibrary, Layers3 as OriginalLayers3, BarChart3 as OriginalBarChart3, Radio as OriginalRadio, PenTool as OriginalPenTool, Code2 as OriginalCode2, Pencil as OriginalPencil, Search as OriginalSearch, UserCheck as OriginalUserCheck, Timer as OriginalTimer, Save as OriginalSave, Info as OriginalInfo, Archive as OriginalArchive, Bell as OriginalBell, SlidersHorizontal as OriginalSlidersHorizontal, VideoOff as OriginalVideoOff, ArrowDown as OriginalArrowDown, ArrowUp as OriginalArrowUp, ArrowUpDown as OriginalArrowUpDown, Calculator as OriginalCalculator, ChevronDown as OriginalChevronDown, EyeOff as OriginalEyeOff, FileUp as OriginalFileUp, GripVertical as OriginalGripVertical, KeyRound as OriginalKeyRound, ListChecks as OriginalListChecks, Lock as OriginalLock, Medal as OriginalMedal, Minus as OriginalMinus, PanelLeftClose as OriginalPanelLeftClose, PanelLeftOpen as OriginalPanelLeftOpen, TrendingDown as OriginalTrendingDown, TrendingUp as OriginalTrendingUp, History as OriginalHistory, Inbox as OriginalInbox, CheckCheck as OriginalCheckCheck } from "lucide-react";
+import { useTrainerVisuals } from "@/components/TrainerVisualContext";
+import { cn } from "@/lib/utils";
+import { AcademicCapIcon } from "./classroom/academic-cap";
+import { AdjustmentsHorizontalIcon } from "./classroom/adjustments-horizontal";
+import { ArchiveBoxIcon } from "./classroom/archive-box";
+import { ArrowDownIcon } from "./classroom/arrow-down";
+import { ArrowLeftIcon } from "./classroom/arrow-left";
+import { ArrowPathIcon } from "./classroom/arrow-path";
+import { ArrowTopRightOnSquareIcon } from "./classroom/arrow-top-right-on-square";
+import { ArrowTrendingDownIcon } from "./classroom/arrow-trending-down";
+import { ArrowTrendingUpIcon } from "./classroom/arrow-trending-up";
+import { ArrowUpIcon } from "./classroom/arrow-up";
+import { ArrowUpTrayIcon } from "./classroom/arrow-up-tray";
+import { ArrowUturnLeftIcon } from "./classroom/arrow-uturn-left";
+import { ArrowsUpDownIcon } from "./classroom/arrows-up-down";
+import { Bars3Icon } from "./classroom/bars-3";
+import { BellIcon } from "./classroom/bell";
+import { BookOpenIcon } from "./classroom/book-open";
+import { BookmarkSquareIcon } from "./classroom/bookmark-square";
+import { BuildingLibraryIcon } from "./classroom/building-library";
+import { CalculatorIcon } from "./classroom/calculator";
+import { CalendarDaysIcon } from "./classroom/calendar-days";
+import { ChartBarIcon } from "./classroom/chart-bar";
+import { ChatBubbleLeftRightIcon } from "./classroom/chat-bubble-left-right";
+import { CheckIcon } from "./classroom/check";
+import { CheckBadgeIcon } from "./classroom/check-badge";
+import { CheckCircleIcon } from "./classroom/check-circle";
+import { ChevronDoubleLeftIcon } from "./classroom/chevron-double-left";
+import { ChevronDoubleRightIcon } from "./classroom/chevron-double-right";
+import { ChevronDownIcon } from "./classroom/chevron-down";
+import { ChevronRightIcon } from "./classroom/chevron-right";
+import { ChevronUpDownIcon } from "./classroom/chevron-up-down";
+import { ClipboardDocumentCheckIcon } from "./classroom/clipboard-document-check";
+import { ClockIcon } from "./classroom/clock";
+import { CodeBracketIcon } from "./classroom/code-bracket";
+import { DocumentPlusIcon } from "./classroom/document-plus";
+import { DocumentTextIcon } from "./classroom/document-text";
+import { EllipsisHorizontalIcon } from "./classroom/ellipsis-horizontal";
+import { ExclamationCircleIcon } from "./classroom/exclamation-circle";
+import { EyeIcon } from "./classroom/eye";
+import { EyeSlashIcon } from "./classroom/eye-slash";
+import { InboxIcon } from "./classroom/inbox";
+import { InformationCircleIcon } from "./classroom/information-circle";
+import { KeyIcon } from "./classroom/key";
+import { LockClosedIcon } from "./classroom/lock-closed";
+import { MagnifyingGlassIcon } from "./classroom/magnifying-glass";
+import { MinusIcon } from "./classroom/minus";
+import { PencilIcon } from "./classroom/pencil";
+import { PencilSquareIcon } from "./classroom/pencil-square";
+import { PlayIcon } from "./classroom/play";
+import { PlusIcon } from "./classroom/plus";
+import { QuestionMarkCircleIcon } from "./classroom/question-mark-circle";
+import { RectangleStackIcon } from "./classroom/rectangle-stack";
+import { ShieldCheckIcon } from "./classroom/shield-check";
+import { SignalIcon } from "./classroom/signal";
+import { SparklesIcon } from "./classroom/sparkles";
+import { StopIcon } from "./classroom/stop";
+import { TrashIcon } from "./classroom/trash";
+import { TrophyIcon } from "./classroom/trophy";
+import { UserCircleIcon } from "./classroom/user-circle";
+import { UsersIcon } from "./classroom/users";
+import { VideoCameraSlashIcon } from "./classroom/video-camera-slash";
+import { ViewfinderCircleIcon } from "./classroom/viewfinder-circle";
+import { XMarkIcon } from "./classroom/x-mark";
+
+// Shared classroom components keep their original student icons.
+function trainerIcon(name, AnimatedIcon, Original) {
+  function TrainerIcon({ className, size, ...props }) {
+    const enabled = useTrainerVisuals();
+    const reduced = useReducedMotion();
+    const root = useRef(null);
+    const animation = useRef(null);
+    useEffect(() => {
+      if (!enabled || reduced) return;
+      const target = root.current?.closest('button, a, [role="menuitem"], summary') || root.current;
+      if (!target) return;
+      const enter = (event) => {
+        if (event.pointerType !== 'touch' && !target.matches(':disabled, [aria-disabled="true"]')) animation.current?.startAnimation();
+      };
+      const leave = () => animation.current?.stopAnimation();
+      target.addEventListener('pointerenter', enter);
+      target.addEventListener('pointerleave', leave);
+      return () => {
+        target.removeEventListener('pointerenter', enter);
+        target.removeEventListener('pointerleave', leave);
+      };
+    }, [enabled, reduced]);
+    if (!enabled) return <Original className={className} size={size} {...props} />;
+    return (
+      <span ref={root} aria-hidden="true" className={cn("inline-flex h-4 w-4 shrink-0 items-center justify-center [&>span]:h-full [&>span]:w-full [&_svg]:h-full [&_svg]:w-full", className)} style={size ? { width: size, height: size } : undefined} {...props}>
+        <AnimatedIcon ref={animation} />
+      </span>
+    );
+  }
+  TrainerIcon.displayName = `Trainer${name}`;
+  return TrainerIcon;
+}
+
+// Busy indicators keep their explicit spinning state.
+export { Loader2 } from "lucide-react";
+export const Play = trainerIcon("Play", PlayIcon, OriginalPlay);
+export const Square = trainerIcon("Square", StopIcon, OriginalSquare);
+export const BookOpen = trainerIcon("BookOpen", BookOpenIcon, OriginalBookOpen);
+export const Clock = trainerIcon("Clock", ClockIcon, OriginalClock);
+export const MessageSquare = trainerIcon("MessageSquare", ChatBubbleLeftRightIcon, OriginalMessageSquare);
+export const CheckCircle2 = trainerIcon("CheckCircle2", CheckCircleIcon, OriginalCheckCircle2);
+export const AlertCircle = trainerIcon("AlertCircle", ExclamationCircleIcon, OriginalAlertCircle);
+export const Plus = trainerIcon("Plus", PlusIcon, OriginalPlus);
+export const Trash2 = trainerIcon("Trash2", TrashIcon, OriginalTrash2);
+export const Award = trainerIcon("Award", TrophyIcon, OriginalAward);
+export const FileText = trainerIcon("FileText", DocumentTextIcon, OriginalFileText);
+export const HelpCircle = trainerIcon("HelpCircle", QuestionMarkCircleIcon, OriginalHelpCircle);
+export const Trophy = trainerIcon("Trophy", TrophyIcon, OriginalTrophy);
+export const ChevronRight = trainerIcon("ChevronRight", ChevronRightIcon, OriginalChevronRight);
+export const Sparkles = trainerIcon("Sparkles", SparklesIcon, OriginalSparkles);
+export const ShieldCheck = trainerIcon("ShieldCheck", ShieldCheckIcon, OriginalShieldCheck);
+export const Users = trainerIcon("Users", UsersIcon, OriginalUsers);
+export const GraduationCap = trainerIcon("GraduationCap", AcademicCapIcon, OriginalGraduationCap);
+export const Calendar = trainerIcon("Calendar", CalendarDaysIcon, OriginalCalendar);
+export const Target = trainerIcon("Target", ViewfinderCircleIcon, OriginalTarget);
+export const ArrowLeft = trainerIcon("ArrowLeft", ArrowLeftIcon, OriginalArrowLeft);
+export const ExternalLink = trainerIcon("ExternalLink", ArrowTopRightOnSquareIcon, OriginalExternalLink);
+export const Check = trainerIcon("Check", CheckIcon, OriginalCheck);
+export const ChevronsUpDown = trainerIcon("ChevronsUpDown", ChevronUpDownIcon, OriginalChevronsUpDown);
+export const X = trainerIcon("X", XMarkIcon, OriginalX);
+export const Eye = trainerIcon("Eye", EyeIcon, OriginalEye);
+export const MoreHorizontal = trainerIcon("MoreHorizontal", EllipsisHorizontalIcon, OriginalMoreHorizontal);
+export const RefreshCw = trainerIcon("RefreshCw", ArrowPathIcon, OriginalRefreshCw);
+export const FilePlus2 = trainerIcon("FilePlus2", DocumentPlusIcon, OriginalFilePlus2);
+export const Library = trainerIcon("Library", BuildingLibraryIcon, OriginalLibrary);
+export const Layers3 = trainerIcon("Layers3", RectangleStackIcon, OriginalLayers3);
+export const BarChart3 = trainerIcon("BarChart3", ChartBarIcon, OriginalBarChart3);
+export const Radio = trainerIcon("Radio", SignalIcon, OriginalRadio);
+export const PenTool = trainerIcon("PenTool", PencilSquareIcon, OriginalPenTool);
+export const Code2 = trainerIcon("Code2", CodeBracketIcon, OriginalCode2);
+export const Pencil = trainerIcon("Pencil", PencilIcon, OriginalPencil);
+export const Search = trainerIcon("Search", MagnifyingGlassIcon, OriginalSearch);
+export const UserCheck = trainerIcon("UserCheck", UserCircleIcon, OriginalUserCheck);
+export const Timer = trainerIcon("Timer", ClockIcon, OriginalTimer);
+export const Save = trainerIcon("Save", BookmarkSquareIcon, OriginalSave);
+export const Info = trainerIcon("Info", InformationCircleIcon, OriginalInfo);
+export const Archive = trainerIcon("Archive", ArchiveBoxIcon, OriginalArchive);
+export const Bell = trainerIcon("Bell", BellIcon, OriginalBell);
+export const SlidersHorizontal = trainerIcon("SlidersHorizontal", AdjustmentsHorizontalIcon, OriginalSlidersHorizontal);
+export const VideoOff = trainerIcon("VideoOff", VideoCameraSlashIcon, OriginalVideoOff);
+export const ArrowDown = trainerIcon("ArrowDown", ArrowDownIcon, OriginalArrowDown);
+export const ArrowUp = trainerIcon("ArrowUp", ArrowUpIcon, OriginalArrowUp);
+export const ArrowUpDown = trainerIcon("ArrowUpDown", ArrowsUpDownIcon, OriginalArrowUpDown);
+export const Calculator = trainerIcon("Calculator", CalculatorIcon, OriginalCalculator);
+export const ChevronDown = trainerIcon("ChevronDown", ChevronDownIcon, OriginalChevronDown);
+export const EyeOff = trainerIcon("EyeOff", EyeSlashIcon, OriginalEyeOff);
+export const FileUp = trainerIcon("FileUp", ArrowUpTrayIcon, OriginalFileUp);
+export const GripVertical = trainerIcon("GripVertical", Bars3Icon, OriginalGripVertical);
+export const KeyRound = trainerIcon("KeyRound", KeyIcon, OriginalKeyRound);
+export const ListChecks = trainerIcon("ListChecks", ClipboardDocumentCheckIcon, OriginalListChecks);
+export const Lock = trainerIcon("Lock", LockClosedIcon, OriginalLock);
+export const Medal = trainerIcon("Medal", TrophyIcon, OriginalMedal);
+export const Minus = trainerIcon("Minus", MinusIcon, OriginalMinus);
+export const PanelLeftClose = trainerIcon("PanelLeftClose", ChevronDoubleLeftIcon, OriginalPanelLeftClose);
+export const PanelLeftOpen = trainerIcon("PanelLeftOpen", ChevronDoubleRightIcon, OriginalPanelLeftOpen);
+export const TrendingDown = trainerIcon("TrendingDown", ArrowTrendingDownIcon, OriginalTrendingDown);
+export const TrendingUp = trainerIcon("TrendingUp", ArrowTrendingUpIcon, OriginalTrendingUp);
+export const History = trainerIcon("History", ArrowUturnLeftIcon, OriginalHistory);
+export const Inbox = trainerIcon("Inbox", InboxIcon, OriginalInbox);
+export const CheckCheck = trainerIcon("CheckCheck", CheckBadgeIcon, OriginalCheckCheck);

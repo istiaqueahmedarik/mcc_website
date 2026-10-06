@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 
 export default async function ErrorPage({ params, searchParams }) {
-    const errorMsg = decodeURIComponent((await params).error || "Unknown error");
-    if (!params.error) return notFound();
+    const resolvedParams = await params;
+    const encodedError = resolvedParams?.error;
+    if (!encodedError) return notFound();
+
+    const errorMsg = decodeURIComponent(encodedError || "Unknown error");
     return (
         <div className="flex min-h-screen items-center justify-center">
             <div className="bg-white p-8 rounded shadow max-w-md w-full text-center">

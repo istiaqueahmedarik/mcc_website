@@ -8,7 +8,7 @@ import { forwardRef, useEffect, useRef } from "react";
 
 const ProgressLink = forwardRef(function ProgressLink(
   { href, children, className, onClick, ...props },
-  ref,
+  ref
 ) {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
@@ -22,20 +22,13 @@ const ProgressLink = forwardRef(function ProgressLink(
 
   const handleClick = (event) => {
     onClick?.(event);
-
     if (!event.defaultPrevented && pathname !== href) {
       NProgress.start();
     }
   };
 
   return (
-    <Link
-      ref={ref}
-      href={href}
-      className={className}
-      onClick={handleClick}
-      {...props}
-    >
+    <Link ref={ref} href={href} className={className} onClick={handleClick} {...props}>
       {children}
     </Link>
   );

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   getSchedulesDash,
+  getClassroomSettings,
   getVjudgeId,
   listCodeforcesPending,
   listVjudgePending,
@@ -12,7 +14,9 @@ import {
   setMistId,
   setMistIdCard,
   setProfilePic,
+  setTrainerProfile,
   setTshirtSize,
+  updateClassroomSettings,
   setVjudgeId,
   verifyCodeforces,
   verifyVjudge,
@@ -22,14 +26,13 @@ const route = new Hono();
 
 route.use(
   "/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 route.get("/get_vjudge_id", getVjudgeId);
 route.get("/get_shchedules_dash", getSchedulesDash);
+route.get("/classroom-settings", getClassroomSettings);
+route.post("/classroom-settings", updateClassroomSettings);
 route.post("/vjudge_login", loginToVJudgeRoute);
 // Codeforces manual verification endpoints
 route.post("/cf/set", setCodeforcesId);
@@ -44,5 +47,6 @@ route.post("/profile-pic/set", setProfilePic);
 route.post("/mist-id-card/set", setMistIdCard);
 route.post("/mist-id/set", setMistId);
 route.get("/search", searchUsers);
+route.post("/trainer-profile/set", setTrainerProfile);
 
 export default route;

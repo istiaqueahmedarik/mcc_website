@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 // Use dynamic require to avoid TS path resolution issues in this environment
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const teamCtrl = require("../controllers/teamCollectionController");
@@ -56,10 +57,7 @@ route.get("/public/finalized/teams/by-contest", publicFinalizedTeamsByContest);
 // Authenticated user endpoints
 route.use(
   "/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 // Admin endpoints

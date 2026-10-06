@@ -1,6 +1,91 @@
 import sql from "../db";
+import { normalizeFullNameUpdate } from "../utils/basicProfile";
+import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
+import {
+  CLASSROOM_UPDATE_PRIORITIES,
+  ensureClassroomUpdatesSchema,
+  normalizeClassroomUpdatePriorities,
+} from "../utils/classroomUpdatesSchema";
 
 type Ctx = any;
+
+export const getClassroomSettings = async (c: Ctx) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await ensureClassroomUpdatesSchema();
+    const user =
+      await sql`select id from users where id = ${id} and email = ${email}`;
+    if (user.length === 0) return c.json({ error: "Unauthorized" }, 401);
+
+    const rows = await sql`
+      select classroom_update_priorities, classroom_email_notifications_enabled
+      from user_settings
+      where user_id = ${id}
+    `;
+    const priorities = normalizeClassroomUpdatePriorities(rows[0]?.classroom_update_priorities || CLASSROOM_UPDATE_PRIORITIES);
+    const emailEnabled = rows.length === 0
+      ? true
+      : Boolean(rows[0].classroom_email_notifications_enabled);
+
+    return c.json({
+      classroom_update_priorities: priorities,
+      classroom_email_notifications_enabled: emailEnabled,
+      update_priorities: priorities,
+      email_notifications_enabled: emailEnabled,
+    });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to load classroom settings" }, 400);
+  }
+};
+
+export const updateClassroomSettings = async (c: Ctx) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  try {
+    await ensureClassroomUpdatesSchema();
+    const user =
+      await sql`select id from users where id = ${id} and email = ${email}`;
+    if (user.length === 0) return c.json({ error: "Unauthorized" }, 401);
+
+    const body = await c.req.json();
+    const priorities = normalizeClassroomUpdatePriorities(
+      body?.classroom_update_priorities || body?.update_priorities || CLASSROOM_UPDATE_PRIORITIES
+    );
+    const emailEnabled = typeof body?.classroom_email_notifications_enabled === "boolean"
+      ? body.classroom_email_notifications_enabled
+      : typeof body?.email_notifications_enabled === "boolean"
+        ? body.email_notifications_enabled
+        : true;
+
+    const rows = await sql`
+      insert into user_settings (
+        user_id,
+        classroom_update_priorities,
+        classroom_email_notifications_enabled,
+        updated_at
+      )
+      values (${id}, ${priorities}, ${emailEnabled}, now())
+      on conflict (user_id) do update set
+        classroom_update_priorities = excluded.classroom_update_priorities,
+        classroom_email_notifications_enabled = excluded.classroom_email_notifications_enabled,
+        updated_at = now()
+      returning classroom_update_priorities, classroom_email_notifications_enabled
+    `;
+
+    return c.json({
+      success: true,
+      classroom_update_priorities: normalizeClassroomUpdatePriorities(rows[0].classroom_update_priorities),
+      classroom_email_notifications_enabled: Boolean(rows[0].classroom_email_notifications_enabled),
+    });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to save classroom settings" }, 400);
+  }
+};
 
 // ---- Codeforces manual verification (mirrors VJudge flow) ----
 export const setCodeforcesId = async (c: Ctx) => {
@@ -309,6 +394,7 @@ export const setMistId = async (c: any) => {
     const rows =
       await sql`update users set mist_id = ${numeric} where id = ${id} returning id, mist_id`;
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
+    await markPreEnrollmentClaimsForUser(id);
     return c.json({ result: rows[0] });
   } catch (e) {
     console.error(e);
@@ -322,8 +408,8 @@ export const setBasicProfile = async (c: any) => {
 
   try {
     const { full_name, phone, batch_name } = await c.req.json();
-    const shouldUpdateName =
-      typeof full_name === "string" && full_name.trim().length > 0;
+    const fullNameUpdate = normalizeFullNameUpdate(full_name);
+    const { shouldUpdate: shouldUpdateName, name } = fullNameUpdate;
     const shouldUpdatePhone = phone !== undefined;
     const shouldUpdateBatch = batch_name !== undefined;
 
@@ -331,7 +417,10 @@ export const setBasicProfile = async (c: any) => {
       return c.json({ error: "No profile fields provided" }, 400);
     }
 
-    const name = shouldUpdateName ? full_name.trim() : null;
+    if (fullNameUpdate.error) {
+      return c.json({ error: fullNameUpdate.error }, 400);
+    }
+
     const sanitizedPhone =
       typeof phone === "string" ? phone.trim() || null : null;
     const sanitizedBatch =
@@ -342,9 +431,13 @@ export const setBasicProfile = async (c: any) => {
       set
         full_name = case when ${shouldUpdateName} then ${name} else full_name end,
         phone = case when ${shouldUpdatePhone} then ${sanitizedPhone} else phone end,
-        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end
+        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end,
+        granted = case
+          when ${shouldUpdateName} and full_name is distinct from ${name} then false
+          else granted
+        end
       where id = ${id}
-      returning id, full_name, phone, batch_name
+      returning id, full_name, phone, batch_name, granted
     `;
 
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
@@ -376,5 +469,52 @@ export const searchUsers = async (c: any) => {
   } catch (e) {
     console.error(e);
     return c.json({ error: "Search failed" }, 500);
+  }
+};
+
+// ---- Trainer profile ----
+export const setTrainerProfile = async (c: any) => {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
+
+  // Only trainers and admins may update trainer-profile fields
+  const rows = await sql`SELECT trainer, admin FROM users WHERE id = ${id}`;
+  if (rows.length === 0) return c.json({ error: "Unauthorized" }, 401);
+  if (!rows[0].trainer && !rows[0].admin) return c.json({ error: "Forbidden" }, 403);
+
+  try {
+    const {
+      trainer_title,
+      trainer_bio,
+      trainer_experience,
+      trainer_specializations,
+      trainer_linkedin,
+      trainer_github,
+      trainer_website,
+    } = await c.req.json();
+
+    const specializations = Array.isArray(trainer_specializations)
+      ? trainer_specializations.filter((s: any) => typeof s === "string" && s.trim()).map((s: string) => s.trim())
+      : [];
+
+    const updated = await sql`
+      UPDATE users SET
+        trainer_title       = COALESCE(${trainer_title ?? null}, trainer_title),
+        trainer_bio         = COALESCE(${trainer_bio ?? null}, trainer_bio),
+        trainer_experience  = COALESCE(${trainer_experience ?? null}, trainer_experience),
+        trainer_specializations = ${specializations as any},
+        trainer_linkedin    = COALESCE(${trainer_linkedin ?? null}, trainer_linkedin),
+        trainer_github      = COALESCE(${trainer_github ?? null}, trainer_github),
+        trainer_website     = COALESCE(${trainer_website ?? null}, trainer_website)
+      WHERE id = ${id}
+      RETURNING
+        id, trainer_title, trainer_bio, trainer_experience,
+        trainer_specializations, trainer_linkedin, trainer_github, trainer_website
+    `;
+    if (updated.length === 0) return c.json({ error: "User not found" }, 404);
+    return c.json({ result: updated[0] });
+  } catch (e) {
+    console.error(e);
+    return c.json({ error: "Failed to update trainer profile" }, 400);
   }
 };

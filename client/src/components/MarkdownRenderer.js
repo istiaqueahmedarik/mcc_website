@@ -22,12 +22,20 @@ const Iframe = ({ node, ...props }) => {
   return null
 }
 
-const MarkdownRender = ({ content, className = '' }) => {
+const MarkdownRender = ({
+  allowRawHtml = true,
+  className = '',
+  content,
+  useDefaultWidth = true,
+}) => {
+  const rehypePlugins = allowRawHtml ? [rehypeRaw, rehypeKatex] : [rehypeKatex]
+  const widthClass = useDefaultWidth ? 'w-[90vw] max-w-3xl' : 'w-full max-w-none'
+
   return (
-    <div className={`prose dark:prose-invert w-[90vw] max-w-3xl ${className}`.trim()}>
+    <div className={`prose dark:prose-invert ${widthClass} ${className}`.trim()}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeRaw, rehypeKatex]} // Add rehypeRaw for raw HTML
+        rehypePlugins={rehypePlugins}
         components={{
           iframe: Iframe,
           code(props) {

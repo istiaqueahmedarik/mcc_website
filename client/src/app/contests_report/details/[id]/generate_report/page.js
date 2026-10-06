@@ -1,283 +1,151 @@
-import {
-  getContestStructuredRank,
-  getContestStructuredRankWithDemerits,
-  getContestRoomContestById,
-  getAllContestRoomContests,
-  getDemeritsByContestId,
-  getCurrentLevelData,
-} from "@/actions/contest_details";
+import { generateContestRoomReport } from "@/actions/contest_details";
+import ContestReportSubmitButton from "@/components/ContestReportSubmitButton";
 import ReportTable from "@/components/ReportTable";
-import { Button } from "@/components/ui/button";
-import React from "react";
+import { Database, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
-function mergeResultsByUser(results, contestIdToWeight = {}, allDemerits = {}) {
-  // Add defensive checks
-  if (!results || !Array.isArray(results) || results.length === 0) {
-    return {
-      users: [],
-      contestIds: [],
-      contestIdToTitle: {},
-    };
-  }
-
-  const contests = results.map((r) => r?.contestInfo).filter(Boolean);
-  const contestIdToTitle = Object.fromEntries(
-    contests.map((c) => [c.id, c.title])
-  );
-  const contestIds = contests.map((c) => c.id);
-  const userMap = {};
-
-  for (const contest of results) {
-    // Skip if contest or contest.teams is invalid
-    if (
-      !contest ||
-      !contest.contestInfo ||
-      !contest.teams ||
-      !Array.isArray(contest.teams)
-    ) {
-      continue;
-    }
-
-    for (const team of contest.teams) {
-      if (!team || !team.username) {
-        continue;
-      }
-
-      if (!userMap[team.username]) {
-        userMap[team.username] = {
-          username: team.username,
-          realName: team.realName || team.username,
-          avatarUrl: team.avatarUrl,
-          contests: {},
-          totalSolved: 0,
-          totalPenalty: 0,
-          totalScore: 0,
-          attended: 0,
-          totalDemeritPoints: 0,
-          demerits: {}, // Add demerits object back
-          originalTotalScore: 0, // Track original score before demerits
-        };
-      }
-      const weight = contestIdToWeight[contest.contestInfo.id] ?? 1;
-
-      // Use the already processed finalScore from the team data
-      const finalScore = (team.finalScore || 0) * weight;
-
-      // Get demerits for this user in this contest
-      const contestDemerits = allDemerits[contest.contestInfo.id] || [];
-      const userDemerits = contestDemerits.filter(
-        (d) => d.vjudge_id === team.username
-      );
-
-      userMap[team.username].contests[contest.contestInfo.id] = {
-        solved: team.solvedCount || 0,
-        penalty: team.penalty || 0, // Already includes demerit penalty
-        finalScore,
-        submissions: team.submissions || [],
-        contestId: contest.contestInfo.id,
-        contestTitle: contest.contestInfo.title,
-        demeritPoints: team.demeritPoints || 0,
-        demerits: userDemerits,
-      };
-
-      // Store demerits data for easy access by ReportTable
-      userMap[team.username].demerits[contest.contestInfo.id] = userDemerits;
-
-      userMap[team.username].totalDemeritPoints += team.demeritPoints || 0;
-      userMap[team.username].totalSolved += team.solvedCount || 0;
-      userMap[team.username].totalPenalty += team.penalty || 0;
-      userMap[team.username].totalScore += finalScore;
-      userMap[team.username].attended += 1;
-    }
-  }
-
-  for (const user of Object.values(userMap)) {
-    for (const cid of contestIds) {
-      if (!user.contests[cid]) {
-        // Get demerits for this user in this contest even if they didn't participate
-        const contestDemerits = allDemerits[cid] || [];
-        const userDemerits = contestDemerits.filter(
-          (d) => d.vjudge_id === user.username
-        );
-        const userDemeritPoints = userDemerits.reduce(
-          (sum, d) => sum + (d.demerit_point || 0),
-          0
-        );
-
-        user.contests[cid] = {
-          solved: 0,
-          penalty: userDemeritPoints * 100, // Only demerit penalty for non-participants
-          finalScore: Math.max(0, 0 - userDemeritPoints), // Negative score from demerits
-          submissions: [],
-          contestId: cid,
-          contestTitle: contestIdToTitle[cid] || "Unknown Contest",
-          demeritPoints: userDemeritPoints,
-          demerits: userDemerits,
-        };
-
-        // Store demerits data
-        user.demerits[cid] = userDemerits;
-        user.totalDemeritPoints += userDemeritPoints;
-        user.totalPenalty += userDemeritPoints * 100;
-        user.totalScore += Math.max(0, 0 - userDemeritPoints);
-      }
-    }
-
-    // Add safety checks for calculations
-    if (contestIds.length === 0) {
-      user.stdDeviationPen = 0;
-      user.stdDeviationScore = 0;
-      user.effectiveSolved = user.totalScore;
-      user.effectivePenalty = user.totalPenalty;
-      continue;
-    }
-
-    const scores = contestIds.map((cid) => user.contests[cid]?.finalScore || 0);
-    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const variance =
-      scores.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-      scores.length;
-    const totPen = contestIds.map((cid) => user.contests[cid]?.penalty || 0);
-    const meanPen = totPen.reduce((a, b) => a + b, 0) / totPen.length;
-    const variancePen =
-      totPen.reduce((sum, val) => sum + Math.pow(val - meanPen, 2), 0) /
-      totPen.length;
-    user.stdDeviationPen = Math.sqrt(variancePen);
-    user.stdDeviationScore = Math.sqrt(variance);
-    user.effectiveSolved = user.totalScore - user.stdDeviationScore;
-    user.effectivePenalty = user.totalPenalty + user.stdDeviationPen;
-  }
-
-  const sortedUsers = Object.values(userMap).sort((a, b) => {
-    if (b.effectiveSolved !== a.effectiveSolved)
-      return b.effectiveSolved - a.effectiveSolved;
-    if (a.effectivePenalty !== b.effectivePenalty)
-      return a.effectivePenalty - b.effectivePenalty;
-    return b.attended - a.attended;
+async function refreshSavedContestReport(formData) {
+  "use server";
+  const roomId = String(formData.get("room-id") || "").slice(0, 80);
+  const contestItemId = String(formData.get("contest-item-id") || "").slice(0, 80) || null;
+  const result = await generateContestRoomReport(roomId, {
+    ...(contestItemId ? { contestItemId } : {}),
+    refresh: true,
   });
+  const query = new URLSearchParams();
+  if (contestItemId) query.set("item", contestItemId);
+  if (result?.success) query.set("refreshed", "1");
+  else query.set("refreshError", result?.error || "Unable to refresh provider data");
+  redirect(`/contests_report/details/${encodeURIComponent(roomId)}/generate_report?${query.toString()}`);
+}
 
-  return { users: sortedUsers, contestIds, contestIdToTitle };
+function providerFailureMessage(failure) {
+  if (!failure) return null;
+  const error = String(failure.error || "");
+  if (failure.usedSavedData) {
+    return `Live source unavailable; using saved data${failure.savedAt ? ` from ${new Date(failure.savedAt).toLocaleString()}` : ""}. ${error}`;
+  }
+  const credentialsRejected = failure.code === "CODEFORCES_API_CREDENTIALS_INVALID"
+    || /incorrect api key|rejected the saved api key/i.test(error);
+  if (!credentialsRejected) return error || null;
+
+  const fallbackGuidance = {
+    CODEFORCES_WEB_SESSION_MISSING: "No Codeforces JSESSIONID fallback is connected.",
+    CODEFORCES_WEB_SESSION_INVALID: "The connected Codeforces JSESSIONID could not access this group contest.",
+    CODEFORCES_WEB_BLOCKED: "Codeforces challenged the server-side JSESSIONID fallback.",
+  }[failure.fallbackCode] || "The JSESSIONID fallback also did not complete.";
+
+  return `Codeforces rejected the saved API key or secret. Replace or clear it in Provider access. ${fallbackGuidance}`;
 }
 
 async function page({ params, searchParams }) {
+  const paramsBox = await params;
+  const roomId = paramsBox.id;
   const searchParamsBox = await searchParams;
-  let contestIds = [];
-  let name = "";
-  let results = [];
-  let usedFallback = false;
-  let contestIdToWeight = {};
-  let allDemerits = {};
-  /*
-   *  const responseOfVjudge = await getCurrentLevelData(searchParamsBox.id);
-   *  console.log(responseOfVjudge);
-   */
+  const requestedContestItemId = searchParamsBox.item
+    ? String(searchParamsBox.item).slice(0, 80)
+    : null;
 
-  if (searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)) {
-    const res = await getContestStructuredRankWithDemerits(searchParamsBox.id);
-    if (res && res.status !== "error" && res.teams) {
-      results.push(res);
-      contestIdToWeight[searchParamsBox.id] = searchParamsBox.weight
-        ? Number(searchParamsBox.weight)
-        : 1;
+  const response = await generateContestRoomReport(
+    roomId,
+    requestedContestItemId ? { contestItemId: requestedContestItemId } : {},
+  );
+  const merged = response?.merged || null;
 
-      // Fetch demerits for tooltip functionality
-      try {
-        const demeritRes = await getDemeritsByContestId(searchParamsBox.id);
-        if (demeritRes.success) {
-          allDemerits[searchParamsBox.id] = demeritRes.data;
-        } else {
-          allDemerits[searchParamsBox.id] = [];
-        }
-      } catch (error) {
-        console.error(
-          "Error fetching demerits for contest:",
-          searchParamsBox.id,
-          error
-        );
-        allDemerits[searchParamsBox.id] = [];
-      }
-    } else {
-      console.warn(
-        "Failed to fetch contest data for ID:",
-        searchParamsBox.id,
-        res
-      );
-      usedFallback = true;
-    }
-  } else {
-    usedFallback = true;
-  }
-
-  if (usedFallback) {
-    const roomId = (await params).id;
-    const roomRes = await getContestRoomContestById(roomId);
-    console.log(roomRes);
-    if (roomRes && roomRes.result && Array.isArray(roomRes.result)) {
-      name = roomRes.name;
-      contestIds = roomRes.result.map((x) => ({
-        id: x.contest_id,
-        title: x.contest_name,
-      }));
-      console.log(contestIds);
-      for (const c of roomRes.result) {
-        contestIdToWeight[c.contest_id] = c.weight ?? 1;
-      }
-      for (const cid of contestIds) {
-        if (/^\d+$/.test(cid.id)) {
-          let r = await getContestStructuredRankWithDemerits(cid.id);
-          if (r.status && r.status === "error") continue;
-          console.log(r, cid.title);
-          if (cid.title) r.contestInfo.title = cid.title;
-          if (r && r.status !== "error" && r.teams) {
-            results.push(r);
-
-            // Fetch demerits for tooltip functionality
-            try {
-              const demeritRes = await getDemeritsByContestId(cid.id);
-              if (demeritRes.success) {
-                allDemerits[cid.id] = demeritRes.data;
-              } else {
-                allDemerits[cid.id] = [];
-              }
-            } catch (error) {
-              console.error(
-                "Error fetching demerits for contest:",
-                cid.id,
-                error
-              );
-              allDemerits[cid.id] = [];
-            }
-          } else {
-            console.warn("Failed to fetch contest data for ID:", cid.id, r);
-          }
-        }
-      }
-    }
-  }
-
-  const merged = mergeResultsByUser(results, contestIdToWeight, allDemerits);
-
-  // Add defensive check to ensure merged data is valid
-  if (!merged || !merged.users || !Array.isArray(merged.users)) {
-    console.error("Invalid merged data:", merged);
+  if (!response?.success || !merged || !Array.isArray(merged.users)) {
     return (
-      <div>
-        <p>Error: Unable to load contest data. Please try again.</p>
+      <div className="mx-auto max-w-3xl space-y-3 px-4 py-10">
+        <h1 className="text-2xl font-semibold text-foreground">Report unavailable</h1>
+        <p className="text-sm text-muted-foreground">
+          {providerFailureMessage(response?.missingContests?.[0])
+            || response?.error
+            || "Unable to load contest data. Confirm the access required by this room's providers, then try again."}
+        </p>
+        <Link
+          href={`/contests_report/details/${encodeURIComponent(roomId)}#provider-access`}
+          className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >
+          Review provider access
+        </Link>
       </div>
     );
   }
 
-  console.log(merged);
-  const liveReportId =
-    (await params).id + (searchParamsBox.id ? `_${searchParamsBox.id}` : "");
+  const liveReportId = roomId + (requestedContestItemId ? `_${requestedContestItemId}` : "");
+  const canPublish = !requestedContestItemId
+    && (!Array.isArray(response?.missingContests) || response.missingContests.length === 0)
+    && !response?.cache?.isStale;
+  const generatedAt = response?.cache?.generatedAt
+    ? new Date(response.cache.generatedAt)
+    : null;
+
   return (
-    <div>
+    <div className="space-y-4">
+      {searchParamsBox?.refreshed && (
+        <p role="status" className="mx-auto max-w-5xl rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+          Saved report refreshed with the latest provider data.
+        </p>
+      )}
+      {searchParamsBox?.refreshError && (
+        <p role="alert" className="mx-auto max-w-5xl rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Refresh failed. The previously saved report is still shown. {searchParamsBox.refreshError}
+        </p>
+      )}
+      {response?.cache?.isStale && (
+        <div role="alert" className="mx-auto max-w-5xl rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Saved report needs a refresh</p>
+          <p className="mt-1 text-muted-foreground">
+            Room, mapping, demerit, or scoring settings changed after this snapshot. You can still review it, but refresh before publishing.
+          </p>
+        </div>
+      )}
+      {Array.isArray(response?.missingContests) && response.missingContests.length > 0 && (
+        <div role="alert" className="mx-auto mt-4 max-w-5xl rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <p className="font-medium text-foreground">Report includes sources that were unavailable during refresh</p>
+          <ul className="mt-2 space-y-1 text-muted-foreground">
+            {response.missingContests.map((contest) => (
+              <li key={contest.id}>
+                {contest.provider === "codeforces" ? "Codeforces" : "VJudge"} · {contest.title}: {providerFailureMessage(contest)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Database className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">Saved report</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              {generatedAt && !Number.isNaN(generatedAt.getTime())
+                ? `Updated ${generatedAt.toLocaleString()}. `
+                : ""}
+              Provider data is reused until you refresh it.
+            </p>
+          </div>
+        </div>
+        <form action={refreshSavedContestReport} className="shrink-0">
+          <input type="hidden" name="room-id" value={roomId} />
+          {requestedContestItemId ? <input type="hidden" name="contest-item-id" value={requestedContestItemId} /> : null}
+          <ContestReportSubmitButton
+            pendingLabel="Refreshing…"
+            variant="outline"
+            className="min-h-11 w-full rounded-lg px-4 active:scale-[0.98] motion-reduce:transform-none sm:w-auto"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Refresh
+          </ContestReportSubmitButton>
+        </form>
+      </div>
       <ReportTable
         merged={merged}
         liveReportId={liveReportId}
-        report_id={(await params).id}
-        partial={searchParamsBox.id && /^\d+$/.test(searchParamsBox.id)}
-        name={name}
+        name={merged.name || "Contest report"}
+        publishEndpoint={canPublish ? `/api/contest-room/${encodeURIComponent(roomId)}/publish` : null}
+        enableViewModes
       />
     </div>
   );

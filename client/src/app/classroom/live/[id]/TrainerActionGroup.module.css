@@ -1,0 +1,85 @@
+.group.group.group {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: 0;
+  padding: 0.25rem;
+  border-color: transparent;
+  border-radius: 1.75rem;
+  box-shadow: none;
+}
+
+/* Keep one continuous rounded boundary above the shader in every WebGL state. */
+.group.group.group::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid hsl(var(--foreground) / 0.105);
+  border-radius: inherit;
+}
+
+/* Grouped actions keep the lens and rim, without dock or hover shadows. */
+.group.group.group > :is([aria-hidden='true'], canvas) {
+  box-shadow: none;
+}
+
+.group.group.group[data-webgl='active'] {
+  box-shadow: none;
+}
+
+.group > :is(button, a),
+.group > :global([data-state]) {
+  position: relative;
+  z-index: 3;
+}
+
+.group.group :is(button, a) {
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  white-space: normal;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: hsl(var(--foreground));
+  border-radius: 1rem;
+}
+
+.group.group :is(button, a):is(:global(.bg-primary), [aria-pressed='true'], [data-state='active']) {
+  color: hsl(var(--primary));
+  font-weight: 600;
+}
+
+.group.group :is(button, a):is(:global(.text-destructive), :global(.bg-destructive), :global(.text-red-500), :global(.text-red-600)) {
+  color: hsl(var(--destructive));
+}
+
+.group.group :is(button, a):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group.group :is(button, a) { transform: none; transition: none; }
+}
+
+@media (forced-colors: active), (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .group.group.group { background: hsl(var(--background)); backdrop-filter: none; }
+  .group.group.group::after { border-color: CanvasText; }
+}
+
+/* The lens supplies hover feedback; keep legacy button paint/movement out of it. */
+.group.group :is(button, a):hover {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}

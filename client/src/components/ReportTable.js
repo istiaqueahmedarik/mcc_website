@@ -6,19 +6,140 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from '@/lib/utils'
-import { AlertCircle, CheckCheck, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
+import { AlertCircle, CheckCheck, Download, FileText, Info, Minus, Search, TrendingDown, TrendingUp, Users2, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import LiveShareModal from "./LiveShareModal"
+import ContestPerformance from "./ContestPerformance"
 import { ScrollArea } from "./ui/scroll-area"
 
-function ReportTable({ merged, report_id, partial, liveReportId, name }) {
+function normalizeProvider(value) {
+  return String(value || "vjudge").toLowerCase() === "codeforces" ? "codeforces" : "vjudge"
+}
+
+function rowIdentity(user) {
+  return String(user?.identityKey || user?.username || "")
+}
+
+function sourceHandlesForUser(user) {
+  return [
+    ...(Array.isArray(user?.sourceHandles) ? user.sourceHandles : []),
+    user?.username,
+    user?.realName,
+  ].map((value) => String(value || "").trim()).filter(Boolean)
+}
+
+function hasProvider(user, provider) {
+  const normalized = normalizeProvider(provider)
+  const providers = Array.isArray(user?.providers) ? user.providers.map(normalizeProvider) : []
+  if (providers.includes(normalized)) return true
+  return Object.values(user?.contests || {}).some((contest) => normalizeProvider(contest?.provider) === normalized)
+}
+
+function vjudgeLookupIdForUser(user) {
+  const mappedVjudge = user?.classroomMapping?.student?.vjudgeId || user?.classroomMapping?.student?.vjudge_id
+  if (mappedVjudge) return String(mappedVjudge).trim().toLowerCase()
+
+  const hasExplicitProviders = Array.isArray(user?.providers) && user.providers.length > 0
+  if (hasExplicitProviders && !hasProvider(user, "vjudge")) return ""
+
+  const vjudgeContest = Object.values(user?.contests || {}).find((contest) => normalizeProvider(contest?.provider) === "vjudge")
+  const sourceHandle = Array.isArray(vjudgeContest?.sourceHandles) ? vjudgeContest.sourceHandles[0] : null
+  return String(sourceHandle || user?.username || "").trim().toLowerCase()
+}
+
+function ProviderBadge({ provider }) {
+  const normalized = normalizeProvider(provider)
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "border-border/70 px-1.5 py-0 text-[10px] font-semibold uppercase tracking-normal",
+        normalized === "codeforces"
+          ? "border-sky-500/30 bg-sky-500/10 text-sky-700"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-700",
+      )}
+    >
+      {normalized === "codeforces" ? "CF" : "VJ"}
+    </Badge>
+  )
+}
+
+function ProviderProfileLink({ provider, id }) {
+  if (!id) return <span aria-hidden="true" className="h-7 w-7" />
+
+  const isCodeforces = provider === "codeforces"
+  const label = isCodeforces ? "Codeforces" : "VJudge"
+  const href = isCodeforces
+    ? `https://codeforces.com/profile/${encodeURIComponent(id)}`
+    : `https://vjudge.net/user/${encodeURIComponent(id)}`
+
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={`Open ${label} profile for ${id}`}
+      title={`${label}: ${id}`}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 active:scale-[0.97]"
+    >
+      <Image
+        src={isCodeforces ? "/cf.png" : "/vj.jpg"}
+        alt=""
+        width={14}
+        height={14}
+        className="h-3.5 w-3.5 rounded-[3px] object-cover"
+      />
+    </Link>
+  )
+}
+
+function ReportTable({
+  merged,
+  liveReportId,
+  name,
+  shareControl = null,
+  publishEndpoint = null,
+  showLiveShare = true,
+  solveOnly = false,
+  contestOrder = [],
+  highlightStudentId = "",
+  highlightVjudgeId = "",
+  highlightGroupIds = [],
+  enableViewModes = false,
+  showPerformance = false,
+}) {
+  const isTscCombined = merged?.scoringMode === "TSC_COMBINED"
+  const isScoredSnapshot = Boolean(merged?.snapshotVersion === 2 || merged?.scoring)
+  const scorePrecision = Number.isFinite(Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision))
+    ? Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision)
+    : 2
+  const formatScore = (value, precision = scorePrecision) => {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric.toFixed(precision) : "0"
+  }
+  const formatCompactNumber = (value) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return "0"
+    return numeric.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")
+  }
+  const clampPercentage = (value, fallback = 0) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric)) return fallback
+    return Math.max(0, Math.min(100, numeric))
+  }
+
+  const [tfcPercentageInput, setTfcPercentageInput] = useState(() =>
+    String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)),
+  )
   const [searchText, setSearchText] = useState("")
-  const [removeWorstCount, setRemoveWorstCount] = useState(1)
+  const [viewMode, setViewMode] = useState("compact")
+  const [removeWorstCount, setRemoveWorstCount] = useState(0)
   const [optOutContests, setOptOutContests] = useState({})
-  const [advancedFilters, setAdvancedFilters] = useState({
+  const [advancedFilters] = useState({
     minSolved: 0,
     maxSolved: Number.POSITIVE_INFINITY,
     minContests: 0,
@@ -26,8 +147,6 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     sortBy: "effectiveTotalSolved", // Default sort by effective solved
     sortDirection: "desc",
   })
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
-  const [liveModal, setLiveModal] = useState(false)
   const [publicProfilesByVjudge, setPublicProfilesByVjudge] = useState({})
   const [isProfilesLoading, setIsProfilesLoading] = useState(false)
   const [failedAvatars, setFailedAvatars] = useState(new Set())
@@ -38,16 +157,100 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return base ? String(base).replace(/\/+$/, "") : ""
   }, [])
   const debugProfiles = process.env.NEXT_PUBLIC_DEBUG_PROFILE_BATCH === "true"
+  const tfcPercentage = useMemo(
+    () => clampPercentage(tfcPercentageInput, 0),
+    [tfcPercentageInput],
+  )
+  const tscPercentage = useMemo(
+    () => (isTscCombined ? 100 - tfcPercentage : 100),
+    [isTscCombined, tfcPercentage],
+  )
+  const normalizedHighlightStudentId = String(highlightStudentId || "")
+  const isCompactView = enableViewModes && viewMode === "compact"
+  const normalizedHighlightVjudgeId = String(highlightVjudgeId || "").trim().toLowerCase()
+  const highlightedGroupIdSet = useMemo(
+    () => new Set((highlightGroupIds || []).map((id) => String(id))),
+    [highlightGroupIds],
+  )
+  const mergedContestIds = useMemo(
+    () => (Array.isArray(merged?.contestIds) ? merged.contestIds : []),
+    [merged?.contestIds],
+  )
+  const orderedContestIds = useMemo(() => {
+    const existingIds = new Set(mergedContestIds)
+    const ordered = (Array.isArray(contestOrder) ? contestOrder : []).filter((contestId) => existingIds.has(contestId))
+    return [
+      ...ordered,
+      ...mergedContestIds.filter((contestId) => !ordered.includes(contestId)),
+    ]
+  }, [contestOrder, mergedContestIds])
 
-  const users = useMemo(() => {
-    let filtered = merged.users.filter(
-      (u) =>
-        !searchText ||
-        u.username.toLowerCase().includes(searchText.toLowerCase()) ||
-        (u.realName && u.realName.toLowerCase().includes(searchText.toLowerCase())),
-    )
+  const computeStdDeviation = (values) => {
+    if (!Array.isArray(values) || values.length === 0) return 0
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length
+    const variance =
+      values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
+      values.length
+    return Math.sqrt(variance)
+  }
 
-    filtered = filtered.map((u) => {
+  const rankedUsers = useMemo(() => {
+    if (isScoredSnapshot) {
+      return (Array.isArray(merged.users) ? merged.users : []).map((u) => ({
+        ...u,
+        totalContestsAttended: Number(u.totalContestsAttended ?? u.attended ?? 0),
+        worstContests: [],
+        optedOutContests: [],
+        effectiveTotalSolved: Number(u.effectiveTotalSolved ?? u.effectiveSolved ?? u.score ?? 0),
+        effectiveTotalPenalty: Number(u.effectiveTotalPenalty ?? u.effectivePenalty ?? 0),
+        effectiveTotalScore: Number(u.effectiveTotalScore ?? u.score ?? 0),
+      }))
+    }
+
+    if (solveOnly) {
+      const processed = merged.users.map((u) => {
+        const activeContestIds = orderedContestIds.filter((cid) => !optOutContests[cid])
+        const attendedContests = activeContestIds.map((cid) => [cid, u.contests?.[cid]]).filter(([, perf]) => Boolean(perf))
+        const totalSolved = attendedContests.reduce((sum, [, perf]) => sum + Number(perf?.solved || 0), 0)
+        const totalContestsAttended = attendedContests.filter(([, perf]) => (
+          Number(perf?.solved || 0) > 0 ||
+          Boolean(perf?.manualSolveOverride) ||
+          (Array.isArray(perf?.submissions) && perf.submissions.length > 0)
+        )).length
+
+        return {
+          ...u,
+          totalContestsAttended,
+          worstContests: [],
+          optedOutContests: Object.keys(optOutContests).filter((contestId) => optOutContests[contestId] && u.contests?.[contestId]),
+          effectiveTotalSolved: totalSolved,
+          effectiveTotalPenalty: 0,
+          effectiveTotalScore: totalSolved,
+        }
+      })
+
+      processed.sort((a, b) => {
+        for (const contestId of orderedContestIds) {
+          if (optOutContests[contestId]) continue
+          const contestDelta = Number(b.contests?.[contestId]?.solved || 0) - Number(a.contests?.[contestId]?.solved || 0)
+          if (contestDelta !== 0) return contestDelta
+        }
+
+        if (a.effectiveTotalSolved !== b.effectiveTotalSolved) {
+          return b.effectiveTotalSolved - a.effectiveTotalSolved
+        }
+
+        if (a.totalContestsAttended !== b.totalContestsAttended) {
+          return b.totalContestsAttended - a.totalContestsAttended
+        }
+
+        return String(a.username || "").localeCompare(String(b.username || ""))
+      })
+
+      return processed
+    }
+
+    let processed = merged.users.map((u) => {
       const allContestIds = Object.keys(u.contests).filter((cid) => !optOutContests[cid])
       const attendedContests = allContestIds.map((cid) => [cid, u.contests[cid]])
       const totalContestsAttended = attendedContests.filter(
@@ -94,6 +297,108 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       return processedUser
     })
 
+    if (isTscCombined) {
+      const highestTfcScore = Number(merged?.tscConfig?.highestTfcScore || 0)
+
+      const adjustedUsers = processed.map((u) => {
+        const dropped = new Set([...(u.worstContests || []), ...(u.optedOutContests || [])])
+        const keptContestIds = Object.keys(u.contests || {}).filter((cid) => !dropped.has(cid))
+
+        const adjustedTscScore = keptContestIds.reduce(
+          (sum, cid) => sum + Number(u.contests?.[cid]?.finalScore || 0),
+          0,
+        )
+        const adjustedPenalty = keptContestIds.reduce(
+          (sum, cid) => sum + Number(u.contests?.[cid]?.penalty || 0),
+          0,
+        )
+        const adjustedAttended = keptContestIds.filter((cid) => {
+          const performance = u.contests?.[cid]
+          return (
+            performance &&
+            (performance.solved > 0 ||
+              (performance.submissions && performance.submissions.length > 0))
+          )
+        }).length
+
+        const keptScores = keptContestIds.map((cid) => Number(u.contests?.[cid]?.finalScore || 0))
+        const keptPenalties = keptContestIds.map((cid) => Number(u.contests?.[cid]?.penalty || 0))
+
+        return {
+          ...u,
+          _adjustedTscScore: adjustedTscScore,
+          _adjustedPenalty: adjustedPenalty,
+          _adjustedAttended: adjustedAttended,
+          stdDeviationScore: computeStdDeviation(keptScores),
+          stdDeviationPen: computeStdDeviation(keptPenalties),
+        }
+      })
+
+      const highestAdjustedTscScore = Math.max(
+        ...adjustedUsers.map((u) => Number(u._adjustedTscScore || 0)),
+        0,
+      )
+
+      processed = adjustedUsers.map((u) => {
+        const tfcRawScore = Number(u.tfcScore || 0)
+        const tfcComponent =
+          tfcPercentage > 0 && highestTfcScore > 0
+            ? (tfcRawScore / highestTfcScore) * tfcPercentage
+            : 0
+        const tscComponent =
+          tscPercentage > 0 && highestAdjustedTscScore > 0
+            ? (Number(u._adjustedTscScore || 0) / highestAdjustedTscScore) *
+              tscPercentage
+            : 0
+
+        const combinedScore = tfcComponent + tscComponent
+        const effectivePenalty =
+          Number(u._adjustedPenalty || 0) + Number(u.stdDeviationPen || 0)
+
+        return {
+          ...u,
+          totalContestsAttended: u._adjustedAttended,
+          effectiveTotalSolved: combinedScore,
+          effectiveTotalScore: combinedScore,
+          effectiveTotalPenalty: effectivePenalty,
+          effectiveSolved: combinedScore,
+          effectivePenalty,
+          tfcComponent,
+          tscComponent,
+          tscAdjustedScore: Number(u._adjustedTscScore || 0),
+        }
+      })
+    }
+
+    processed.sort((a, b) => {
+      if (a.effectiveTotalScore !== b.effectiveTotalScore) return b.effectiveTotalScore - a.effectiveTotalScore
+      if (a.effectiveTotalSolved !== b.effectiveTotalSolved) return b.effectiveTotalSolved - a.effectiveTotalSolved
+      if (a.effectiveTotalPenalty !== b.effectiveTotalPenalty) return a.effectiveTotalPenalty - b.effectiveTotalPenalty
+      return b.totalContestsAttended - a.totalContestsAttended
+    })
+
+    return processed
+  }, [
+    merged.users,
+    merged?.tscConfig?.highestTfcScore,
+    removeWorstCount,
+    optOutContests,
+    isTscCombined,
+    tfcPercentage,
+    tscPercentage,
+    solveOnly,
+    orderedContestIds,
+    isScoredSnapshot,
+  ])
+
+  const users = useMemo(() => {
+    let filtered = rankedUsers.filter(
+      (u) =>
+        !searchText ||
+        u.username.toLowerCase().includes(searchText.toLowerCase()) ||
+        (u.realName && u.realName.toLowerCase().includes(searchText.toLowerCase())),
+    )
+
     filtered = filtered.filter((u) => {
       if (u.effectiveTotalSolved < advancedFilters.minSolved) return false
       if (advancedFilters.maxSolved !== Number.POSITIVE_INFINITY && u.effectiveTotalSolved > advancedFilters.maxSolved)
@@ -110,7 +415,27 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       return true
     })
 
+    if (isScoredSnapshot) return filtered
+
     filtered.sort((a, b) => {
+      if (solveOnly) {
+        for (const contestId of orderedContestIds) {
+          if (optOutContests[contestId]) continue
+          const contestDelta = Number(b.contests?.[contestId]?.solved || 0) - Number(a.contests?.[contestId]?.solved || 0)
+          if (contestDelta !== 0) return contestDelta
+        }
+
+        if (a.effectiveTotalSolved !== b.effectiveTotalSolved) {
+          return b.effectiveTotalSolved - a.effectiveTotalSolved
+        }
+
+        if (a.totalContestsAttended !== b.totalContestsAttended) {
+          return b.totalContestsAttended - a.totalContestsAttended
+        }
+
+        return String(a.username || "").localeCompare(String(b.username || ""))
+      }
+
       const direction = advancedFilters.sortDirection === "asc" ? 1 : -1
 
       switch (advancedFilters.sortBy) {
@@ -140,10 +465,18 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     })
 
     return filtered
-  }, [merged.users, searchText, removeWorstCount, optOutContests, advancedFilters])
+  }, [
+    rankedUsers,
+    searchText,
+    advancedFilters,
+    solveOnly,
+    orderedContestIds,
+    optOutContests,
+    isScoredSnapshot,
+  ])
 
   const profileIds = useMemo(() => {
-    const ids = new Set(users.map((u) => String(u?.username || "").trim().toLowerCase()).filter(Boolean))
+    const ids = new Set(users.map(vjudgeLookupIdForUser).filter(Boolean))
     return Array.from(ids).sort()
   }, [users])
 
@@ -200,16 +533,10 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     }))
   }
 
-  const updateFilter = (key, value) => {
-    setAdvancedFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
-  }
-
-  const maxPossibleSolved = useMemo(() => {
-    return Math.max(...merged.users.map((u) => u.totalSolved), 0)
-  }, [merged.users])
+  useEffect(() => {
+    if (!isTscCombined) return
+    setTfcPercentageInput(String(clampPercentage(merged?.tscConfig?.tfcPercentage, 0)))
+  }, [isTscCombined, merged?.tscConfig?.tfcPercentage])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -292,7 +619,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     return () => {
       controller.abort()
     }
-  }, [profileIdsSignature])
+  }, [profileIdsSignature, profileIds, debugProfiles])
 
   // Progress: build per-contest ranking and compute last vs previous attended
   const { contestRanks, progressByUser } = useMemo(() => {
@@ -308,25 +635,26 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       const bPen = bPerf?.penalty ?? Number.POSITIVE_INFINITY
       return aPen - bPen
     }
-    merged.contestIds.forEach((cid) => {
+    orderedContestIds.forEach((cid) => {
       const participants = merged.users
         .filter((u) => u.contests && u.contests[cid])
         .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]))
       const rankMap = {}
       participants.forEach((u, idx) => {
-        rankMap[u.username] = idx + 1
+        rankMap[rowIdentity(u)] = idx + 1
       })
       contestRanks[cid] = rankMap
     })
-    const lastId = merged.contestIds[merged.contestIds.length - 1]
+    const lastId = orderedContestIds[orderedContestIds.length - 1]
     const progressByUser = {}
     merged.users.forEach((u) => {
-      const lastRank = contestRanks[lastId]?.[u.username]
+      const identity = rowIdentity(u)
+      const lastRank = contestRanks[lastId]?.[identity]
       let prevRank
-      for (let i = merged.contestIds.length - 2; i >= 0; i--) {
-        const cid = merged.contestIds[i]
+      for (let i = orderedContestIds.length - 2; i >= 0; i--) {
+        const cid = orderedContestIds[i]
         if (u.contests && u.contests[cid]) {
-          prevRank = contestRanks[cid]?.[u.username]
+          prevRank = contestRanks[cid]?.[identity]
           if (prevRank !== undefined) break
         }
       }
@@ -338,10 +666,10 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         else if (delta <= -1) status = 'down'
         else status = 'neutral'
       }
-      progressByUser[u.username] = { status, delta, lastRank, prevRank }
+      progressByUser[identity] = { status, delta, lastRank, prevRank }
     })
     return { contestRanks, progressByUser }
-  }, [merged.users, merged.contestIds])
+  }, [merged.users, orderedContestIds])
 
   const totalUsers = users.length
   const getNameColor = (rank) => {
@@ -373,6 +701,100 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
   }
 
   const exportToCSV = () => {
+    if (isScoredSnapshot) {
+      const headers = [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Effective Solved",
+        "Effective Penalty",
+        "Score Deviation",
+        "Penalty Deviation",
+        "Contests",
+        "Demerits",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+
+      const rows = users.map((u, idx) => {
+        const base = [
+          u.rank || idx + 1,
+          u.username,
+          u.realName,
+          formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
+          formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.stdDeviationScore, 2),
+          formatScore(u.stdDeviationPen, 2),
+          u.totalContestsAttended,
+          u.totalDemeritPoints || 0,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+        })
+        return [...base, ...contestData]
+      })
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const filename = `report_${new Date().toISOString().slice(0, 10)}.csv`
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", filename)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      return
+    }
+
+    if (solveOnly) {
+      const headers = [
+        "Rank",
+        "Name",
+        "Real Name",
+        "Total Solves",
+        "Contests",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+
+      const rows = users.map((u, idx) => {
+        const base = [
+          idx + 1,
+          u.username,
+          u.realName,
+          u.effectiveTotalSolved,
+          u.totalContestsAttended,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return optOutContests[cid] ? "Filtered" : Number(perf?.solved || 0)
+        })
+        return [...base, ...contestData]
+      })
+
+      const csv = [headers, ...rows]
+        .map((row) => row.map((field) => `"${String(field).replace(/"/g, '""')}"`).join(","))
+        .join("\n")
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const filename = `report_${new Date().toISOString().slice(0, 10)}.csv`
+      const link = document.createElement("a")
+      const url = URL.createObjectURL(blob)
+      link.setAttribute("href", url)
+      link.setAttribute("download", filename)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      return
+    }
+
     const headers = [
       "Rank",
       "Username",
@@ -381,10 +803,10 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
       "Effective Solved",
       "Effective Penalty",
       "Contests Attended",
-      ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
     ]
 
-    const rows = users.map((u, idx) => {
+    const rows = (solveOnly ? users : rankedUsers).map((u, idx) => {
       const base = [
         idx + 1,
         u.username,
@@ -394,7 +816,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         u.effectiveTotalPenalty.toFixed(2),
         u.totalContestsAttended,
       ]
-      const contestData = merged.contestIds.map((cid) => {
+      const contestData = orderedContestIds.map((cid) => {
         const perf = u.contests[cid]
         const isWorst = u.worstContests.includes(cid)
         const isOptedOut = u.optedOutContests.includes(cid)
@@ -437,17 +859,73 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
     // Dynamic import to reduce bundle size
     const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
 
-    const headers = [
-      "Rank",
-      "Username",
-      "Real Name",
-      "Effective Score",
-      "Effective Solved",
-      "Effective Penalty",
-      "Contests Attended",
-      ...merged.contestIds.map((cid) => merged.contestIdToTitle[cid]),
-    ]
-    const rows = users.map((u, idx) => {
+    const headers = isScoredSnapshot
+      ? [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Effective Solved",
+        "Effective Penalty",
+        "Score Deviation",
+        "Penalty Deviation",
+        "Contests",
+        "Demerits",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+      : solveOnly
+      ? [
+        "Rank",
+        "Name",
+        "Real Name",
+        "Total Solves",
+        "Contests",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+      : [
+        "Rank",
+        "Username",
+        "Real Name",
+        "Effective Score",
+        "Effective Solved",
+        "Effective Penalty",
+        "Contests Attended",
+        ...orderedContestIds.map((cid) => merged.contestIdToTitle[cid]),
+      ]
+    const rows = (solveOnly || isScoredSnapshot ? users : rankedUsers).map((u, idx) => {
+      if (isScoredSnapshot) {
+        const base = [
+          u.rank || idx + 1,
+          u.username,
+          u.realName,
+          formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score),
+          formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty),
+          formatScore(u.stdDeviationScore, 2),
+          formatScore(u.stdDeviationPen, 2),
+          u.totalContestsAttended,
+          u.totalDemeritPoints || 0,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return `Solved: ${Number(perf?.solved || 0)}, Penalty: ${formatScore(perf?.penalty, 2)}, Score: ${formatScore(perf?.finalScore ?? perf?.rawScore, 2)}`
+        })
+        return [...base, ...contestData]
+      }
+
+      if (solveOnly) {
+        const base = [
+          idx + 1,
+          u.username,
+          u.realName,
+          u.effectiveTotalSolved,
+          u.totalContestsAttended,
+        ]
+        const contestData = orderedContestIds.map((cid) => {
+          const perf = u.contests?.[cid]
+          return optOutContests[cid] ? "Filtered" : Number(perf?.solved || 0)
+        })
+        return [...base, ...contestData]
+      }
+
       const base = [
         idx + 1,
         u.username,
@@ -457,7 +935,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         u.effectiveTotalPenalty.toFixed(2),
         u.totalContestsAttended,
       ]
-      const contestData = merged.contestIds.map((cid) => {
+      const contestData = orderedContestIds.map((cid) => {
         const perf = u.contests[cid]
         const isWorst = u.worstContests.includes(cid)
         const isOptedOut = u.optedOutContests.includes(cid)
@@ -530,10 +1008,18 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
   const liveReportData = useMemo(
     () => ({
       ...merged,
-      users,
+      contestIds: orderedContestIds,
+      tscConfig: isTscCombined
+        ? {
+          ...(merged?.tscConfig || {}),
+          tfcPercentage,
+          tscPercentage,
+        }
+        : merged?.tscConfig,
+      users: rankedUsers,
       name,
     }),
-    [merged, users, name],
+    [merged, orderedContestIds, rankedUsers, name, isTscCombined, tfcPercentage, tscPercentage],
   )
 
   return (
@@ -542,68 +1028,107 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         <div className="bg-card rounded-lg p-4 border shadow-sm">
           <div className="flex items-start justify-between">
             <h2 className="text-lg font-semibold mb-4">Report Settings</h2>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 ml-2" title="How ranking & effective score are calculated">
-                  <Info className="h-4 w-4" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
-                  <DialogDescription asChild>
-                    <div className="space-y-4 text-sm leading-relaxed mt-2">
-                      <div>
-                        <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Solved</strong>: Number of accepted problems.</li>
-                          <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
-                          <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
-                          <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
-                          <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
-                        <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Score SD</strong>: SD of per-contest scores.</li>
-                          <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
-                        </ul>
-                        <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Effective Metrics</h4>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
-                          <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
-                          <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Ranking Order</h4>
-                        <ol className="list-decimal list-inside space-y-1">
-                          <li>Higher <strong>Effective Solved / Score</strong></li>
-                          <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
-                          <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
-                        </ol>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
-                        <p>1 worst contest (generally) opt out. </p>
-                      </div>
+            {!solveOnly && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0 ml-2" title="How ranking & effective score are calculated">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>{isScoredSnapshot ? "Scoring Rules" : "Ranking & Effective Score Calculation"}</DialogTitle>
+                    <DialogDescription asChild>
+                      <div className="space-y-4 text-sm leading-relaxed mt-2">
+                        {isScoredSnapshot ? (
+                          <>
+                            <div>
+                              <h4 className="font-semibold mb-1">Solved score formula</h4>
+                              <code className="block rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                                {merged?.scoring?.solvedScoreFormula || merged?.scoring?.formula || "sum(solved)"}
+                              </code>
+                              <h4 className="mb-1 mt-3 font-semibold">Penalty formula</h4>
+                              <code className="block rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+                                {merged?.scoring?.penaltyScoreFormula || "sum(penalty)"}
+                              </code>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-1">Rank Order</h4>
+                              <ol className="list-decimal list-inside space-y-1">
+                                {(merged?.scoring?.sortRules || []).map((rule, ruleIndex) => (
+                                  <li key={`${rule.key}-${ruleIndex}`}>
+                                    {rule.key} {rule.direction === "asc" ? "ascending" : "descending"}
+                                  </li>
+                                ))}
+                              </ol>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold mb-1">Result Units</h4>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(merged?.scoring?.resultUnits || []).map((unit) => (
+                                  <Badge key={unit.key} variant={unit.isComposite ? "secondary" : "outline"}>
+                                    {unit.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                        <div>
+                          <h4 className="font-semibold mb-1">Per-Contest Metrics</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Solved</strong>: Number of accepted problems.</li>
+                            <li><strong>Penalty</strong>: Base contest penalty (e.g., time + wrong submission penalties) plus any demerit penalties (100 per demerit point if user absent; or integrated into recorded penalty).</li>
+                            <li><strong>Score</strong>: Weighted score for that contest (base finalScore × contest weight). Negative impact from demerits is already applied to the stored finalScore.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Aggregated Totals (Raw)</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Total Solved</strong>: Sum of solved across all contests (after weighting if applied inside finalScore logic).</li>
+                            <li><strong>Total Penalty</strong>: Sum of penalty across contests (includes added penalty for demerits / absences).</li>
+                            <li><strong>Total Score</strong>: Sum of each contest&apos;s finalScore x weight.</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Standard Deviation Adjustment</h4>
+                          <p>To reward consistency, a standard deviation (SD) penalty is applied:</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Score SD</strong>: SD of per-contest scores.</li>
+                            <li><strong>Penalty SD</strong>: SD of per-contest penalties.</li>
+                          </ul>
+                          <p className="mt-1">Higher variability (larger SD) reduces effective performance.</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Effective Metrics</h4>
+                          <ul className="list-disc list-inside space-y-1">
+                            <li><strong>Effective Solved / Effective Score</strong>: totalScore - scoreSD.</li>
+                            <li><strong>Effective Penalty</strong>: totalPenalty + penaltySD.</li>
+                            <li><strong>Total Demerits</strong>: Sum of demerit points across contests (shown; each demerit may also affect score/penalty already).</li>
+                          </ul>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Ranking Order</h4>
+                          <ol className="list-decimal list-inside space-y-1">
+                            <li>Higher <strong>Effective Solved / Score</strong></li>
+                            <li>Lower <strong>Effective Penalty</strong> (tie-breaker)</li>
+                            <li>Higher <strong>Contests Attended</strong> (final tie-breaker)</li>
+                          </ol>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold mb-1">Removing Worst Contests / Opt-out</h4>
+                          <p>Default is 0. Increase it only when this report should ignore each participant&apos;s weakest contests.</p>
+                        </div>
+                          </>
+                        )}
 
-                    </div>
-                  </DialogDescription>
-                </DialogHeader>
-              </DialogContent>
-            </Dialog>
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
             <div className="space-y-2">
@@ -619,78 +1144,59 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Remove Worst Contests</label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={removeWorstCount.toString()}
-                  onValueChange={(value) => setRemoveWorstCount(Number(value))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select number" defaultValue={1} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: merged.contestIds.length }, (_, i) => (
-                      <SelectItem key={i} value={i.toString()}>
-                        {i}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="secondary"
-                  onClick={() => setRemoveWorstCount(removeWorstCount)}
-                  className="whitespace-nowrap"
-                >
-                  Apply
-                </Button>
+            {!solveOnly && !isScoredSnapshot && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Remove Worst Contests</label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={removeWorstCount.toString()}
+                    onValueChange={(value) => setRemoveWorstCount(Number(value))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select number" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: orderedContestIds.length }, (_, i) => (
+                        <SelectItem key={i} value={i.toString()}>
+                          {i}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
+
+            {isTscCombined && !solveOnly && !isScoredSnapshot && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">TFC Percentage</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={tfcPercentageInput}
+                  onChange={(e) => setTfcPercentageInput(e.target.value)}
+                  onBlur={() =>
+                    setTfcPercentageInput(String(clampPercentage(tfcPercentageInput, 0)))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  TSC share is auto-calculated from this TFC percentage.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Actions</label>
               <div className="flex flex-wrap gap-2">
-                <LiveShareModal reportData={liveReportData} reportId={liveReportId} />
+                {shareControl || (showLiveShare ? <LiveShareModal reportData={liveReportData} reportId={liveReportId} publishEndpoint={publishEndpoint} /> : null)}
                 <Button size="sm" variant="outline" onClick={exportToCSV} className="flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="lucide lucide-file-text"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" x2="8" y1="13" y2="13" />
-                    <line x1="16" x2="8" y1="17" y2="17" />
-                    <line x1="10" x2="8" y1="9" y2="9" />
-                  </svg>
+                  <FileText className="h-4 w-4" />
                   CSV
                 </Button>
                 <Button size="sm" variant="outline" onClick={exportToPDF} className="flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="lucide lucide-file-type"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <path d="M9 13v-1h6v1" />
-                    <path d="M11 18h2" />
-                    <path d="M12 12v6" />
-                  </svg>
+                  <Download className="h-4 w-4" />
                   PDF
                 </Button>
               </div>
@@ -699,10 +1205,11 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
         </div>
       </div>
 
+      {!isScoredSnapshot && (
       <div className="mb-4 bg-card rounded-lg p-4 border shadow-sm">
         <h3 className="text-sm font-medium mb-3">Exclude Specific Contests</h3>
         <div className="flex flex-wrap gap-2">
-          {merged.contestIds.map((cid) => (
+          {orderedContestIds.map((cid) => (
             <Button
               key={cid}
               variant={optOutContests[cid] ? "destructive" : "outline"}
@@ -715,14 +1222,16 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
               ) : (
                 <CheckCheck className="h-3 w-3 mr-1" />
               )}
+              <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />
               <span className="text-xs">{merged.contestIdToTitle[cid]}</span>
             </Button>
           ))}
         </div>
       </div>
+      )}
 
       <div>
-        <div className="flex items-center gap-2 bg-card p-3 rounded-lg border shadow-sm">
+        <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-2 shadow-sm sm:px-3">
           <div className="flex items-center gap-2">
             <Users2 className="h-5 w-5 text-muted-foreground" />
             <span className="font-medium">Showing</span>
@@ -731,24 +1240,66 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
             </Badge>
             <span className="font-medium">participants</span>
           </div>
+          {enableViewModes && (
+            <Tabs value={viewMode} onValueChange={setViewMode}>
+              <TabsList className="h-12" aria-label="Contest report view">
+                <TabsTrigger className="h-10 px-3 text-xs active:scale-[0.97]" value="compact">
+                  Compact
+                </TabsTrigger>
+                <TabsTrigger className="h-10 px-3 text-xs active:scale-[0.97]" value="extended">
+                  Extended
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
         </div>
       </div>
 
-      <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-        <Table>
+      <ScrollArea
+        className="w-full whitespace-nowrap rounded-md border"
+        horizontal
+        viewportClassName="pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        viewportProps={{
+          role: "region",
+          "aria-label": "Contest report table",
+          tabIndex: 0,
+        }}
+      >
+        <Table className={cn("min-w-max", isCompactView && "text-xs")} containerClassName="overflow-visible">
           <TableHeader>
             <TableRow>
-              <TableHead>Rank</TableHead>
-              <TableHead>Progress</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Contests</TableHead>
-              <TableHead>Effective Score</TableHead>
-              <TableHead>Standard Deviation</TableHead>
-              <TableHead>Total Demerits</TableHead>
-              {merged.contestIds.map((cid) => (
-                <TableHead key={cid} className={optOutContests[cid] ? "bg-destructive/10" : ""}>
-                  <div className="max-w-[120px] truncate">
-                    {merged.contestIdToTitle[cid]}
+              <TableHead className={cn(isCompactView && "h-9 px-3 text-center")}>Rank</TableHead>
+              {!isCompactView && !solveOnly && !isScoredSnapshot && <TableHead>Progress</TableHead>}
+              <TableHead className={cn(isCompactView && "h-9 w-[240px] min-w-[240px] px-3")}>{isCompactView ? "Name / ID" : "Name"}</TableHead>
+              {!isCompactView && <TableHead>Contests</TableHead>}
+              {showPerformance && <TableHead className="px-3 text-center">
+                <div className="text-xs font-medium">Performance</div>
+              </TableHead>}
+              {isCompactView ? (
+                <TableHead className="h-9 px-3 text-center">Solved (Penalty)</TableHead>
+              ) : solveOnly ? (
+                <TableHead>Total Solves</TableHead>
+              ) : isScoredSnapshot ? (
+                <>
+                  <TableHead>Effective Score</TableHead>
+                  <TableHead>Standard Deviation</TableHead>
+                  <TableHead>Total Demerits</TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead>Effective Score</TableHead>
+                  <TableHead>Standard Deviation</TableHead>
+                  <TableHead>Total Demerits</TableHead>
+                </>
+              )}
+              {orderedContestIds.map((cid) => (
+                <TableHead
+                  key={cid}
+                  className={cn(optOutContests[cid] && "bg-destructive/10", isCompactView && "h-9 px-3 text-center")}
+                >
+                  <div className={cn("flex items-center gap-1.5 truncate", isCompactView ? "w-full justify-center" : "max-w-[140px]")}>
+                    {!isCompactView && <ProviderBadge provider={merged.contestMetaById?.[cid]?.provider || cid.split(":")[0]} />}
+                    <span className="truncate">{merged.contestIdToTitle[cid]}</span>
                     {optOutContests[cid] && (
                       <span className="ml-1 text-destructive">
                         <AlertCircle className="inline h-3 w-3" />
@@ -762,16 +1313,20 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
           <TableBody>
             {users.map((u, index) => {
               const isTop = index === 0
-              const profileKey = String(u.username || "").toLowerCase()
-              const hasResolvedLookup = Object.prototype.hasOwnProperty.call(publicProfilesByVjudge, profileKey)
+              const identity = rowIdentity(u)
+              const profileKey = vjudgeLookupIdForUser(u)
+              const hasResolvedLookup = Boolean(profileKey) && Object.prototype.hasOwnProperty.call(publicProfilesByVjudge, profileKey)
               const profile = hasResolvedLookup ? publicProfilesByVjudge[profileKey] : null
               const hasDbProfile = !!profile
               const shouldUseFallback = hasResolvedLookup && !hasDbProfile
-              const isResolving = isProfilesLoading && !hasResolvedLookup
+              const isResolving = Boolean(profileKey) && isProfilesLoading && !hasResolvedLookup
+              const mappedStudent = u.classroomMapping?.student || null
+              const mappedGroup = u.classroomMapping?.group || null
               const dbAvatar = hasDbProfile ? resolveAvatarUrl(profile.profile_pic) : null
               const fallbackAvatar = resolveAvatarUrl(u.avatarUrl)
-              const customAvatar = getCustomAvatar(u.username)
-              const hasFailedAvatar = failedAvatars.has(u.username)
+              const classroomMappingLabel = u.classroomMapping?.targetName || mappedStudent?.name || mappedGroup?.name || null
+              const customAvatar = getCustomAvatar(classroomMappingLabel || u.realName || u.username)
+              const hasFailedAvatar = failedAvatars.has(identity)
               const resolvedAvatar = hasFailedAvatar 
                 ? customAvatar
                 : (hasDbProfile && dbAvatar) 
@@ -781,22 +1336,71 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                     : isResolving
                       ? null
                       : customAvatar
-              const resolvedName = hasDbProfile
-                ? profile.full_name || u.realName || u.username
-                : shouldUseFallback
-                  ? u.username || "—"
-                  : "Loading..."
-              const resolvedBatch = hasDbProfile ? profile.batch_name || null : null
-              const resolvedVjudgeId = hasDbProfile ? profile.vjudge_id || u.username : u.username
-              const resolvedMistId = hasDbProfile ? profile.mist_id || null : u.mist_id || u.mistId || null
-              const resolvedCfId = hasDbProfile ? profile.cf_id || null : u.cf_id || u.cfId || null
+              const resolvedName = classroomMappingLabel
+                || (hasDbProfile ? profile.full_name || u.realName || u.username : null)
+                || (isResolving ? "Loading..." : u.realName || u.username || "—")
+              const resolvedBatch = mappedStudent?.batchName || mappedStudent?.batch_name || (hasDbProfile ? profile.batch_name || null : null)
+              const resolvedVjudgeId = mappedStudent?.vjudgeId
+                || mappedStudent?.vjudge_id
+                || (hasDbProfile ? profile.vjudge_id || null : null)
+                || (hasProvider(u, "vjudge") ? profileKey || u.username : null)
+              const codeforcesContest = Object.values(u.contests || {}).find((contest) => normalizeProvider(contest?.provider) === "codeforces")
+              const resolvedCfId = mappedStudent?.cfId
+                || mappedStudent?.cf_id
+                || (hasDbProfile ? profile.cf_id || null : null)
+                || (Array.isArray(codeforcesContest?.sourceHandles) ? codeforcesContest.sourceHandles[0] : null)
+                || (hasProvider(u, "codeforces") ? sourceHandlesForUser(u)[0] : null)
+              const resolvedMistId = mappedStudent?.mistId || mappedStudent?.mist_id || (hasDbProfile ? profile.mist_id || null : u.mist_id || u.mistId || null)
+              const compactParticipantId = resolvedMistId || resolvedVjudgeId || resolvedCfId || u.username || "—"
+              const compactSolved = isScoredSnapshot
+                ? u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score ?? 0
+                : u.effectiveTotalSolved ?? u.totalSolved ?? 0
+              const compactPenalty = isScoredSnapshot
+                ? u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty ?? 0
+                : solveOnly
+                  ? orderedContestIds.reduce((total, contestId) => {
+                      if (optOutContests[contestId]) return total
+                      return total + Number(u.contests?.[contestId]?.penalty || 0)
+                    }, 0)
+                  : u.effectiveTotalPenalty ?? u.effectivePenalty ?? u.totalPenalty ?? 0
+              const isClassroomParticipant = Boolean(u.isClassroomParticipant || u.classroomMapping?.isClassroomParticipant)
+              const mappedStudentId = String(u.studentId || u.classroomMapping?.studentId || u.classroomMapping?.student?.id || "")
+              const mappedGroupId = String(u.groupId || u.classroomMapping?.groupId || u.classroomMapping?.group?.id || "")
+              const rowHandles = [
+                ...sourceHandlesForUser(u),
+                u.username,
+                u.realName,
+                resolvedVjudgeId,
+                resolvedCfId,
+                u.classroomMapping?.student?.vjudgeId,
+                u.classroomMapping?.student?.vjudge_id,
+                u.classroomMapping?.student?.cfId,
+                u.classroomMapping?.student?.cf_id,
+              ].map((value) => String(value || "").trim().toLowerCase()).filter(Boolean)
+              const isHighlightedParticipant = Boolean(
+                (normalizedHighlightStudentId && mappedStudentId === normalizedHighlightStudentId) ||
+                (normalizedHighlightVjudgeId && rowHandles.includes(normalizedHighlightVjudgeId)) ||
+                (mappedGroupId && highlightedGroupIdSet.has(mappedGroupId)),
+              )
               return (
-                <TableRow key={u.username} className={cn(index % 2 === 0 ? "bg-muted/20" : "", isTop && 'top-rank-wrapper')}>
-                  <TableCell>
+                <TableRow
+                  key={identity || u.username}
+                  className={cn(
+                    isHighlightedParticipant
+                      ? "bg-primary/10 ring-1 ring-inset ring-primary/25"
+                      : isClassroomParticipant
+                        ? "bg-emerald-500/5"
+                        : index % 2 === 0
+                          ? "bg-muted/20"
+                          : "",
+                    isTop && 'top-rank-wrapper',
+                  )}
+                >
+                  <TableCell className={cn(isCompactView && "px-3 py-2 text-center align-middle")}>
                     <div className={cn('inline-flex items-center justify-center', isTop && 'crown-badge')}>
                       <Badge
                         variant="default"
-                        className={`min-w-[32px] transition-all duration-200 ${index < 12
+                        className={`${isCompactView ? "h-5 min-w-7 px-1.5 text-[10px]" : "min-w-[32px]"} transition-colors duration-200 ${index < 12
                             ? index < 3
                               ? "bg-yellow-500 text-white"
                               : index < 6
@@ -807,37 +1411,53 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             : ""
                           } ${isTop ? 'bg-transparent text-[hsl(var(--alumni-gold))] font-bold shadow-none' : ''}`}
                       >
-                        {index + 1}
+                        {u.rank || index + 1}
                       </Badge>
                     </div>
                   </TableCell>
                   {/* Progress */}
-                  <TableCell className="min-w-[90px]">
-                    {(() => {
-                      const p = progressByUser[u.username] || { status: 'neutral', delta: 0 }
-                      const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
-                      const improvement = p.delta > 0
-                      const decline = p.delta < 0
-                      const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
-                      return (
-                        <div className="flex items-center gap-1.5">
-                          <Icon className={`${improvement ? 'text-green-600' : decline ? 'text-red-600' : 'text-muted-foreground'} h-4 w-4`} />
-                          {hasComparison ? (
-                            improvement ? (
-                              <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
-                            ) : decline ? (
-                              <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                  {!isCompactView && !solveOnly && !isScoredSnapshot && (
+                    <TableCell className="min-w-[90px]">
+                      {(() => {
+                        const p = progressByUser[identity] || { status: 'neutral', delta: 0 }
+                        const hasComparison = p.lastRank !== undefined && p.prevRank !== undefined
+                        const improvement = p.delta > 0
+                        const decline = p.delta < 0
+                        const Icon = improvement ? TrendingUp : decline ? TrendingDown : Minus
+                        return (
+                          <div className="flex items-center gap-1.5">
+                            <Icon className={`${improvement ? 'text-green-600' : decline ? 'text-red-600' : 'text-muted-foreground'} h-4 w-4`} />
+                            {hasComparison ? (
+                              improvement ? (
+                                <sup className="text-[10px] font-semibold text-green-600">+{p.delta}</sup>
+                              ) : decline ? (
+                                <sub className="text-[10px] font-semibold text-red-600">{p.delta}</sub>
+                              ) : (
+                                <span className="text-[10px] font-medium text-muted-foreground">0</span>
+                              )
                             ) : (
-                              <span className="text-[10px] font-medium text-muted-foreground">0</span>
-                            )
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
-                          )}
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </TableCell>
+                  )}
+                  <TableCell className={cn(isCompactView && "px-3 py-2")}>
+                    {isCompactView ? (
+                      <div className="grid w-[216px] grid-cols-[minmax(0,1fr)_1.75rem_1.75rem] items-center gap-1">
+                        <div className="min-w-0 leading-tight">
+                          <p className="truncate text-xs font-semibold text-foreground" title={resolvedName}>
+                            {resolvedName}
+                          </p>
+                          <p className="mt-0.5 truncate text-[10px] text-muted-foreground" title={String(compactParticipantId)}>
+                            {compactParticipantId}
+                          </p>
                         </div>
-                      )
-                    })()}
-                  </TableCell>
-                  <TableCell>
+                        <ProviderProfileLink provider="vjudge" id={resolvedVjudgeId} />
+                        <ProviderProfileLink provider="codeforces" id={resolvedCfId} />
+                      </div>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
@@ -870,7 +1490,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             )}
                             quality={20}
                             onError={() => {
-                              setFailedAvatars(prev => new Set(prev).add(u.username))
+                              setFailedAvatars(prev => new Set(prev).add(identity))
                             }}
                           />
                         )}
@@ -891,105 +1511,211 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                         </p>
                         {!isResolving && (
                           <div className="mt-1 flex items-center gap-2">
-                            {resolvedVjudgeId ? (
-                              <Link
-                                href={`https://vjudge.net/user/${encodeURIComponent(resolvedVjudgeId)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center"
-                                title={`VJudge: ${resolvedVjudgeId}`}
-                              >
-                                <Image
-                                  src="/vj.jpg"
-                                  alt="VJudge"
-                                  width={16}
-                                  height={16}
-                                  className="h-4 w-4 rounded-sm object-cover"
-                                />
-                              </Link>
-                            ) : null}
-
-                            {resolvedCfId ? (
-                              <Link
-                                href={`https://codeforces.com/profile/${encodeURIComponent(resolvedCfId)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center"
-                                title={`Codeforces: ${resolvedCfId}`}
-                              >
-                                <Image
-                                  src="/cf.png"
-                                  alt="Codeforces"
-                                  width={16}
-                                  height={16}
-                                  className="h-4 w-4 rounded-sm object-cover"
-                                />
-                              </Link>
-                            ) : null}
+                            {isClassroomParticipant && (
+                              <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-700">
+                                {classroomMappingLabel || "Classroom"}
+                              </Badge>
+                            )}
+                            {isHighlightedParticipant && (
+                              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] text-primary">
+                                You
+                              </Badge>
+                            )}
+                            {(Array.isArray(u.providers) && u.providers.length > 0 ? u.providers : Object.values(u.contests || {}).map((contest) => contest?.provider))
+                              .map(normalizeProvider)
+                              .filter((provider, providerIndex, providers) => provider && providers.indexOf(provider) === providerIndex)
+                              .map((provider) => (
+                                <ProviderBadge key={`${identity}-${provider}`} provider={provider} />
+                              ))}
+                            {resolvedVjudgeId ? <ProviderProfileLink provider="vjudge" id={resolvedVjudgeId} /> : null}
+                            {resolvedCfId ? <ProviderProfileLink provider="codeforces" id={resolvedCfId} /> : null}
                           </div>
                         )}
                       </div>
                     </div>
-                  </TableCell>
-                  
-                  <TableCell>{u.totalContestsAttended}</TableCell>
-                  <TableCell>
-                    <p>
-                      Solved: {u.effectiveTotalSolved.toFixed(2)}
-                      {u.effectiveTotalSolved !== u.totalSolved && (
-                        <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
-                      )}
-                    </p>
-                    <p>
-                      Penalty: {u.effectiveTotalPenalty.toFixed(2)}
-                      {u.effectiveTotalPenalty !== u.totalPenalty && (
-                        <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
-                      )}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
-                    <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
-                  </TableCell>
-                  <TableCell>
-                    {u.totalDemeritPoints > 0 ? (
-                      <div
-                        className="relative"
-                        onMouseEnter={(e) => {
-                          // Create tooltip showing all demerit reasons
-                          const allDemerits = Object.values(u.demerits).flat();
-                          if (allDemerits.length > 0) {
-                            const tooltip = document.createElement('div');
-                            tooltip.className = 'absolute z-50 p-2 bg-black text-white text-xs rounded shadow-lg max-w-xs';
-                            tooltip.style.left = '0px';
-                            tooltip.style.top = '-10px';
-                            tooltip.style.transform = 'translateY(-100%)';
-                            tooltip.innerHTML = allDemerits.map(d =>
-                              `<div class="mb-1"><strong>Contest ${d.contest_id}:</strong> -${d.demerit_point} points - ${d.reason}</div>`
-                            ).join('');
-                            e.target.appendChild(tooltip);
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          // Remove tooltip
-                          const tooltip = e.target.querySelector('.absolute.z-50');
-                          if (tooltip) {
-                            tooltip.remove();
-                          }
-                        }}
-                      >
-                        <Badge variant="destructive" className="cursor-help">
-                          -{u.totalDemeritPoints}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  {merged.contestIds.map((cid) => {
+                  
+                  {!isCompactView && <TableCell className="tabular-nums">{u.totalContestsAttended}</TableCell>}
+                  {showPerformance && <TableCell className="px-3 py-1 text-center align-middle"><ContestPerformance performance={u.recentPerformance} name={u.realName || u.username} /></TableCell>}
+                  {isCompactView ? (
+                    <TableCell className="px-3 py-2 text-center font-semibold tabular-nums text-foreground">
+                      {formatCompactNumber(compactSolved)}<span className="font-normal text-muted-foreground">({formatCompactNumber(compactPenalty)})</span>
+                    </TableCell>
+                  ) : solveOnly ? (
+                    <TableCell className="text-base font-semibold tabular-nums">{u.effectiveTotalSolved}</TableCell>
+                  ) : isScoredSnapshot ? (
+                    <>
+                      <TableCell>
+                        <p className="tabular-nums">
+                          <span className="font-medium">Solved:</span>{" "}
+                          <span className="font-semibold text-primary">
+                            {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
+                          </span>
+                          {Number(u.solvedScore ?? u.score ?? 0) !== Number(u.totalScore ?? 0) && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({formatScore(u.totalScore, 2)})
+                            </span>
+                          )}
+                        </p>
+                        <p className="tabular-nums">
+                          <span className="font-medium">Penalty:</span>{" "}
+                          <span className="font-semibold">
+                            {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
+                          </span>
+                          {Number(u.penaltyScore ?? u.effectivePenalty ?? 0) !== Number(u.totalPenalty ?? 0) && (
+                            <span className="ml-1 text-xs text-muted-foreground">
+                              ({formatScore(u.totalPenalty, 2)})
+                            </span>
+                          )}
+                        </p>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        <p><span className="font-medium">Score:</span> {formatScore(u.stdDeviationScore, 2)}</p>
+                        <p><span className="font-medium">Penalty:</span> {formatScore(u.stdDeviationPen, 2)}</p>
+                      </TableCell>
+                      <TableCell>
+                        {Number(u.totalDemeritPoints || 0) > 0 ? (
+                          <Badge variant="destructive">-{u.totalDemeritPoints}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell>
+                        <p>
+                          Solved: {u.effectiveTotalSolved.toFixed(2)}
+                          {u.effectiveTotalSolved !== u.totalSolved && (
+                            <span className="text-xs text-muted-foreground ml-1">({u.totalSolved})</span>
+                          )}
+                        </p>
+                        <p>
+                          Penalty: {u.effectiveTotalPenalty.toFixed(2)}
+                          {u.effectiveTotalPenalty !== u.totalPenalty && (
+                            <span className="text-xs text-muted-foreground ml-1">({u.totalPenalty.toFixed(2)})</span>
+                          )}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <p>Score: {u.stdDeviationScore.toFixed(2)}</p>
+                        <p>Penalty: {u.stdDeviationPen.toFixed(2)}</p>
+                      </TableCell>
+                      <TableCell>
+                        {u.totalDemeritPoints > 0 ? (
+                          <div className="relative">
+                            <Badge
+                              variant="destructive"
+                              className="cursor-help"
+                              title={Object.values(u.demerits || {})
+                                .flat()
+                                .map((d) => `Contest ${d.contest_id}: -${d.demerit_point} points - ${d.reason}`)
+                                .join("\n")}
+                            >
+                              -{u.totalDemeritPoints}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
+                  {orderedContestIds.map((cid) => {
                     const perf = u.contests[cid]
-                    const isWorst = u.worstContests.includes(cid)
-                    const isOptedOut = u.optedOutContests.includes(cid)
+                    const worstContests = Array.isArray(u.worstContests) ? u.worstContests : []
+                    const optedOutContests = Array.isArray(u.optedOutContests) ? u.optedOutContests : []
+                    const isWorst = worstContests.includes(cid)
+                    const isOptedOut = optedOutContests.includes(cid)
+                    if (isCompactView) {
+                      const isExcluded = !perf || isWorst || isOptedOut || perf?.excluded || perf?.dropped
+                      const solved = isExcluded ? 0 : Number(perf?.solved || 0)
+                      const penalty = isExcluded ? 0 : Number(perf?.penalty || 0)
+                      return (
+                        <TableCell
+                          key={cid}
+                          className={cn(
+                            "px-3 py-2 text-center tabular-nums",
+                            isExcluded && "text-muted-foreground",
+                            (isWorst || isOptedOut || perf?.excluded || perf?.dropped) && "bg-muted/50",
+                          )}
+                        >
+                          <span className="font-semibold text-foreground">{formatCompactNumber(solved)}</span>
+                          <span>({formatCompactNumber(penalty)})</span>
+                        </TableCell>
+                      )
+                    }
+                    if (solveOnly) {
+                      const isManual = Boolean(perf?.manualSolveOverride)
+                      return (
+                        <TableCell
+                          key={cid}
+                          className={cn(
+                            "text-center tabular-nums",
+                            isOptedOut && "bg-destructive/10 text-muted-foreground",
+                          )}
+                        >
+                          <div className="flex min-w-[72px] flex-col items-center gap-1">
+                            <span className="text-base font-semibold">{isOptedOut ? 0 : Number(perf?.solved || 0)}</span>
+                            {isManual && !isOptedOut && (
+                              <Badge variant="outline" className="h-5 border-primary/25 bg-primary/10 px-1.5 text-[10px] text-primary">
+                                Manual
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                      )
+                    }
+                    if (isScoredSnapshot) {
+                      const sourceBreakdown = perf?.sourceBreakdown && typeof perf.sourceBreakdown === "object"
+                        ? Object.entries(perf.sourceBreakdown)
+                        : []
+                      return (
+                        <TableCell key={cid} className={cn((perf?.excluded || perf?.dropped) && "bg-muted/50 text-muted-foreground")}>
+                          <div className="min-w-[120px] space-y-1 text-sm">
+                            <div className="flex items-center gap-1.5">
+                              {perf?.isComposite && (
+                                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">Composite</Badge>
+                              )}
+                              {perf?.dropped && (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Dropped</Badge>
+                              )}
+                              {perf?.excluded && (
+                                <Badge variant="outline" className="h-5 px-1.5 text-[10px]">Excluded</Badge>
+                              )}
+                            </div>
+                            <div>Solved: {Number(perf?.solved || 0)}</div>
+                            <div>Score: {formatScore(perf?.finalScore ?? perf?.rawScore, 2)} ({formatScore(perf?.penalty, 2)})</div>
+                            {sourceBreakdown.length > 1 && (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                                    Breakdown
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-lg">
+                                  <DialogHeader>
+                                    <DialogTitle>{merged.contestIdToTitle[cid]} Breakdown</DialogTitle>
+                                    <DialogDescription>Source contest metrics used in this result unit.</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+                                    {sourceBreakdown.map(([sourceId, source]) => (
+                                      <div key={sourceId} className="rounded-md border p-3 text-sm">
+                                        <p className="font-medium">{source?.contestTitle || sourceId}</p>
+                                        <p className="text-muted-foreground">
+                                          Solved {Number(source?.solved || 0)} - Penalty {formatScore(source?.penalty, 2)} - Source score {formatScore(source?.finalScore ?? source?.rawScore, 2)}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+                          </div>
+                        </TableCell>
+                      )
+                    }
                     if (!perf || isWorst || isOptedOut) {
                       let cellClassName = ""
                       let statusText = null
@@ -1012,8 +1738,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                           )}
                           <div>Solved: 0</div>
-                          <div>Penalty: 0.00</div>
-                          <div>Score: 0.00</div>
+                          <div>Score: 0.00 (0.00)</div>
                         </TableCell>
                       )
                     }
@@ -1033,8 +1758,7 @@ function ReportTable({ merged, report_id, partial, liveReportId, name }) {
                             <div className="text-xs font-medium mb-1 text-muted-foreground">{statusText}</div>
                           )}
                           <div>Solved: {perf.solved}</div>
-                          <div>Penalty: {perf.penalty.toFixed(2)}</div>
-                          <div>Score: {perf.finalScore.toFixed(2)}</div>
+                          <div>Score: {perf.finalScore.toFixed(2)} ({perf.penalty.toFixed(2)})</div>
                         </div>
                       </TableCell>
                     )

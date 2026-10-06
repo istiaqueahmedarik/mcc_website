@@ -15,19 +15,22 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { get_with_token } from "@/lib/action";
+import { get_with_token, logout } from "@/lib/action";
 import {
   AlertTriangle,
   Award,
   CalendarClock,
   ChartNoAxesCombined,
   Code,
+  FileSpreadsheet,
   Globe,
   Keyboard,
   LogIn,
+  LogOut,
   Menu,
   Settings,
   ShieldHalf,
+  Trophy,
   UserCheck,
   UserPlus,
   Users
@@ -44,6 +47,7 @@ const Navbar = async () => {
       icon: CalendarClock,
       label: 'Reminders',
     },
+    { href: '/contests', icon: Trophy, label: 'Contests' },
     { href: '/icpc_journey', icon: Globe, label: 'ICPC' },
     { href: '/alumni', icon: Award, label: 'Alumni' },
     { href: '/achievements', icon: ChartNoAxesCombined, label: 'Achievements' },
@@ -53,14 +57,16 @@ const Navbar = async () => {
   ]
 
   const userTools = [
-    // { href: '/courses', icon: BookOpen, label: 'Course Details' },
-    // { href: '/my_dashboard', icon: Backpack, label: 'My Dashboard' },
+    { href: '/classroom/list', icon: Users, label: 'Classrooms' },
   ]
 
   const adminTools = [
     { href: '/admin', icon: Settings, label: 'CMS' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
+    { href: '/admin/trainers', icon: UserCheck, label: 'Manage Trainers & Admins' },
+    { href: '/admin/student-profiles', icon: FileSpreadsheet, label: 'Student Profile Export' },
     { href: '/admin/icpc', icon: CalendarClock, label: 'ICPC' },
+    { href: '/admin/contests', icon: Trophy, label: 'Contest Manager' },
     { href: '/achievements/insert', icon: Award, label: 'Insert Achievement' },
     // { href: '/batches', icon: BrainCircuit, label: 'Batches' },
     // { href: '/courses/insert', icon: Coffee, label: 'Create Course' },
@@ -73,15 +79,29 @@ const Navbar = async () => {
   const loggedIn = (await cookies()).get("token");
   const user = await get_with_token("auth/user/profile");
 
+  const profile = (user && user.result && user.result[0]) || null;
+  const isLoggedIn = Boolean(loggedIn && profile);
+  const isAdmin = Boolean(profile && profile.admin);
+  const isTrainer = Boolean(profile && profile.trainer);
+  const canUseTrainerDashboard = isTrainer || isAdmin;
+
+  const trainerTools = [];
+  if (canUseTrainerDashboard) {
+    trainerTools.push({ href: '/trainer/dashboard', icon: Code, label: 'Trainer Dashboard' });
+  }
+
+  // Pure trainers go to /trainer/profile; Admins & students go to /profile
+  const profileHref = (isTrainer && !isAdmin) ? '/trainer/profile' : '/profile';
+
   return (
     <nav className="w-full px-4 md:px-8 py-4 bg-background shadow-sm">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <div className="flex w-full items-center justify-between">
         <div className="flex items-center w-full space-x-8">
           <ProgressLink href="/" className="flex items-center space-x-2">
             <MccLogo w={60} h={60} />
           </ProgressLink>
 
-          <div className="hidden lg:flex items-center justify-center w-full space-x-2">
+          <div className="hidden lg:flex flex-wrap items-center justify-center w-full gap-1">
             {navItems.map((item) => (
               <ProgressLink key={item.href} href={item.href}>
                 <Button
@@ -94,7 +114,7 @@ const Navbar = async () => {
                 </Button>
               </ProgressLink>
             ))}
-            {loggedIn &&
+            {isLoggedIn && !canUseTrainerDashboard &&
               userTools.map((item) => (
                 <ProgressLink key={item.href} href={item.href}>
                   <Button
@@ -107,7 +127,20 @@ const Navbar = async () => {
                   </Button>
                 </ProgressLink>
               ))}
-            {user && user.result && user.result[0].admin && (
+            {isLoggedIn &&
+              trainerTools.map((item) => (
+                <ProgressLink key={item.href} href={item.href}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm font-medium"
+                  >
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                  </Button>
+                </ProgressLink>
+              ))}
+            {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex flex-row items-center gap-2">
                   {" "}
@@ -131,28 +164,29 @@ const Navbar = async () => {
         <div className="flex items-center space-x-4">
           <ThemeChanger />
           <div className="hidden md:flex items-center space-x-2">
-            <ProgressLink href="/login" className={`${loggedIn && "hidden"}`}>
+            <ProgressLink href="/login" className={`${isLoggedIn && "hidden"}`}>
               <Button variant="outline" size="sm">
                 <LogIn className="w-4 h-4 mr-2" />
                 Login
               </Button>
             </ProgressLink>
-            <ProgressLink href="/signup" className={`${loggedIn && "hidden"}`}>
+            <ProgressLink href="/signup" className={`${isLoggedIn && "hidden"}`}>
               <Button variant="default" size="sm">
                 <UserPlus className="w-4 h-4 mr-2" />
                 Sign Up
               </Button>
             </ProgressLink>
             <ProgressLink
-              href="/profile"
-              className={`${!loggedIn && "hidden"}`}
+              href={profileHref}
+              className={`${!isLoggedIn && "hidden"}`}
             >
+
               <Avatar className="w-8 h-8">
                 <AvatarImage
-                  src={user && user.result && user.result[0].profile_pic}
+                  src={profile?.profile_pic}
                 />
                 <AvatarFallback>
-                  {user && user.result && user.result[0].full_name[0]}
+                  {profile?.full_name?.[0]}
                 </AvatarFallback>
               </Avatar>
             </ProgressLink>
@@ -190,10 +224,38 @@ const Navbar = async () => {
                     </SheetClose>
                   ))}
 
-                  <hr className="my-4" />
-                  {user &&
-                    user.result &&
-                    user.result[0].admin &&
+                  {isLoggedIn && !canUseTrainerDashboard &&
+                    userTools.map((item, index) => (
+                      <SheetClose asChild key={index}>
+                        <ProgressLink key={item.href} href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-lg"
+                          >
+                            <item.icon className="mr-2 h-5 w-5" />
+                            {item.label}
+                          </Button>
+                        </ProgressLink>
+                      </SheetClose>
+                    ))}
+
+                  {isLoggedIn &&
+                    trainerTools.map((item, index) => (
+                      <SheetClose asChild key={index}>
+                        <ProgressLink key={item.href} href={item.href}>
+                          <Button
+                            variant="ghost"
+                            className="w-full justify-start text-lg"
+                          >
+                            <item.icon className="mr-2 h-5 w-5" />
+                            {item.label}
+                          </Button>
+                        </ProgressLink>
+                      </SheetClose>
+                    ))}
+
+                  {isAdmin && <hr className="my-4" />}
+                  {isAdmin &&
                     adminTools.map((item, index) => (
                       <SheetClose asChild key={index}>
                         <ProgressLink key={item.href} href={item.href}>
@@ -211,7 +273,7 @@ const Navbar = async () => {
                   <SheetClose asChild>
                     <ProgressLink
                       href="/login"
-                      className={`${loggedIn && "hidden"}`}
+                      className={`${isLoggedIn && "hidden"}`}
                     >
                       <Button
                         variant="outline"
@@ -225,7 +287,7 @@ const Navbar = async () => {
                   <SheetClose asChild>
                     <ProgressLink
                       href="/signup"
-                      className={`${loggedIn && "hidden"}`}
+                      className={`${isLoggedIn && "hidden"}`}
                     >
                       <Button
                         variant="default"
@@ -238,19 +300,36 @@ const Navbar = async () => {
                   </SheetClose>
                   <SheetClose asChild>
                     <ProgressLink
-                      href="/profile"
-                      className={`${!loggedIn && "hidden"}`}
+                      href={profileHref}
+                      className={`${!isLoggedIn && "hidden"}`}
                     >
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage
-                          src={user && user.result && user.result[0].profile_pic}
-                        />
-                        <AvatarFallback>
-                          {user && user.result && user.result[0].full_name[0]}
-                        </AvatarFallback>
-                      </Avatar>
+                      <div className="flex items-center gap-3 py-1">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage
+                            src={profile?.profile_pic}
+                          />
+                          <AvatarFallback>
+                            {profile?.full_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-base font-medium">My Profile</span>
+                      </div>
                     </ProgressLink>
                   </SheetClose>
+                  {isLoggedIn && (
+                    <SheetClose asChild>
+                      <form action={logout} className="pt-2">
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="w-full justify-start text-lg text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                        >
+                          <LogOut className="mr-2 h-5 w-5" />
+                          Logout
+                        </Button>
+                      </form>
+                    </SheetClose>
+                  )}
                 </div>
               </SheetClose>
             </SheetContent>

@@ -43,23 +43,27 @@ export default function IUPCSection() {
     useEffect(() => {
         async function fetchBapsojContests() {
             setIsLoading(true)
+            let tophContests = []
+            
             try {
-                const response = await fetch("https://api.bapsoj.org/api/judge/contests/?offset=0&limit=25");
+                tophContests = await getContests() || []
+            } catch (e) {
+                console.error("Error fetching Toph contests:", e)
+            }
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 second timeout
+                const response = await fetch("https://api.bapsoj.org/api/judge/contests/?offset=0&limit=25", { signal: controller.signal });
+                clearTimeout(timeoutId);
                 const data = await response.json();
 
-                const res = await getContests()
-                const tophContests = res
-                console.log(tophContests)
-               
-
                 const bapsojContests = convertBapsojContests(data.results)
-                
-
                 setAllIUPCContests([...tophContests, ...bapsojContests])
-                setIsLoading(false)
             } catch (error) {
                 console.error("Error fetching BAPSOJ contests:", error)
                 setAllIUPCContests(tophContests)
+            } finally {
                 setIsLoading(false)
             }
         }

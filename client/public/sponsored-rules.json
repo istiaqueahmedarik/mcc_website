@@ -1,0 +1,37 @@
+{
+  "rules": [
+    {
+      "mistRanks": [1],
+      "brackets": [
+        { "limit": 1, "percentage": 200 },
+        { "limit": 5, "percentage": 150 },
+        { "limit": 10, "percentage": 125 },
+        { "limit": 20, "percentage": 100 },
+        { "limit": 25, "percentage": 75 }
+      ],
+      "defaultPercentage": 50
+    },
+    {
+      "mistRanks": [2, 3],
+      "brackets": [
+        { "limit": 2, "percentage": 200 },
+        { "limit": 10, "percentage": 150 },
+        { "limit": 20, "percentage": 125 },
+        { "limit": 30, "percentage": 100 },
+        { "limit": 35, "percentage": 75 }
+      ],
+      "defaultPercentage": 50
+    },
+    {
+      "mistRanks": "4+",
+      "brackets": [
+        { "limit": 3, "percentage": 200 },
+        { "limit": 15, "percentage": 150 },
+        { "limit": 30, "percentage": 125 },
+        { "limit": 40, "percentage": 100 },
+        { "limit": 45, "percentage": 75 }
+      ],
+      "defaultPercentage": 50
+    }
+  ]
+}

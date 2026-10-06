@@ -1,6 +1,5 @@
 "use client";
 
-import MccLogo from "@/components/IconChanger/MccLogo";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUp } from "@/lib/action";
-import { cropBase64Image } from "@/lib/imageCrop";
-import { OCRImage } from "@/lib/imageProcess";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -44,8 +41,6 @@ const initialState = {
 export default function Page() {
   const [state, formAction, pending] = useActionState(signUp, initialState);
   const [idCardImage, setIdCardImage] = useState(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResults, setScanResults] = useState(null);
   const fileInputRef = useRef(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -63,6 +58,10 @@ export default function Page() {
 
   const handlePickedFile = (file) => {
     if (!file) return;
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setIdError("Please select a JPG or PNG image.");
+      return;
+    }
     if (file.size > maxIdSize) {
       setIdError("File too large. Max 5MB.");
       return;
@@ -71,7 +70,6 @@ export default function Page() {
     const reader = new FileReader();
     reader.onload = () => {
       setIdCardImage(reader.result);
-      processIdCard(reader.result);
     };
     reader.readAsDataURL(file);
   };
@@ -92,28 +90,6 @@ export default function Page() {
       dt.items.add(file);
       if (fileInputRef.current) fileInputRef.current.files = dt.files;
       handlePickedFile(file);
-    }
-  };
-
-  const processIdCard = async (imageData) => {
-    setIsScanning(true);
-    setScanResults(null);
-
-    try {
-      const res = await OCRImage(imageData);
-      console.log("ID Card OCR Result:", res);
-
-      const resData = {
-        batchDetails: res.Batch_details,
-        rollNo: res.Roll_no,
-        profilePicture: await cropBase64Image(res.bounding_box, imageData),
-      };
-
-      setIsScanning(false);
-      setScanResults(resData);
-    } catch (error) {
-      console.error("Error processing ID card:", error);
-      setIsScanning(false);
     }
   };
 
@@ -167,13 +143,13 @@ export default function Page() {
               </CardDescription>
               <div className="mt-3 flex items-center justify-center text-xs text-muted-foreground">
                 <Info className="h-3.5 w-3.5 mr-1" />
-                We’ll extract your basic details from your ID card image. You
-                can link CP profiles later from your profile page.
+                Enter your student details manually and upload a clear image of
+                your ID card for verification.
               </div>
             </motion.div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="mx-auto max-w-2xl">
               <motion.div
                 variants={containerVariants}
                 initial="hidden"
@@ -231,6 +207,45 @@ export default function Page() {
                       />
                     </div>
                   </motion.div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <motion.div variants={itemVariants} className="space-y-2">
+                      <Label htmlFor="mist_id" className="text-sm font-medium">
+                        MIST Student ID
+                      </Label>
+                      <div className="flex flex-row items-center w-full rounded-xl border group focus-within:border-primary focus-within:ring-1 focus-within:ring-primary px-3 transition-all duration-200">
+                        <IdCard className="h-5 w-5 text-muted-foreground" />
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]+"
+                          id="mist_id"
+                          name="mist_id"
+                          placeholder="Enter your student ID"
+                          className="ring-0 border-0 focus-visible:ring-offset-0 focus-visible:ring-0"
+                          required
+                        />
+                      </div>
+                    </motion.div>
+
+                    <motion.div variants={itemVariants} className="space-y-2">
+                      <Label
+                        htmlFor="batch_name"
+                        className="text-sm font-medium"
+                      >
+                        Batch Details
+                      </Label>
+                      <Input
+                        type="text"
+                        id="batch_name"
+                        name="batch_name"
+                        placeholder="For example, CSE 22"
+                        className="rounded-xl"
+                        maxLength={120}
+                        required
+                      />
+                    </motion.div>
+                  </div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
                     <Label htmlFor="password" className="text-sm font-medium">
@@ -344,6 +359,23 @@ export default function Page() {
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
+                    <Label htmlFor="profile_pic" className="text-sm font-medium">
+                      Profile Picture
+                    </Label>
+                    <Input
+                      type="file"
+                      id="profile_pic"
+                      name="profile_pic"
+                      accept="image/jpeg,image/png"
+                      className="h-auto cursor-pointer rounded-xl py-2 file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm file:font-medium"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Upload a clear photo of yourself (JPG/PNG, max 5MB).
+                    </p>
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} className="space-y-2">
                     <Label
                       htmlFor="mist_id_card"
                       className="text-sm font-medium"
@@ -358,17 +390,26 @@ export default function Page() {
                           : "border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5"
                       )}
                       onClick={() => fileInputRef.current?.click()}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          fileInputRef.current?.click();
+                        }
+                      }}
                       onDragOver={(e) => {
                         e.preventDefault();
                       }}
                       onDrop={onDropIdCard}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Upload MIST ID card image"
                     >
                       <input
                         ref={fileInputRef}
                         type="file"
                         id="mist_id_card"
                         name="mist_id_card"
-                        accept="image/*"
+                        accept="image/jpeg,image/png"
                         className="hidden"
                         onChange={handleIdCardUpload}
                         required
@@ -383,7 +424,12 @@ export default function Page() {
                           <p className="text-xs text-muted-foreground mt-1">
                             Click or drag & drop (JPG/PNG, max 5MB)
                           </p>
-                          <Button variant="outline" size="sm" className="mt-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-4"
+                          >
                             <Upload className="h-4 w-4 mr-2" /> Select Image
                           </Button>
                         </div>
@@ -397,13 +443,13 @@ export default function Page() {
                             height={200}
                           />
                           <Button
+                            type="button"
                             variant="secondary"
                             size="sm"
                             className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               setIdCardImage(null);
-                              setScanResults(null);
                               if (fileInputRef.current)
                                 fileInputRef.current.value = "";
                             }}
@@ -417,21 +463,6 @@ export default function Page() {
                       )}
                     </div>
                   </motion.div>
-                  <input
-                    type="hidden"
-                    name="profile_pic"
-                    value={scanResults?.profilePicture || ""}
-                  />
-                  <input
-                    type="hidden"
-                    name="batch_details"
-                    value={scanResults?.batchDetails || ""}
-                  />
-                  <input
-                    type="hidden"
-                    name="mist_id"
-                    value={scanResults?.rollNo || ""}
-                  />
 
                   {state?.message && (
                     <motion.div
@@ -475,22 +506,19 @@ export default function Page() {
                       className="w-full py-6 text-base"
                       disabled={
                         pending ||
-                        isScanning ||
                         !agree ||
                         !password ||
                         password !== confirmPassword
                       }
                     >
-                      {pending || isScanning ? (
+                      {pending ? (
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           className="flex items-center"
                         >
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {isScanning
-                            ? "Scanning ID Card..."
-                            : "Creating Account..."}
+                          Creating Account...
                         </motion.div>
                       ) : (
                         "Create Account"
@@ -498,108 +526,6 @@ export default function Page() {
                     </Button>
                   </motion.div>
                 </form>
-              </motion.div>
-
-              <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-6"
-              >
-                <motion.div
-                  variants={itemVariants}
-                  className={cn(
-                    "border rounded-xl p-4 transition-all duration-300",
-                    scanResults
-                      ? "border-primary/50 bg-primary/5"
-                      : "border-muted"
-                  )}
-                >
-                  <h3 className="font-medium text-lg mb-4 flex items-center">
-                    <IdCard className="mr-2 h-5 w-5" />
-                    ID Card Information
-                  </h3>
-
-                  {isScanning ? (
-                    <div className="flex flex-col items-center justify-center py-8">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 2,
-                          repeat: Number.POSITIVE_INFINITY,
-                          ease: "linear",
-                        }}
-                      >
-                        <Loader2 className="h-10 w-10 text-primary" />
-                      </motion.div>
-                      <p className="mt-4 text-sm text-muted-foreground">
-                        Processing...
-                      </p>
-                    </div>
-                  ) : scanResults ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Batch Details
-                          </p>
-                          <p className="font-medium">
-                            {scanResults.batchDetails}
-                          </p>
-                        </div>
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            Roll Number
-                          </p>
-                          <p className="font-medium">{scanResults.rollNo}</p>
-                        </div>
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      </div>
-
-                      {scanResults.profilePicture && (
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Profile Picture
-                          </p>
-                          <div className="flex justify-center">
-                            <motion.div
-                              initial={{ scale: 0.8, opacity: 0 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-primary"
-                            >
-                              <Image
-                                src={
-                                  scanResults.profilePicture || "/mccLogo.png"
-                                }
-                                alt="Extracted Profile"
-                                className="w-full h-full object-cover"
-                                width={96}
-                                height={96}
-                              />
-                            </motion.div>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <MccLogo className=" text-primary" w={160} h={160} />
-                      <p className="text-sm text-muted-foreground">
-                        Upload your ID card to automatically extract your
-                        information
-                      </p>
-                    </div>
-                  )}
-                </motion.div>
               </motion.div>
             </div>
           </CardContent>

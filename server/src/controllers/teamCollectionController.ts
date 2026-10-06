@@ -233,7 +233,8 @@ export const getCollectionPublic = async (c: any) => {
           const uname = String(u.username);
           performance[uname] = {
             totalSolved: u.totalSolved ?? u.solved ?? null,
-            effectiveSolved: u.effectiveSolved ?? null,
+            score: u.score ?? u.effectiveTotalScore ?? u.effectiveSolved ?? null,
+            effectiveSolved: u.score ?? u.effectiveTotalScore ?? u.effectiveSolved ?? null,
             effectivePenalty: u.effectivePenalty ?? null,
             contestsAttended:
               u.contests && typeof u.contests === "object"
@@ -1426,10 +1427,24 @@ export const publicFinalizedTeamsLeaderboard = async (c: any) => {
         snapshots[rid] = JSON.parse(snap[0].JSON_string || "{}");
     } catch {}
   }
+  function findReportUser(vj: string, snap: any) {
+    const key = String(vj || "").trim().toLowerCase();
+    if (!snap || !Array.isArray(snap.users)) return null;
+    return snap.users.find((x: any) => {
+      const aliases = [
+        x?.username,
+        x?.identityKey,
+        x?.realName,
+        ...(Array.isArray(x?.sourceHandles) ? x.sourceHandles : []),
+      ];
+      return aliases.some((value) => String(value || "").trim().toLowerCase() === key);
+    });
+  }
   function scoreFor(vj: string, snap: any): number {
-    if (!snap || !Array.isArray(snap.users)) return 0;
-    const u = snap.users.find((x: any) => String(x.username) === vj);
+    const u = findReportUser(vj, snap);
     if (!u) return 0;
+    if (typeof u.score === "number") return u.score;
+    if (typeof u.effectiveTotalScore === "number") return u.effectiveTotalScore;
     if (typeof u.effectiveSolved === "number") return u.effectiveSolved;
     if (typeof u.totalSolved === "number") return u.totalSolved;
     if (typeof u.solved === "number") return u.solved;
@@ -1490,10 +1505,24 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
         snapshots[rid] = JSON.parse(snap[0].JSON_string || "{}");
     } catch {}
   }
+  function findReportUser(vj: string, snap: any) {
+    const key = String(vj || "").trim().toLowerCase();
+    if (!snap || !Array.isArray(snap.users)) return null;
+    return snap.users.find((x: any) => {
+      const aliases = [
+        x?.username,
+        x?.identityKey,
+        x?.realName,
+        ...(Array.isArray(x?.sourceHandles) ? x.sourceHandles : []),
+      ];
+      return aliases.some((value) => String(value || "").trim().toLowerCase() === key);
+    });
+  }
   function scoreFor(vj: string, snap: any): number {
-    if (!snap || !Array.isArray(snap.users)) return 0;
-    const u = snap.users.find((x: any) => String(x.username) === vj);
+    const u = findReportUser(vj, snap);
     if (!u) return 0;
+    if (typeof u.score === "number") return u.score;
+    if (typeof u.effectiveTotalScore === "number") return u.effectiveTotalScore;
     if (typeof u.effectiveSolved === "number") return u.effectiveSolved;
     if (typeof u.totalSolved === "number") return u.totalSolved;
     if (typeof u.solved === "number") return u.solved;
@@ -1505,6 +1534,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
     {
       collection_id: string;
       collection_title: string;
+      room_id: string;
       room_name: string;
       finalized_at: Date | null;
       teams: any[];
@@ -1516,6 +1546,7 @@ export const publicFinalizedTeamsByContest = async (c: any) => {
       grouped[cid] = {
         collection_id: cid,
         collection_title: t.collection_title,
+        room_id: t.room_id,
         room_name: t.room_name,
         finalized_at: t.finalized_at,
         teams: [],

@@ -1,9 +1,4 @@
-import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import TransitionButton from '@/components/TransitionButton'
+import LiveReportsGallery from './LiveReportsGallery'
 
 async function fetchAllSharedReports(){
   try{
@@ -41,48 +36,5 @@ export default async function PublicSharedReportsPage(){
   // Sort by most recently updated first
   parsed.sort((a, b) => b._updatedTime - a._updatedTime)
 
-  return (
-    <div className="container mx-auto py-8 px-4 space-y-6">
-      <div className="flex items-center justify-center gap-4 flex-wrap">
-        <h1 className="text-xl md:text-2xl font-bold">Public Contest Room Reports</h1>
-        <Badge variant="secondary text-muted-foreground">
-          {parsed.length} shared
-        </Badge>
-      </div>
-
-      {parsed.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            No shared reports available yet.
-          </CardContent>
-        </Card>
-      ) : (
-        <ScrollArea className="w-full rounded-md border">
-          <div className="grid gap-4 p-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
-            {parsed.map((item) => (
-              <Card key={item.id} className="flex flex-col">
-                <CardHeader className="pb-3">
-                  <CardTitle className="line-clamp-2 leading-snug">{item.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">Contests: {item.contests}</Badge>
-                    <Badge variant="outline">Participants: {item.participants}</Badge>
-                  </div>
-                  <div className="text-xs text-muted-foreground">Last updated: {item.updated}</div>
-                  <div className="mt-auto">
-                    <TransitionButton
-                      href={`/contests_report/live/${encodeURIComponent(item.id)}`}
-                      idleText="View live report"
-                      pendingText="Opening report..."
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
-      )}
-    </div>
-  )
+  return <LiveReportsGallery items={parsed} />
 }

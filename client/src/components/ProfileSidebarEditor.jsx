@@ -15,10 +15,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import ProgressLink from "@/components/ProgressLink";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
 import {
+  Award,
   CheckCircle2,
+  Clock3,
   Edit3,
   IdCard,
+  Key,
   LogOut,
   Mail,
   Phone,
@@ -26,6 +31,7 @@ import {
   Save,
   Shield,
   Shirt,
+  UserRound,
   ZoomIn
 } from "lucide-react";
 import Image from "next/image";
@@ -34,10 +40,13 @@ import { useFormStatus } from "react-dom";
 
 export default function ProfileSidebarEditor({ user, saveAction, logoutAction }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [fullName, setFullName] = useState(user.full_name || "");
+  const nameChanged = fullName.trim() !== (user.full_name || "").trim();
 
   return (
     <div className="profile-card space-y-2" aria-label="Profile Summary">
-      <form action={saveAction} encType="multipart/form-data" className="space-y-2">
+      <form action={saveAction} className="space-y-2">
         <div className="flex justify-center">
           <div className="relative group">
             <Avatar
@@ -78,13 +87,55 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
                 Admin
               </span>
             )}
+            {user.trainer && (
+              <span
+                className="profile-badge"
+                style={{
+                  background: "hsl(220 90% 50%)",
+                  color: "white",
+                }}
+              >
+                <Award className="h-3.5 w-3.5" />
+                Trainer
+              </span>
+            )}
             {user.granted && (
               <span className="profile-badge profile-badge-success">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Verified
               </span>
             )}
+            {!user.granted && (
+              <span
+                className="profile-badge"
+                style={{
+                  background: "hsl(var(--profile-warning) / 0.16)",
+                  color: "hsl(var(--profile-warning))",
+                }}
+              >
+                <Clock3 className="h-3.5 w-3.5" />
+                Pending verification
+              </span>
+            )}
           </div>
+          {(user.admin || user.trainer) && (
+            <div className="flex flex-col gap-1.5 mt-3">
+              {user.admin && (
+                <ProgressLink href="/admin/trainers">
+                  <Button variant="default" size="sm" className="w-full font-semibold gap-1.5">
+                    <Shield className="h-4 w-4" /> Admin Dashboard
+                  </Button>
+                </ProgressLink>
+              )}
+              {(user.trainer || user.admin) && (
+                <ProgressLink href="/trainer/dashboard">
+                  <Button variant="outline" size="sm" className="w-full font-semibold gap-1.5">
+                    <Award className="h-4 w-4" /> Trainer Dashboard
+                  </Button>
+                </ProgressLink>
+              )}
+            </div>
+          )}
           <p
             className="mt-2 text-xs"
             style={{ color: "hsl(var(--profile-text-muted))" }}
@@ -97,6 +148,42 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
         </div>
 
         <div className="space-y-2">
+          <div>
+            <div className="relative">
+              <UserRound
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+                style={{ color: "hsl(var(--profile-text-muted))" }}
+                aria-hidden="true"
+              />
+              <Input
+                id="full-name-input"
+                name="full_name"
+                type="text"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+                placeholder="Enter your full name"
+                autoComplete="name"
+                maxLength={160}
+                required
+                disabled={!isEditing}
+                aria-describedby={isEditing ? "full-name-verification-note" : undefined}
+                className="h-9 pl-9 text-sm profile-focus-ring"
+                style={{ borderRadius: "var(--profile-radius-sm)" }}
+              />
+            </div>
+            {isEditing && (
+              <p
+                id="full-name-verification-note"
+                className="mt-1.5 flex gap-1.5 text-xs leading-5"
+                style={{ color: "hsl(var(--profile-warning))" }}
+              >
+                <Clock3 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {nameChanged
+                  ? "Saving this name will send your account to admin verification again."
+                  : "Changing your full name will send your account to admin verification again."}
+              </p>
+            )}
+          </div>
           <div>
             <div className="relative">
               <Mail
@@ -312,31 +399,51 @@ export default function ProfileSidebarEditor({ user, saveAction, logoutAction })
               Edit
             </Button>
           ) : (
-            <SaveSubmitButton />
+            <SaveSubmitButton nameChanged={nameChanged} />
           )}
         </div>
       </form>
 
-      <form action={logoutAction}>
+      <div className="space-y-2">
         <Button
-          type="submit"
+          type="button"
           variant="outline"
+          onClick={() => setChangePasswordOpen(true)}
           className="w-full profile-focus-ring"
           style={{
             borderRadius: "var(--profile-radius-sm)",
-            color: "hsl(var(--profile-danger))",
-            borderColor: "hsl(var(--profile-danger) / 0.3)",
           }}
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          Logout
+          <Key className="h-4 w-4 mr-2" />
+          Change Password
         </Button>
-      </form>
+
+        <form action={logoutAction}>
+          <Button
+            type="submit"
+            variant="outline"
+            className="w-full profile-focus-ring"
+            style={{
+              borderRadius: "var(--profile-radius-sm)",
+              color: "hsl(var(--profile-danger))",
+              borderColor: "hsl(var(--profile-danger) / 0.3)",
+            }}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </form>
+      </div>
+
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
+      />
     </div>
   );
 }
 
-function SaveSubmitButton() {
+function SaveSubmitButton({ nameChanged }) {
   const { pending } = useFormStatus();
 
   return (
@@ -351,7 +458,11 @@ function SaveSubmitButton() {
       }}
     >
       <Save className="h-4 w-4 mr-2" />
-      {pending ? "Saving..." : "Save"}
+      {pending
+        ? "Saving..."
+        : nameChanged
+          ? "Save and request verification"
+          : "Save"}
     </Button>
   );
 }

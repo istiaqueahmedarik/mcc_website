@@ -23,6 +23,10 @@ export default function ContestList() {
             try {
                 const response = await fetch("https://contests.dhruvmishra.com/api/v1/contests/all")
                 const data = await response.json()
+                
+                // Sort contests chronologically by start time so platforms are interleaved
+                data.sort((a, b) => a.start_time - b.start_time)
+                
                 setContests(data)
                 setFilteredContests(data)
                 setIsLoading(false)

@@ -74,10 +74,10 @@ export default async function Page({ params }) {
   let eligible = [];
   if (phase === 2 && isParticipant) {
     eligible = rank.slice(myIdx + 1);
-    const myEff = performance?.[myVj]?.effectiveSolved;
+    const myEff = performance?.[myVj]?.score ?? performance?.[myVj]?.effectiveSolved;
     if (typeof myEff === "number") {
       let within = eligible.filter((vj) => {
-        const eff = performance?.[vj]?.effectiveSolved;
+        const eff = performance?.[vj]?.score ?? performance?.[vj]?.effectiveSolved;
         return typeof eff === "number" && eff >= myEff - 5 && eff <= myEff + 5;
       });
       if (within.length < 5) {

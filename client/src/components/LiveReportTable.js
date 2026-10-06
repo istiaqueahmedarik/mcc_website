@@ -43,12 +43,30 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  liveReportRowIdentity,
+  liveReportVjudgeLookupId,
+  resolveLiveReportParticipant,
+} from "./live-report-participant.mjs";
 import { ScrollArea, ScrollBar } from "./ui/scroll-area";
 
 function ReportTable({ merged, lastUpdated }) {
+  const isScoredSnapshot = Boolean(merged?.snapshotVersion === 2 || merged?.scoring);
+  const scorePrecision = Number.isFinite(Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision))
+    ? Number(merged?.scoring?.scorePrecision ?? merged?.scorePrecision)
+    : 2;
+  const formatScore = (value, precision = scorePrecision) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(precision) : "0";
+  };
   const users = useMemo(() => {
-    const filtered = merged.users;
-    return filtered;
+    return (Array.isArray(merged.users) ? merged.users : []).map((user) => ({
+      ...user,
+      totalContestsAttended: Number(user.totalContestsAttended ?? user.attended ?? 0),
+      effectiveTotalSolved: Number(user.effectiveTotalSolved ?? user.effectiveSolved ?? user.score ?? 0),
+      effectiveTotalPenalty: Number(user.effectiveTotalPenalty ?? user.effectivePenalty ?? 0),
+      effectiveTotalScore: Number(user.effectiveTotalScore ?? user.score ?? 0),
+    }));
   }, [merged.users]);
   
   const { contestRanks, progressByUser } = useMemo(() => {
@@ -66,14 +84,14 @@ function ReportTable({ merged, lastUpdated }) {
       return aPen - bPen;
     };
 
-    // For each contest, compute rank per username (1 is best)
+    // For each contest, compute rank per canonical participant identity (1 is best).
     merged.contestIds.forEach((cid) => {
       const participants = merged.users
         .filter((u) => u.contests && u.contests[cid])
         .sort((u1, u2) => comparePerf(u1.contests[cid], u2.contests[cid]));
       const rankMap = {};
       participants.forEach((u, idx) => {
-        rankMap[u.username] = idx + 1;
+        rankMap[liveReportRowIdentity(u)] = idx + 1;
       });
       contestRanks[cid] = rankMap;
     });
@@ -81,13 +99,14 @@ function ReportTable({ merged, lastUpdated }) {
     const lastId = merged.contestIds[merged.contestIds.length - 1];
     const progressByUser = {};
     merged.users.forEach((u) => {
-      const lastRank = contestRanks[lastId]?.[u.username];
+      const identity = liveReportRowIdentity(u);
+      const lastRank = contestRanks[lastId]?.[identity];
       // find the most recent previous contest the user attended
       let prevRank = undefined;
       for (let i = merged.contestIds.length - 2; i >= 0; i--) {
         const cid = merged.contestIds[i];
         if (u.contests && u.contests[cid]) {
-          prevRank = contestRanks[cid]?.[u.username];
+          prevRank = contestRanks[cid]?.[identity];
           if (prevRank !== undefined) break;
         }
       }
@@ -99,7 +118,7 @@ function ReportTable({ merged, lastUpdated }) {
         else if (delta <= -1) status = "down";
         else status = "neutral";
       }
-      progressByUser[u.username] = { status, delta, lastRank, prevRank };
+      progressByUser[identity] = { status, delta, lastRank, prevRank };
     });
 
     return { contestRanks, progressByUser };
@@ -119,7 +138,7 @@ function ReportTable({ merged, lastUpdated }) {
   const profileIds = useMemo(() => {
     const ids = new Set(
       users
-        .map((u) => String(u?.username || "").trim().toLowerCase())
+        .map(liveReportVjudgeLookupId)
         .filter(Boolean)
     );
     return Array.from(ids).sort();
@@ -258,7 +277,7 @@ function ReportTable({ merged, lastUpdated }) {
     return () => {
       controller.abort();
     };
-  }, [profileIdsSignature]);
+  }, [profileIdsSignature, profileIds, debugProfiles]);
 
   const getNameColor = (rank) => {
     if (rank <= 3) {
@@ -320,6 +339,33 @@ function ReportTable({ merged, lastUpdated }) {
                 <DialogTitle>Ranking & Effective Score Calculation</DialogTitle>
                 <DialogDescription asChild>
                   <div className="space-y-4 text-sm leading-relaxed mt-2">
+                    {isScoredSnapshot ? (
+                      <>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Solved score formula</h4>
+                          <code className="block rounded-md bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--foreground))]">
+                            {merged?.scoring?.solvedScoreFormula || merged?.scoring?.formula || "sum(solved)"}
+                          </code>
+                        </div>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Penalty formula</h4>
+                          <code className="block rounded-md bg-[hsl(var(--muted))] px-3 py-2 text-xs text-[hsl(var(--foreground))]">
+                            {merged?.scoring?.penaltyScoreFormula || "sum(penalty)"}
+                          </code>
+                        </div>
+                        <div>
+                          <h4 className="mb-1 font-semibold">Ranking order</h4>
+                          <ol className="list-inside list-decimal space-y-1">
+                            {(merged?.scoring?.sortRules || []).map((rule, index) => (
+                              <li key={`${rule.key}-${index}`}>
+                                {rule.key} {rule.direction === "asc" ? "ascending" : "descending"}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      </>
+                    ) : (
+                      <>
                     <div>
                       <h4 className="font-semibold mb-1">
                         Per-Contest Metrics
@@ -424,6 +470,8 @@ function ReportTable({ merged, lastUpdated }) {
                       </h4>
                       <p>1 worst contest (generally) opt out.</p>
                     </div>
+                      </>
+                    )}
                   </div>
                 </DialogDescription>
               </DialogHeader>
@@ -440,9 +488,11 @@ function ReportTable({ merged, lastUpdated }) {
                 <TableHead className="w-[60px] text-[hsl(var(--foreground))]">
                   Rank
                 </TableHead>
-                <TableHead className="text-[hsl(var(--foreground))]">
-                  Progress
-                </TableHead>
+                {!isScoredSnapshot && (
+                  <TableHead className="text-[hsl(var(--foreground))]">
+                    Progress
+                  </TableHead>
+                )}
                 <TableHead className="text-[hsl(var(--foreground))]">
                   Name
                 </TableHead>
@@ -480,48 +530,26 @@ function ReportTable({ merged, lastUpdated }) {
             <TableBody>
               {users.map((u, index) => {
                 const isTop = index === 0;
-                const profileKey = String(u.username || "").toLowerCase();
-                const hasResolvedLookup = Object.prototype.hasOwnProperty.call(
+                const identity = liveReportRowIdentity(u);
+                const profileKey = liveReportVjudgeLookupId(u);
+                const hasResolvedLookup = Boolean(profileKey) && Object.prototype.hasOwnProperty.call(
                   publicProfilesByVjudge,
                   profileKey
                 );
                 const profile = hasResolvedLookup
                   ? publicProfilesByVjudge[profileKey]
                   : null;
-                const hasDbProfile = !!profile;
-                const shouldUseFallback = hasResolvedLookup && !hasDbProfile;
-                const isResolving = isProfilesLoading && !hasResolvedLookup;
-                const dbAvatar = hasDbProfile
-                  ? resolveAvatarUrl(profile.profile_pic)
-                  : null;
-                const fallbackAvatar = resolveAvatarUrl(u.avatarUrl);
-
-                // Always prioritize DB profile image/name when available.
-                const resolvedAvatar = hasDbProfile
-                  ? dbAvatar || "/vercel.svg"
-                  : shouldUseFallback
-                  ? fallbackAvatar || "/vercel.svg"
-                  : "/vercel.svg";
-                const resolvedName = hasDbProfile
-                  ? profile.full_name || u.realName || u.username
-                  : shouldUseFallback
-                  ? u.realName || "—"
-                  : "Loading...";
-                const resolvedBatch = hasDbProfile
-                  ? profile.batch_name || null
-                  : null;
-                const resolvedVjudgeId = hasDbProfile
-                  ? profile.vjudge_id || u.username
-                  : u.username;
-                const resolvedMistId = hasDbProfile
-                  ? profile.mist_id || null
-                  : u.mist_id || u.mistId || null;
-                const resolvedCfId = hasDbProfile
-                  ? profile.cf_id || null
-                  : u.cf_id || u.cfId || null;
+                const isResolving = Boolean(profileKey) && isProfilesLoading && !hasResolvedLookup;
+                const participant = resolveLiveReportParticipant(u, profile);
+                const resolvedAvatar = resolveAvatarUrl(participant.profilePic) || "/vercel.svg";
+                const resolvedName = participant.name;
+                const resolvedBatch = participant.batch;
+                const resolvedVjudgeId = participant.vjudgeId;
+                const resolvedMistId = participant.mistId;
+                const resolvedCfId = participant.cfId;
                 return (
                   <TableRow
-                    key={u.username}
+                    key={identity || u.username}
                     className={cn(
                       "group transition-all duration-200 hover:bg-[hsl(var(--accent)/0.25)]",
                       index % 2 === 0
@@ -555,14 +583,15 @@ function ReportTable({ merged, lastUpdated }) {
                               "bg-transparent text-[hsl(var(--alumni-gold))] font-bold shadow-none"
                           )}
                         >
-                          {index + 1}
+                          {u.rank || index + 1}
                         </Badge>
                       </div>
                     </TableCell>
                     {/* Progress */}
+                    {!isScoredSnapshot && (
                     <TableCell className="min-w-[90px]">
                       {(() => {
-                        const p = progressByUser[u.username] || {
+                        const p = progressByUser[identity] || {
                           status: "neutral",
                           delta: 0,
                         };
@@ -625,6 +654,7 @@ function ReportTable({ merged, lastUpdated }) {
                         );
                       })()}
                     </TableCell>
+                    )}
                     {/* Name & Avatar */}
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -728,52 +758,100 @@ function ReportTable({ merged, lastUpdated }) {
                     {/* Solved */}
                     <TableCell>
                       <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
-                        <p className="flex items-center gap-1 text-sm">
-                          <span className="font-medium text-[hsl(var(--foreground))]">
-                            Solved:
-                          </span>
-                          <span className="font-semibold text-[hsl(var(--primary))]">
-                            {u.effectiveTotalSolved.toFixed(2)}
-                          </span>
-                          {u.effectiveTotalSolved !== u.totalSolved && (
-                            <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                              ({u.totalSolved})
-                            </span>
-                          )}
-                        </p>
-                        <p className="flex items-center gap-1 text-sm">
-                          <span className="font-medium text-[hsl(var(--foreground))]">
-                            Penalty:
-                          </span>
-                          <span className="font-semibold">
-                            {u.effectiveTotalPenalty.toFixed(2)}
-                          </span>
-                          {u.effectiveTotalPenalty !== u.totalPenalty && (
-                            <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                              ({u.totalPenalty.toFixed(2)})
-                            </span>
-                          )}
-                        </p>
+                        {isScoredSnapshot ? (
+                          <>
+                            <p className="flex items-center gap-1 text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Solved:
+                              </span>
+                              <span className="font-semibold text-[hsl(var(--primary))]">
+                                {formatScore(u.displaySolvedScore ?? u.solvedScore ?? u.displayScore ?? u.score)}
+                              </span>
+                              {Number(u.solvedScore ?? u.score ?? 0) !== Number(u.totalScore ?? 0) && (
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  ({formatScore(u.totalScore, 2)})
+                                </span>
+                              )}
+                            </p>
+                            <p className="flex items-center gap-1 text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Penalty:
+                              </span>
+                              <span className="font-semibold">
+                                {formatScore(u.displayPenaltyScore ?? u.penaltyScore ?? u.effectiveTotalPenalty ?? u.effectivePenalty)}
+                              </span>
+                              {Number(u.penaltyScore ?? u.effectivePenalty ?? 0) !== Number(u.totalPenalty ?? 0) && (
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  ({formatScore(u.totalPenalty, 2)})
+                                </span>
+                              )}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="flex items-center gap-1 text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Solved:
+                              </span>
+                              <span className="font-semibold text-[hsl(var(--primary))]">
+                                {u.effectiveTotalSolved.toFixed(2)}
+                              </span>
+                              {u.effectiveTotalSolved !== u.totalSolved && (
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  ({u.totalSolved})
+                                </span>
+                              )}
+                            </p>
+                            <p className="flex items-center gap-1 text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Penalty:
+                              </span>
+                              <span className="font-semibold">
+                                {u.effectiveTotalPenalty.toFixed(2)}
+                              </span>
+                              {u.effectiveTotalPenalty !== u.totalPenalty && (
+                                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                                  ({u.totalPenalty.toFixed(2)})
+                                </span>
+                              )}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1.5 rounded-md bg-[hsl(var(--background))] p-1.5 transition-all duration-200 group-hover:bg-[hsl(var(--card))] group-hover:shadow-sm">
-                        <p className="text-sm">
-                          <span className="font-medium text-[hsl(var(--foreground))]">
-                            Score:
-                          </span>
-                          <span className="font-semibold">
-                            {u.stdDeviationScore.toFixed(2)}
-                          </span>
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-medium text-[hsl(var(--foreground))]">
-                            Penalty:
-                          </span>
-                          <span className="font-semibold">
-                            {u.stdDeviationPen.toFixed(2)}
-                          </span>
-                        </p>
+                        {isScoredSnapshot ? (
+                          <>
+                            <p className="text-sm tabular-nums">
+                              <span className="font-medium text-[hsl(var(--foreground))]">Score:</span>{" "}
+                              <span className="font-semibold">{formatScore(u.stdDeviationScore, 2)}</span>
+                            </p>
+                            <p className="text-sm tabular-nums">
+                              <span className="font-medium text-[hsl(var(--foreground))]">Penalty:</span>{" "}
+                              <span className="font-semibold">{formatScore(u.stdDeviationPen, 2)}</span>
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Score:
+                              </span>
+                              <span className="font-semibold">
+                                {u.stdDeviationScore.toFixed(2)}
+                              </span>
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium text-[hsl(var(--foreground))]">
+                                Penalty:
+                              </span>
+                              <span className="font-semibold">
+                                {u.stdDeviationPen.toFixed(2)}
+                              </span>
+                            </p>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -841,8 +919,7 @@ function ReportTable({ merged, lastUpdated }) {
                             )}
                             <div className="space-y-0.5 rounded-md bg-[hsl(var(--background)/0.7)] p-1 opacity-70">
                               <p className="text-xs">Solved: 0</p>
-                              <p className="text-xs">Penalty: 0.00</p>
-                              <p className="text-xs">Score: 0.00</p>
+                              <p className="text-xs">Score: 0.00 (0.00)</p>
                             </div>
                           </TableCell>
                         );
@@ -877,18 +954,12 @@ function ReportTable({ merged, lastUpdated }) {
                             </p>
                             <p className="text-xs">
                               <span className="font-medium text-[hsl(var(--foreground))]">
-                                Penalty:
-                              </span>{" "}
-                              <span className="font-semibold">
-                                {perf.penalty.toFixed(2)}
-                              </span>
-                            </p>
-                            <p className="text-xs">
-                              <span className="font-medium text-[hsl(var(--foreground))]">
                                 Score:
                               </span>{" "}
                               <span className="font-semibold">
-                                {perf.finalScore.toFixed(2)}
+                                {formatScore(perf.finalScore ?? perf.rawScore, 2)}
+                                {" "}
+                                ({formatScore(perf.penalty, 2)})
                               </span>
                             </p>
                           </div>

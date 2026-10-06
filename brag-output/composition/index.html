@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>MCC Trainer — One calm place to teach</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "SF Pro Display"; src: url("assets/fonts/SFPRODISPLAYREGULAR.otf") format("opentype"); font-weight: 400; }
+      @font-face { font-family: "SF Pro Display"; src: url("assets/fonts/SFPRODISPLAYMEDIUM.otf") format("opentype"); font-weight: 500; }
+      @font-face { font-family: "SF Pro Display"; src: url("assets/fonts/SFPRODISPLAYBOLD.otf") format("opentype"); font-weight: 700; }
+      @font-face { font-family: "Geist Mono"; src: url("assets/fonts/GeistMonoVF.woff") format("woff"); }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0e0e10; color: #e4e2e4; font-family: "SF Pro Display", ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      body { position: relative; }
+      .clip { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+      .scene { background-color: #131315; isolation: isolate; }
+      .scene::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 82% 16%, rgba(10,132,255,.13), rgba(10,132,255,0) 31%), radial-gradient(circle at 12% 92%, rgba(88,133,196,.07), rgba(88,133,196,0) 33%); z-index: -2; }
+      .scene::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.08'/%3E%3C/svg%3E"); mix-blend-mode: soft-light; z-index: 20; }
+      .scene-content { width: 100%; height: 100%; padding: 92px 112px; display: flex; flex-direction: column; box-sizing: border-box; }
+      .eyebrow { display: inline-flex; align-items: center; gap: 12px; color: #9fcfff; font-size: 19px; font-weight: 600; letter-spacing: .13em; text-transform: uppercase; }
+      .eyebrow::before { content: ""; width: 30px; height: 2px; border-radius: 2px; background: #0a84ff; }
+      .mono { font-family: "Geist Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+      .muted { color: #aeb8cc; }
+
+      #scene-1 .scene-content { justify-content: center; padding-left: 150px; }
+      .hook-grid { display: grid; grid-template-columns: 1.35fr .9fr; align-items: center; gap: 130px; width: 100%; }
+      .hook-copy { max-width: 980px; }
+      .hook-title { margin: 26px 0 0; max-width: 980px; font-size: 116px; line-height: .96; letter-spacing: -.05em; font-weight: 700; }
+      .hook-title .accent-word { color: #0a84ff; }
+      .hook-sub { margin-top: 30px; max-width: 760px; color: #aeb8cc; font-size: 29px; line-height: 1.35; font-weight: 400; }
+      .route-panel { position: relative; height: 550px; padding: 56px 44px; border-radius: 34px; background: rgba(28,28,30,.64); border: 1px solid rgba(255,255,255,.09); overflow: hidden; }
+      .route-panel::before { content: ""; position: absolute; left: 82px; top: 92px; bottom: 92px; width: 2px; background: rgba(255,255,255,.10); }
+      .route-glow { position: absolute; left: 63px; top: 74px; width: 40px; height: 40px; border-radius: 50%; background: rgba(10,132,255,.18); box-shadow: 0 0 72px rgba(10,132,255,.34); }
+      .route-list { position: relative; display: flex; flex-direction: column; justify-content: space-between; height: 100%; gap: 24px; }
+      .route-token { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 20px; min-height: 108px; padding: 22px 24px; border-radius: 22px; background: #1c1c1e; border: 1px solid rgba(255,255,255,.10); }
+      .route-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 15px; color: #9fcfff; background: rgba(10,132,255,.14); font-size: 23px; }
+      .route-token strong { display: block; font-size: 24px; font-weight: 600; }
+      .route-token small { display: block; margin-top: 6px; color: #aeb8cc; font-size: 17px; }
+      .route-status { color: #63d49a; font-size: 17px; }
+
+      #scene-2 { background-color: #0e0e10; z-index: 2; }
+      #scene-2 .scene-content { padding: 66px 92px; }
+      .app-topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; padding-bottom: 26px; border-bottom: 1px solid rgba(255,255,255,.09); }
+      .app-kicker { color: #9fcfff; font-size: 17px; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; }
+      .app-title { margin: 8px 0 0; font-size: 43px; line-height: 1; letter-spacing: -.035em; }
+      .app-subtitle { margin-top: 12px; color: #aeb8cc; font-size: 20px; }
+      .header-actions { display: flex; gap: 12px; }
+      .ui-button { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 22px; border-radius: 16px; border: 1px solid rgba(255,255,255,.11); color: #e4e2e4; background: #202024; font-size: 18px; font-weight: 600; }
+      .ui-button.primary { color: #0e0e10; background: #0a84ff; border-color: #0a84ff; font-weight: 700; }
+      .summary-row { display: flex; gap: 10px; margin-top: 23px; }
+      .summary-chip { padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.04); color: #c5cbd7; font-size: 16px; font-weight: 500; }
+      .summary-chip.attention { color: #f6d187; border-color: rgba(242,184,75,.26); background: rgba(242,184,75,.09); }
+      .dashboard-layout { display: grid; grid-template-columns: minmax(0,1fr) 390px; gap: 30px; margin-top: 30px; flex: 1; min-height: 0; }
+      .workspace-head { display: flex; align-items: center; justify-content: space-between; }
+      .workspace-head h2 { font-size: 30px; letter-spacing: -.025em; }
+      .view-all { color: #66afff; font-size: 18px; font-weight: 600; }
+      .search-shell { margin-top: 20px; height: 54px; border-radius: 16px; display: flex; align-items: center; gap: 14px; padding: 0 18px; color: #8f99ad; background: #18181b; border: 1px solid rgba(255,255,255,.09); font-size: 18px; }
+      .class-card { position: relative; margin-top: 22px; min-height: 360px; padding: 34px; border-radius: 22px; background: rgba(28,28,30,.94); border: 1px solid rgba(255,255,255,.11); transform-origin: left top; will-change: transform; }
+      .card-meta { color: #aeb8cc; font-size: 16px; font-weight: 500; }
+      .class-card h3 { margin: 22px 0 0; font-size: 36px; letter-spacing: -.03em; }
+      .latest-topic { margin-top: 14px; color: #aeb8cc; font-size: 21px; }
+      .room-facts { display: flex; gap: 24px; margin-top: 24px; color: #aeb8cc; font-size: 17px; }
+      .card-rule { height: 1px; margin: 30px 0 22px; background: rgba(255,255,255,.09); }
+      .card-actions { display: flex; align-items: center; gap: 18px; }
+      .link-action { color: #66afff; font-size: 17px; font-weight: 600; }
+      .attention-rail { padding: 30px; border-radius: 22px; background: rgba(28,28,30,.82); border: 1px solid rgba(255,255,255,.10); }
+      .attention-rail h2 { font-size: 24px; }
+      .attention-item { padding: 24px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+      .attention-item:last-child { border-bottom: 0; }
+      .attention-item strong { display: block; font-size: 18px; line-height: 1.35; }
+      .attention-item span { display: block; margin-top: 10px; color: #66afff; font-size: 16px; }
+      .cursor { position: absolute; left: 776px; top: 748px; z-index: 18; width: 34px; height: 42px; filter: drop-shadow(0 5px 8px rgba(0,0,0,.45)); }
+      .cursor svg { width: 100%; height: 100%; }
+      .click-ring { position: absolute; left: -17px; top: -17px; width: 56px; height: 56px; border: 2px solid rgba(159,207,255,.75); border-radius: 50%; opacity: 0; }
+
+      #scene-3 { background-color: #111113; z-index: 3; }
+      #scene-3 .scene-content { padding: 72px 108px 66px; }
+      .classroom-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 36px; padding-bottom: 26px; border-bottom: 1px solid rgba(255,255,255,.10); }
+      .back-link { color: #66afff; font-size: 17px; font-weight: 600; }
+      .classroom-title { margin: 22px 0 0; font-size: 50px; line-height: 1; letter-spacing: -.04em; }
+      .classroom-meta { margin-top: 14px; color: #aeb8cc; font-size: 20px; }
+      .classroom-actions { display: flex; gap: 12px; }
+      .classroom-actions .ui-button { background: rgba(28,28,30,.72); }
+      .workspace-canvas { position: relative; display: grid; grid-template-columns: 1.45fr .8fr; gap: 28px; flex: 1; margin-top: 28px; min-height: 0; }
+      .arrival-card, .status-card { padding: 32px; border-radius: 20px; background: rgba(28,28,30,.72); border: 1px solid rgba(255,255,255,.10); }
+      .arrival-card, .status-card { min-height: 320px; }
+      .badge { display: inline-flex; min-height: 34px; align-items: center; padding: 0 13px; border-radius: 999px; color: #9fcfff; border: 1px solid rgba(10,132,255,.28); background: rgba(10,132,255,.10); font-size: 15px; font-weight: 600; }
+      .arrival-card h3 { margin: 22px 0 0; font-size: 35px; letter-spacing: -.025em; }
+      .arrival-card p { margin-top: 12px; color: #aeb8cc; font-size: 19px; }
+      .quick-actions { display: flex; gap: 12px; margin-top: 34px; }
+      .quick-pill { min-height: 48px; padding: 0 18px; border-radius: 15px; display: inline-flex; align-items: center; background: rgba(255,255,255,.045); color: #c9cfda; font-size: 16px; }
+      .status-card h3 { font-size: 22px; }
+      .caught-up { display: flex; gap: 16px; margin-top: 26px; color: #c9cfda; font-size: 18px; line-height: 1.45; }
+      .check-mark { display: grid; place-items: center; flex: 0 0 auto; width: 38px; height: 38px; border-radius: 13px; background: rgba(99,212,154,.13); color: #63d49a; }
+      .dock-wrap { position: absolute; left: 50%; bottom: 16px; width: 820px; height: 100px; transform: translateX(-50%); border-radius: 34px; border: 1px solid rgba(255,255,255,.14); background: rgba(27,29,33,.52); box-shadow: 0 20px 52px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(18px) saturate(135%); overflow: hidden; }
+      .dock-wrap::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 18% 0%, rgba(102,175,255,.11), rgba(102,175,255,0) 44%); }
+      .dock-items { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(6,1fr); width: 100%; height: 100%; padding: 7px; }
+      .dock-lens { position: absolute; z-index: 1; left: 8px; top: 8px; width: 134px; height: 82px; border-radius: 29px; background: rgba(128,189,255,.12); border: 1px solid rgba(190,225,255,.28); box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 12px 36px rgba(10,132,255,.10); backdrop-filter: blur(11px) saturate(150%); will-change: transform, box-shadow; }
+      .dock-item { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #c3c9d4; font-size: 14px; font-weight: 500; }
+      .dock-item svg { width: 25px; height: 25px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+      .dock-item.contests { color: #9fcfff; font-weight: 700; }
+      .section-shift { position: absolute; top: 18px; right: 18px; padding: 10px 15px; border-radius: 12px; background: rgba(10,132,255,.11); color: #9fcfff; font-size: 15px; font-weight: 600; opacity: 0; }
+
+      #scene-4 { background-color: #0e0e10; z-index: 4; }
+      #scene-4 .scene-content { padding: 74px 108px; }
+      .report-stage { width: 100%; height: 100%; display: flex; flex-direction: column; }
+      .report-heading-row { display: flex; justify-content: space-between; align-items: flex-end; }
+      .report-title { margin: 18px 0 0; font-size: 54px; line-height: 1; letter-spacing: -.04em; }
+      .report-note { max-width: 530px; color: #aeb8cc; font-size: 20px; line-height: 1.45; text-align: right; }
+      .report-shell { margin-top: 46px; border-radius: 22px; overflow: hidden; background: #1a1a1d; border: 1px solid rgba(255,255,255,.10); }
+      .report-row { display: grid; grid-template-columns: 110px minmax(420px,1.4fr) 170px 220px 240px; align-items: center; min-height: 112px; padding: 0 30px; border-bottom: 1px solid rgba(255,255,255,.08); }
+      .report-row:last-child { border-bottom: 0; }
+      .report-row.header { min-height: 76px; color: #aeb8cc; font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+      .report-row.data { font-size: 21px; }
+      .rank { color: #aeb8cc; }
+      .student-name { font-weight: 600; }
+      .student-id { display: block; margin-top: 6px; color: #8994a8; font-size: 15px; }
+      .solved { font-family: "Geist Mono", monospace; font-variant-numeric: tabular-nums; }
+      .performance-head, .performance-cell { text-align: center; }
+      .performance-cell { display: flex; align-items: baseline; justify-content: center; gap: 11px; font-family: "Geist Mono", monospace; }
+      .perf-number { color: #63d49a; font-size: 44px; font-weight: 700; line-height: 1; }
+      .perf-window { color: #aeb8cc; font-size: 17px; }
+      .focus-bracket { position: absolute; right: 134px; top: 270px; width: 254px; height: 128px; border: 2px solid rgba(99,212,154,.56); border-radius: 20px; box-shadow: 0 0 42px rgba(99,212,154,.09); pointer-events: none; }
+      .logic-line { display: flex; align-items: center; gap: 16px; margin-top: 30px; color: #c7ceda; font-size: 21px; }
+      .logic-pill { padding: 9px 14px; border-radius: 11px; background: rgba(99,212,154,.11); color: #86e5b2; font-family: "Geist Mono", monospace; font-size: 17px; }
+      .logic-muted { color: #8791a4; }
+      .brand-close { position: absolute; inset: 0; z-index: 8; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 42px; padding: 0 240px; background: #0e0e10; opacity: 0; }
+      .brand-mark { width: 170px; height: 170px; display: grid; place-items: center; border-radius: 44px; background: #0a84ff; box-shadow: 0 24px 80px rgba(10,132,255,.22); }
+      .brand-mark img { width: 112px; height: 112px; object-fit: contain; }
+      .brand-copy h2 { margin: 0; font-size: 82px; line-height: .98; letter-spacing: -.045em; }
+      .brand-copy p { margin: 20px 0 0; color: #aeb8cc; font-size: 29px; }
+      .brand-rule { width: 100%; height: 1px; margin-top: 30px; background: rgba(255,255,255,.12); transform-origin: left center; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="mcc-trainer-brag" data-start="0" data-duration="20" data-width="1920" data-height="1080">
+      <section id="scene-1" class="clip scene" data-start="0" data-duration="4.8" data-track-index="1">
+        <div class="scene-content"><div class="hook-grid">
+          <div class="hook-copy"><div id="hook-eyebrow" class="eyebrow">MCC Trainer</div><h1 id="hook-title" class="hook-title">Teaching has <span class="accent-word">enough</span> moving parts.</h1><p id="hook-sub" class="hook-sub">The workspace should make the next useful action feel obvious.</p></div>
+          <div id="route-panel" class="route-panel"><div id="route-glow" class="route-glow"></div><div class="route-list">
+            <div id="route-1" class="route-token"><span class="route-dot">01</span><span><strong>Classrooms</strong><small>What is happening now</small></span><span class="route-status">Ready</span></div>
+            <div id="route-2" class="route-token"><span class="route-dot">02</span><span><strong>Live sessions</strong><small>What needs the trainer</small></span><span class="route-status">Clear</span></div>
+            <div id="route-3" class="route-token"><span class="route-dot">03</span><span><strong>Reports</strong><small>What changed after class</small></span><span class="route-status">Fresh</span></div>
+          </div></div>
+        </div></div>
+      </section>
+
+      <section id="scene-2" class="clip scene" data-start="4.4" data-duration="5.9" data-track-index="2" data-layout-allow-overlap>
+        <div id="dashboard-shell" class="scene-content" data-layout-allow-overflow>
+          <header class="app-topbar"><div><div id="dashboard-kicker" class="app-kicker">Trainer workspace</div><h2 id="dashboard-title" class="app-title">Trainer dashboard</h2><p id="dashboard-subtitle" class="app-subtitle">Your classrooms and work needing attention.</p></div><div id="dashboard-actions" class="header-actions"><span class="ui-button">Forms</span><span class="ui-button primary">＋ New classroom</span></div></header>
+          <div id="summary-row" class="summary-row"><span class="summary-chip">4 classrooms</span><span class="summary-chip">1 live now</span><span class="summary-chip attention">2 need attention</span></div>
+          <div class="dashboard-layout">
+            <main id="dashboard-main"><div class="workspace-head"><h2>Your classrooms</h2><span class="view-all">View all →</span></div><div class="search-shell" data-layout-allow-occlusion>⌕ <span>Search classrooms…</span></div>
+              <article id="class-card" class="class-card"><div class="card-meta">Next session · Owner</div><h3>Algorithms — Batch 07</h3><p class="latest-topic">Latest topic: Dynamic Programming</p><div class="room-facts"><span>32 students</span><span>Trainer Ayesha</span><span>Thu, 3:30 PM</span></div><div class="card-rule"></div><div class="card-actions"><span id="open-classroom" class="ui-button primary">Open classroom&nbsp; →</span><span class="link-action">Contests &amp; reports</span></div></article>
+            </main>
+            <aside id="attention-rail" class="attention-rail"><h2>Needs attention</h2><div class="attention-item"><strong>2 account link requests</strong><span>Algorithms — Batch 07 · Review requests →</span></div><div class="attention-item"><strong>Weekly Arena: report needs refresh</strong><span>Open report →</span></div><div class="attention-item"><strong class="muted">Everything else is caught up</strong></div></aside>
+          </div>
+        </div>
+        <div id="cursor" class="cursor" aria-hidden="true"><svg viewBox="0 0 28 36"><path d="M3 2L24 22H14L10 33L6 31L10 21H3Z" fill="#f7f8fb" stroke="#111218" stroke-width="2"/></svg><span id="click-ring" class="click-ring"></span></div>
+      </section>
+
+      <section id="scene-3" class="clip scene" data-start="10" data-duration="5.3" data-track-index="3" data-layout-allow-overlap>
+        <div class="scene-content">
+          <header class="classroom-header"><div><div id="back-link" class="back-link" data-layout-allow-overlap>← Trainer dashboard</div><h2 id="classroom-title" class="classroom-title">Algorithms — Batch 07</h2><p id="classroom-meta" class="classroom-meta">Trainer <strong>Ayesha</strong> · 32 roster members</p></div><div id="classroom-actions" class="classroom-actions"><span class="ui-button">◯&nbsp; No live session</span><span class="ui-button">⌘&nbsp; Manage</span></div></header>
+          <div class="workspace-canvas">
+            <section id="arrival-card" class="arrival-card"><span class="badge">Next session</span><h3>Dynamic Programming Lab</h3><p>Thursday, 3:30 PM · Practice and review</p><div class="quick-actions"><span class="quick-pill">History</span><span class="quick-pill">Resources</span><span class="quick-pill">Schedule</span></div></section>
+            <section id="status-card" class="status-card"><h3>Needs attention</h3><div class="caught-up"><span class="check-mark">✓</span><span>No pending account links or submitted work to review.</span></div></section>
+            <div id="section-shift" class="section-shift">Contests workspace</div>
+            <nav id="trainer-dock" class="dock-wrap" aria-label="Trainer classroom sections"><div id="dock-lens" class="dock-lens"></div><div class="dock-items">
+              <span class="dock-item"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M8 3v4M16 3v4"/></svg><span>Updates</span></span>
+              <span class="dock-item"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg><span>Live</span></span>
+              <span class="dock-item"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Topics</span></span>
+              <span class="dock-item"><svg viewBox="0 0 24 24"><path d="M16 20v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2M9.5 10a4 4 0 100-8 4 4 0 000 8M17 11a3 3 0 100-6M18 14a4 4 0 013 4v2"/></svg><span>People</span></span>
+              <span class="dock-item contests"><svg viewBox="0 0 24 24"><path d="M8 4h8v4a4 4 0 01-8 0zM8 6H4v1a4 4 0 004 4M16 6h4v1a4 4 0 01-4 4M12 12v5M8 21h8M9 17h6"/></svg><span>Contests</span></span>
+              <span class="dock-item"><svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span>More</span></span>
+            </div></nav>
+          </div>
+        </div>
+      </section>
+
+      <section id="scene-4" class="clip scene" data-start="15" data-duration="5" data-track-index="4" data-layout-allow-overlap>
+        <div id="report-stage" class="scene-content report-stage" data-layout-allow-overlap><div class="report-heading-row"><div><div id="report-eyebrow" class="eyebrow" data-layout-allow-overlap>Contest report</div><h2 id="report-title" class="report-title">Signal, not noise.</h2></div><p id="report-note" class="report-note">Performance shows the first positive cumulative window: 24h, then 48h, then 72h.</p></div>
+          <div id="report-shell" class="report-shell" data-layout-allow-overlap><div class="report-row header"><span>Rank</span><span>Name / ID</span><span>Solved</span><span>Penalty</span><span class="performance-head">Performance</span></div><div class="report-row data"><span class="rank">01</span><span><span class="student-name">Nafisa Rahman</span><span class="student-id mono">mist_2027_014</span></span><span class="solved">7</span><span class="mono">842</span><span id="performance-cell" class="performance-cell"><strong class="perf-number">+3</strong><span class="perf-window">24h</span></span></div><div class="report-row data"><span class="rank">02</span><span><span class="student-name">Tahmid Hasan</span><span class="student-id mono">mist_2027_021</span></span><span class="solved">6</span><span class="mono">913</span><span class="performance-cell"><strong class="perf-number" style="color:#aeb8cc;font-size:31px">—</strong></span></div></div>
+          <div id="focus-bracket" class="focus-bracket"></div><div id="logic-line" class="logic-line"><span class="logic-pill">+3 · 24h</span><strong>First positive window only</strong><span class="logic-muted">48h and 72h stay quiet when 24h already tells the story.</span></div>
+        </div>
+        <div id="brand-close" class="brand-close" data-layout-allow-overlap><div id="brand-mark" class="brand-mark"><img src="assets/brand/mcc.png" alt="MCC mark" /></div><div class="brand-copy"><h2 id="brand-title" data-layout-allow-overlap>One calm place to teach.</h2><p id="brand-sub">MCC Trainer</p><div id="brand-rule" class="brand-rule"></div></div></div>
+      </section>
+
+      <audio id="music" data-start="0" data-duration="20" data-track-index="10" data-volume="0.22" src="assets/music/mcc-trainer-20s.mp3"></audio>
+      <audio id="sfx-click" data-start="8.05" data-duration="0.01" data-track-index="11" data-volume="0.62" src="assets/sfx/interface/click_003.ogg"></audio>
+      <audio id="sfx-handoff" data-start="8.74" data-duration="0.18" data-track-index="12" data-volume="0.52" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+      <audio id="sfx-payoff" data-start="17.47" data-duration="0.18" data-track-index="13" data-volume="0.48" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+      <audio id="sfx-close" data-start="18.82" data-duration="0.12" data-track-index="14" data-volume="0.42" src="assets/sfx/interface/bong_001.ogg"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      tl.from("#hook-eyebrow", { x: -34, opacity: 0, duration: .55, ease: "expo.out" }, .18);
+      tl.from("#hook-title", { y: 48, opacity: 0, duration: .82, ease: "power4.out" }, .34);
+      tl.from("#hook-sub", { y: 24, opacity: 0, duration: .62, ease: "sine.out" }, .78);
+      tl.from("#route-panel", { x: 70, scale: .97, opacity: 0, duration: .86, ease: "power3.out" }, .42);
+      tl.from("#route-1", { x: 34, opacity: 0, duration: .48, ease: "expo.out" }, .72);
+      tl.from("#route-2", { scale: .96, opacity: 0, duration: .58, ease: "back.out(1.25)" }, 1.26);
+      tl.from("#route-3", { x: -28, opacity: 0, duration: .52, ease: "power3.out" }, 1.82);
+      tl.from("#route-glow", { scale: .2, opacity: 0, duration: .8, ease: "sine.out" }, .56);
+      tl.to("#route-glow", { y: 350, scale: 1.18, duration: 2.2, ease: "sine.inOut" }, 1.38);
+      tl.to("#route-panel", { y: -8, duration: 1.4, yoyo: true, repeat: 1, ease: "sine.inOut" }, 2);
+
+      tl.from("#scene-2", { clipPath: "inset(0 0 100% 0)", filter: "blur(12px)", duration: .62, ease: "power3.inOut" }, 4.4);
+      tl.from("#dashboard-kicker", { x: -28, opacity: 0, duration: .42, ease: "expo.out" }, 4.62);
+      tl.from("#dashboard-title", { y: 34, opacity: 0, duration: .56, ease: "power4.out" }, 4.72);
+      tl.from("#dashboard-subtitle", { opacity: 0, duration: .7, ease: "sine.out" }, 4.96);
+      tl.from("#dashboard-actions", { x: 38, opacity: 0, duration: .5, ease: "power3.out" }, 4.76);
+      tl.from("#summary-row .summary-chip", { y: 22, opacity: 0, duration: .42, stagger: .12, ease: "back.out(1.35)" }, 5.18);
+      tl.from("#dashboard-main", { x: -42, opacity: 0, duration: .68, ease: "expo.out" }, 5.42);
+      tl.from("#attention-rail", { x: 48, scale: .98, opacity: 0, duration: .72, ease: "power3.out" }, 5.62);
+      tl.from("#class-card", { y: 38, opacity: 0, duration: .62, ease: "power4.out" }, 5.86);
+      tl.from("#attention-rail .attention-item", { x: 24, opacity: 0, duration: .38, stagger: .13, ease: "sine.out" }, 6.2);
+      tl.from("#cursor", { x: 180, y: -120, opacity: 0, duration: .22, ease: "power3.out" }, 7.26);
+      tl.to("#cursor", { x: -128, y: 58, duration: .64, ease: "power2.inOut" }, 7.5);
+      tl.fromTo("#click-ring", { scale: .25, opacity: .85 }, { scale: 1.25, opacity: 0, duration: .42, ease: "power2.out" }, 8.05);
+      tl.to("#open-classroom", { scale: .965, duration: .12, yoyo: true, repeat: 1, ease: "power2.inOut" }, 8.05);
+      // beat-locked: classroom handoff lands at 8.74s.
+      tl.to("#class-card", { scale: 1.18, x: 150, y: -82, borderColor: "rgba(10,132,255,.58)", duration: .82, ease: "power3.inOut" }, 8.1);
+      tl.to("#dashboard-shell", { scale: 1.025, transformOrigin: "50% 45%", duration: 1, ease: "sine.inOut" }, 8.12);
+
+      tl.from("#scene-3", { scale: 1.035, opacity: 0, filter: "blur(10px)", duration: .62, ease: "sine.inOut" }, 10);
+      tl.from("#back-link", { x: -28, opacity: 0, duration: .42, ease: "expo.out" }, 10.18);
+      tl.from("#classroom-title", { y: 42, opacity: 0, duration: .66, ease: "power4.out" }, 10.26);
+      tl.from("#classroom-meta", { opacity: 0, duration: .66, ease: "sine.out" }, 10.56);
+      tl.from("#classroom-actions .ui-button", { x: 28, opacity: 0, duration: .46, stagger: .13, ease: "power3.out" }, 10.38);
+      tl.from("#arrival-card", { x: -48, scale: .985, opacity: 0, duration: .72, ease: "expo.out" }, 10.68);
+      tl.from("#status-card", { x: 46, opacity: 0, duration: .68, ease: "power3.out" }, 10.88);
+      // beat-grid: dock labels enter as one readable set near 11.46s.
+      tl.from("#trainer-dock", { y: 54, scale: .96, opacity: 0, duration: .72, ease: "back.out(1.18)" }, 11.42);
+      tl.from("#trainer-dock .dock-item", { y: 14, opacity: 0, duration: .38, stagger: .07, ease: "power2.out" }, 11.68);
+      tl.from("#dock-lens", { scale: .76, opacity: 0, duration: .46, ease: "sine.out" }, 11.62);
+      tl.to("#dock-lens", { x: 540, duration: 1.06, ease: "power3.inOut" }, 12.05);
+      // beat-locked: lens settles on Contests at 13.11s.
+      tl.to("#dock-lens", { boxShadow: "inset 0 1px 0 rgba(255,255,255,.2), 0 12px 48px rgba(10,132,255,.26)", duration: .24, yoyo: true, repeat: 1, ease: "sine.inOut" }, 13.11);
+      tl.fromTo("#section-shift", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: .5, ease: "expo.out" }, 13.11);
+      tl.to("#arrival-card", { borderColor: "rgba(10,132,255,.24)", duration: .7, ease: "sine.inOut" }, 13.2);
+
+      tl.from("#scene-4", { yPercent: 8, opacity: 0, filter: "blur(8px)", duration: .56, ease: "power3.out" }, 15);
+      tl.from("#report-eyebrow", { x: -30, opacity: 0, duration: .42, ease: "expo.out" }, 15.18);
+      tl.from("#report-title", { y: 38, opacity: 0, duration: .62, ease: "power4.out" }, 15.28);
+      tl.from("#report-note", { x: 42, opacity: 0, duration: .66, ease: "sine.out" }, 15.32);
+      tl.from("#report-shell", { y: 42, scale: .985, opacity: 0, duration: .7, ease: "power3.out" }, 15.68);
+      tl.from("#report-shell .header span", { y: 12, opacity: 0, duration: .34, stagger: .08, ease: "power2.out" }, 15.94);
+      tl.from("#report-shell .data", { x: -28, opacity: 0, duration: .48, stagger: .16, ease: "expo.out" }, 16.18);
+      tl.from("#performance-cell", { scale: .72, opacity: 0, duration: .58, ease: "back.out(1.5)" }, 16.89);
+      // beat-locked: +3 · 24h payoff lands at 17.47s.
+      tl.from("#focus-bracket", { scale: .82, opacity: 0, duration: .46, ease: "power3.out" }, 17.01);
+      tl.from("#logic-line", { y: 24, opacity: 0, duration: .58, ease: "sine.out" }, 17.47);
+      tl.to("#focus-bracket", { boxShadow: "0 0 62px rgba(99,212,154,.18)", duration: .34, yoyo: true, repeat: 1, ease: "sine.inOut" }, 17.47);
+      tl.to("#report-stage", { opacity: 0, scale: .985, duration: .48, ease: "power2.in" }, 18.36);
+      tl.to("#brand-close", { opacity: 1, duration: .56, ease: "sine.out" }, 18.36);
+      tl.from("#brand-mark", { scale: .78, rotation: -4, opacity: 0, duration: .64, ease: "back.out(1.25)" }, 18.46);
+      tl.from("#brand-title", { x: 44, opacity: 0, duration: .6, ease: "power4.out" }, 18.54);
+      tl.from("#brand-sub", { y: 18, opacity: 0, duration: .48, ease: "sine.out" }, 18.76);
+      tl.from("#brand-rule", { scaleX: 0, duration: .64, ease: "expo.out" }, 18.82);
+      window.__timelines["mcc-trainer-brag"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

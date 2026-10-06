@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "../utils/supabase/server";
+import { clearAuthCookies, setAuthCookies } from "./auth-cookies";
 
 const serverBase =
   (process.env.SERVER_URL || process.env.NEXT_PUBLIC_SERVER_URL || "").replace(
@@ -73,31 +74,172 @@ export const get_with_token = cache(async (url) => {
       error: "Unauthorized",
     };
 
-  const response = await fetch(
-    server_url + url,
-    {
+  try {
+    const response = await fetch(
+      server_url + url,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token.value}`,
+        },
+      },
+      {
+        cache: "force-cache",
+      },
+      { next: { revalidate: 900 } }
+    );
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
+    };
+  }
+});
+
+export async function get_uncached_with_token(url) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) {
+    return {
+      error: "Unauthorized",
+    };
+  }
+
+  try {
+    const response = await fetch(server_url + url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token.value}`,
       },
-    },
-    {
-      cache: "force-cache",
-    },
-    { next: { revalidate: 900 } }
-  );
-  try {
-    const json = await response.json();
-    return json;
+      cache: "no-store",
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
   } catch (error) {
     return {
-      error: "An error occurred " + error,
+      error: error?.message || "Failed to reach server",
+    };
+  }
+}
+
+export const post_with_token = cache(async (url, data) => {
+  const token = (await cookies()).get("token");
+  if (token === undefined)
+    return {
+      error: "Unauthorized",
+    };
+
+  try {
+    const response = await fetch(
+      server_url + url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token.value}`,
+        },
+        body: JSON.stringify(data),
+      },
+      {
+        cache: "force-cache",
+      },
+      { next: { revalidate: 900 } }
+    );
+    try {
+      const json = await response.json();
+      return json;
+    } catch (error) {
+      // If JSON parse fails, try to read text to surface the server response
+      try {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        return { error: text || "An error occurred" };
+      } catch (inner) {
+        console.error("Error:", error, inner);
+        return {
+          error: "An error occurred",
+        };
+      }
+    }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
     };
   }
 });
 
-export const post_with_token = cache(async (url, data) => {
+export async function post_uncached_with_token(url, data) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) return { error: "Unauthorized" };
+
+  try {
+    const response = await fetch(server_url + url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.value}`,
+      },
+      body: JSON.stringify(data),
+      cache: "no-store",
+    });
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return { error: text || "An error occurred " + error };
+    }
+  } catch (error) {
+    return { error: error?.message || "Failed to reach server" };
+  }
+}
+
+export async function post_form_with_token(url, formData) {
+  const token = (await cookies()).get("token");
+  if (token === undefined) {
+    return {
+      error: "Unauthorized",
+    };
+  }
+
+  try {
+    const response = await fetch(server_url + url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+      },
+      body: formData,
+    });
+
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      return {
+        error: text || "An error occurred " + error,
+      };
+    }
+  } catch (error) {
+    return {
+      error: error?.message || "Failed to reach server",
+    };
+  }
+}
+
+export const delete_with_token = cache(async (url) => {
   const token = (await cookies()).get("token");
   if (token === undefined)
     return {
@@ -107,33 +249,18 @@ export const post_with_token = cache(async (url, data) => {
   const response = await fetch(
     server_url + url,
     {
-      method: "POST",
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token.value}`,
       },
-      body: JSON.stringify(data),
-    },
-    {
-      cache: "force-cache",
-    },
-    { next: { revalidate: 900 } }
+    }
   );
   try {
     const json = await response.json();
     return json;
   } catch (error) {
-    // If JSON parse fails, try to read text to surface the server response
-    try {
-      const text = await response.text();
-      console.error("Non-JSON response:", text);
-      return { error: text || "An error occurred" };
-    } catch (inner) {
-      console.error("Error:", error, inner);
-      return {
-        error: "An error occurred",
-      };
-    }
+    return { error: "An error occurred " + error };
   }
 });
 
@@ -200,7 +327,7 @@ export async function createAchievement(prevState, formData) {
   if (error) {
     return {
       success: false,
-      message: "Problem uploading image",
+      message: "Problem uploading MIST ID card",
     };
   }
   raw.image = url;
@@ -266,7 +393,6 @@ export async function updateAchievement(prevState, formData) {
 export async function signUp(prevState, formData) {
 
   let raw = Object.fromEntries(formData)
-  console.log(raw)
   
   // Validate password length
   if (!raw.password || raw.password.length < 8) {
@@ -283,9 +409,63 @@ export async function signUp(prevState, formData) {
     };
   }
 
+  const mistId = raw.mist_id?.toString().trim();
+  if (!mistId || !/^\d+$/.test(mistId)) {
+    return {
+      success: false,
+      message: "MIST Student ID must contain numbers only",
+    };
+  }
+
+  const batchName = raw.batch_name?.toString().trim();
+  if (!batchName) {
+    return {
+      success: false,
+      message: "Batch details are required",
+    };
+  }
+
+  const validateImage = (file, label) => {
+    if (!file || typeof file === "string" || file.size === 0) {
+      return `${label} is required`;
+    }
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      return `${label} must be a JPG or PNG image`;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return `${label} must be 5MB or smaller`;
+    }
+    return "";
+  };
+
+  const profilePictureError = validateImage(raw.profile_pic, "Profile picture");
+  const idCardError = validateImage(raw.mist_id_card, "MIST ID card");
+  if (profilePictureError || idCardError) {
+    return {
+      success: false,
+      message: profilePictureError || idCardError,
+    };
+  }
+
+  const profileUpload = await uploadImage(
+    "profile_pics",
+    mistId,
+    raw.profile_pic,
+    "all_picture"
+  );
+  if (profileUpload.error) {
+    return {
+      success: false,
+      message: "Problem uploading profile picture",
+    };
+  }
+  raw.profile_pic = profileUpload.url;
+  raw.mist_id = mistId;
+  raw.batch_name = batchName;
+
   const { url, error } = await uploadImage(
     "mist_id_cards",
-    raw.mist_id,
+    mistId,
     raw.mist_id_card,
     "all_picture"
   );
@@ -295,7 +475,6 @@ export async function signUp(prevState, formData) {
       message: "Problem uploading image",
     };
   }
-  console.log(url);
   raw.mist_id_card = url;
   const response = await post("auth/signup", raw);
   if (response.error)
@@ -313,14 +492,12 @@ export async function login(prevState, formData) {
       success: false,
       message: response.error,
     };
-  const cookieStore = await cookies();
-  cookieStore.set("token", response.token);
-  cookieStore.set("admin", response.admin);
+  await setAuthCookies(response.token, response.admin);
   redirect("/");
 }
 
 export async function logout() {
-  (await cookies()).delete("token");
+  await clearAuthCookies();
   redirect("/");
 }
 
@@ -1053,5 +1230,24 @@ export async function resetPassword(email, otp, password) {
       success: false,
       message: 'An error occurred while resetting password'
     }
+  }
+}
+
+export async function changeOwnPassword(currentPassword, newPassword) {
+  try {
+    const response = await post_with_token('auth/user/change-password', {
+      currentPassword,
+      newPassword,
+    });
+    return {
+      success: !response?.error && (response?.success === true || !!response?.message),
+      message: response?.error || response?.message || 'Password updated successfully',
+    };
+  } catch (error) {
+    console.error('Change Own Password Error:', error);
+    return {
+      success: false,
+      message: 'An error occurred while updating password',
+    };
   }
 }

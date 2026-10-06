@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { jwt } from 'hono/jwt'
+import { jwtAuthOptions } from '../utils/jwtAuthOptions'
 import {
   createAdminAlumniBatch,
   createAdminAlumniMember,
@@ -15,7 +16,7 @@ import {
 const route = new Hono()
 
 route.get('/public', getAlumniPublic)
-route.use('/admin/*', jwt({ secret: process.env.SECRET || '', alg: 'HS256' }))
+route.use('/admin/*', jwt(jwtAuthOptions()))
 route.get('/admin/batch', listAdminAlumniBatches)
 route.post('/admin/batch/create', createAdminAlumniBatch)
 route.post('/admin/batch/update', updateAdminAlumniBatch)

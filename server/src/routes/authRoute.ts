@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   acceptUser,
   getProfile,
@@ -7,22 +8,26 @@ import {
   getPublicProfileByVjudge,
   listPublicVjudgeIds,
   login,
+  logout,
   pendingUser,
   rejectUser,
   resetPassword,
   sendResetOTP,
   signup,
   verifyOTP,
+  changeOwnPassword,
 } from "../controllers/authController";
+import {
+  beginDiscordAuthorize as beginDiscordAuthorizeHandler,
+  getDiscordStatus as getDiscordStatusHandler,
+  handleDiscordCallback as handleDiscordCallbackHandler,
+} from "../controllers/discordController";
 
 const route = new Hono();
 
 route.use(
   "/user/*",
-  jwt({
-    secret: process.env.SECRET || "",
-    alg: "HS256",
-  }),
+  jwt(jwtAuthOptions()),
 );
 
 // route.use('/user/*', async (c, next) => {
@@ -54,6 +59,18 @@ route.use(
 
 route.post("/signup", signup);
 route.post("/login", login);
+route.post("/logout", logout);
+route.post(
+  "/discord/authorize",
+  jwt(jwtAuthOptions()),
+  beginDiscordAuthorizeHandler,
+);
+route.get("/discord/callback", handleDiscordCallbackHandler);
+route.get(
+  "/discord/status",
+  jwt(jwtAuthOptions()),
+  getDiscordStatusHandler,
+);
 
 // Password reset routes
 route.post("/reset-password/send-otp", sendResetOTP);
@@ -64,6 +81,7 @@ route.get("/user/pendings", pendingUser);
 route.post("/user/reject", rejectUser);
 route.post("/user/accept", acceptUser);
 route.get("/user/profile", getProfile);
+route.post("/user/change-password", changeOwnPassword);
 route.post("/profile", getProfilePost);
 
 // Public endpoints (no auth)

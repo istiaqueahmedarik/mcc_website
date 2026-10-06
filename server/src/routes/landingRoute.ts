@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
+import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   alumniBatchCrud,
   alumniMemberCrud,
@@ -15,7 +16,7 @@ const route = new Hono();
 route.get("/public", getLandingPublic);
 
 // Protect admin endpoints
-route.use("/admin/*", jwt({ secret: process.env.SECRET || "", alg: "HS256" }));
+route.use("/admin/*", jwt(jwtAuthOptions()));
 
 // Features
 route.get("/admin/features", featuresCrud.list);

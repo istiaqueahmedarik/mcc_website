@@ -1,33 +1,56 @@
 import { sign as JwtSign } from "hono/jwt";
+import { deleteCookie } from "hono/cookie";
 import sql from "../db";
 import { sendEmail } from "../sendEmail";
+import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
+
+async function isAdminUser(c: any) {
+  const { id, email } = c.get("jwtPayload") || {};
+  if (!id || !email) return false;
+
+  const rows = await sql`
+    select id
+    from users
+    where id = ${id} and email = ${email} and admin = true
+    limit 1
+  `;
+  return rows.length > 0;
+}
 
 export const signup = async (c: any) => {
   const {
     full_name,
     profile_pic,
     mist_id,
-    batch_details,
+    batch_name,
     mist_id_card,
     email,
     phone,
     password,
   } = await c.req.json();
-  console.log(
-    full_name,
-    profile_pic,
-    mist_id,
-    batch_details,
-    mist_id_card,
-    email,
-    phone,
-    password,
-  );
   try {
     // Validate password length
     if (!password || password.length < 8) {
       return c.json(
         { error: "Password must be at least 8 characters long" },
+        400,
+      );
+    }
+
+    const normalizedMistId = String(mist_id || "").trim();
+    const normalizedBatchName = String(batch_name || "").trim();
+    if (!/^\d+$/.test(normalizedMistId)) {
+      return c.json({ error: "MIST Student ID must contain numbers only" }, 400);
+    }
+    if (!normalizedBatchName) {
+      return c.json({ error: "Batch details are required" }, 400);
+    }
+    if (normalizedBatchName.length > 120) {
+      return c.json({ error: "Batch details must be 120 characters or fewer" }, 400);
+    }
+    if (!profile_pic || !mist_id_card) {
+      return c.json(
+        { error: "Profile picture and MIST ID card are required" },
         400,
       );
     }
@@ -38,11 +61,12 @@ export const signup = async (c: any) => {
     }
     const hash = await Bun.password.hash(password);
     const result =
-      await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password)
-        VALUES (${full_name}, ${profile_pic}, ${Number(
-          mist_id,
-        )}, ${mist_id_card}, ${email}, ${phone}, ${hash})
+      await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name)
+        VALUES (${full_name}, ${profile_pic}, ${normalizedMistId}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName})
         RETURNING *`;
+    if (result[0]?.id) {
+      await markPreEnrollmentClaimsForUser(result[0].id);
+    }
     return c.json({ result });
   } catch (error: any) {
     console.error("Database error in signup:", error.message);
@@ -83,6 +107,9 @@ export const login = async (c: any) => {
     if (result.length === 0) {
       return c.json({ error: "Invalid email or password" }, 400);
     }
+    if (result[0].is_pre_enrolled) {
+      return c.json({ error: "Invalid email or password" }, 400);
+    }
     const isMatch = await Bun.password.verify(password, result[0].password);
     if (!isMatch) {
       return c.json({ error: "Invalid email or password" }, 400);
@@ -120,6 +147,18 @@ export const login = async (c: any) => {
 
     return c.json({ error: "Login failed. Please try again." }, 500);
   }
+};
+
+export const logout = async (c: any) => {
+  const cookieOptions = { path: "/" };
+  const secureCookieOptions = { ...cookieOptions, secure: true };
+
+  deleteCookie(c, "token", cookieOptions);
+  deleteCookie(c, "token", secureCookieOptions);
+  deleteCookie(c, "admin", cookieOptions);
+  deleteCookie(c, "admin", secureCookieOptions);
+
+  return c.json({ success: true });
 };
 
 export const getProfile = async (c: any) => {
@@ -237,6 +276,10 @@ export const listPublicVjudgeIds = async (c: any) => {
 
 export const pendingUser = async (c: any) => {
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result = await sql`select * from users where granted = false`;
     return c.json({ result });
   } catch (error) {
@@ -247,11 +290,14 @@ export const pendingUser = async (c: any) => {
 
 export const rejectUser = async (c: any) => {
   const { userId } = await c.req.json();
-  console.log(userId);
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result =
       await sql`delete from users where id = ${userId} returning *`;
-    console.log(result[0].email);
+    if (result.length === 0) return c.json({ error: "User not found" }, 404);
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Account Registration Status",
@@ -340,11 +386,14 @@ Military Institute of Science and Technology`,
 
 export const acceptUser = async (c: any) => {
   const { userId } = await c.req.json();
-  console.log(userId);
   try {
+    if (!(await isAdminUser(c))) {
+      return c.json({ error: "Admin access required" }, 403);
+    }
+
     const result =
       await sql`update users set granted = true where id = ${userId} returning *`;
-    console.log(result[0].email);
+    if (result.length === 0) return c.json({ error: "User not found" }, 404);
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Welcome! Account Approved",
@@ -637,5 +686,44 @@ export const resetPassword = async (c: any) => {
   } catch (error) {
     console.log(error);
     return c.json({ error: "Failed to reset password" }, 500);
+  }
+};
+
+export const changeOwnPassword = async (c: any) => {
+  const { id } = c.get("jwtPayload") || {};
+  if (!id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const { currentPassword, newPassword } = await c.req.json();
+    if (!currentPassword || !newPassword) {
+      return c.json({ error: "Current password and new password are required" }, 400);
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return c.json({ error: "New password must be at least 8 characters long" }, 400);
+    }
+
+    const userRows = await sql`SELECT id, password FROM users WHERE id = ${id}`;
+    if (userRows.length === 0) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    const user = userRows[0];
+    if (user.password) {
+      const isMatch = await Bun.password.verify(currentPassword, user.password);
+      if (!isMatch) {
+        return c.json({ error: "Incorrect current password" }, 400);
+      }
+    }
+
+    const hash = await Bun.password.hash(newPassword);
+    await sql`UPDATE users SET password = ${hash} WHERE id = ${id}`;
+
+    return c.json({ success: true, message: "Password updated successfully" });
+  } catch (error: any) {
+    console.error("Error in changeOwnPassword:", error.message);
+    return c.json({ error: "Failed to change password. Please try again." }, 500);
   }
 };
