@@ -1,4 +1,6 @@
 .vscode
 
 # Local credentials and environment overrides
-.env.local
+.env
+.env.*
+!.env.example

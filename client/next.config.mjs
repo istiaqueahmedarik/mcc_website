@@ -10,7 +10,8 @@ const supHost = (() => {
 })();
 
 const nextConfig = {
-  
+
+  output: "standalone",
   images: {
     remotePatterns: [
       ...(process.env.HOST_NAME
