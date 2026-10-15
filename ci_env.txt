@@ -6,6 +6,6 @@ NEXT_PUBLIC_DEBUG_PROFILE_BATCH=false
 NEXT_PUBLIC_WEBSITE_URL=https://computerclub.mist.ac.bd
 NEXT_PUBLIC_FACEBOOK_URL=https://www.facebook.com/MistComputerClub
 NEXT_PUBLIC_LINKEDIN_URL=https://www.linkedin.com/company/mistcomputerclub
-NEXT_PUBLIC_DISCORD_URL=https://discord.gg/bwgMV5djvY
+NEXT_PUBLIC_DISCORD_URL=https://discord.gg/discord-invite
 SUPABASE_URL=https://example.supabase.co
 HOST_NAME=example.supabase.co

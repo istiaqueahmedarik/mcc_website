@@ -20,6 +20,13 @@ jobs:
       run:
         working-directory: ./client
     steps:
+      # Pin the runner to Node 24 BEFORE any Node-using action runs.
+      # Without this, actions/checkout@v4 and actions/cache@v4 fall back to the
+      # deprecated Node 20 default and emit a deprecation warning.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - uses: actions/checkout@v4
 
       # Make the NEXT_PUBLIC_* values from ci_env.txt available to `next build`
@@ -47,6 +54,12 @@ jobs:
       run:
         working-directory: ./server
     steps:
+      # Pin the runner to Node 24 BEFORE actions/checkout@v4 and actions/cache@v4
+      # so they don't fall back to the deprecated Node 20 default.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - uses: actions/checkout@v4
 
       - uses: oven-sh/setup-bun@v2
@@ -70,6 +83,12 @@ jobs:
     timeout-minutes: 20
     needs: [client, server]
     steps:
+      # Pin the runner to Node 24 BEFORE actions/checkout@v4 so it doesn't
+      # fall back to the deprecated Node 20 default.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
       - uses: actions/checkout@v4
 
       # docker-compose.yml has `env_file: .env` and ${VAR} build args
