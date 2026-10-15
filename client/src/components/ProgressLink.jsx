@@ -22,9 +22,8 @@ const ProgressLink = forwardRef(function ProgressLink(
 
   const handleClick = (event) => {
     onClick?.(event);
-    if (event.defaultPrevented) return;
-    if (pathname !== href) {
-      NProgress.start(); // start immediately on click
+    if (!event.defaultPrevented && pathname !== href) {
+      NProgress.start();
     }
   };
 

@@ -270,57 +270,65 @@ const Navbar = async () => {
                       </SheetClose>
                     ))}
                   <hr className="my-4" />
-                  <ProgressLink
-                    href="/login"
-                    className={`${isLoggedIn && "hidden"}`}
-                  >
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-lg"
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href="/login"
+                      className={`${isLoggedIn && "hidden"}`}
                     >
-                      <LogIn className="mr-2 h-5 w-5" />
-                      Login
-                    </Button>
-                  </ProgressLink>
-                  <ProgressLink
-                    href="/signup"
-                    className={`${isLoggedIn && "hidden"}`}
-                  >
-                    <Button
-                      variant="default"
-                      className="w-full justify-start text-lg"
-                    >
-                      <UserPlus className="mr-2 h-5 w-5" />
-                      Sign Up
-                    </Button>
-                  </ProgressLink>
-                  <ProgressLink
-                    href={profileHref}
-                    className={`${!isLoggedIn && "hidden"}`}
-                  >
-                    <div className="flex items-center gap-3 py-1">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage
-                          src={profile?.profile_pic}
-                        />
-                        <AvatarFallback>
-                          {profile?.full_name?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-base font-medium">My Profile</span>
-                    </div>
-                  </ProgressLink>
-                  {isLoggedIn && (
-                    <form action={logout} className="pt-2">
                       <Button
-                        type="submit"
                         variant="outline"
-                        className="w-full justify-start text-lg text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                        className="w-full justify-start text-lg"
                       >
-                        <LogOut className="mr-2 h-5 w-5" />
-                        Logout
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Login
                       </Button>
-                    </form>
+                    </ProgressLink>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href="/signup"
+                      className={`${isLoggedIn && "hidden"}`}
+                    >
+                      <Button
+                        variant="default"
+                        className="w-full justify-start text-lg"
+                      >
+                        <UserPlus className="mr-2 h-5 w-5" />
+                        Sign Up
+                      </Button>
+                    </ProgressLink>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <ProgressLink
+                      href={profileHref}
+                      className={`${!isLoggedIn && "hidden"}`}
+                    >
+                      <div className="flex items-center gap-3 py-1">
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage
+                            src={profile?.profile_pic}
+                          />
+                          <AvatarFallback>
+                            {profile?.full_name?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-base font-medium">My Profile</span>
+                      </div>
+                    </ProgressLink>
+                  </SheetClose>
+                  {isLoggedIn && (
+                    <SheetClose asChild>
+                      <form action={logout} className="pt-2">
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          className="w-full justify-start text-lg text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                        >
+                          <LogOut className="mr-2 h-5 w-5" />
+                          Logout
+                        </Button>
+                      </form>
+                    </SheetClose>
                   )}
                 </div>
               </SheetClose>
