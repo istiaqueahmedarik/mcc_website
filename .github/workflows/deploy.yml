@@ -4,10 +4,21 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:   # re-run a deploy manually from the Actions tab
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false   # queue deploys; never kill one halfway through
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
     runs-on: self-hosted
+    # build + up --wait (180s) + possible rollback --wait (180s) + headroom
+    timeout-minutes: 30
+    environment: production
 
     steps:
       - name: Run deploy script

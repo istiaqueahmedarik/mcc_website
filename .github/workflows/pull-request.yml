@@ -5,30 +5,88 @@ on:
     branches:
       - master
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  build:
+  client:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./client
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js for client
-        uses: actions/setup-node@v3
+      # Make the NEXT_PUBLIC_* values from ci_env.txt available to `next build`
+      - name: Load build env from ci_env.txt
+        working-directory: .
+        run: cat ci_env.txt >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
-      - name: Install client dependencies
-        run: npm install --force
-        working-directory: ./client
+      - run: npm ci
 
-      - name: Build client
-        run: npm run build
-        working-directory: ./client
+      # - run: npm run lint
+      # - run: npm test
 
-      - name: Set up Bun for server
-        uses: oven-sh/setup-bun@v1
+      - run: npm run build
 
-      - name: Install server dependencies
-        run: bun install
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
         working-directory: ./server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest   # better: pin, e.g. 1.2.x
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('server/bun.lock*') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - run: bun install --frozen-lockfile
+
+      # - run: bun run lint
+      # - run: bun test
+      # - run: bunx tsc --noEmit   # if TypeScript
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [client, server]
+    steps:
+      - uses: actions/checkout@v4
+
+      # docker-compose.yml has `env_file: .env` and ${VAR} build args
+      - name: Create .env from ci_env.txt
+        run: cp ci_env.txt .env
+
+      - name: Verify compose variables are all set
+        run: |
+          # Compose only warns on unset variables; turn that into a failure
+          if docker compose config 2>&1 >/dev/null | grep -i "not set"; then
+            echo "::error::Variables used by docker-compose.yml are missing from ci_env.txt"
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        run: docker compose build
+        env:
+          DOCKER_BUILDKIT: 1
