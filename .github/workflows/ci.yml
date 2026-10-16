@@ -1,13 +1,14 @@
-name: Pull Request Workflow
+name: CI
 
 on:
   pull_request:
-    branches:
-      - master
+    branches: [master]
+  push:
+    branches: [master]   # re-verify the merged commit; CD waits on this
 
 concurrency:
-  group: pr-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -20,31 +21,22 @@ jobs:
       run:
         working-directory: ./client
     steps:
-      # Pin the runner to Node 24 BEFORE any Node-using action runs.
-      # Without this, actions/checkout@v4 and actions/cache@v4 fall back to the
-      # deprecated Node 20 default and emit a deprecation warning.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Make the NEXT_PUBLIC_* values from ci_env.txt available to `next build`
       - name: Load build env from ci_env.txt
         working-directory: .
         run: cat ci_env.txt >> "$GITHUB_ENV"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '24.x'
           cache: npm
           cache-dependency-path: client/package-lock.json
 
       - run: npm ci
-
       # - run: npm run lint
       # - run: npm test
-
       - run: npm run build
 
   server:
@@ -54,17 +46,11 @@ jobs:
       run:
         working-directory: ./server
     steps:
-      # Pin the runner to Node 24 BEFORE actions/checkout@v4 and actions/cache@v4
-      # so they don't fall back to the deprecated Node 20 default.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest   # better: pin, e.g. 1.2.x
+          bun-version: 1.2.x   # match your server image
 
       - uses: actions/cache@v4
         with:
@@ -73,23 +59,16 @@ jobs:
           restore-keys: bun-${{ runner.os }}-
 
       - run: bun install --frozen-lockfile
-
       # - run: bun run lint
       # - run: bun test
-      # - run: bunx tsc --noEmit   # if TypeScript
+      # - run: bunx tsc --noEmit
 
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [client, server]
     steps:
-      # Pin the runner to Node 24 BEFORE actions/checkout@v4 so it doesn't
-      # fall back to the deprecated Node 20 default.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # docker-compose.yml has `env_file: .env` and ${VAR} build args
       - name: Create .env from ci_env.txt
