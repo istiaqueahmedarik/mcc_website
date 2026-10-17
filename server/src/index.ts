@@ -11,6 +11,7 @@ import contestRoomContestsRoute from "./routes/contestRoomContestsRoute";
 import contestRoomRoute from "./routes/contestRoomRoute";
 import courseRoute from "./routes/courseRoute";
 import customContestRoute from "./routes/customContestRoute";
+import contestRoutes from "./routes/generalContestRoute"
 import demeritRoute from "./routes/demeritRoute";
 import icpcJourneyRoute from "./routes/icpcJourneyRoute";
 import landingRoute from "./routes/landingRoute";
@@ -57,6 +58,7 @@ app.route("/public-contest-report", publicContestReportRoute);
 app.route("/vjudge", vjudgeRoute);
 app.route("/api/vjudge", vjudgeRoute);
 app.route("/custom-contests", customContestRoute);
+app.route("/general-contests", contestRoutes);
 app.route("/saved-standings", savedStandingsRoute);
 app.route("/landing", landingRoute);
 app.route("/alumni", alumniRoute);

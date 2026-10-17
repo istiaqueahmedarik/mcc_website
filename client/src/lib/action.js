@@ -1119,6 +1119,22 @@ export async function getContestResults(contestId, sessionId) {
   return htm;
 }
 
+export async function getGeneralContests() {
+    try {
+      console.log("Fetching general contests from:", server_url + "general-contests/all");
+        const response = await fetch(server_url + "general-contests/all", {
+            next: { revalidate: 300 }, // cache for 5 minutes on the Next.js side
+        })
+        if (!response.ok) throw new Error(`API returned ${response.status}`)
+
+        const data = await response.json()
+        return { data, error: null }
+    } catch (error) {
+        console.error("Error fetching contests:", error)
+        return { data: [], error: "Failed to load contests" }
+    }
+}
+
 export async function getActiveCustomContests() {
   try {
     const res = await fetch(
