@@ -154,6 +154,9 @@ export const createAdminAlumniBatch = async (c: any) => {
     const result = await sql`insert into alumni_batch (label) values (${label}) returning *`
     return c.json({ result: result[0] })
   } catch (e) {
+    if ((e as any)?.code === '23505') {
+      return c.json({ error: 'Batch already exists.' }, 409)
+    }
     console.error(e)
     return c.json({ error: 'Failed to create alumni batch' }, 400)
   }
