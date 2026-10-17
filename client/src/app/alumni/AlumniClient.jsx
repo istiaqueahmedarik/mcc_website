@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { uploadImage } from "@/lib/action";
-import { isAdminClient } from "@/lib/isAdmin";
 import { ChevronDown, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import React from "react";
 import { toast } from "sonner";
@@ -70,8 +69,14 @@ function matchText(value, query) {
   return String(value || "").toLowerCase().includes(query.toLowerCase());
 }
 
-export default function AlumniClient({ initialBatches, loadError }) {
-  const [isAdmin, setIsAdmin] = React.useState(false);
+function compareBatchLabels(a, b) {
+  return String(a.label || "").localeCompare(String(b.label || ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+export default function AlumniClient({ initialBatches, loadError, isAdmin }) {
   const [batches, setBatches] = React.useState(initialBatches || []);
   const [query, setQuery] = React.useState("");
   const [batchFilter, setBatchFilter] = React.useState("all");
@@ -122,10 +127,6 @@ export default function AlumniClient({ initialBatches, loadError }) {
   const companyOptions = React.useMemo(() => [...new Set(members.map((m) => m.company_name).filter(Boolean))].sort(), [members]);
   const positionOptions = React.useMemo(() => [...new Set(members.map((m) => m.position_in_club).filter(Boolean))].sort(), [members]);
   const designationOptions = React.useMemo(() => [...new Set(members.map((m) => m.designation).filter(Boolean))].sort(), [members]);
-
-  React.useEffect(() => {
-    setIsAdmin(isAdminClient());
-  }, []);
 
   async function refreshPublic() {
     const res = await fetch(process.env.NEXT_PUBLIC_SERVER_URL + "/alumni/public", { cache: "no-store" });
@@ -193,8 +194,9 @@ export default function AlumniClient({ initialBatches, loadError }) {
   }
 
   async function saveBatch() {
-    if (!batchForm.label.trim()) {
-      toast.error("Batch label is required.");
+    const batchNumber = batchForm.label.trim();
+    if (!/^\d+$/.test(batchNumber) || Number(batchNumber) < 1) {
+      toast.error("Enter a valid batch number.");
       return;
     }
 
@@ -202,7 +204,7 @@ export default function AlumniClient({ initialBatches, loadError }) {
     const tid = toast.loading("Saving batch...");
     try {
       const { createAdminAlumniBatch } = await import("@/actions/alumni");
-      const res = await createAdminAlumniBatch({ label: batchForm.label, is_active: true });
+      const res = await createAdminAlumniBatch({ label: `CSE ${Number(batchNumber)}`, is_active: true });
       if (res?.error) throw new Error(res.error);
       await refreshPublic();
       setBatchDialogOpen(false);
@@ -337,8 +339,11 @@ export default function AlumniClient({ initialBatches, loadError }) {
                   </DialogHeader>
                     <div className="space-y-3">
                     <div>
-                      <Label>Label</Label>
-                      <Input value={batchForm.label} onChange={(e) => setBatchForm((p) => ({ ...p, label: e.target.value }))} placeholder="CSE" />
+                      <Label>Batch number</Label>
+                      <div className="mt-1 flex h-10 items-center overflow-hidden rounded-md border border-input bg-background">
+                        <span className="flex h-full items-center border-r border-input bg-muted px-3 text-sm font-medium text-muted-foreground">CSE</span>
+                        <Input type="number" min="1" step="1" value={batchForm.label} onChange={(e) => setBatchForm((p) => ({ ...p, label: e.target.value }))} placeholder="8" className="h-full border-0 shadow-none focus-visible:ring-0" />
+                      </div>
                     </div>
                     <Button onClick={saveBatch} disabled={loading}>Save Batch</Button>
                   </div>
@@ -377,8 +382,8 @@ export default function AlumniClient({ initialBatches, loadError }) {
                         <SelectTrigger>
                           <SelectValue placeholder="Select batch" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {(batches || []).map((b) => (
+                        <SelectContent className="max-h-60">
+                          {[...(batches || [])].sort(compareBatchLabels).map((b) => (
                             <SelectItem key={b.id} value={b.id}>
                               {b.label}
                             </SelectItem>
