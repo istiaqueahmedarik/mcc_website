@@ -6,6 +6,7 @@ import FilterBar from "./filter-bar"
 import { isSameDay } from "date-fns"
 import { SearchInput } from "./search-input"
 import { PaginationControls } from "./pagination-controls"
+import { getGeneralContests } from "@/lib/action"
 
 export default function ContestList() {
     const [contests, setContests] = useState([])
@@ -20,20 +21,13 @@ export default function ContestList() {
 
     useEffect(() => {
         async function fetchContests() {
-            try {
-                const response = await fetch("https://contests.dhruvmishra.com/api/v1/contests/all")
-                const data = await response.json()
-                
-                // Sort contests chronologically by start time so platforms are interleaved
-                data.sort((a, b) => a.start_time - b.start_time)
-                
-                setContests(data)
-                setFilteredContests(data)
-                setIsLoading(false)
-            } catch (error) {
-                console.error("Error fetching contests:", error)
-                setIsLoading(false)
-            }
+            const { data, error } = await getGeneralContests()
+
+            if (error) console.error(error)
+
+            setContests(data)
+            setFilteredContests(data)
+            setIsLoading(false)
         }
 
         fetchContests()
@@ -70,7 +64,7 @@ export default function ContestList() {
         }
 
         setFilteredContests(filtered)
-        setCurrentPage(1) 
+        setCurrentPage(1)
     }, [filter, dateFilter, searchQuery, contests])
 
     useEffect(() => {

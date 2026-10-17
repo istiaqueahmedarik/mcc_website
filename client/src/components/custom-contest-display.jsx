@@ -19,7 +19,7 @@ export default function CustomContestDisplay(){
   useEffect(()=>{
     (async ()=>{
       const data = await getActiveCustomContests()
-      console.log('Fetched contests:', data)
+      // console.log('Fetched contests:', data)
       setContests(data)
       setFilteredContests(data)
       setLoading(false)
@@ -48,7 +48,7 @@ export default function CustomContestDisplay(){
     const start = new Date(contest.start_time).getTime()
     const isUpcoming = now < start
     if (isUpcoming) {
-      console.log('Upcoming contest:', contest.name, 'Start:', new Date(contest.start_time), 'Now:', new Date(now))
+      // console.log('Upcoming contest:', contest.name, 'Start:', new Date(contest.start_time), 'Now:', new Date(now))
     }
     return isUpcoming
   })
@@ -59,7 +59,7 @@ export default function CustomContestDisplay(){
     const end = new Date(contest.end_time).getTime()
     const isOngoing = now >= start && now <= end
     if (isOngoing) {
-      console.log('Ongoing contest:', contest.name)
+      // console.log('Ongoing contest:', contest.name)
     }
     return isOngoing
   })
@@ -69,12 +69,12 @@ export default function CustomContestDisplay(){
     const end = new Date(contest.end_time).getTime()
     const isEnded = now > end
     if (isEnded) {
-      console.log('Ended contest:', contest.name)
+      // console.log('Ended contest:', contest.name)
     }
     return isEnded
   })
 
-  console.log('Contest counts - Upcoming:', upcomingContests.length, 'Ongoing:', ongoingContests.length, 'Ended:', endedContests.length)
+  // console.log('Contest counts - Upcoming:', upcomingContests.length, 'Ongoing:', ongoingContests.length, 'Ended:', endedContests.length)
 
   // Apply pagination to ended contests only (since upcoming and ongoing are typically fewer)
   const totalEndedPages = Math.ceil(endedContests.length / pageSize)

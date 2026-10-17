@@ -5,6 +5,7 @@
     "discord:worker": "bun run src/workers/discordWorker.ts"
   },
   "dependencies": {
+    "@qatadaazzeh/atcoder-api": "^1.0.1",
     "@tldraw/sync-core": "5.2.5",
     "cheerio": "^1.0.0",
     "date-fns": "^4.1.0",
