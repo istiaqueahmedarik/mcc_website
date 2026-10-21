@@ -9,13 +9,29 @@ import { SearchInput } from "./search-input"
 import { PaginationControls } from "./pagination-controls"
 import { getContests } from "@/lib/action"
 
+function getSortTime(contest) {
+    if (contest.source === "bapsoj") {
+        const time = contest.status === "Upcoming" ? contest.starts_at : contest.ends_at
+        const timestamp = new Date(time).getTime()
+        return Number.isFinite(timestamp) ? timestamp : 0
+    }
+
+    const timestamp = Number(contest.endedAt)
+    return Number.isFinite(timestamp) && timestamp > 0 ? timestamp * 1000 : 0
+}
+
+function mergeContests(tophContests, bapsojContests) {
+    return [
+        ...tophContests.map((contest) => ({ ...contest, source: "toph" })),
+        ...bapsojContests,
+    ]
+}
 
 
 function convertBapsojContests(bapsojContests){
     return bapsojContests.map((contest) => {
-        const now = new Date()
         const endsAt = new Date(contest.ends_at)
-        const isEnded = endsAt < now
+        const isEnded = endsAt.getTime() < Date.now()
 
         return {
             id: contest.id,
@@ -27,7 +43,7 @@ function convertBapsojContests(bapsojContests){
             starts_at: contest.starts_at,
             ends_at: contest.ends_at,
             duration: contest.duration,
-            endedAt: isEnded ? (endsAt.getTime() / 1000).toString() : null,
+            endedAt: contest.ends_at,
             source: "bapsoj",
         }
     })
@@ -59,7 +75,7 @@ export default function IUPCSection() {
                 const data = await response.json();
 
                 const bapsojContests = convertBapsojContests(data.results)
-                setAllIUPCContests([...tophContests, ...bapsojContests])
+                setAllIUPCContests(mergeContests(tophContests, bapsojContests))
             } catch (error) {
                 console.error("Error fetching BAPSOJ contests:", error)
                 setAllIUPCContests(tophContests)
@@ -75,8 +91,12 @@ export default function IUPCSection() {
         contest.name.toLowerCase().includes(searchQuery.toLowerCase()),
     )
 
-    const upcomingContests = filteredContests.filter((contest) => contest.status === "Upcoming")
-    const endedContests = filteredContests.filter((contest) => contest.status === "Ended")
+    const upcomingContests = filteredContests
+        .filter((contest) => contest.status === "Upcoming")
+        .sort((a, b) => getSortTime(a) - getSortTime(b))
+    const endedContests = filteredContests
+        .filter((contest) => contest.status === "Ended")
+        .sort((a, b) => getSortTime(b) - getSortTime(a))
 
     const totalEndedPages = Math.ceil(endedContests.length / pageSize)
     const paginatedEndedContests = endedContests.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -156,8 +176,8 @@ function IUPCCard({ contest }) {
             if (contest.source === "bapsoj" && contest.starts_at) {
                 return new Date(contest.starts_at).getTime()
             } else {
-                // For demo purposes, set a future timestamp for upcoming contests
-                return Date.now() + 1000 * 60 * 60 * 24 * (Math.floor(Math.random() * 7) + 1)
+                const timestamp = Number(contest.endedAt)
+                return Number.isFinite(timestamp) && timestamp > 0 ? timestamp * 1000 : 0
             }
         }
         return 0
