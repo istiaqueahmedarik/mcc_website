@@ -8,9 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Check, CheckCircle2, Clock3, ExternalLink, Loader2, LockKeyhole, RefreshCw, Send, UserRound } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, ExternalLink, Loader2, LockKeyhole, RefreshCw, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./registration.module.css";
+import HoldToRegister from "./HoldToRegister";
 
 async function api(path, options = {}) {
   const response = await fetch(`/api/global-forms/${path}`, {
@@ -60,6 +61,7 @@ export default function RegistrationClient({ slug }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const sessionIdRef = useRef("");
   const formRef = useRef(null);
+  const submissionRef = useRef(false);
 
   const restoreDraft = useCallback(() => {
     try {
@@ -160,9 +162,15 @@ export default function RegistrationClient({ slug }) {
     return Object.keys(errors).length === 0;
   }
 
+  function reviewBeforeSubmit(event) {
+    event.preventDefault();
+    if (validate()) formRef.current?.querySelector("[data-registration-confirm]")?.focus();
+  }
+
   async function submit(event) {
     event?.preventDefault();
-    if (!validate()) return;
+    if (submissionRef.current || !validate()) return;
+    submissionRef.current = true;
     setSubmitting(true); setError("");
     try {
       const data = await api(`public/${encodeURIComponent(slug)}/submit`, {
@@ -173,6 +181,7 @@ export default function RegistrationClient({ slug }) {
       await sendHeartbeat(false);
       setPreview((current) => ({ ...current, receipt: data.receipt }));
     } catch (err) {
+      submissionRef.current = false;
       if (err.code === "PREVIEW_STALE") {
         await load({ keepDraft: true });
         setError("Your profile changed while this preview was open. We refreshed it; review the current values and submit again.");
@@ -194,9 +203,11 @@ export default function RegistrationClient({ slug }) {
   return <PageShell>
     <CampaignHeader campaign={campaign} />
     {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Review required</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-    <form ref={formRef} data-registration-form className="space-y-5" aria-labelledby="review-heading" onSubmit={submit} noValidate>
+    <form ref={formRef} data-registration-form className="space-y-5" aria-labelledby="review-heading" onSubmit={reviewBeforeSubmit} onKeyDown={(event) => {
+      if (event.key === "Enter" && event.target.tagName === "INPUT" && event.target.type !== "checkbox") reviewBeforeSubmit(event);
+    }} noValidate>
       <div className="sr-only" aria-live="polite">{error || Object.values(fieldErrors)[0] || ""}</div>
-      <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Registration preview</p><h2 id="review-heading" className="mt-1 text-2xl font-semibold">Review your details</h2><p className="mt-1 text-sm text-muted-foreground">Known account values are reused. Only missing required profile details can be entered here.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Registration preview</p><h2 id="review-heading" className="mt-1 text-2xl font-semibold">Review your details</h2><p className="mt-1 text-sm text-muted-foreground">Known account values are reused. Only missing required profile details can be entered here.</p></div>
       <section className={`${styles.surface} rounded-2xl p-5`} aria-label="Your saved profile">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div className="min-w-0"><h3 className="flex items-center gap-2 font-semibold"><UserRound className="h-4 w-4" aria-hidden="true" /> MCC account</h3><p className="mt-1 break-all text-sm text-muted-foreground">{profileValue(preview.profile, "email")}</p></div>
@@ -211,7 +222,7 @@ export default function RegistrationClient({ slug }) {
         const change = (next) => field.mapUserField ? setProfileValues((old) => ({ ...old, [field.mapUserField]: next })) : setAnswers((old) => ({ ...old, [field.id]: next }));
         return <div key={field.id} className={`${styles.surface} rounded-2xl p-5`}><RegistrationField field={field} value={value} onChange={change} error={fieldErrors[field.id]} profileInput={missing} /></div>;
       })}</div>
-      <div className={`${styles.actionBar} rounded-2xl p-4 sm:p-5`}><label className="flex min-h-11 cursor-pointer items-start gap-3"><Checkbox className="mt-0.5" checked={agreement} onCheckedChange={(checked) => setAgreement(Boolean(checked))} aria-invalid={Boolean(fieldErrors.agreement)} /><span className="text-sm leading-6">{campaign.agreement_text || "I confirm that these details are correct and agree to register."}</span></label>{fieldErrors.agreement && <p className="mt-2 text-sm text-destructive">{fieldErrors.agreement}</p>}<Button type="submit" className={`${styles.press} mt-4 min-h-12 w-full text-base`} disabled={submitting}>{submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}{submitting ? "Registering…" : "Confirm registration"}</Button><p className="mt-2 text-center text-xs text-muted-foreground">You can submit once. Pending handle verification does not block registration.</p></div>
+      <div className={`${styles.actionBar} rounded-2xl p-4 sm:p-5`}><label className="flex min-h-11 cursor-pointer items-start gap-3"><Checkbox className="mt-0.5" checked={agreement} onCheckedChange={(checked) => setAgreement(Boolean(checked))} aria-invalid={Boolean(fieldErrors.agreement)} /><span className="text-sm leading-6">{campaign.agreement_text || "I confirm that these details are correct and agree to register."}</span></label>{fieldErrors.agreement && <p className="mt-2 text-sm text-destructive">{fieldErrors.agreement}</p>}<HoldToRegister busy={submitting} validate={validate} onConfirm={submit} /><p className="mt-2 text-center text-xs text-muted-foreground">You can submit once. Pending handle verification does not block registration.</p></div>
     </form>
   </PageShell>;
 }

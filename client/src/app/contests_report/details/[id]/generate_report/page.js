@@ -95,17 +95,12 @@ async function page({ params, searchParams }) {
           </p>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
             {eligibility.mode === "campaign"
-              ? `${eligibility.eligibleCount} eligible in provider data · ${eligibility.excludedCount} other mapped · ${eligibility.unmappedCount} unmapped · ${eligibility.responseCount} submitted`
+              ? `${eligibility.eligibleCount} registered students shown · ${eligibility.excludedCount} other students excluded · ${eligibility.unmappedCount} unmatched participants · ${eligibility.responseCount} registrations total`
               : `${merged.users.length} participants from provider standings`}
           </p>
-          {eligibility.mode === "campaign" && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Selection v{eligibility.selectionVersion} · membership revision {eligibility.membershipRevision}
-            </p>
-          )}
           {eligibility.linkedTfcCohortFixed && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-              Linked TFC values remain fixed to that report&apos;s published cohort; this campaign filters only the current TSC participants.
+              Linked TFC scores stay as published. This form filter applies to students in the current TSC report.
             </p>
           )}
         </div>
@@ -113,7 +108,7 @@ async function page({ params, searchParams }) {
           href={`/contests_report/details/${encodeURIComponent(roomId)}${campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : ""}`}
           className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Change cohort
+          Change form filter
         </Link>
       </div>
       {searchParamsBox?.refreshed && (

@@ -267,7 +267,7 @@ async function page({ params, searchParams }) {
               <UsersRound className="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
-              <h2 id="participant-eligibility-heading" className="text-sm font-semibold">Participant eligibility</h2>
+              <h2 id="participant-eligibility-heading" className="text-sm font-semibold">Form response filter</h2>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 Score everyone in provider standings, or only MCC students who submitted a selected registration campaign.
               </p>
@@ -277,7 +277,7 @@ async function page({ params, searchParams }) {
             "use server";
             await handleReportEligibility(formData, id);
           }} className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-            <label htmlFor="campaign-id" className="sr-only">Report participant campaign</label>
+            <label htmlFor="campaign-id" className="sr-only">Registration form</label>
             <select
               id="campaign-id"
               name="campaign-id"
@@ -292,17 +292,15 @@ async function page({ params, searchParams }) {
               ))}
             </select>
             <ContestReportSubmitButton pendingLabel="Applying…" className="min-h-11 px-5">
-              Apply cohort
+              Apply filter
             </ContestReportSubmitButton>
           </form>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
-          <span>{reportEligibility.mode === "campaign" ? `${reportEligibility.responseCount} submitted respondents` : "Provider standings include all participants"}</span>
-          <span>Selection v{reportEligibility.selectionVersion}</span>
-          {reportEligibility.mode === "campaign" ? <span>Membership revision {reportEligibility.membershipRevision}</span> : null}
+          <span>{reportEligibility.mode === "campaign" ? `${reportEligibility.responseCount} registered students` : "Provider standings include all participants"}</span>
         </div>
         {searchParamsBox?.eligibility && (
-          <p role="status" className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">Participant eligibility updated. Generate the report to score this cohort.</p>
+          <p role="status" className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">Form response filter updated. Generate the report to score the selected students.</p>
         )}
         {searchParamsBox?.eligibilityError && (
           <p role="alert" className="mt-3 text-sm text-destructive">{searchParamsBox.eligibilityError}</p>
