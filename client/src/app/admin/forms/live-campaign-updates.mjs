@@ -7,7 +7,7 @@ function validStats(stats) {
 
 // Keep a stalled stream from disabling updates. EventSource handles reconnection;
 // REST polling fills the gap until a valid stats event confirms recovery.
-export function watchCampaignUpdates({ url, readStats, onData, onState,
+export function watchCampaignUpdates({ url, readStats, onData, onState = () => {},
   createSource = value => new EventSource(value), visibility = document }) {
   let disposed = false, generation = 0, source, watchdog, pollTimer;
   let pollRequest, session, mode;

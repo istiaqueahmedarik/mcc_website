@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-16 - Remove the live status card
+
+User requested removal of the connection-status card. Show only Submitted, Currently completing, and Needs verification in a responsive three-column row; retain background updates and fallback behavior. This supersedes the visible connection-mode labels below.
+
 ## 2026-11-16 - Forms retain SSE with automatic fallback
 
 Keep the existing SSE transport and authorization. After fifteen seconds without valid stats, use serialized five-second dashboard polling with ten-second request bounds. Label the working mode honestly and terminate on explicit authorization loss. No transport replacement, package, database change, or claimed proxy diagnosis is needed.

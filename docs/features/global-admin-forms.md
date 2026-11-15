@@ -49,3 +49,7 @@ The [implementation review](../reviews/global-admin-forms-20261115-implementatio
 The post-merge corrections, migration behavior, current single-button interaction, dialog measurements, and screenshots are recorded in `docs/reviews/global-forms-review-followup-20261115.md`. Historical hold-control screenshots are superseded by this follow-up.
 
 Live-stream fallback behavior and transport-fixture reproduction: `docs/reviews/global-forms-live-status-20261116.md`. This protects dashboard updates if a hosting layer holds the stream; inspect the deployed request/proxy separately to identify the underlying transport cause.
+
+### Connection indicator removal (2026-11-16)
+
+The dashboard no longer displays a Live status card or connection-mode labels. Submitted, Currently completing, and Needs verification remain visible. Background streaming and automatic refresh continue. This supersedes the visible status-label descriptions above.
