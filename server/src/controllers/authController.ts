@@ -321,7 +321,11 @@ export const rejectUser = async (c: any) => {
       `;
       const review = reviews[0];
       if (!review) return null;
-      const priorName = typeof review.prior_values?.full_name === "string" ? review.prior_values.full_name : user.full_name;
+      const proposedName = review.proposed_values?.full_name;
+      if (user.full_name !== proposedName) return { conflict: true };
+      const hasPriorName = Object.prototype.hasOwnProperty.call(review.prior_values || {}, "full_name");
+      const storedPriorName = hasPriorName ? review.prior_values.full_name : undefined;
+      const priorName = storedPriorName === null || typeof storedPriorName === "string" ? storedPriorName : user.full_name;
       await tx`
         update users set full_name = ${priorName}, granted = true, account_review_origin = 'signup'
         where id = ${userId}
@@ -332,10 +336,11 @@ export const rejectUser = async (c: any) => {
       `;
       return { ...user, full_name: priorName, review_type: "profile_change" };
     });
+    if (profileChange?.conflict) return c.json({ error: "Profile changed; reload before reviewing", code: "REVIEW_STALE" }, 409);
     if (profileChange) return c.json({ result: [profileChange] });
 
     const result = await sql`
-      delete from users where id = ${userId} and account_review_origin = 'signup' returning *
+      delete from users where id = ${userId} and account_review_origin = 'signup' and granted = false returning *
     `;
     if (result.length === 0) return c.json({ error: "User review state changed; reload and try again" }, 409);
     await sendEmail(
@@ -432,11 +437,22 @@ export const acceptUser = async (c: any) => {
     }
 
     const result = await sql.begin(async (tx) => {
-      const current = await tx`select account_review_origin from users where id = ${userId} for update`;
+      const current = await tx`select id, full_name, granted, account_review_origin from users where id = ${userId} for update`;
+      if (!current[0]) return [];
+      if (current[0].granted) return [{ __conflict: true }];
       const reviewType = current[0]?.account_review_origin === "profile_change" ? "profile_change" : "signup";
+      if (reviewType === "profile_change") {
+        const reviews = await tx`
+          select id, proposed_values from global_form_profile_reviews
+          where user_id = ${userId} and status = 'pending' order by created_at desc limit 1 for update
+        `;
+        if (!reviews[0] || current[0].full_name !== reviews[0].proposed_values?.full_name) {
+          return [{ __conflict: true }];
+        }
+      }
       const rows = await tx`
         update users set granted = true, account_review_origin = 'signup'
-        where id = ${userId} returning *
+        where id = ${userId} and granted = false returning *
       `;
       if (rows[0]) await tx`
         update global_form_profile_reviews set status = 'approved', reviewed_by = ${payloadId(c)}, reviewed_at = now()
@@ -445,6 +461,7 @@ export const acceptUser = async (c: any) => {
       return rows.map((row: any) => ({ ...row, review_type: reviewType }));
     });
     if (result.length === 0) return c.json({ error: "User not found" }, 404);
+    if (result[0].__conflict) return c.json({ error: "Review state changed; reload before reviewing", code: "REVIEW_STALE" }, 409);
     if (result[0].review_type === "profile_change") return c.json({ result });
     await sendEmail(
       result[0].email,
