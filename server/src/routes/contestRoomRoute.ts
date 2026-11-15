@@ -5,6 +5,7 @@ import {
   deleteContestRoom,
   deleteContestReportCodeforcesCredentials,
   generateContestRoomReport,
+  getContestRoomReportEligibility,
   getAllContestRooms,
   getContestReportCodeforcesCredentials,
   getContestRoom,
@@ -14,6 +15,7 @@ import {
   publishContestRoomReport,
   saveContestReportCodeforcesCredentials,
   updateContestRoom,
+  updateContestRoomReportEligibility,
   updateContestRoomScoring,
   validateContestReportCodeforcesSession,
 } from "../controllers/contestRoomController";
@@ -37,6 +39,8 @@ route.post("/provider-access/codeforces-session/validate", validateContestReport
 route.get("/:roomId/scoring", getContestRoomScoring);
 route.post("/:roomId/scoring/preview", previewContestRoomScoring);
 route.put("/:roomId/scoring", updateContestRoomScoring);
+route.get("/:roomId/report-eligibility", getContestRoomReportEligibility);
+route.put("/:roomId/report-eligibility", updateContestRoomReportEligibility);
 route.post("/:roomId/report", generateContestRoomReport);
 route.post("/:roomId/publish", publishContestRoomReport);
 

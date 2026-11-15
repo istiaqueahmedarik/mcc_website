@@ -8,6 +8,10 @@ export type GlobalContestReportSnapshot = {
     sourceSnapshots: Record<string, any>;
     missingContests: any[];
     scoringConfigVersion: number;
+    eligibilityCampaignId: string | null;
+    eligibilityMembershipRevision: number | null;
+    eligibilitySelectionVersion: number;
+    eligibilityIsCurrent: boolean;
     isStale: boolean;
     generatedAt: string;
 }
@@ -28,6 +32,21 @@ export function globalContestReportSnapshotFromRow(row: any): GlobalContestRepor
     if (!report || typeof report !== 'object' || Array.isArray(report)) return null
     const missingContests = parseJsonValue(row.missing_contests, [])
     const sourceSnapshots = parseJsonValue(row.source_snapshots, {})
+    const eligibilityCampaignId = row.eligibility_campaign_id ? String(row.eligibility_campaign_id) : null
+    const eligibilityMembershipRevision = eligibilityCampaignId
+        ? Number(row.eligibility_membership_revision || 0)
+        : null
+    const eligibilitySelectionVersion = Number(row.eligibility_selection_version || 0)
+    const currentCampaignId = row.current_eligibility_campaign_id
+        ? String(row.current_eligibility_campaign_id)
+        : null
+    const currentSelectionVersion = Number(row.current_eligibility_selection_version || 0)
+    const currentMembershipRevision = currentCampaignId
+        ? Number(row.current_eligibility_membership_revision || 0)
+        : null
+    const eligibilityIsCurrent = eligibilityCampaignId === currentCampaignId
+        && eligibilitySelectionVersion === currentSelectionVersion
+        && eligibilityMembershipRevision === currentMembershipRevision
     return {
         id: String(row.id),
         roomId: String(row.room_id),
@@ -38,7 +57,11 @@ export function globalContestReportSnapshotFromRow(row: any): GlobalContestRepor
             : {},
         missingContests: Array.isArray(missingContests) ? missingContests : [],
         scoringConfigVersion: Number(row.scoring_config_version || 0),
-        isStale: Boolean(row.is_stale),
+        eligibilityCampaignId,
+        eligibilityMembershipRevision,
+        eligibilitySelectionVersion,
+        eligibilityIsCurrent,
+        isStale: Boolean(row.is_stale) || !eligibilityIsCurrent,
         generatedAt: new Date(row.generated_at).toISOString(),
     }
 }
@@ -46,22 +69,68 @@ export function globalContestReportSnapshotFromRow(row: any): GlobalContestRepor
 export async function loadGlobalContestReportSnapshot(
     roomId: string,
     contestItemId: string | null,
+    database: any = sql,
+    lock = false,
 ): Promise<GlobalContestReportSnapshot | null> {
     const rows = contestItemId
-        ? await sql`
-            SELECT id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
-                   scoring_config_version, is_stale, generated_at
-            FROM public.global_contest_report_snapshots
-            WHERE room_id = ${roomId}
-              AND contest_item_id = ${contestItemId}
+        ? lock ? await database`
+            SELECT snapshot.id, snapshot.room_id, snapshot.contest_item_id, snapshot.snapshot,
+                   snapshot.source_snapshots, snapshot.missing_contests, snapshot.scoring_config_version,
+                   snapshot.eligibility_campaign_id, snapshot.eligibility_membership_revision,
+                   snapshot.eligibility_selection_version, snapshot.is_stale, snapshot.generated_at,
+                   eligibility.campaign_id AS current_eligibility_campaign_id,
+                   COALESCE(eligibility.selection_version, 0) AS current_eligibility_selection_version,
+                   campaign.revision AS current_eligibility_membership_revision
+            FROM public.global_contest_report_snapshots snapshot
+            LEFT JOIN public.global_contest_report_eligibility eligibility ON eligibility.room_id = snapshot.room_id
+            LEFT JOIN public.global_form_campaigns campaign ON campaign.id = eligibility.campaign_id
+            WHERE snapshot.room_id = ${roomId}
+              AND snapshot.contest_item_id = ${contestItemId}
+            LIMIT 1
+            FOR SHARE OF snapshot
+        ` : await database`
+            SELECT snapshot.id, snapshot.room_id, snapshot.contest_item_id, snapshot.snapshot,
+                   snapshot.source_snapshots, snapshot.missing_contests, snapshot.scoring_config_version,
+                   snapshot.eligibility_campaign_id, snapshot.eligibility_membership_revision,
+                   snapshot.eligibility_selection_version, snapshot.is_stale, snapshot.generated_at,
+                   eligibility.campaign_id AS current_eligibility_campaign_id,
+                   COALESCE(eligibility.selection_version, 0) AS current_eligibility_selection_version,
+                   campaign.revision AS current_eligibility_membership_revision
+            FROM public.global_contest_report_snapshots snapshot
+            LEFT JOIN public.global_contest_report_eligibility eligibility ON eligibility.room_id = snapshot.room_id
+            LEFT JOIN public.global_form_campaigns campaign ON campaign.id = eligibility.campaign_id
+            WHERE snapshot.room_id = ${roomId}
+              AND snapshot.contest_item_id = ${contestItemId}
             LIMIT 1
         `
-        : await sql`
-            SELECT id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
-                   scoring_config_version, is_stale, generated_at
-            FROM public.global_contest_report_snapshots
-            WHERE room_id = ${roomId}
-              AND contest_item_id IS NULL
+        : lock ? await database`
+            SELECT snapshot.id, snapshot.room_id, snapshot.contest_item_id, snapshot.snapshot,
+                   snapshot.source_snapshots, snapshot.missing_contests, snapshot.scoring_config_version,
+                   snapshot.eligibility_campaign_id, snapshot.eligibility_membership_revision,
+                   snapshot.eligibility_selection_version, snapshot.is_stale, snapshot.generated_at,
+                   eligibility.campaign_id AS current_eligibility_campaign_id,
+                   COALESCE(eligibility.selection_version, 0) AS current_eligibility_selection_version,
+                   campaign.revision AS current_eligibility_membership_revision
+            FROM public.global_contest_report_snapshots snapshot
+            LEFT JOIN public.global_contest_report_eligibility eligibility ON eligibility.room_id = snapshot.room_id
+            LEFT JOIN public.global_form_campaigns campaign ON campaign.id = eligibility.campaign_id
+            WHERE snapshot.room_id = ${roomId}
+              AND snapshot.contest_item_id IS NULL
+            LIMIT 1
+            FOR SHARE OF snapshot
+        ` : await database`
+            SELECT snapshot.id, snapshot.room_id, snapshot.contest_item_id, snapshot.snapshot,
+                   snapshot.source_snapshots, snapshot.missing_contests, snapshot.scoring_config_version,
+                   snapshot.eligibility_campaign_id, snapshot.eligibility_membership_revision,
+                   snapshot.eligibility_selection_version, snapshot.is_stale, snapshot.generated_at,
+                   eligibility.campaign_id AS current_eligibility_campaign_id,
+                   COALESCE(eligibility.selection_version, 0) AS current_eligibility_selection_version,
+                   campaign.revision AS current_eligibility_membership_revision
+            FROM public.global_contest_report_snapshots snapshot
+            LEFT JOIN public.global_contest_report_eligibility eligibility ON eligibility.room_id = snapshot.room_id
+            LEFT JOIN public.global_form_campaigns campaign ON campaign.id = eligibility.campaign_id
+            WHERE snapshot.room_id = ${roomId}
+              AND snapshot.contest_item_id IS NULL
             LIMIT 1
         `
     return globalContestReportSnapshotFromRow(rows[0])
@@ -75,9 +144,46 @@ export async function saveGlobalContestReportSnapshot(input: {
     missingContests: any[];
     scoringConfigVersion: number;
     generatedBy: string;
+    eligibilityCampaignId: string | null;
+    eligibilityMembershipRevision: number | null;
+    eligibilitySelectionVersion: number;
 }): Promise<GlobalContestReportSnapshot> {
-    const rows = input.contestItemId
-        ? await sql`
+    return sql.begin(async (tx) => {
+        const selectionHint = await tx`
+            SELECT campaign_id
+            FROM public.global_contest_report_eligibility
+            WHERE room_id = ${input.roomId}
+        `
+        const hintedCampaignId = selectionHint[0]?.campaign_id ? String(selectionHint[0].campaign_id) : null
+        let currentMembershipRevision: number | null = null
+        if (hintedCampaignId) {
+            const campaignRows = await tx`
+                SELECT revision FROM public.global_form_campaigns WHERE id = ${hintedCampaignId} FOR SHARE
+            `
+            currentMembershipRevision = Number(campaignRows[0]?.revision || 0)
+        }
+        const selectionRows = await tx`
+            SELECT campaign_id, selection_version
+            FROM public.global_contest_report_eligibility
+            WHERE room_id = ${input.roomId}
+            FOR SHARE
+        `
+        const currentCampaignId = selectionRows[0]?.campaign_id ? String(selectionRows[0].campaign_id) : null
+        const currentSelectionVersion = Number(selectionRows[0]?.selection_version || 0)
+        if (
+            currentCampaignId !== hintedCampaignId
+            || currentCampaignId !== input.eligibilityCampaignId
+            || currentSelectionVersion !== input.eligibilitySelectionVersion
+            || currentMembershipRevision !== input.eligibilityMembershipRevision
+        ) {
+            throw Object.assign(new Error('Campaign respondents changed while the report was generated; generate it again'), {
+                statusCode: 409,
+                code: 'REPORT_ELIGIBILITY_CHANGED',
+            })
+        }
+
+        const rows = input.contestItemId
+        ? await tx`
             INSERT INTO public.global_contest_report_snapshots (
                 room_id,
                 contest_item_id,
@@ -85,6 +191,9 @@ export async function saveGlobalContestReportSnapshot(input: {
                 source_snapshots,
                 missing_contests,
                 scoring_config_version,
+                eligibility_campaign_id,
+                eligibility_membership_revision,
+                eligibility_selection_version,
                 is_stale,
                 generated_by,
                 generated_at
@@ -96,6 +205,9 @@ export async function saveGlobalContestReportSnapshot(input: {
                 ${sql.json(input.sourceSnapshots || {})},
                 ${sql.json(input.missingContests || [])},
                 ${input.scoringConfigVersion},
+                ${input.eligibilityCampaignId},
+                ${input.eligibilityMembershipRevision},
+                ${input.eligibilitySelectionVersion},
                 false,
                 ${input.generatedBy},
                 now()
@@ -106,13 +218,17 @@ export async function saveGlobalContestReportSnapshot(input: {
                 source_snapshots = EXCLUDED.source_snapshots,
                 missing_contests = EXCLUDED.missing_contests,
                 scoring_config_version = EXCLUDED.scoring_config_version,
+                eligibility_campaign_id = EXCLUDED.eligibility_campaign_id,
+                eligibility_membership_revision = EXCLUDED.eligibility_membership_revision,
+                eligibility_selection_version = EXCLUDED.eligibility_selection_version,
                 is_stale = false,
                 generated_by = EXCLUDED.generated_by,
                 generated_at = now()
             RETURNING id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
-                      scoring_config_version, is_stale, generated_at
+                      scoring_config_version, eligibility_campaign_id, eligibility_membership_revision,
+                      eligibility_selection_version, is_stale, generated_at
         `
-        : await sql`
+        : await tx`
             INSERT INTO public.global_contest_report_snapshots (
                 room_id,
                 contest_item_id,
@@ -120,6 +236,9 @@ export async function saveGlobalContestReportSnapshot(input: {
                 source_snapshots,
                 missing_contests,
                 scoring_config_version,
+                eligibility_campaign_id,
+                eligibility_membership_revision,
+                eligibility_selection_version,
                 is_stale,
                 generated_by,
                 generated_at
@@ -131,6 +250,9 @@ export async function saveGlobalContestReportSnapshot(input: {
                 ${sql.json(input.sourceSnapshots || {})},
                 ${sql.json(input.missingContests || [])},
                 ${input.scoringConfigVersion},
+                ${input.eligibilityCampaignId},
+                ${input.eligibilityMembershipRevision},
+                ${input.eligibilitySelectionVersion},
                 false,
                 ${input.generatedBy},
                 now()
@@ -141,15 +263,25 @@ export async function saveGlobalContestReportSnapshot(input: {
                 source_snapshots = EXCLUDED.source_snapshots,
                 missing_contests = EXCLUDED.missing_contests,
                 scoring_config_version = EXCLUDED.scoring_config_version,
+                eligibility_campaign_id = EXCLUDED.eligibility_campaign_id,
+                eligibility_membership_revision = EXCLUDED.eligibility_membership_revision,
+                eligibility_selection_version = EXCLUDED.eligibility_selection_version,
                 is_stale = false,
                 generated_by = EXCLUDED.generated_by,
                 generated_at = now()
             RETURNING id, room_id, contest_item_id, snapshot, source_snapshots, missing_contests,
-                      scoring_config_version, is_stale, generated_at
+                      scoring_config_version, eligibility_campaign_id, eligibility_membership_revision,
+                      eligibility_selection_version, is_stale, generated_at
         `
-    const snapshot = globalContestReportSnapshotFromRow(rows[0])
-    if (!snapshot) throw new Error('Failed to save the generated report snapshot')
-    return snapshot
+        const snapshot = globalContestReportSnapshotFromRow({
+            ...rows[0],
+            current_eligibility_campaign_id: currentCampaignId,
+            current_eligibility_selection_version: currentSelectionVersion,
+            current_eligibility_membership_revision: currentMembershipRevision,
+        })
+        if (!snapshot) throw new Error('Failed to save the generated report snapshot')
+        return snapshot
+    })
 }
 
 export async function markGlobalContestReportsStale(database: any, roomIds: string[]) {

@@ -9,12 +9,14 @@ async function refreshSavedContestReport(formData) {
   "use server";
   const roomId = String(formData.get("room-id") || "").slice(0, 80);
   const contestItemId = String(formData.get("contest-item-id") || "").slice(0, 80) || null;
+  const campaignId = String(formData.get("campaign-id") || "").slice(0, 80) || null;
   const result = await generateContestRoomReport(roomId, {
     ...(contestItemId ? { contestItemId } : {}),
     refresh: true,
   });
   const query = new URLSearchParams();
   if (contestItemId) query.set("item", contestItemId);
+  if (campaignId) query.set("campaign", campaignId);
   if (result?.success) query.set("refreshed", "1");
   else query.set("refreshError", result?.error || "Unable to refresh provider data");
   redirect(`/contests_report/details/${encodeURIComponent(roomId)}/generate_report?${query.toString()}`);
@@ -46,6 +48,9 @@ async function page({ params, searchParams }) {
   const requestedContestItemId = searchParamsBox.item
     ? String(searchParamsBox.item).slice(0, 80)
     : null;
+  const campaignId = searchParamsBox.campaign
+    ? String(searchParamsBox.campaign).slice(0, 80)
+    : null;
 
   const response = await generateContestRoomReport(
     roomId,
@@ -63,7 +68,7 @@ async function page({ params, searchParams }) {
             || "Unable to load contest data. Confirm the access required by this room's providers, then try again."}
         </p>
         <Link
-          href={`/contests_report/details/${encodeURIComponent(roomId)}#provider-access`}
+          href={`/contests_report/details/${encodeURIComponent(roomId)}${campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : ""}#provider-access`}
           className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
         >
           Review provider access
@@ -79,9 +84,38 @@ async function page({ params, searchParams }) {
   const generatedAt = response?.cache?.generatedAt
     ? new Date(response.cache.generatedAt)
     : null;
+  const eligibility = response?.eligibility || { mode: "all", eligibleCount: merged.users.length, excludedCount: 0, unmappedCount: 0 };
 
   return (
     <div className="space-y-4">
+      <div className="mx-auto flex max-w-5xl flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            {eligibility.mode === "campaign" ? eligibility.campaignTitle : "All participants"}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {eligibility.mode === "campaign"
+              ? `${eligibility.eligibleCount} eligible in provider data · ${eligibility.excludedCount} other mapped · ${eligibility.unmappedCount} unmapped · ${eligibility.responseCount} submitted`
+              : `${merged.users.length} participants from provider standings`}
+          </p>
+          {eligibility.mode === "campaign" && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Selection v{eligibility.selectionVersion} · membership revision {eligibility.membershipRevision}
+            </p>
+          )}
+          {eligibility.linkedTfcCohortFixed && (
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              Linked TFC values remain fixed to that report&apos;s published cohort; this campaign filters only the current TSC participants.
+            </p>
+          )}
+        </div>
+        <Link
+          href={`/contests_report/details/${encodeURIComponent(roomId)}${campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : ""}`}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Change cohort
+        </Link>
+      </div>
       {searchParamsBox?.refreshed && (
         <p role="status" className="mx-auto max-w-5xl rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
           Saved report refreshed with the latest provider data.
@@ -130,6 +164,7 @@ async function page({ params, searchParams }) {
         <form action={refreshSavedContestReport} className="shrink-0">
           <input type="hidden" name="room-id" value={roomId} />
           {requestedContestItemId ? <input type="hidden" name="contest-item-id" value={requestedContestItemId} /> : null}
+          {campaignId ? <input type="hidden" name="campaign-id" value={campaignId} /> : null}
           <ContestReportSubmitButton
             pendingLabel="Refreshing…"
             variant="outline"
