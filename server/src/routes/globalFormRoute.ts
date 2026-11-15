@@ -8,6 +8,7 @@ import {
   cloneCampaign,
   createCampaign,
   createTemplate,
+  deleteTemplate,
   endCampaign,
   getCampaign,
   getDashboard,
@@ -43,6 +44,7 @@ route.post("/public/:slug/heartbeat", bodyLimit({ maxSize: 8 * 1024 }), jwt(jwtA
 route.use("/manage/*", jwt(jwtAuthOptions()));
 route.get("/manage/templates", listTemplates);
 route.post("/manage/templates", bodyLimit({ maxSize: 256 * 1024 }), createTemplate);
+route.delete("/manage/templates/:id", deleteTemplate);
 route.put("/manage/templates/:id", bodyLimit({ maxSize: 256 * 1024 }), updateTemplate);
 route.post("/manage/templates/:id/clone", cloneTemplate);
 route.get("/manage/campaigns", listCampaigns);

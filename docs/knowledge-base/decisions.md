@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-15 - Forms use one ordinary submit action
+
+The user superseded the hold interaction: student registration has a single normal submit button. Editable templates can be deleted with confirmation while frozen campaigns/responses survive. Forms dialogs get explicit responsive widths rather than relying on maximum widths. The report/profile review fixes require the additive follow-up migration; hosted rollout remains separate.
+
 ## 2026-11-15 - Forms use neutral surfaces and plain filter labels
 
 User approved replacing decorative form gradients with restrained Apple-style neutral surfaces. Translucency is limited to navigation chrome. “Cohort” remains an internal implementation concept; visible report controls say Form response filter and Registered students. Final registration uses a one-second hold adapted from Motion, with a standard-button alternative. No dependency upgrade or hosted rollout is included.

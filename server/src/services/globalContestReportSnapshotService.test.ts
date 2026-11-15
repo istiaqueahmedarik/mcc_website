@@ -27,6 +27,7 @@ describe('global contest report snapshot cache', () => {
             eligibilitySelectionVersion: 0,
             eligibilityIsCurrent: true,
             isStale: true,
+            sourceIsStale: true,
             generatedAt: '2026-09-19T12:00:00.000Z',
         })
     })
@@ -74,6 +75,7 @@ describe('global contest report snapshot cache', () => {
 
         expect(snapshot?.eligibilityIsCurrent).toBe(false)
         expect(snapshot?.isStale).toBe(true)
+        expect(snapshot?.sourceIsStale).toBe(false)
     })
 
     test('retains the unfiltered source cache beside a filtered scored report', () => {

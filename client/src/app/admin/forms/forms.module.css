@@ -57,3 +57,11 @@
 @media (max-width: 640px) {
   .workspace input, .workspace textarea, .workspace select { font-size: 16px; scroll-margin-block: 2rem; }
 }
+
+.dialog button:not([role='checkbox']) { min-height: 44px; min-width: 44px; }
+.dialog > button { display: flex; align-items: center; justify-content: center; }
+.dialog > :first-child { padding-inline-end: 2rem; }
+.dialog input, .dialog textarea, .dialog select { scroll-margin-block: 2rem; }
+@media (max-width: 640px) {
+  .dialog input, .dialog textarea, .dialog select { font-size: 16px; }
+}

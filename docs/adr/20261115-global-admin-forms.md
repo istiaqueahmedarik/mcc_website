@@ -33,3 +33,11 @@ The initial implementation adds no new dependency or external judge verification
 ## Approved presentation revision — 2026-11-15
 
 The user replaced the initial decorative glass/gradient direction with neutral Apple-style content surfaces and restrained translucent navigation. Report controls use Form response filter and Registered students; internal eligibility contracts remain compatible. Registration adopts the one-second hold interaction from Motion with cancellation and keyboard support, plus a discoverable standard-button alternative. The installed Framer Motion version is reused without a dependency upgrade. Review and verification: `docs/reviews/global-admin-forms-20261115-design-revision.md`.
+
+## Post-merge review corrections — 2026-11-15
+
+User requested a new PR after merging #44, with normal submission replacing the hold control, wider forms dialogs, and editable-template deletion. Template deletion uses the existing `ON DELETE SET NULL` relationship so frozen campaigns and immutable responses survive; built-in recovery starters stay protected.
+
+Private snapshot `is_stale` now represents non-eligibility invalidation. Eligibility freshness is independently computed from persisted selection and membership revisions; published staleness still updates immediately. A filter-only refresh rejects stale source inputs, preserves provider failures, and cannot enable publication without a successful source refresh. A room input revision is incremented by ordinary report invalidation and checked under a room share lock at snapshot commit to reject generation races. Migration retains ambiguous existing private stale flags conservatively.
+
+Normal profile name edits lock the user before updating the pending review proposal, retaining original prior values and response history. The follow-up migration repairs already mismatched pending proposals under the same user-first lock order. See `docs/reviews/global-forms-review-followup-20261115.md`.
