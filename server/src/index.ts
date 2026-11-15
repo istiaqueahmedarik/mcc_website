@@ -24,6 +24,7 @@ import typingRoomRoute from "./routes/typingRoomRoute";
 import typingParticipantRoute from "./routes/typingParticipantRoute";
 import classroomRoute from "./routes/classroomRoute";
 import trainerFormRoute from "./routes/trainerFormRoute";
+import globalFormRoute from "./routes/globalFormRoute";
 import { websocket } from "./utils/bunWebSocket";
 import {
   autoStartScheduledRooms,
@@ -66,6 +67,7 @@ app.route("/typing/rooms", typingRoomRoute);
 app.route("/typing/participants", typingParticipantRoute);
 app.route("/classroom", classroomRoute);
 app.route("/trainer-forms", trainerFormRoute);
+app.route("/global-forms", globalFormRoute);
 
 let autoStartSchedulerInFlight = false;
 let autoStartConsecutiveDbFailures = 0;

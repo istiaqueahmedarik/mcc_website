@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   MAX_FULL_NAME_LENGTH,
   normalizeFullNameUpdate,
+  normalizeMistIdUpdate,
 } from "./basicProfile";
 
 describe("normalizeFullNameUpdate", () => {
@@ -31,5 +32,13 @@ describe("normalizeFullNameUpdate", () => {
       name: null,
       error: `Full name must be ${MAX_FULL_NAME_LENGTH} characters or fewer`,
     });
+  });
+});
+
+describe("normalizeMistIdUpdate", () => {
+  test("accepts only a trimmed nine-digit ID", () => {
+    expect(normalizeMistIdUpdate(" 123456789 ")).toBe("123456789");
+    expect(normalizeMistIdUpdate("12345678")).toBeNull();
+    expect(normalizeMistIdUpdate("1234567890")).toBeNull();
   });
 });

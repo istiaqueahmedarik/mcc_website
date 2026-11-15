@@ -273,9 +273,9 @@ export async function preEnrollClassroomStudents(classroomId: string, rows: PreE
   };
 }
 
-export async function markPreEnrollmentClaimsForUser(userId: string) {
+export async function markPreEnrollmentClaimsForUser(userId: string, executor: any = sql) {
   await ensurePreEnrollmentSchema();
-  const users = await sql`
+  const users = await executor`
     SELECT id, full_name, email, mist_id, admin, trainer, is_pre_enrolled
     FROM users
     WHERE id = ${userId}
@@ -290,7 +290,7 @@ export async function markPreEnrollmentClaimsForUser(userId: string) {
   const mistId = user.mist_id === null || user.mist_id === undefined ? '' : String(user.mist_id);
   if (!email && !mistId) return [];
 
-  const claimed = await sql`
+  const claimed = await executor`
     UPDATE classroom_students cs
     SET enrollment_status = ${ENROLLMENT_LINK_PENDING},
         claimed_user_id = ${user.id},
