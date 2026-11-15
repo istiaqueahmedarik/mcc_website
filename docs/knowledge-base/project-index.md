@@ -2,7 +2,7 @@
 
 ## 2026-11-15 - Forms post-merge follow-up
 
-After PR #44 merged, the user approved a new PR for its four review findings plus editable-template deletion, wider dialogs, and one normal submit button. Migration: `docs/sql/global-forms-review-followup-20261115.sql`; reviewer path and evidence: `docs/reviews/global-forms-review-followup-20261115.md`.
+After PR #44 merged, the user approved a new PR for its four review findings plus editable-template deletion, wider dialogs, and one normal submit button. Delivered in [PR #45](https://github.com/istiaqueahmedarik/mcc_website/pull/45). Migration: `docs/sql/global-forms-review-followup-20261115.sql`; reviewer path and evidence: `docs/reviews/global-forms-review-followup-20261115.md`.
 
 ## 2026-11-15 - Global forms design revision
 

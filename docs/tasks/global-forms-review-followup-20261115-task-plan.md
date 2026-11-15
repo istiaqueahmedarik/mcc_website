@@ -12,6 +12,6 @@ Base: `master` at `7427e6d`; implementation branch: `codex/forms-review-followup
 - [x] Replace hold/mode-choice controls with one normal submit button.
 - [x] Run local unit, API/database, browser, migration/reapply/rollback, and lint checks.
 - [x] Complete final production client build.
-- [ ] Commit/push and create a new PR.
+- [x] Commit/push and create [PR #45](https://github.com/istiaqueahmedarik/mcc_website/pull/45) targeting `master`.
 
 Reviewer path, measured checks, current screenshots, and rollout limits: `docs/reviews/global-forms-review-followup-20261115.md`. No hosted migration or deployment is included.
