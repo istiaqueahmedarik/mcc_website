@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "ordinary responses load while the separate stream has no stats",
+    "stalled stream leaves Connecting and enters automatic REST refresh",
+    "new response and counter update through polling without manual Refresh",
+    "valid SSE recovery shows Live and stops fallback polling",
+    "authorization revocation stops updates and reports Access changed"
+  ],
+  "errors": []
+}

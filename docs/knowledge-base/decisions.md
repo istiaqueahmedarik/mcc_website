@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-16 - Forms retain SSE with automatic fallback
+
+Keep the existing SSE transport and authorization. After fifteen seconds without valid stats, use serialized five-second dashboard polling with ten-second request bounds. Label the working mode honestly and terminate on explicit authorization loss. No transport replacement, package, database change, or claimed proxy diagnosis is needed.
+
 ## 2026-11-15 - Forms use one ordinary submit action
 
 The user superseded the hold interaction: student registration has a single normal submit button. Editable templates can be deleted with confirmation while frozen campaigns/responses survive. Forms dialogs get explicit responsive widths rather than relying on maximum widths. The report/profile review fixes require the additive follow-up migration; hosted rollout remains separate.

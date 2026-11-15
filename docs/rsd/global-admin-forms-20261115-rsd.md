@@ -166,3 +166,7 @@ The user requested fixes for review 5910681992. Preserve the approved interface 
 ## Approved post-merge follow-up — 2026-11-15
 
 After merging PR #44 the user requested a new PR from the updated default branch, retaining the four review corrections above and adding: deletion of editable templates while preserving existing campaigns/responses and built-in starters; explicit responsive widths for forms dialogs; and a single ordinary registration submit button, superseding the earlier hold interaction and mode chooser. These changes are authorized for implementation, verification, and a new PR; hosted migration/deployment remain separate.
+
+## Live-status reliability correction — 2026-11-16
+
+User reported the dashboard staying on Connecting while responses load. Normal data loading and SSE status are independent. Add a 15-second deadline for first/subsequent valid stats, serialized authenticated polling every five seconds when streaming is unavailable, bounded refresh requests, and truthful Live/Auto-refresh/Offline/Access changed states. Stop activity and discard late results on hide, campaign change, and unmount. A valid stats event restores live mode. This is a scoped correction under the existing approved dashboard behavior; deployed proxy behavior remains a runtime hypothesis until measured.
