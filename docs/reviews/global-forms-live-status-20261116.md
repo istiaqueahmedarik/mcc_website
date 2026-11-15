@@ -31,3 +31,9 @@ Screenshots and compact results: `global-forms-live-status-20261116-assets/`. On
 ## Reproduction
 
 Run `node --test client/src/app/admin/forms/live-campaign-updates.test.mjs` with Node 22+. For the browser check, start `bun server/scripts/serve-global-forms-live-fixture.ts`, then the existing Next client on port 55443 with `SERVER_URL` and `NEXT_PUBLIC_SERVER_URL` pointing to `http://127.0.0.1:55441`. Use the local synthetic Supabase environment from the forms QA guide. Run `PLAYWRIGHT_MODULE=/absolute/path/to/playwright-core/index.mjs node client/scripts/verify-global-forms-live-status.mjs`. The fixture is loopback-only and accepts only its explicitly synthetic bearer token. No new dependency or database migration is required.
+
+## User follow-up: remove connection card
+
+Removed the Live status card and its state/labels/icons from AdminFormsClient. The three remaining metrics fill the row on larger screens and stack on small screens. Background SSE and polling continue; the controller callback is optional. Browser verification no longer depends on removed labels. Earlier screenshots and status-label evidence above describe the previous revision.
+
+Removal verification: client lint passed with zero errors and nine existing warnings; all ten lifecycle tests passed. Updated browser script was syntax-checked; browser checks and screenshots above were not rerun for this removal.
