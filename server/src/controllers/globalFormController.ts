@@ -406,8 +406,15 @@ export async function listResponses(c: Ctx) {
   const rows = await sql`
     select r.id, r.receipt_id, r.campaign_id, r.user_id, r.answers, r.profile_values, r.submitted_at,
       u.full_name, u.email, u.mist_id, u.cf_verified, u.vjudge_verified,
-      exists(select 1 from global_form_profile_reviews pr where pr.response_id = r.id and pr.status = 'pending') as pending_profile_review
-    from global_form_responses r join users u on u.id = r.user_id
+      exists(select 1 from global_form_profile_reviews pr where pr.response_id = r.id and pr.status = 'pending') as pending_profile_review,
+      (
+        exists(select 1 from global_form_profile_reviews pr where pr.response_id = r.id and pr.status = 'pending')
+        or (jsonb_path_exists(c.fields, '$[*] ? (@.required == true && @.mapUserField == "cf_id")') and u.cf_verified is false)
+        or (jsonb_path_exists(c.fields, '$[*] ? (@.required == true && @.mapUserField == "vjudge_id")') and u.vjudge_verified is false)
+      ) as pending_verification
+    from global_form_responses r
+    join users u on u.id = r.user_id
+    join global_form_campaigns c on c.id = r.campaign_id
     where r.campaign_id = ${campaignId} and (${q} = '' or u.full_name ilike ${pattern} escape '\\' or u.email ilike ${pattern} escape '\\' or u.mist_id::text ilike ${pattern} escape '\\')
     order by r.submitted_at desc limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}
   `;
