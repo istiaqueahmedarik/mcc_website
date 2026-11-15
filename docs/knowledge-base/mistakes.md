@@ -1,3 +1,7 @@
+
+## 2026-11-15 - Forms design feedback and dark error contrast
+
+The initial forms design overused decorative gradients and exposed “cohort” and revision jargon. User review requested neutral Apple-style surfaces and plain language. Browser review of the revision also caught dark-mode error text inheriting a low-contrast destructive token; the registration surface now scopes a readable error color. Inspect actual dark failure states and reduce shared decoration on the same routes before handoff.
 ## 2026-11-15 - Global form integration near misses caught locally
 
 Review found that including known mapped values in the profile mutation set would reset already verified CF/VJudge flags; only missing/invalid values now enter that set. Actual database/route checks caught null-name rollback failing to restore absence and a stale second rejection crossing into the signup-delete path; review origin, pending-state checks, and prior/proposed comparisons now guard both. Browser QA caught the first SSE response failing to refresh the row list at revision zero, a missing automatically generated campaign slug, and sticky agreement overlap. Keep these cases in integration/browser verification rather than relying on build success. Rollback must preserve profile-review provenance until pending reviews are resolved.

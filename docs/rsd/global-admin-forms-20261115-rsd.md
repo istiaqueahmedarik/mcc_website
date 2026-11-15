@@ -148,3 +148,13 @@ New global form routes/controllers/services and frontend pages should be separat
 ## Acceptance summary
 
 The feature is complete only when an admin can start a campaign from either starter, share it, receive an authenticated student's reviewed registration with correct profile-update semantics, see responses and approximate active activity update, end submissions reliably, and view/export a contest report narrowed to that campaign's respondents. Existing classroom forms, profile approval authority, and contest scoring remain compatible. User approval authorizes autonomous technical decisions, implementation, verification, and review within this scope. Production deployment remains a separate rollout boundary.
+
+## Approved design revision — 2026-11-15
+
+The user requested and authorized these changes after reviewing the initial implementation:
+
+- Remove decorative gradients from the new form workspace and student registration. Use the Apple-design skill: calm neutral surfaces, readable type, restrained depth, and immediate, interruptible feedback. Retain translucent material only where it supports navigation; preserve semantic theme tokens and existing responsive layouts.
+- Replace user-facing “cohort” terminology with **Form response filter**, **Registered students**, **Apply filter**, and **Change form filter** as appropriate. Internal database/API identity and scoring behavior remain unchanged. Hide selection-version and membership-revision diagnostics from the ordinary report UI.
+- Adapt [Motion’s long-press example](https://motion.dev/examples/react-press-hold) for student registration: one-second deliberate hold, visible progress, release/leave/cancel resets, and successful completion submits once. Support keyboard and a discoverable standard-button alternative. Validate missing fields/agreement before starting and revalidate before submission. Reduced motion retains feedback without scale or animated ring movement.
+
+This revision is covered by the user's instruction to continue autonomously. It does not authorize hosted deployment or database changes. Review evidence: `docs/reviews/global-admin-forms-20261115-design-revision.md`.

@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
+import { animate, motion, useMotionValue } from "framer-motion";
 import { Loader2, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./registration.module.css";
@@ -12,7 +12,6 @@ export default function HoldToRegister({ busy, validate, onConfirm }) {
   const [standardMode, setStandardMode] = useState(false);
   const [holding, setHolding] = useState(false);
   const progress = useMotionValue(0);
-  const reduceMotion = useReducedMotion();
   const buttonRef = useRef(null);
   const gesture = useRef(null);
   const animation = useRef(null);
@@ -94,7 +93,7 @@ export default function HoldToRegister({ busy, validate, onConfirm }) {
       onClick={() => { if (standardMode && !busy) onConfirm(); }}
       onContextMenu={(event) => { if (!standardMode) event.preventDefault(); }}
     >
-      {busy ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : standardMode || reduceMotion ? <Send className="h-5 w-5" aria-hidden="true" /> : <svg className={styles.holdRing} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.25" /><motion.circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ pathLength: progress }} transform="rotate(-90 12 12)" /></svg>}
+      {busy ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : standardMode ? <Send className="h-5 w-5" aria-hidden="true" /> : <><svg className={styles.holdRing} viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.25" /><motion.circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ pathLength: progress }} transform="rotate(-90 12 12)" /></svg><Send className={`${styles.holdReducedIcon} h-5 w-5`} aria-hidden="true" /></>}
       {busy ? "Registering…" : standardMode ? "Confirm registration" : holding ? "Keep holding…" : "Hold to register"}
     </Button>
     <p id="registration-submit-help" className="text-center text-xs leading-5 text-muted-foreground">{standardMode ? "Select Confirm registration when you are ready." : "Hold for 1 second. Release or move away to cancel. Keyboard: hold Space or Enter."}</p>

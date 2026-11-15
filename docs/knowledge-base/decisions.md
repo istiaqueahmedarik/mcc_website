@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-15 - Forms use neutral surfaces and plain filter labels
+
+User approved replacing decorative form gradients with restrained Apple-style neutral surfaces. Translucency is limited to navigation chrome. “Cohort” remains an internal implementation concept; visible report controls say Form response filter and Registered students. Final registration uses a one-second hold adapted from Motion, with a standard-button alternative. No dependency upgrade or hosted rollout is included.
+
 ## 2026-11-15 - Global forms campaign boundaries
 
 The approved global-forms scope separates reusable templates from immutable campaign definitions and submitted responses. Students authenticate with MCC; registration may complete while an OJ handle remains pending admin verification. Responses use immutable account IDs rather than typed student identifiers. Approximate active-filling counts use visible-page TTL heartbeats; dashboard SSE reconciles authoritative database counts. Contest campaign eligibility is applied before scoring, with raw provider source snapshots retained for cohort regeneration and explicit stale/publication checks. Profile-change rejection must preserve existing accounts. See `docs/adr/20261115-global-admin-forms.md`.

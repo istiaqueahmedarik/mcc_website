@@ -1,0 +1,11 @@
+{
+  "room": "0ea194fb-fcd7-4391-b8da-bdbab6244dd7",
+  "campaign": "9bdc79ac-d70c-4a4e-9802-be7e8bd8f238",
+  "errors": [],
+  "checks": [
+    "select campaign in room",
+    "persist selected campaign",
+    "render recalculated cohort from saved sources",
+    "390px report layout"
+  ]
+}

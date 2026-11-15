@@ -29,3 +29,7 @@ Read current Context7 Next.js authorization guidance and Hono streaming guidance
 ## Consequences
 
 The initial implementation adds no new dependency or external judge verification. Keeping global workflows separate avoids coupling campaign policy to classroom enrollment. SSE offers bounded near-live counts with explicit connection state; a five-second reconciliation interval is observable and should be described accurately. Source snapshots remain reusable while cohort-specific score snapshots are versioned and audited.
+
+## Approved presentation revision — 2026-11-15
+
+The user replaced the initial decorative glass/gradient direction with neutral Apple-style content surfaces and restrained translucent navigation. Report controls use Form response filter and Registered students; internal eligibility contracts remain compatible. Registration adopts the one-second hold interaction from Motion with cancellation and keyboard support, plus a discoverable standard-button alternative. The installed Framer Motion version is reused without a dependency upgrade. Review and verification: `docs/reviews/global-admin-forms-20261115-design-revision.md`.

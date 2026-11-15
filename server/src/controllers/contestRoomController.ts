@@ -636,7 +636,7 @@ async function buildGlobalScoredReportSnapshot(
                     title,
                     statusCode: 409,
                     code: 'REPORT_SOURCE_CACHE_MISSING',
-                    error: 'Generate this report once with provider access before applying the campaign cohort.',
+                    error: 'Generate this report once with provider access before applying the form response filter.',
                 })
                 continue
             }
@@ -745,7 +745,7 @@ async function buildGlobalScoredReportSnapshot(
     }
 
     if (options.reuseSourceSnapshotsOnly && missingContests.length > 0) {
-        throw Object.assign(new Error('Saved provider source data is incomplete; refresh provider data before applying this cohort'), {
+        throw Object.assign(new Error('Saved provider source data is incomplete; refresh provider data before applying this form response filter'), {
             statusCode: 409,
             code: 'REPORT_SOURCE_CACHE_MISSING',
             missingContests,

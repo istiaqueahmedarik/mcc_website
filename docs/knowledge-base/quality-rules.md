@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-11-15 - Verify intentional holds as input behavior
+
+Exercise short release, pointer leave, blur/hidden cancellation, keyboard hold, Escape, busy duplicate prevention, retry preservation, and non-hold accessibility. Keep focused fields unobscured and test dark/error and reduced-motion states. Do not rely solely on animation appearance or build success to prove submission behavior.
+
 ## 2026-11-15 - Registration persistence and realtime boundaries
 
 Global form profile completion must preserve existing verified fields. Distinguish profile-change rejection from signup rejection, restore null prior values correctly, and guard repeated/stale reviews so a completed review cannot become an account deletion. Historical responses are immutable; display/export their submitted profile values separately from current verification status. A campaign filter belongs before scoring, with membership/version checks on snapshot save and publish. Live count revision comparisons must handle 0-to-1, and sticky agreement controls must never obscure focused fields. Server-owned form tables remain behind authorized APIs, with RLS and no browser grants.

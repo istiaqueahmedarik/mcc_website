@@ -23,3 +23,12 @@ Each worker has one worktree/branch and disjoint write scope. Do not introduce d
 6. Run focused server suites, integrated frontend lint, and production build; distinguish pre-existing failures from new failures.
 7. Browser-check the real app where local dependencies permit; otherwise use isolated fixtures and explicitly report that boundary. Check mobile/laptop/dark mode, long content, focus, reduced motion/transparency and glass fallback.
 8. Publish an ordered implementation review: data/lifecycle → profile safety → student flow → admin dashboard → report cohort → verification/rollout. Update the durable knowledge base after implementation review. No automatic deployment or hosted migration is included.
+
+## Authorized follow-up: neutral design, clear labels, deliberate submit
+
+- [x] Record the user's revised direction in the RSD and ADR.
+- [x] Revise forms surfaces and route-scoped shared footer without decorative gradients.
+- [x] Replace visible cohort/version jargon with form response filter and registered-student terminology.
+- [x] Implement and locally exercise one-second hold, cancellation, keyboard, retry, reduced-motion, and standard-button flows.
+- [x] Record reviewer path, screenshots, fixture browser runner, and knowledge-base lessons.
+- [x] Complete production build and final integration handoff (evidence in the design-revision review).

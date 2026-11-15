@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-11-15 - Deliberate registration submission
+
+Keep hold progress/cancellation in a scoped UI component while retaining validation and synchronous request guards at the form boundary. Implicit form submission validates and focuses the final control without bypassing the gesture. Provide a standard-button mode for users who cannot hold, and recover failed requests without losing agreement or drafts. Use CSS reduced-motion visibility for immediate response to preference changes.
+
 ## 2026-11-15 - Authenticated campaign response and profile transaction
 
 Global forms identify a response by immutable campaign/account IDs and freeze the question/agreement definition. Lock the account and campaign before checking the profile preview version and open state; insert the response and missing-field profile mutations in one transaction. The mutation set contains only genuinely missing/invalid mapped values: a complete-profile submission must not rewrite existing handles or reset their verification flags. Retries recover the existing receipt. Report cohorts use canonical account identity before scoring while preserving unfiltered source snapshots for regeneration. See `docs/reviews/global-admin-forms-20261115-implementation-review.md`.

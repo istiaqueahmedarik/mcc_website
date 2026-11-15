@@ -3,6 +3,8 @@
   background: hsl(var(--muted) / 0.25);
 }
 
+:global(.dark) .page { --destructive: 0 85% 72%; }
+
 .page button:not([role='checkbox']) { min-height: 44px; }
 
 .hero {
@@ -48,7 +50,10 @@
 }
 .holdButton[data-holding="true"] { transform: scale(0.98); }
 .holdButton .holdRing { width: 24px; height: 24px; }
+.holdButton .holdReducedIcon { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .holdButton { transition: none; }
+  .holdButton .holdRing { display: none; }
+  .holdButton .holdReducedIcon { display: block; }
   .holdButton[data-holding="true"] { transform: none; }
 }
