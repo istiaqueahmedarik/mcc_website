@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label";
 import { login } from "@/lib/action";
 import { AtSign, Eye, EyeOff, Lock } from "lucide-react";
 import { Link } from "next-view-transitions";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { getSafeReturnPath } from "@/lib/safe-return-path.mjs";
 
 const initialState = {
   message: "",
@@ -24,9 +25,14 @@ const initialState = {
 };
 
 export default function Page() {
+  const [returnTo, setReturnTo] = useState("/");
   const [state, formAction, pending] = useActionState(login, initialState);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    setReturnTo(getSafeReturnPath(new URLSearchParams(window.location.search).get("returnTo")));
+  }, []);
 
   return (
     <div className="min-h-screen w-full py-12 px-4 flex items-center justify-center bg-background">
@@ -42,6 +48,7 @@ export default function Page() {
         </CardHeader>
         <CardContent>
           <form action={formAction} className="space-y-4">
+            <input type="hidden" name="returnTo" value={returnTo} />
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="flex flex-row items-center justify-center w-full rounded-xl border group focus-within:border-primary px-2">

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { createClient } from "../utils/supabase/server";
 import { clearAuthCookies, setAuthCookies } from "./auth-cookies";
+import { getSafeReturnPath } from "./safe-return-path.mjs";
 
 const serverBase =
   (process.env.SERVER_URL || process.env.NEXT_PUBLIC_SERVER_URL || "").replace(
@@ -486,14 +487,17 @@ export async function signUp(prevState, formData) {
 }
 
 export async function login(prevState, formData) {
-  const response = await post("auth/login", Object.fromEntries(formData));
+  const raw = Object.fromEntries(formData);
+  const returnTo = getSafeReturnPath(raw.returnTo);
+  delete raw.returnTo;
+  const response = await post("auth/login", raw);
   if (response.error)
     return {
       success: false,
       message: response.error,
     };
   await setAuthCookies(response.token, response.admin);
-  redirect("/");
+  redirect(returnTo);
 }
 
 export async function logout() {
