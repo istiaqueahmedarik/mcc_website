@@ -90,7 +90,7 @@ export default function AdminFormsClient() {
   const [responseTotal, setResponseTotal] = useState(0);
   const [responsePageSize, setResponsePageSize] = useState(50);
   const [dashboard, setDashboard] = useState({ submitted: 0, active: 0, pending_verification: 0, revision: 0 });
-  const revisionRef = useRef(0);
+  const revisionRef = useRef(null);
   const [streamState, setStreamState] = useState("connecting");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -152,7 +152,7 @@ export default function AdminFormsClient() {
       events.addEventListener("stats", (event) => {
         try {
           const stats = JSON.parse(event.data);
-          const changed = revisionRef.current && stats.revision !== revisionRef.current;
+          const changed = revisionRef.current !== null && stats.revision !== revisionRef.current;
           revisionRef.current = stats.revision || 0;
           setDashboard(stats); setStreamState("fresh");
           if (changed) refreshCampaign().catch(() => setStreamState("stale"));
