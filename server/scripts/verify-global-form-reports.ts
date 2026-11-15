@@ -7,7 +7,8 @@ const {default:sql}=await import('../src/db');
 const {sign}=await import('hono/jwt');
 const {createGlobalFormsTestApp}=await import('../tests/globalFormsTestApp');
 const {buildScoredContestReport}=await import('../src/services/contestScoringService');
-const {saveGlobalContestReportSnapshot}=await import('../src/services/globalContestReportSnapshotService');
+const {loadGlobalFormReportEligibility}=await import('../src/services/globalFormEligibilityService');
+const {saveGlobalContestReportSnapshot, markGlobalContestReportsStale}=await import('../src/services/globalContestReportSnapshotService');
 const app=createGlobalFormsTestApp();
 let checks=0;
 function check(condition:unknown,message:string){assert.ok(condition,message);checks++;}
@@ -66,5 +67,37 @@ try{
   await request(`/contest-room/${room.id}/report-eligibility`,admin,{campaignId:null},'PUT');
   const restored=await request(`/contest-room/${room.id}/report`,admin,{});
   check(restored.status===200 && restored.json.merged.users.length===3,'removing cohort restores full provider input');
+  // A filter-only regeneration must retain provider failure provenance.
+  const failure={id:item.id,provider:'vjudge',contestId:'424242',title:'Synthetic saved source',statusCode:503,code:'SYNTHETIC_PROVIDER_FAILURE',usedSavedData:true,savedAt:new Date().toISOString()};
+  await sql`update global_contest_report_snapshots set missing_contests=${sql.json([failure])} where room_id=${room.id}`;
+  await request(`/contest-room/${room.id}/report-eligibility`,admin,{campaignId:campaign.id},'PUT');
+  const failedSelection=await request(`/contest-room/${room.id}/report`,admin,{});
+  check(failedSelection.status===200 && failedSelection.json.missingContests?.[0]?.code===failure.code && failedSelection.json.missingContests[0].usedSavedData===true,'filter change retains saved provider failure metadata');
+  check((await request(`/contest-room/${room.id}/publish`,admin,{})).status===409,'provider failure still blocks publication after changing form filter');
+  const third=await user();await register(third);
+  const failedMembership=await request(`/contest-room/${room.id}/report`,admin,{});
+  check(failedMembership.status===200 && failedMembership.json.missingContests?.[0]?.code===failure.code,'new response retains saved provider failure metadata');
+  check((await request(`/contest-room/${room.id}/publish`,admin,{})).status===409,'provider failure still blocks publication after membership changes');
+
+  // Use the real mapping replacement handler to invalidate a previously mapped source.
+  let mappedMistId=300000000+(Date.now()%600000000);
+  while ((await sql`select id from users where mist_id in (${mappedMistId},${mappedMistId+1})`).length) mappedMistId+=2;
+  await sql`update users set mist_id=${mappedMistId} where id=${one.id}`;
+  await sql`update users set mist_id=${mappedMistId+1} where id=${two.id}`;
+  await sql`update "Contest_room_contests" set provider='codeforces',contest_id='group:QA:424242',codeforces_source_type='group',codeforces_group_identity_mode='csv' where id=${item.id}`;
+  const currentEligibility=await loadGlobalFormReportEligibility(room.id);
+  await saveGlobalContestReportSnapshot({roomId:room.id,contestItemId:null,report,sourceSnapshots:{[item.id]:{rankData:{...rankData,teams:[{...team(one,2),username:'GroupStudent'}]},savedAt:new Date().toISOString()}},missingContests:[],scoringConfigVersion:0,generatedBy:admin.id,eligibilityCampaignId:currentEligibility.campaignId,eligibilityMembershipRevision:currentEligibility.membershipRevision,eligibilitySelectionVersion:currentEligibility.selectionVersion});
+  const mapped=await request('/contest-room-contests/codeforces-identity-mapping/replace',admin,{contest_room_contest_id:item.id,codeforces_group_identity_mode:'csv',mapping_csv:`username,student_id\nGroupStudent,${mappedMistId+1}`});
+  check(mapped.status===200,'administrator corrects group CSV identity mapping through actual route');
+  await request(`/contest-room/${room.id}/report-eligibility`,admin,{campaignId:empty.json.campaign.id},'PUT');
+  const invalidated=await request(`/contest-room/${room.id}/report`,admin,{});
+  check(invalidated.status===409 && invalidated.json.code==='REPORT_INPUTS_STALE','mapping invalidation cannot be cleared by changing form filter');
+  check((await request(`/contest-room/${room.id}/publish`,admin,{})).status===409,'old canonical identities remain blocked from publication');
+  const [inputVersion]=await sql`select report_input_revision from "Contest_report_room" where id=${room.id}`;
+  await sql.begin(tx=>markGlobalContestReportsStale(tx,[room.id]));
+  const latestEligibility=await loadGlobalFormReportEligibility(room.id);
+  let raced=false;
+  try {await saveGlobalContestReportSnapshot({roomId:room.id,contestItemId:null,report,missingContests:[],scoringConfigVersion:0,generatedBy:admin.id,inputRevision:Number(inputVersion.report_input_revision),eligibilityCampaignId:latestEligibility.campaignId,eligibilityMembershipRevision:latestEligibility.membershipRevision,eligibilitySelectionVersion:latestEligibility.selectionVersion});}catch(error:any){raced=error.code==='REPORT_INPUTS_CHANGED';}
+  check(raced,'concurrent report input invalidation rejects an older generation at commit');
   console.log(`Global form report integration: ${checks} checks passed (synthetic source snapshots, no provider access).`);
 }finally{await sql.end();}

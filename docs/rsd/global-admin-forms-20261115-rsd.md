@@ -158,3 +158,11 @@ The user requested and authorized these changes after reviewing the initial impl
 - Adapt [Motion’s long-press example](https://motion.dev/examples/react-press-hold) for student registration: one-second deliberate hold, visible progress, release/leave/cancel resets, and successful completion submits once. Support keyboard and a discoverable standard-button alternative. Validate missing fields/agreement before starting and revalidate before submission. Reduced motion retains feedback without scale or animated ring movement.
 
 This revision is covered by the user's instruction to continue autonomously. It does not authorize hosted deployment or database changes. Review evidence: `docs/reviews/global-admin-forms-20261115-design-revision.md`.
+
+## Authorized PR #44 corrections — 2026-11-15
+
+The user requested fixes for review 5910681992. Preserve the approved interface and existing registration/report semantics while addressing four defects: distinguish identity/source invalidation from form-filter changes; preserve saved provider-failure metadata while recomputing registered-student eligibility; reconcile pending name reviews when normal profile edits change the proposed name; and preserve raw select-option text until save. Add targeted regressions and record the file-by-file review path. This authorizes code changes and updating the existing PR branch, with no hosted migration or deployment.
+
+## Approved post-merge follow-up — 2026-11-15
+
+After merging PR #44 the user requested a new PR from the updated default branch, retaining the four review corrections above and adding: deletion of editable templates while preserving existing campaigns/responses and built-in starters; explicit responsive widths for forms dialogs; and a single ordinary registration submit button, superseding the earlier hold interaction and mode chooser. These changes are authorized for implementation, verification, and a new PR; hosted migration/deployment remain separate.

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { jwt } from 'hono/jwt';
 import globalFormRoute from '../src/routes/globalFormRoute';
 import { acceptUser, getProfile, login, pendingUser, rejectUser } from '../src/controllers/authController';
-import { setMistId } from '../src/controllers/userController';
+import { setBasicProfile, setMistId } from '../src/controllers/userController';
 import { jwtAuthOptions } from '../src/utils/jwtAuthOptions';
 import contestRoomRoute from '../src/routes/contestRoomRoute';
 import contestRoomContestsRoute from '../src/routes/contestRoomContestsRoute';
@@ -19,6 +19,7 @@ export function createGlobalFormsTestApp() {
   app.get('/auth/user/pendings', pendingUser);
   app.post('/auth/user/accept', acceptUser);
   app.post('/auth/user/reject', rejectUser);
+  app.post('/user/basic/set', jwt(jwtAuthOptions()), setBasicProfile);
   app.post('/user/mist-id/set', jwt(jwtAuthOptions()), setMistId);
   return app;
 }

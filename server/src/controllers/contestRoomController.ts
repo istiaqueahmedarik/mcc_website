@@ -578,6 +578,7 @@ async function buildGlobalScoredReportSnapshot(
         contestItemId?: string | null;
         contestId?: string | null;
         fallbackSourceSnapshots?: Record<string, any>;
+        fallbackMissingContests?: any[];
         reuseSourceSnapshotsOnly?: boolean;
         eligibility?: GlobalFormReportEligibility;
     } = {},
@@ -598,7 +599,9 @@ async function buildGlobalScoredReportSnapshot(
 
     const rankDataByItemId = new Map<string, any>()
     const sourceSnapshots: Record<string, any> = {}
-    const missingContests: any[] = []
+    const missingContests: any[] = options.reuseSourceSnapshotsOnly
+        ? (options.fallbackMissingContests || []).filter((failure) => items.some((item: any) => String(item.id) === String(failure.id)))
+        : []
     const needsSavedCodeforcesHandles = !options.reuseSourceSnapshotsOnly && items.some((item: any) => (
         normalizeContestProvider(item.provider) === 'codeforces'
         && normalizeText(item.codeforces_source_type, 20) !== 'group'
@@ -744,7 +747,7 @@ async function buildGlobalScoredReportSnapshot(
         }
     }
 
-    if (options.reuseSourceSnapshotsOnly && missingContests.length > 0) {
+    if (options.reuseSourceSnapshotsOnly && missingContests.some((failure) => failure.code === 'REPORT_SOURCE_CACHE_MISSING')) {
         throw Object.assign(new Error('Saved provider source data is incomplete; refresh provider data before applying this form response filter'), {
             statusCode: 409,
             code: 'REPORT_SOURCE_CACHE_MISSING',
@@ -1409,6 +1412,12 @@ export const generateContestRoomReport = async (c: any) => {
         }
 
         const eligibilityOnlyRefresh = Boolean(savedSnapshot && !refresh && !savedSnapshot.eligibilityIsCurrent)
+        if (eligibilityOnlyRefresh && savedSnapshot?.sourceIsStale) {
+            return c.json({
+                error: 'Contest inputs or student mappings changed. Refresh provider data before applying the form filter.',
+                code: 'REPORT_INPUTS_STALE',
+            }, 409)
+        }
 
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
@@ -1421,6 +1430,7 @@ export const generateContestRoomReport = async (c: any) => {
             {
                 contestItemId,
                 fallbackSourceSnapshots: savedSnapshot?.sourceSnapshots,
+                fallbackMissingContests: savedSnapshot?.missingContests,
                 reuseSourceSnapshotsOnly: eligibilityOnlyRefresh,
                 eligibility,
             },
@@ -1433,6 +1443,7 @@ export const generateContestRoomReport = async (c: any) => {
             missingContests: snapshot.missingContests,
             scoringConfigVersion: snapshot.configVersion,
             generatedBy: actor.id,
+            inputRevision: Number(snapshot.room.report_input_revision || 0),
             eligibilityCampaignId: eligibility.campaignId,
             eligibilityMembershipRevision: eligibility.membershipRevision,
             eligibilitySelectionVersion: eligibility.selectionVersion,

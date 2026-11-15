@@ -1,4 +1,8 @@
 
+## 2026-11-15 - PR44 review caught cross-feature state loss
+
+Cached report regeneration originally conflated membership and source staleness and dropped saved provider failure diagnostics; form filter changes could incorrectly permit publication. Ordinary name edits could also diverge from pending proposals, and option normalization erased typing. Regression checks now exercise these transitions, not just isolated happy paths. Dialog width checks must wait for entry/viewport transitions before measuring bounds.
+
 ## 2026-11-15 - Forms design feedback and dark error contrast
 
 The initial forms design overused decorative gradients and exposed “cohort” and revision jargon. User review requested neutral Apple-style surfaces and plain language. Browser review of the revision also caught dark-mode error text inheriting a low-contrast destructive token; the registration surface now scopes a readable error color. Inspect actual dark failure states and reduce shared decoration on the same routes before handoff.

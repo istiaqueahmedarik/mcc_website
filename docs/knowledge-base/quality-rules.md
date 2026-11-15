@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-11-15 - Preserve invalidation provenance and pending review baselines
+
+A form-filter or membership change must not clear unrelated source invalidation or failure metadata. Test mapping correction followed by filter regeneration and invalidation racing snapshot save. Ordinary profile edits must reconcile pending proposals under the admin review lock order without replacing original prior values. Controlled text inputs must preserve unfinished whitespace while editing.
+
 ## 2026-11-15 - Verify intentional holds as input behavior
 
 Exercise short release, pointer leave, blur/hidden cancellation, keyboard hold, Escape, busy duplicate prevention, retry preservation, and non-hold accessibility. Keep focused fields unobscured and test dark/error and reduced-motion states. Do not rely solely on animation appearance or build success to prove submission behavior.

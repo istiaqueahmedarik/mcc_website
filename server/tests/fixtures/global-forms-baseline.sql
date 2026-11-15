@@ -59,5 +59,6 @@ create table if not exists public."Demerit" (
 );
 create table if not exists public.contest_report_codeforces_identity_mappings (
   id uuid primary key default gen_random_uuid(),contest_item_id uuid,
-  provider_username_normalized text,student_user_id uuid
+  provider_username_normalized text,student_user_id uuid,
+  provider_username text, created_by uuid, updated_by uuid
 );

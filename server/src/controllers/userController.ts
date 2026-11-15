@@ -422,19 +422,33 @@ export const setBasicProfile = async (c: any) => {
     const sanitizedBatch =
       typeof batch_name === "string" ? batch_name.trim() || null : null;
 
-    const rows = await sql`
-      update users
-      set
-        full_name = case when ${shouldUpdateName} then ${name} else full_name end,
-        phone = case when ${shouldUpdatePhone} then ${sanitizedPhone} else phone end,
-        batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end,
-        granted = case
-          when ${shouldUpdateName} and full_name is distinct from ${name} then false
-          else granted
-        end
-      where id = ${id}
-      returning id, full_name, phone, batch_name, granted
-    `;
+    const rows = await sql.begin(async (tx) => {
+      // Use the same user-first lock order as registration and admin review.
+      const current = await tx`select id, account_review_origin from users where id = ${id} for update`;
+      if (!current[0]) return [];
+      const updated = await tx`
+        update users
+        set
+          full_name = case when ${shouldUpdateName} then ${name} else full_name end,
+          phone = case when ${shouldUpdatePhone} then ${sanitizedPhone} else phone end,
+          batch_name = case when ${shouldUpdateBatch} then ${sanitizedBatch} else batch_name end,
+          granted = case
+            when ${shouldUpdateName} and full_name is distinct from ${name} then false
+            else granted
+          end
+        where id = ${id}
+        returning id, full_name, phone, batch_name, granted
+      `;
+      if (shouldUpdateName && current[0].account_review_origin === "profile_change") {
+        // Keep the original rejection baseline; administrators review the latest proposal.
+        await tx`
+          update global_form_profile_reviews
+          set proposed_values = jsonb_set(proposed_values, '{full_name}', to_jsonb(${name}::text), true)
+          where user_id = ${id} and status = 'pending'
+        `;
+      }
+      return updated;
+    });
 
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
     return c.json({ result: rows[0] });

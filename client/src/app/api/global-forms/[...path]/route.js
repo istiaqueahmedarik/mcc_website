@@ -79,3 +79,7 @@ export function POST(request, context) {
 export function PUT(request, context) {
   return forward(request, context, "PUT");
 }
+
+export function DELETE(request, context) {
+  return forward(request, context, "DELETE");
+}

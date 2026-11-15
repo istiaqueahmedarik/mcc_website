@@ -1,0 +1,14 @@
+{
+  "checks": [
+    "normal submit exposes missing fields without a request",
+    "one normal keyboard submit, disabled pending state and duplicate protection",
+    "receipt survives reload",
+    "select textarea preserves typed spaces, blank lines and trailing newline",
+    "template editor viewport-safe desktop/mobile width",
+    "options normalize only on save",
+    "ordinary mobile submit works with select answer and reduced motion",
+    "preview, create campaign and response dialogs have explicit usable widths",
+    "template deletion confirmation, cancellation, focus recovery and campaign/response retention"
+  ],
+  "errors": []
+}

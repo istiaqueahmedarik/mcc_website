@@ -196,11 +196,6 @@ export async function setGlobalFormReportEligibility(input: {
                 updated_at = now()
         `
         await tx`
-            UPDATE public.global_contest_report_snapshots
-            SET is_stale = true
-            WHERE room_id = ${input.roomId} AND is_stale = false
-        `
-        await tx`
             UPDATE public."Public_contest_report"
             SET is_stale = true, "Updated_at" = now()
             WHERE "Shared_contest_id" = ${input.roomId} AND is_stale = false

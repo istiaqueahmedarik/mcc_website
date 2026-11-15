@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-11-15 - Independent report input and eligibility freshness
+
+Keep private source invalidation separate from form membership/selection freshness. Preserve provider failure metadata across cached eligibility recomputation. Increment a room input revision for mapping/scoring/source mutations and verify it under lock at snapshot save, so an in-flight generation cannot overwrite a newer invalidation. Keep raw textarea drafts until save normalization.
+
 ## 2026-11-15 - Deliberate registration submission
 
 Keep hold progress/cancellation in a scoped UI component while retaining validation and synchronous request guards at the form boundary. Implicit form submission validates and focuses the final control without bypassing the gesture. Provide a standard-button mode for users who cannot hold, and recover failed requests without losing agreement or drafts. Use CSS reduced-motion visibility for immediate response to preference changes.

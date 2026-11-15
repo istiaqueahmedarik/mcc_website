@@ -13,6 +13,7 @@ export type GlobalContestReportSnapshot = {
     eligibilitySelectionVersion: number;
     eligibilityIsCurrent: boolean;
     isStale: boolean;
+    sourceIsStale: boolean;
     generatedAt: string;
 }
 
@@ -61,6 +62,7 @@ export function globalContestReportSnapshotFromRow(row: any): GlobalContestRepor
         eligibilityMembershipRevision,
         eligibilitySelectionVersion,
         eligibilityIsCurrent,
+        sourceIsStale: Boolean(row.is_stale),
         isStale: Boolean(row.is_stale) || !eligibilityIsCurrent,
         generatedAt: new Date(row.generated_at).toISOString(),
     }
@@ -144,11 +146,23 @@ export async function saveGlobalContestReportSnapshot(input: {
     missingContests: any[];
     scoringConfigVersion: number;
     generatedBy: string;
+    inputRevision?: number;
     eligibilityCampaignId: string | null;
     eligibilityMembershipRevision: number | null;
     eligibilitySelectionVersion: number;
 }): Promise<GlobalContestReportSnapshot> {
     return sql.begin(async (tx) => {
+        if (input.inputRevision !== undefined) {
+            const rooms = await tx`
+                SELECT report_input_revision FROM public."Contest_report_room"
+                WHERE id = ${input.roomId} FOR SHARE
+            `
+            if (!rooms[0] || Number(rooms[0].report_input_revision) !== input.inputRevision) {
+                throw Object.assign(new Error('Report inputs changed while generating; refresh the report again'), {
+                    statusCode: 409, code: 'REPORT_INPUTS_CHANGED',
+                })
+            }
+        }
         const selectionHint = await tx`
             SELECT campaign_id
             FROM public.global_contest_report_eligibility
@@ -287,6 +301,11 @@ export async function saveGlobalContestReportSnapshot(input: {
 export async function markGlobalContestReportsStale(database: any, roomIds: string[]) {
     const normalizedRoomIds = Array.from(new Set(roomIds.map(String).filter(Boolean)))
     if (normalizedRoomIds.length === 0) return
+    await database`
+        UPDATE public."Contest_report_room"
+        SET report_input_revision = report_input_revision + 1
+        WHERE id = ANY(${normalizedRoomIds})
+    `
     await database`
         UPDATE public.global_contest_report_snapshots
         SET is_stale = true

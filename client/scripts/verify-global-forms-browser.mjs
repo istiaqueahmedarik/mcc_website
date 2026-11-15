@@ -1,42 +1,145 @@
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright-core");
+/** Actual UI checks against the local synthetic forms fixture API and Next client. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-// Start the disposable forms_test fixture API and client before running this check.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const base = process.env.FORMS_QA_CLIENT || 'http://127.0.0.1:55443';
 const apiBase = process.env.FORMS_QA_API || 'http://127.0.0.1:55441';
-const shots = process.env.FORMS_QA_OUTPUT || '/tmp/mcc-forms-revision-qa';
-for (const target of [base, apiBase]) {
-  assert.ok(['127.0.0.1', 'localhost'].includes(new URL(target).hostname), 'QA requires loopback services');
-}
-await fs.mkdir(shots, { recursive: true });
-const manifest=await (await fetch(apiBase+'/qa/manifest')).json();
+const output = process.env.FORMS_QA_OUTPUT || '/tmp/mcc-forms-followup-qa';
+for (const target of [base, apiBase]) assert.ok(['127.0.0.1', 'localhost'].includes(new URL(target).hostname), 'Loopback services required');
+await fs.mkdir(output, { recursive: true });
+const manifest = await (await fetch(apiBase + '/qa/manifest')).json();
 assert.ok([manifest.admin, manifest.student, manifest.complete].every(email => email?.endsWith('@forms.invalid')), 'Synthetic fixture accounts required');
-async function login(email){const r=await fetch(apiBase+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:'forms-qa-password'})});return (await r.json()).token;}
-const token=await login(manifest.admin);
-async function api(path,body){const r=await fetch(apiBase+'/global-forms/'+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(body?{body:JSON.stringify(body)}:{})});const d=await r.json();assert.ok(r.ok,JSON.stringify(d));return d;}
-const starter=(await api('manage/templates')).templates.find(t=>t.kind==='tfc'&&t.built_in);
-async function campaign(){const c=(await api('manage/campaigns',{template_id:starter.id,title:'Registration interaction QA'})).campaign;await api(`manage/campaigns/${c.id}/start`,{});return c;}
-const browser=await chromium.launch({executablePath:process.env.FORMS_QA_CHROME || '/usr/bin/google-chrome',headless:true,args:['--no-sandbox']});
-const errors=[],checks=[];
-async function context(email,options={}){const c=await browser.newContext({viewport:{width:1366,height:900},...options});await c.addCookies([{name:'token',value:await login(email),url:base,httpOnly:true,sameSite:'Lax'}]);return c;}
-const student=await context(manifest.student), page=await student.newPage();page.on('pageerror',e=>errors.push(e.message));
-const c1=await campaign();await page.goto(`${base}/register/${c1.slug}`);await page.getByRole('heading',{name:'Review your details'}).waitFor();
-const hold=page.locator('[aria-describedby="registration-submit-help"]');let submissions=0;
-await page.route('**/api/global-forms/public/*/submit',async route=>{submissions++;await new Promise(r=>setTimeout(r,700));await route.continue();});
-await hold.click();await page.locator('[aria-invalid=true]').first().waitFor();
-assert.equal(submissions,0);assert.ok(await page.locator('[aria-invalid=true]').count());checks.push('incomplete hold validates without submitting');
-await page.getByLabel(/MIST Student ID/).fill('202614009');await page.getByLabel(/Codeforces handle/).fill('RevisionCF');await page.getByRole('checkbox').last().check();
-await page.locator('form[data-registration-form]').evaluate(el=>el.requestSubmit());assert.equal(submissions,0);checks.push('implicit form submit cannot bypass hold');
-async function down(){await hold.scrollIntoViewIfNeeded();const box=await hold.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();return box;}
-await down();await page.waitForTimeout(200);await page.mouse.up();await page.waitForTimeout(1100);assert.equal(submissions,0);checks.push('short pointer press cancels');
-const bounds=await down();await page.waitForTimeout(200);await page.mouse.move(bounds.x-20,bounds.y);await page.waitForTimeout(1100);await page.mouse.up();assert.equal(submissions,0);checks.push('pointer leaving cancels');
-await down();await page.waitForTimeout(200);await page.evaluate(()=>window.dispatchEvent(new Event('blur')));await page.waitForTimeout(1100);await page.mouse.up();assert.equal(submissions,0);checks.push('window blur cancels');
-await hold.focus();await page.keyboard.down('Space');await page.waitForTimeout(200);await page.keyboard.up('Space');await page.waitForTimeout(1100);assert.equal(submissions,0);checks.push('short keyboard press cancels');
-await page.screenshot({path:shots+'/student-preview-desktop.png',fullPage:true});
-await hold.focus();await page.keyboard.down('Enter');await page.waitForTimeout(1150);await page.keyboard.up('Enter');await page.getByRole('button',{name:'Registering…'}).waitFor();assert.ok(await page.getByRole('button',{name:'Registering…'}).isDisabled());await page.getByRole('heading',{name:'Registration complete'}).waitFor();assert.equal(submissions,1);checks.push('full keyboard hold submits exactly once with disabled pending state');
-const admin=await context(manifest.admin), dashboard=await admin.newPage();dashboard.on('pageerror',e=>errors.push(e.message));await dashboard.goto(`${base}/admin/forms?campaign=${c1.id}`);await dashboard.getByRole('heading',{name:'Responses',exact:true}).waitFor();await dashboard.getByText(manifest.student,{exact:true}).waitFor();await dashboard.screenshot({path:shots+'/admin-responses-desktop.png',fullPage:true});
-await dashboard.getByRole('button',{name:'Templates',exact:true}).click();await dashboard.getByRole('heading',{name:'Template library'}).waitFor();await dashboard.screenshot({path:shots+'/templates-desktop.png',fullPage:true});await dashboard.setViewportSize({width:390,height:844});await dashboard.screenshot({path:shots+'/templates-mobile.png',fullPage:true});assert.ok(await dashboard.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));checks.push('admin desktop/mobile layout');
-const complete=await context(manifest.complete,{viewport:{width:390,height:844},hasTouch:true,isMobile:true,reducedMotion:'reduce'}), mobile=await complete.newPage();mobile.on('pageerror',e=>errors.push(e.message));const c2=await campaign();await mobile.goto(`${base}/register/${c2.slug}`);await mobile.getByRole('heading',{name:'Review your details'}).waitFor();assert.equal(await mobile.getByLabel(/MIST Student ID/).count(),0);await mobile.getByRole('checkbox').last().check();await mobile.screenshot({path:shots+'/student-preview-mobile.png',fullPage:true});assert.ok(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-await mobile.getByRole('button',{name:'Use a standard submit button instead'}).click();assert.equal(await mobile.getByRole('heading',{name:'Registration complete'}).count(),0);await mobile.getByRole('button',{name:'Confirm registration',exact:true}).click();await mobile.getByRole('heading',{name:'Registration complete'}).waitFor();checks.push('complete profile and reduced-motion mobile standard-button alternative');
-const c3=await campaign();await mobile.goto(`${base}/register/${c3.slug}`);await mobile.getByRole('heading',{name:'Review your details'}).waitFor();await mobile.getByRole('checkbox').last().check();const touchButton=mobile.getByRole('button',{name:'Hold to register',exact:true});await touchButton.scrollIntoViewIfNeeded();const b=await touchButton.boundingBox();const cdp=await complete.newCDPSession(mobile);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2}]});await mobile.waitForTimeout(1150);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await mobile.getByRole('heading',{name:'Registration complete'}).waitFor();checks.push('emulated touch hold completes with reduced motion');
-assert.deepEqual(errors,[]);await fs.writeFile(shots+'/results.json',JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({checks,errors},null,2));await browser.close();
+async function login(email) {
+  return (await (await fetch(apiBase + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'forms-qa-password' }) })).json()).token;
+}
+const adminToken = await login(manifest.admin);
+async function api(path, body, method) {
+  const r = await fetch(apiBase + '/global-forms/' + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + adminToken }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const result = await r.json();
+  assert.ok(r.ok, JSON.stringify(result));
+  return result;
+}
+const browser = await chromium.launch({ executablePath: process.env.FORMS_QA_CHROME || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] });
+const checks = [], errors = [];
+async function account(email, viewport = { width: 1366, height: 900 }) {
+  const context = await browser.newContext({ viewport });
+  await context.addCookies([{ name: 'token', value: await login(email), url: base, httpOnly: true, sameSite: 'Lax' }]);
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  return page;
+}
+try {
+  const starter = (await api('manage/templates')).templates.find(t => t.kind === 'tfc' && t.built_in);
+  const registration = (await api('manage/campaigns', { title: 'Ordinary submit QA', template_id: starter.id })).campaign;
+  await api(`manage/campaigns/${registration.id}/start`, {});
+  const student = await account(manifest.student);
+  await student.goto(`${base}/register/${registration.slug}`);
+  await student.getByRole('heading', { name: 'Review your details', exact: true }).waitFor();
+  let submissions = 0;
+  await student.route('**/api/global-forms/public/*/submit', async route => { submissions++; await new Promise(r => setTimeout(r, 700)); await route.continue(); });
+  const confirm = student.getByRole('button', { name: 'Confirm registration', exact: true });
+  await confirm.click();
+  await student.locator('[aria-invalid=true]').first().waitFor();
+  assert.equal(submissions, 0);
+  checks.push('normal submit exposes missing fields without a request');
+  await student.getByLabel(/MIST Student ID/).fill('202614009');
+  await student.getByLabel(/Codeforces handle/).fill('FollowupCF');
+  await student.getByRole('checkbox').last().check();
+  assert.equal(await student.getByRole('button', { name: /Hold to|standard submit/ }).count(), 0);
+  await student.screenshot({ path: output + '/normal-registration-desktop.png', fullPage: true });
+  await confirm.focus(); await student.keyboard.press('Enter');
+  await student.getByRole('button', { name: 'Registering…' }).waitFor();
+  assert.ok(await student.getByRole('button', { name: 'Registering…' }).isDisabled());
+  await student.keyboard.press('Enter');
+  await student.getByRole('heading', { name: 'Registration complete' }).waitFor();
+  assert.equal(submissions, 1);
+  checks.push('one normal keyboard submit, disabled pending state and duplicate protection');
+  await student.reload(); await student.getByRole('heading', { name: 'Registration complete' }).waitFor();
+  checks.push('receipt survives reload');
+
+  const admin = await account(manifest.admin);
+  await admin.goto(base + '/admin/forms?tab=templates');
+  await admin.getByRole('button', { name: 'New template', exact: true }).click();
+  const dialog = admin.getByRole('dialog');
+  await dialog.waitFor(); await admin.waitForTimeout(250);
+  assert.ok((await dialog.boundingBox()).width >= 1000, 'template editor should use its desktop width');
+  const title = 'Select editor QA ' + Date.now();
+  await dialog.getByLabel('Title', { exact: true }).fill(title);
+  await dialog.getByLabel('Label', { exact: true }).fill('Training session');
+  await dialog.getByLabel('Type', { exact: true }).selectOption('select');
+  const options = dialog.getByLabel('Options (one per line)', { exact: true });
+  await options.pressSequentially('Morning session'); await options.press('Enter');
+  assert.equal(await options.inputValue(), 'Morning session\n');
+  await options.pressSequentially('Evening session'); await options.press('Enter'); await options.press('Enter');
+  await options.pressSequentially(' Weekend session ');
+  assert.equal(await options.inputValue(), 'Morning session\nEvening session\n\n Weekend session ');
+  checks.push('select textarea preserves typed spaces, blank lines and trailing newline');
+  await admin.screenshot({ path: output + '/template-editor-desktop.png', fullPage: true });
+  await admin.setViewportSize({ width: 390, height: 844 });
+  await admin.waitForTimeout(250);
+  const mobileBounds = await dialog.boundingBox();
+  await admin.screenshot({ path: output + "/template-mobile-check.png", fullPage: true });
+  assert.ok(mobileBounds.width >= 350 && mobileBounds.x >= 0 && mobileBounds.x + mobileBounds.width <= 390, JSON.stringify(mobileBounds));
+  assert.ok(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth));
+  assert.equal(await options.evaluate(el => getComputedStyle(el).fontSize), '16px');
+  assert.ok((await dialog.getByRole('button', { name: 'Save template', exact: true }).boundingBox()).height >= 44);
+  await admin.screenshot({ path: output + '/template-editor-mobile.png', fullPage: true });
+  checks.push('template editor viewport-safe desktop/mobile width');
+  await dialog.getByRole('button', { name: 'Save template', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  const saved = (await api('manage/templates')).templates.find(t => t.title === title);
+  assert.deepEqual(saved.fields[0].options, ['Morning session', 'Evening session', 'Weekend session']);
+  assert.equal(saved.fields[0].optionsText, undefined);
+  checks.push('options normalize only on save');
+  await admin.setViewportSize({ width: 1366, height: 900 });
+  const card = admin.locator('.rounded-2xl').filter({ has: admin.getByRole('heading', { name: title, exact: true }) }).last();
+  await card.getByRole('button', { name: 'Preview', exact: true }).click();
+  await dialog.waitFor(); await admin.waitForTimeout(250);
+  assert.ok((await dialog.boundingBox()).width >= 760);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await admin.getByRole('button', { name: 'Campaigns', exact: true }).click();
+  await admin.getByRole('button', { name: 'Create campaign', exact: true }).click();
+  await dialog.waitFor(); await admin.waitForTimeout(250);
+  assert.ok((await dialog.boundingBox()).width >= 650);
+  await dialog.getByLabel('Template', { exact: true }).selectOption(saved.id);
+  await dialog.getByLabel('Campaign title', { exact: true }).fill(title + ' campaign');
+  await dialog.getByRole('button', { name: 'Create draft', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await admin.getByRole('button', { name: 'Start', exact: true }).click();
+  await admin.getByRole('button', { name: 'End', exact: true }).waitFor();
+  const campaign = (await api('manage/campaigns')).campaigns.find(c => c.title === title + ' campaign');
+  const complete = await account(manifest.complete, { width: 390, height: 844 });
+  await complete.emulateMedia({ reducedMotion: 'reduce' });
+  await complete.goto(`${base}/register/${campaign.slug}`);
+  await complete.getByRole('heading', { name: 'Review your details', exact: true }).waitFor();
+  await complete.getByLabel('Training session', { exact: true }).selectOption('Evening session');
+  await complete.getByRole('checkbox').last().check();
+  await complete.screenshot({ path: output + '/normal-registration-mobile.png', fullPage: true });
+  assert.ok(await complete.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await complete.getByRole('button', { name: 'Confirm registration', exact: true }).click();
+  await complete.getByRole('heading', { name: 'Registration complete' }).waitFor();
+  checks.push('ordinary mobile submit works with select answer and reduced motion');
+  await admin.getByText(manifest.complete, { exact: true }).waitFor({ timeout: 15000 });
+  await admin.getByRole('button', { name: 'View', exact: true }).first().click();
+  await dialog.waitFor(); await admin.waitForTimeout(250);
+  assert.ok((await dialog.boundingBox()).width >= 760);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  checks.push('preview, create campaign and response dialogs have explicit usable widths');
+  await admin.getByRole('button', { name: 'Templates', exact: true }).click();
+  await card.getByRole('button', { name: 'Delete', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.ok((await api('manage/templates')).templates.some(t => t.id === saved.id));
+  await card.getByRole('button', { name: 'Delete', exact: true }).click();
+  await admin.screenshot({ path: output + '/delete-template-confirmation.png', fullPage: true });
+  await dialog.getByRole('button', { name: 'Delete template', exact: true }).click();
+  await dialog.waitFor({ state: 'hidden' });
+  await admin.getByRole('heading', { name: title, exact: true }).waitFor({ state: 'hidden' });
+  assert.ok(await admin.getByRole('button', { name: 'New template', exact: true }).evaluate(el => el === document.activeElement));
+  const kept = (await api('manage/campaigns/' + campaign.id)).campaign;
+  assert.equal(kept.id, campaign.id);
+  assert.equal((await api('manage/campaigns/' + campaign.id + '/responses')).total, 1);
+  checks.push('template deletion confirmation, cancellation, focus recovery and campaign/response retention');
+  assert.deepEqual(errors, []);
+  await fs.writeFile(output + '/results.json', JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, errors }, null, 2));
+} finally { await browser.close(); }

@@ -133,6 +133,16 @@ export async function updateTemplate(c: Ctx) {
   return c.json({ template: templateShape(rows[0]) });
 }
 
+export async function deleteTemplate(c: Ctx) {
+  if (!(await requireAdmin(c))) return c.json({ error: "Admin access required" }, 403);
+  // Campaigns retain frozen questions and responses; their template FK becomes null.
+  const rows = await sql`
+    delete from global_form_templates where id = ${c.req.param("id")} and built_in = false returning id
+  `;
+  if (!rows[0]) return c.json({ error: "Editable template not found. Built-in starters cannot be deleted." }, 404);
+  return c.json({ success: true });
+}
+
 export async function cloneTemplate(c: Ctx) {
   const admin = await requireAdmin(c);
   if (!admin) return c.json({ error: "Admin access required" }, 403);
