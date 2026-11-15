@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-11-16 - Treat delivered data as stream liveness
+
+A stream opening is not proof that messages are flowing. Bound first/last valid message time, refresh through authenticated REST while stalled, stop fallback when valid events resume, and abort/discard old work on visibility or selection changes. Keep one pending poll with a request deadline and preserve last values on failure.
+
 ## 2026-11-15 - Independent report input and eligibility freshness
 
 Keep private source invalidation separate from form membership/selection freshness. Preserve provider failure metadata across cached eligibility recomputation. Increment a room input revision for mapping/scoring/source mutations and verify it under lock at snapshot save, so an in-flight generation cannot overwrite a newer invalidation. Keep raw textarea drafts until save normalization.

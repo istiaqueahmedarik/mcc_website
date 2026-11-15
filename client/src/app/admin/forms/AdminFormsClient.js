@@ -17,6 +17,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import styles from "./forms.module.css";
+import { watchCampaignUpdates } from "./live-campaign-updates.mjs";
 
 const FIELD_TYPES = [
   ["text", "Short text"], ["long_text", "Long text"], ["number", "Number"],
@@ -28,6 +29,8 @@ const PROFILE_FIELDS = [
   ["phone", "Phone"], ["batch_name", "Batch"], ["tshirt_size", "T-shirt size"],
   ["codechef_id", "CodeChef handle"], ["atcoder_id", "AtCoder handle"],
 ];
+const LIVE_STATUS_LABELS = { fresh: "Live", connecting: "Connecting", reconnecting: "Reconnecting", polling: "Auto-refresh", stale: "Offline", paused: "Paused", unauthorized: "Access changed", unavailable: "Unavailable" };
+const LIVE_STATUS_HINTS = { connecting: "Waiting for live updates", polling: "Updates every 5 seconds", stale: "Showing last known values; retrying", unauthorized: "Reload and sign in again" };
 const EMPTY_TEMPLATE = { title: "Untitled template", description: "", kind: "general", fields: [], agreement_text: "I confirm that these details are correct." };
 
 function newField() {
@@ -111,16 +114,17 @@ export default function AdminFormsClient() {
     setCampaigns(campaignData.campaigns || []);
   }, []);
 
-  const refreshCampaign = useCallback(async () => {
+  const refreshCampaign = useCallback(async ({ signal } = {}) => {
     if (!campaignId) {
       setSelectedCampaign(null); setResponses([]); setResponseTotal(0); return;
     }
     const suffix = `?q=${encodeURIComponent(query)}&page=${page}`;
     const [campaignData, responseData, dashboardData] = await Promise.all([
-      api(`manage/campaigns/${campaignId}`),
-      api(`manage/campaigns/${campaignId}/responses${suffix}`),
-      api(`manage/dashboard?campaign_id=${encodeURIComponent(campaignId)}`),
+      api(`manage/campaigns/${campaignId}`, { signal }),
+      api(`manage/campaigns/${campaignId}/responses${suffix}`, { signal }),
+      api(`manage/dashboard?campaign_id=${encodeURIComponent(campaignId)}`, { signal }),
     ]);
+    if (signal?.aborted) return;
     setSelectedCampaign(campaignData.campaign);
     setResponses(responseData.responses || []);
     setResponseTotal(responseData.total || 0);
@@ -140,30 +144,19 @@ export default function AdminFormsClient() {
 
   useEffect(() => {
     if (!campaignId) return undefined;
-    let events;
-    const disconnect = () => { events?.close(); events = undefined; };
-    const connect = () => {
-      disconnect();
-      if (document.visibilityState !== "visible") { setStreamState("stale"); return; }
-      setStreamState("connecting");
-      events = new EventSource(`/api/global-forms/manage/stream?campaign_id=${encodeURIComponent(campaignId)}`);
-      events.onopen = () => {
-        setStreamState("fresh");
-        refreshCampaign().catch(() => setStreamState("stale"));
-      };
-      events.addEventListener("stats", (event) => {
-        try {
-          const stats = JSON.parse(event.data);
-          const changed = revisionRef.current !== null && stats.revision !== revisionRef.current;
-          revisionRef.current = stats.revision || 0;
-          setDashboard(stats); setStreamState("fresh");
-          if (changed) refreshCampaign().catch(() => setStreamState("stale"));
-        } catch { setStreamState("stale"); }
-      });
-      events.onerror = () => setStreamState("stale");
-    };
-    document.addEventListener("visibilitychange", connect); connect();
-    return () => { document.removeEventListener("visibilitychange", connect); disconnect(); };
+    return watchCampaignUpdates({
+      url: `/api/global-forms/manage/stream?campaign_id=${encodeURIComponent(campaignId)}`,
+      readStats: (signal) => api(`manage/dashboard?campaign_id=${encodeURIComponent(campaignId)}`, { signal }),
+      onState: setStreamState,
+      onData: (stats, signal) => {
+        const changed = revisionRef.current !== null && stats.revision !== revisionRef.current;
+        revisionRef.current = stats.revision;
+        setDashboard(stats);
+        if (changed) refreshCampaign({ signal }).catch(() => {
+          if (!signal.aborted) setError("Counts updated, but responses could not refresh. Use Refresh to retry.");
+        });
+      },
+    });
   }, [campaignId, refreshCampaign]);
 
   async function perform(label, task) {
@@ -300,7 +293,7 @@ function TemplateEditor({ draft, saving, onClose, onChange, onField, onMove, onS
 }
 
 function CampaignsView({ campaigns, selected, dashboard, streamState, responses, responseTotal, query, page, totalPages, saving, onSelect, onCreate, onStart, onEnd, onClone, onCopy, onQuery, onPage, onExport, onDetail, onRefresh }) {
-  return <section className="grid gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]"><aside className="space-y-3"><div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold">Campaigns</h2><p className="text-xs text-muted-foreground">Draft, open, and ended rounds</p></div><Button size="icon" aria-label="Create campaign" onClick={onCreate}><Plus className="h-4 w-4" /></Button></div>{campaigns.length === 0 ? <Empty icon={ClipboardCheck} title="No campaigns" text="Create one from a template." compact /> : <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain xl:max-h-[calc(100dvh-18rem)]">{campaigns.map((campaign) => <button key={campaign.id} type="button" onClick={() => onSelect(campaign.id)} className={`${styles.pressable} w-full rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected?.id === campaign.id ? "border-foreground/25 bg-muted/70" : "border-border bg-card hover:bg-muted/40"}`}><div className="flex items-start justify-between gap-2"><span className="break-words font-medium">{campaign.title}</span><Badge variant={statusTone(campaign.status)}>{campaign.status}</Badge></div><p className="mt-1 truncate text-xs text-muted-foreground">/{campaign.slug}</p></button>)}</div>}</aside><div className="min-w-0 space-y-5">{!selected ? <Empty icon={ClipboardCheck} title="Select a campaign" text="Choose a campaign to see its lifecycle, live activity, and responses." /> : <><div className={`${styles.surface} rounded-2xl p-5`}><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-2xl font-semibold">{selected.title}</h2><Badge variant={statusTone(selected.status)}>{selected.status}</Badge></div><p className="mt-2 max-w-3xl text-sm text-muted-foreground">{selected.description || "No campaign description."}</p><p className="mt-3 break-all font-mono text-xs text-muted-foreground">/register/{selected.slug}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={saving} onClick={onClone}><Copy className="mr-2 h-4 w-4" />Clone campaign</Button><Button variant="outline" onClick={onCopy}><Link2 className="mr-2 h-4 w-4" />Copy link</Button>{selected.status === "draft" && <Button disabled={saving} onClick={onStart}><Play className="mr-2 h-4 w-4" />Start</Button>}{selected.status === "open" && <Button variant="destructive" disabled={saving} onClick={onEnd}><CircleStop className="mr-2 h-4 w-4" />End</Button>}</div></div></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={ClipboardCheck} label="Submitted" value={dashboard.submitted} /><Metric icon={Activity} label="Currently completing" value={dashboard.active} hint="Approximate, recent visible sessions" /><Metric icon={AlertCircle} label="Needs verification" value={dashboard.pending_verification} /><Metric icon={streamState === "fresh" ? Wifi : WifiOff} label="Live status" value={streamState === "fresh" ? "Fresh" : streamState === "connecting" ? "Connecting" : "Reconnecting"} hint={streamState === "stale" ? "Showing last known values" : undefined} /></div><Card className={`${styles.surface} rounded-2xl`}><CardHeader><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><CardTitle><h2>Responses</h2></CardTitle><CardDescription>{responseTotal} submitted registrations</CardDescription></div><div className="flex flex-col gap-2 sm:flex-row"><div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search responses" className="min-h-10 pl-9" value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Search name, email or ID" /></div><Button variant="outline" onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button><Button variant="outline" disabled={!responses.length} onClick={onExport}><Download className="mr-2 h-4 w-4" />Export page</Button></div></div></CardHeader><CardContent><div className={styles.tableWrap}><table className="w-full border-collapse text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="px-3 py-3">Student</th><th className="px-3 py-3">Student ID</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Verification</th><th className="px-3 py-3 text-right">Details</th></tr></thead><tbody>{responses.map((response) => <tr key={response.id || response.user_id} className="border-b last:border-0"><td className="max-w-64 px-3 py-3"><p className="truncate font-medium">{response.profile_values?.full_name || response.full_name || "Student"}</p><p className="truncate text-xs text-muted-foreground">{response.email || "Account identity"}</p></td><td className="px-3 py-3 font-mono text-xs">{response.profile_values?.mist_id || response.mist_id || "—"}</td><td className="px-3 py-3">{formatDate(response.submitted_at)}</td><td className="px-3 py-3"><Badge variant={response.pending_verification ? "secondary" : "outline"}>{response.verification_status || (response.pending_verification ? "Pending" : "Current")}</Badge></td><td className="px-3 py-3 text-right"><Button variant="ghost" size="sm" onClick={() => onDetail(response)}>View</Button></td></tr>)}</tbody></table>{responses.length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">{query ? "No responses match this search." : "No responses yet."}</p>}</div><div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Page {page} of {totalPages}</p><div className="flex gap-2"><Button variant="outline" size="icon" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" size="icon" aria-label="Next page" disabled={page >= totalPages} onClick={() => onPage(page + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div></CardContent></Card></>}</div></section>;
+  return <section className="grid gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]"><aside className="space-y-3"><div className="flex items-center justify-between"><div><h2 className="text-lg font-semibold">Campaigns</h2><p className="text-xs text-muted-foreground">Draft, open, and ended rounds</p></div><Button size="icon" aria-label="Create campaign" onClick={onCreate}><Plus className="h-4 w-4" /></Button></div>{campaigns.length === 0 ? <Empty icon={ClipboardCheck} title="No campaigns" text="Create one from a template." compact /> : <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain xl:max-h-[calc(100dvh-18rem)]">{campaigns.map((campaign) => <button key={campaign.id} type="button" onClick={() => onSelect(campaign.id)} className={`${styles.pressable} w-full rounded-xl border p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected?.id === campaign.id ? "border-foreground/25 bg-muted/70" : "border-border bg-card hover:bg-muted/40"}`}><div className="flex items-start justify-between gap-2"><span className="break-words font-medium">{campaign.title}</span><Badge variant={statusTone(campaign.status)}>{campaign.status}</Badge></div><p className="mt-1 truncate text-xs text-muted-foreground">/{campaign.slug}</p></button>)}</div>}</aside><div className="min-w-0 space-y-5">{!selected ? <Empty icon={ClipboardCheck} title="Select a campaign" text="Choose a campaign to see its lifecycle, live activity, and responses." /> : <><div className={`${styles.surface} rounded-2xl p-5`}><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="break-words text-2xl font-semibold">{selected.title}</h2><Badge variant={statusTone(selected.status)}>{selected.status}</Badge></div><p className="mt-2 max-w-3xl text-sm text-muted-foreground">{selected.description || "No campaign description."}</p><p className="mt-3 break-all font-mono text-xs text-muted-foreground">/register/{selected.slug}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={saving} onClick={onClone}><Copy className="mr-2 h-4 w-4" />Clone campaign</Button><Button variant="outline" onClick={onCopy}><Link2 className="mr-2 h-4 w-4" />Copy link</Button>{selected.status === "draft" && <Button disabled={saving} onClick={onStart}><Play className="mr-2 h-4 w-4" />Start</Button>}{selected.status === "open" && <Button variant="destructive" disabled={saving} onClick={onEnd}><CircleStop className="mr-2 h-4 w-4" />End</Button>}</div></div></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-4"><Metric icon={ClipboardCheck} label="Submitted" value={dashboard.submitted} /><Metric icon={Activity} label="Currently completing" value={dashboard.active} hint="Approximate, recent visible sessions" /><Metric icon={AlertCircle} label="Needs verification" value={dashboard.pending_verification} /><Metric icon={streamState === "fresh" ? Wifi : WifiOff} label="Live status" value={LIVE_STATUS_LABELS[streamState]} hint={LIVE_STATUS_HINTS[streamState]} live /></div><Card className={`${styles.surface} rounded-2xl`}><CardHeader><div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"><div><CardTitle><h2>Responses</h2></CardTitle><CardDescription>{responseTotal} submitted registrations</CardDescription></div><div className="flex flex-col gap-2 sm:flex-row"><div className="relative"><Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input aria-label="Search responses" className="min-h-10 pl-9" value={query} onChange={(event) => onQuery(event.target.value)} placeholder="Search name, email or ID" /></div><Button variant="outline" onClick={onRefresh}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button><Button variant="outline" disabled={!responses.length} onClick={onExport}><Download className="mr-2 h-4 w-4" />Export page</Button></div></div></CardHeader><CardContent><div className={styles.tableWrap}><table className="w-full border-collapse text-sm"><thead><tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="px-3 py-3">Student</th><th className="px-3 py-3">Student ID</th><th className="px-3 py-3">Submitted</th><th className="px-3 py-3">Verification</th><th className="px-3 py-3 text-right">Details</th></tr></thead><tbody>{responses.map((response) => <tr key={response.id || response.user_id} className="border-b last:border-0"><td className="max-w-64 px-3 py-3"><p className="truncate font-medium">{response.profile_values?.full_name || response.full_name || "Student"}</p><p className="truncate text-xs text-muted-foreground">{response.email || "Account identity"}</p></td><td className="px-3 py-3 font-mono text-xs">{response.profile_values?.mist_id || response.mist_id || "—"}</td><td className="px-3 py-3">{formatDate(response.submitted_at)}</td><td className="px-3 py-3"><Badge variant={response.pending_verification ? "secondary" : "outline"}>{response.verification_status || (response.pending_verification ? "Pending" : "Current")}</Badge></td><td className="px-3 py-3 text-right"><Button variant="ghost" size="sm" onClick={() => onDetail(response)}>View</Button></td></tr>)}</tbody></table>{responses.length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">{query ? "No responses match this search." : "No responses yet."}</p>}</div><div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Page {page} of {totalPages}</p><div className="flex gap-2"><Button variant="outline" size="icon" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="h-4 w-4" /></Button><Button variant="outline" size="icon" aria-label="Next page" disabled={page >= totalPages} onClick={() => onPage(page + 1)}><ChevronRight className="h-4 w-4" /></Button></div></div></CardContent></Card></>}</div></section>;
 }
 
 function CampaignCreator({ draft, templates, saving, onClose, onChange, onSave }) {
@@ -319,7 +312,7 @@ function ResponseDetail({ response, fields, onClose }) {
   return <Dialog open={Boolean(response)} onOpenChange={(open) => !open && onClose()}><DialogContent className={`${styles.dialog} w-[calc(100vw-2rem)] max-h-[90vh] max-w-3xl overflow-y-auto`}><DialogHeader><DialogTitle>Registration details</DialogTitle><DialogDescription>Submitted {formatDate(response?.submitted_at)}</DialogDescription></DialogHeader>{response && <div className="space-y-4"><dl className="grid gap-3 rounded-xl border p-4 sm:grid-cols-2"><Fact label="Name" value={response.profile_values?.full_name || response.full_name} /><Fact label="Student ID" value={response.profile_values?.mist_id || response.mist_id} /><Fact label="Email" value={response.email} /><Fact label="Verification" value={response.verification_status || (response.pending_verification ? "Pending" : "Current")} /></dl><div className="space-y-2">{fields.map((field) => <Fact key={field.id} label={field.label} value={response.answers?.[field.id] ?? response.profile_values?.[field.mapUserField]} block />)}</div></div>}</DialogContent></Dialog>;
 }
 
-function Metric({ icon: Icon, label, value, hint }) { return <div className={`${styles.surface} rounded-2xl p-4`}><div className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="h-4 w-4" />{label}</div><p className="mt-2 text-2xl font-semibold tabular-nums">{value ?? 0}</p>{hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}</div>; }
+function Metric({ icon: Icon, label, value, hint, live = false }) { return <div role={live ? "status" : undefined} aria-live={live ? "polite" : undefined} className={`${styles.surface} rounded-2xl p-4`}><div className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="h-4 w-4" />{label}</div><p className="mt-2 text-2xl font-semibold tabular-nums">{value ?? 0}</p>{hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}</div>; }
 function FieldLabel({ label, children, className = "" }) {
   const id = useId();
   return <div className={`grid gap-2 text-sm font-medium ${className}`}><Label htmlFor={id}>{label}</Label>{Children.map(children, (child, index) => index === 0 && isValidElement(child) ? cloneElement(child, { id }) : child)}</div>;

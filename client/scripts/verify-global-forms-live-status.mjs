@@ -1,0 +1,44 @@
+/** Requires the loopback transport fixture and Next dev client. No hosted data. */
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+const base = 'http://127.0.0.1:55443', api = 'http://127.0.0.1:55441';
+const output = process.env.FORMS_QA_OUTPUT || '/tmp/mcc-forms-live-qa';
+await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] });
+const errors = [], checks = [];
+try {
+  const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+  await context.addCookies([{ name: 'token', value: 'synthetic-live-status-only', url: base, httpOnly: true, sameSite: 'Lax' }]);
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto(base + '/admin/forms?campaign=11111111-1111-4111-8111-111111111111');
+  await page.getByText('student1@forms.invalid', { exact: true }).waitFor();
+  await page.getByText('Connecting', { exact: true }).waitFor();
+  checks.push('ordinary responses load while the separate stream has no stats');
+  await page.getByText('Auto-refresh', { exact: true }).waitFor({ timeout: 23000 });
+  await page.screenshot({ path: output + '/auto-refresh-desktop.png', fullPage: true });
+  checks.push('stalled stream leaves Connecting and enters automatic REST refresh');
+  await fetch(api + '/qa/respond', { method: 'POST' });
+  await page.getByText('student2@forms.invalid', { exact: true }).waitFor({ timeout: 12000 });
+  checks.push('new response and counter update through polling without manual Refresh');
+  await fetch(api + '/qa/recover', { method: 'POST' });
+  await page.getByText('Live', { exact: true }).waitFor();
+  const before = await (await fetch(api + '/qa/metrics')).json();
+  await page.waitForTimeout(6000);
+  const after = await (await fetch(api + '/qa/metrics')).json();
+  assert.equal(after.dashboardGets, before.dashboardGets);
+  checks.push('valid SSE recovery shows Live and stops fallback polling');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await page.screenshot({ path: output + '/live-mobile.png', fullPage: true });
+  await fetch(api + '/qa/revoke', { method: 'POST' });
+  await page.getByText('Access changed', { exact: true }).waitFor();
+  const revoked = await (await fetch(api + '/qa/metrics')).json();
+  await page.waitForTimeout(5500);
+  assert.equal((await (await fetch(api + '/qa/metrics')).json()).dashboardGets, revoked.dashboardGets);
+  checks.push('authorization revocation stops updates and reports Access changed');
+  assert.deepEqual(errors, []);
+  await fs.writeFile(output + '/results.json', JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, errors }, null, 2));
+} finally { await browser.close(); }

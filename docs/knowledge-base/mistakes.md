@@ -1,4 +1,8 @@
 
+## 2026-11-16 - Forms Connecting had no escape path
+
+Normal dashboard reads succeeded independently of the live stream. The label could remain Connecting indefinitely because no deadline or fallback existed; healthy local SSE verification missed this failure condition. The correction adds a watchdog, truthful states, serialized polling, and a silent-stream fixture. Production buffering remains a hypothesis until inspected.
+
 ## 2026-11-15 - PR44 review caught cross-feature state loss
 
 Cached report regeneration originally conflated membership and source staleness and dropped saved provider failure diagnostics; form filter changes could incorrectly permit publication. Ordinary name edits could also diverge from pending proposals, and option normalization erased typing. Regression checks now exercise these transitions, not just isolated happy paths. Dialog width checks must wait for entry/viewport transitions before measuring bounds.

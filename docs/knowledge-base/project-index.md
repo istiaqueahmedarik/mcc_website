@@ -1,5 +1,9 @@
 # Project Index
 
+## 2026-11-16 - Forms live status recovery
+
+A scoped correction adds a stats watchdog and serialized REST fallback so the admin dashboard does not remain Connecting indefinitely. Live now requires valid stats; Auto-refresh describes five-second fallback, while Offline retains prior data and Access changed stops updates. Review: `docs/reviews/global-forms-live-status-20261116.md`. No schema change.
+
 ## 2026-11-15 - Forms post-merge follow-up
 
 After PR #44 merged, the user approved a new PR for its four review findings plus editable-template deletion, wider dialogs, and one normal submit button. Delivered in [PR #45](https://github.com/istiaqueahmedarik/mcc_website/pull/45). Migration: `docs/sql/global-forms-review-followup-20261115.sql`; reviewer path and evidence: `docs/reviews/global-forms-review-followup-20261115.md`.

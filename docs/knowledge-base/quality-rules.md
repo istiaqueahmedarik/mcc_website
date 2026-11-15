@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-11-16 - Test stalled streams through the application
+
+Verify pending connections, headers without messages, silence after healthy data, successful fallback, recovery without duplicate polling, late results, visibility cleanup, and permission loss. A healthy in-process SSE test alone does not verify proxy behavior. Never mark a live status healthy just because its HTTP connection opened.
+
 ## 2026-11-15 - Preserve invalidation provenance and pending review baselines
 
 A form-filter or membership change must not clear unrelated source invalidation or failure metadata. Test mapping correction followed by filter regeneration and invalidation racing snapshot save. Ordinary profile edits must reconcile pending proposals under the admin review lock order without replacing original prior values. Controlled text inputs must preserve unfinished whitespace while editing.
