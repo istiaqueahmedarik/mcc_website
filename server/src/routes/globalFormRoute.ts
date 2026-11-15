@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { jwt } from "hono/jwt";
+import { HTTPException } from "hono/http-exception";
 import { jwtAuthOptions } from "../utils/jwtAuthOptions";
 import {
   cloneTemplate,
+  cloneCampaign,
   createCampaign,
   createTemplate,
   endCampaign,
@@ -24,6 +26,15 @@ import {
 
 const route = new Hono();
 
+route.onError((error: any, c) => {
+  if (error instanceof HTTPException) return error.getResponse();
+  if (error instanceof SyntaxError || error?.code === '22P02') {
+    return c.json({ error: 'Invalid form request' }, 400);
+  }
+  // Database exceptions can contain identifiers and answer values. Do not log them.
+  return c.json({ error: 'The forms service could not complete this request' }, 500);
+});
+
 route.get("/public/:slug", getPublicCampaign);
 route.get("/public/:slug/preview", jwt(jwtAuthOptions()), previewCampaign);
 route.post("/public/:slug/submit", bodyLimit({ maxSize: 256 * 1024 }), jwt(jwtAuthOptions()), submitCampaign);
@@ -39,6 +50,7 @@ route.post("/manage/campaigns", bodyLimit({ maxSize: 32 * 1024 }), createCampaig
 route.get("/manage/campaigns/:id", getCampaign);
 route.put("/manage/campaigns/:id", bodyLimit({ maxSize: 32 * 1024 }), updateCampaign);
 route.post("/manage/campaigns/:id/start", startCampaign);
+route.post("/manage/campaigns/:id/clone", cloneCampaign);
 route.post("/manage/campaigns/:id/end", endCampaign);
 route.get("/manage/campaigns/:id/responses", listResponses);
 route.get("/manage/dashboard", getDashboard);

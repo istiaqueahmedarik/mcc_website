@@ -1,5 +1,9 @@
 # Patterns
 
+## 2026-11-15 - Authenticated campaign response and profile transaction
+
+Global forms identify a response by immutable campaign/account IDs and freeze the question/agreement definition. Lock the account and campaign before checking the profile preview version and open state; insert the response and missing-field profile mutations in one transaction. The mutation set contains only genuinely missing/invalid mapped values: a complete-profile submission must not rewrite existing handles or reset their verification flags. Retries recover the existing receipt. Report cohorts use canonical account identity before scoring while preserving unfiltered source snapshots for regeneration. See `docs/reviews/global-admin-forms-20261115-implementation-review.md`.
+
 ## 2026-09-20 - Public live report index glass lens
 
 The public `/contests_report/live` index keeps its server-side shared-report fetch and `/contests_report/live/[id]` links unchanged while composing the list as a client-side operational broadcast wall. `LiveReportsGallery.jsx` owns one pointer-transparent Three.js lens over semantic report links, caps DPR, renders on demand, disposes GPU resources, and falls back for WebGL failure, reduced transparency, forced colors, high contrast, and reduced motion. Keep the effect scoped to the index; do not copy classroom roster, scoring, or provider authorization behavior into the public list.

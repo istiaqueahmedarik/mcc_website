@@ -7,6 +7,7 @@ import CoachedTeamsSection from "@/components/profile/CoachedTeamsSection";
 import AnimatedTooltip from "@/components/ui/AnimatedTooltip";
 import { get_with_token, logout, post_with_token } from "@/lib/action";
 import { createClient } from "@/utils/supabase/server";
+import { getSafeReturnPath } from "@/lib/safe-return-path.mjs";
 
 import {
   Award,
@@ -46,6 +47,7 @@ export default async function page({ searchParams }) {
     redirect("/login");
   }
   const user = res.result[0];
+  const returnTo = getSafeReturnPath((await searchParams)?.returnTo, null);
 
   // Only pure trainers (non-admins) have the dedicated trainer profile page redirect
   if (user.trainer && !user.admin) {
@@ -86,6 +88,7 @@ export default async function page({ searchParams }) {
       style={{ background: "hsl(var(--profile-bg))" }}
     >
       <div className="max-w-[1400px] mx-auto py-8 px-6">
+        {returnTo && <ProgressLink href={returnTo} className="mb-5 inline-flex min-h-11 items-center rounded-lg border bg-background px-4 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Return to registration preview</ProgressLink>}
         <div className="grid grid-cols-1 lg:grid-cols-[350px_1fr] gap-6">
           {/* Left Sidebar - Profile Summary */}
           <aside className="profile-sidebar-sticky" aria-label="Profile Summary">

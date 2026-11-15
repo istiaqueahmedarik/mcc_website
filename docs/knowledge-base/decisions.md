@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-15 - Global forms campaign boundaries
+
+The approved global-forms scope separates reusable templates from immutable campaign definitions and submitted responses. Students authenticate with MCC; registration may complete while an OJ handle remains pending admin verification. Responses use immutable account IDs rather than typed student identifiers. Approximate active-filling counts use visible-page TTL heartbeats; dashboard SSE reconciles authoritative database counts. Contest campaign eligibility is applied before scoring, with raw provider source snapshots retained for cohort regeneration and explicit stale/publication checks. Profile-change rejection must preserve existing accounts. See `docs/adr/20261115-global-admin-forms.md`.
+
 ## 2026-09-19 - Jev selects subagent execution tiers, not authority
 
 For substantive repository tasks, the primary Codex task remains responsible for scope, user interaction, verification, integration, and the final response. TypeSafe Jev supplies two bounded Choice judgments: the execution tier and the subagent role. The fixed tier mapping is `best` = `gpt-5.6-sol` medium, `medium` = `gpt-5.5` xhigh, `normal` = `gpt-5.5` medium, and `low` = `gpt-5.5` low. Explicit-model spawns use `fork_turns: "none"` and receive the required context in a bounded task prompt. Jev may also recommend one finalized multiple-choice option, but it never selects for the user or authorizes an action. Authorization, safety, repository rules, and explicit user choices remain deterministic constraints. When Jev is unavailable or insufficiently confident, routing escalates or falls back conservatively rather than blocking work.

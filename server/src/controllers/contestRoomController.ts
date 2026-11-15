@@ -1576,11 +1576,12 @@ export const getContestRoomReportEligibility = async (c: any) => {
     if ('error' in actor) return c.json({ error: actor.error }, actor.status)
     try {
         const roomId = c.req.param('roomId')
-        const [eligibility, campaigns] = await Promise.all([
+        const [eligibility, campaigns, savedReport] = await Promise.all([
             loadGlobalFormReportEligibility(roomId),
             listGlobalFormReportCampaigns(),
+            loadGlobalContestReportSnapshot(roomId, null),
         ])
-        return c.json({ success: true, eligibility, campaigns })
+        return c.json({ success: true, eligibility, campaigns, hasSavedReport: Boolean(savedReport) })
     } catch (error: any) {
         return c.json({ error: error?.message || 'Failed to load report eligibility' }, error?.statusCode || 500)
     }

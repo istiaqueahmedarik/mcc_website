@@ -4,7 +4,8 @@ export const MIST_ID_PATTERN = /^\d{9}$/;
 export function normalizeMistIdUpdate(value: unknown): string | null {
   if (typeof value !== "string" && typeof value !== "number") return null;
   const normalized = String(value).trim();
-  return MIST_ID_PATTERN.test(normalized) ? normalized : null;
+  // Legacy users.mist_id is numeric. Reject representations that would lose digits.
+  return MIST_ID_PATTERN.test(normalized) && String(Number(normalized)) === normalized ? normalized : null;
 }
 
 type FullNameUpdate =

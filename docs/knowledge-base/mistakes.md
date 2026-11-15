@@ -1,3 +1,7 @@
+## 2026-11-15 - Global form integration near misses caught locally
+
+Review found that including known mapped values in the profile mutation set would reset already verified CF/VJudge flags; only missing/invalid values now enter that set. Actual database/route checks caught null-name rollback failing to restore absence and a stale second rejection crossing into the signup-delete path; review origin, pending-state checks, and prior/proposed comparisons now guard both. Browser QA caught the first SSE response failing to refresh the row list at revision zero, a missing automatically generated campaign slug, and sticky agreement overlap. Keep these cases in integration/browser verification rather than relying on build success. Rollback must preserve profile-review provenance until pending reviews are resolved.
+
 ## 2026-09-19 - Group Contest URL Was Collapsed To A Gym ID
 
 The global contest add flow accepted a Codeforces group URL but normalized it to only the numeric contest ID. Because high numeric IDs are otherwise treated as Gyms, fetch fallback requested `/gym/717234/...` instead of `/group/SxSYDasIfo/contest/717234/...`. Preserve compound provider identity and regression-test the exact fallback path.

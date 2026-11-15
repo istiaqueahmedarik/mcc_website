@@ -207,7 +207,7 @@ async function page({ params, searchParams }) {
     ? `?campaign=${encodeURIComponent(reportEligibility.campaignId)}`
     : "";
   const roomName = roomMeta?.["Room Name"] || "Contest room";
-  const reportBlocked = needsVjudge && !vjudgeConnected;
+  const reportBlocked = needsVjudge && !vjudgeConnected && !eligibilityRes?.hasSavedReport;
   /**
        * {
     result: [

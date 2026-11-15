@@ -157,7 +157,8 @@ export async function createCampaign(c: Ctx) {
   const body = await c.req.json();
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 160) : "";
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 2000) : "";
-  const slug = normalizeSlug(body.slug);
+  const generatedSlug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70) || 'campaign'}-${crypto.randomUUID().slice(0, 8)}`;
+  const slug = normalizeSlug(body.slug === undefined ? generatedSlug : body.slug);
   if (!title || !slug || typeof body.template_id !== "string") return c.json({ error: "Title, template, and a valid slug are required" }, 400);
   try {
     const rows = await sql`
@@ -178,6 +179,18 @@ export async function getCampaign(c: Ctx) {
   const rows = await sql`select * from global_form_campaigns where id = ${c.req.param("id")} limit 1`;
   if (!rows[0]) return c.json({ error: "Campaign not found" }, 404);
   return c.json({ campaign: campaignShape(rows[0]) });
+}
+
+export async function cloneCampaign(c: Ctx) {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: 'Admin access required' }, 403);
+  const slug = `campaign-${crypto.randomUUID()}`;
+  const rows = await sql`
+    insert into global_form_campaigns(template_id,title,description,slug,kind,fields,agreement_text,created_by)
+    select template_id,left(title || ' Copy',160),description,${slug},kind,fields,agreement_text,${admin.id}
+    from global_form_campaigns where id = ${c.req.param('id')} returning *
+  `;
+  return rows[0] ? c.json({ campaign: campaignShape(rows[0]) }, 201) : c.json({ error: 'Campaign not found' }, 404);
 }
 
 export async function updateCampaign(c: Ctx) {
@@ -379,13 +392,21 @@ export async function heartbeatCampaign(c: Ctx) {
   const sessionId = typeof body.session_id === "string" ? body.session_id.trim().slice(0, 120) : "";
   if (!sessionId) return c.json({ error: "Session ID is required" }, 400);
   const rows = await sql.begin(async (tx) => {
-    await tx`delete from global_form_presence where last_seen_at < now() - interval '10 minutes'`;
+    await tx`select id from users where id = ${user.id} for update`;
+    await tx`
+      delete from global_form_presence
+      where user_id = ${user.id} and last_seen_at < now() - interval '10 minutes'
+    `;
     return tx`
       insert into global_form_presence (campaign_id, user_id, session_id, active, last_seen_at)
       select c.id, ${user.id}, ${sessionId}, ${body.active === true}, now()
       from global_form_campaigns c
       where c.slug = ${c.req.param("slug")} and c.status = 'open'
         and not exists (select 1 from global_form_responses r where r.campaign_id = c.id and r.user_id = ${user.id})
+        and (
+          exists(select 1 from global_form_presence p where p.campaign_id = c.id and p.user_id = ${user.id} and p.session_id = ${sessionId})
+          or (select count(*) from global_form_presence p where p.campaign_id = c.id and p.user_id = ${user.id}) < 8
+        )
       on conflict (campaign_id, user_id, session_id) do update set active = excluded.active, last_seen_at = now()
       returning campaign_id
     `;
@@ -395,13 +416,13 @@ export async function heartbeatCampaign(c: Ctx) {
 
 export async function listResponses(c: Ctx) {
   if (!(await requireAdmin(c))) return c.json({ error: "Admin access required" }, 403);
-  const page = Math.max(1, Math.min(100000, Number(c.req.query("page")) || 1));
+  const page = Math.max(1, Math.min(100000, Math.floor(Number(c.req.query("page"))) || 1));
   const q = String(c.req.query("q") || "").trim().slice(0, 160);
   const pattern = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
   const campaignId = c.req.param("id");
   const counts = await sql`
     select count(*)::int as total from global_form_responses r join users u on u.id = r.user_id
-    where r.campaign_id = ${campaignId} and (${q} = '' or u.full_name ilike ${pattern} escape '\\' or u.email ilike ${pattern} escape '\\' or u.mist_id::text ilike ${pattern} escape '\\')
+    where r.campaign_id = ${campaignId} and (${q} = '' or u.full_name ilike ${pattern} escape '\\' or u.email ilike ${pattern} escape '\\' or u.mist_id::text ilike ${pattern} escape '\\' or r.profile_values->>'full_name' ilike ${pattern} escape '\\' or r.profile_values->>'mist_id' ilike ${pattern} escape '\\')
   `;
   const rows = await sql`
     select r.id, r.receipt_id, r.campaign_id, r.user_id, r.answers, r.profile_values, r.submitted_at,
@@ -415,7 +436,7 @@ export async function listResponses(c: Ctx) {
     from global_form_responses r
     join users u on u.id = r.user_id
     join global_form_campaigns c on c.id = r.campaign_id
-    where r.campaign_id = ${campaignId} and (${q} = '' or u.full_name ilike ${pattern} escape '\\' or u.email ilike ${pattern} escape '\\' or u.mist_id::text ilike ${pattern} escape '\\')
+    where r.campaign_id = ${campaignId} and (${q} = '' or u.full_name ilike ${pattern} escape '\\' or u.email ilike ${pattern} escape '\\' or u.mist_id::text ilike ${pattern} escape '\\' or r.profile_values->>'full_name' ilike ${pattern} escape '\\' or r.profile_values->>'mist_id' ilike ${pattern} escape '\\')
     order by r.submitted_at desc limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}
   `;
   return c.json({ responses: rows, total: Number(counts[0]?.total || 0), page, page_size: PAGE_SIZE });
@@ -426,7 +447,7 @@ async function dashboardStats(campaignId: string) {
     select c.revision,
       (select count(*)::int from global_form_responses r where r.campaign_id = c.id) as submitted,
       (select count(distinct p.user_id)::int from global_form_presence p
-        where p.campaign_id = c.id and p.active and p.last_seen_at > now() - interval '60 seconds'
+        where p.campaign_id = c.id and c.status = 'open' and p.active and p.last_seen_at > now() - interval '60 seconds'
           and not exists (select 1 from global_form_responses r where r.campaign_id = c.id and r.user_id = p.user_id)) as active,
       (select count(distinct r.user_id)::int from global_form_responses r join users u on u.id = r.user_id
         where r.campaign_id = c.id and (

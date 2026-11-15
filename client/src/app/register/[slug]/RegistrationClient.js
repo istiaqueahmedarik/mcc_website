@@ -106,7 +106,7 @@ export default function RegistrationClient({ slug }) {
   function needsProfileInput(field) {
     if (!field.mapUserField) return false;
     const current = profileValue(preview?.profile, field.mapUserField);
-    if (field.mapUserField === "mist_id" && !/^[0-9]{9}$/.test(String(current || "").trim())) return true;
+    if (field.mapUserField === "mist_id" && !/^[1-9][0-9]{8}$/.test(String(current || "").trim())) return true;
     return requiredKeys.has(field.id) || requiredKeys.has(field.mapUserField) || !String(current || "").trim();
   }
 
@@ -147,7 +147,7 @@ export default function RegistrationClient({ slug }) {
       const value = profileInput ? profileValues[field.mapUserField] : field.mapUserField ? profileValue(preview.profile, field.mapUserField) : answers[field.id];
       const empty = value == null || (typeof value === "string" && value.trim() === "");
       if (field.required && (field.type === "checkbox" ? value !== true : empty)) errors[field.id] = "This field is required.";
-      if (!empty && field.mapUserField === "mist_id" && !/^[0-9]{9}$/.test(String(value).trim())) errors[field.id] = "Student ID must be exactly nine ASCII digits.";
+      if (!empty && field.mapUserField === "mist_id" && !/^[1-9][0-9]{8}$/.test(String(value).trim())) errors[field.id] = "Student ID must be nine digits and cannot begin with zero.";
       if (!empty && field.type === "select" && !(field.options || []).includes(value)) errors[field.id] = "Choose one of the available options.";
       if (!empty && field.type === "number" && !Number.isFinite(Number(value))) errors[field.id] = "Enter a valid number.";
       if (!empty && field.type === "date" && Number.isNaN(Date.parse(`${value}T00:00:00`))) errors[field.id] = "Enter a valid date.";
@@ -197,10 +197,16 @@ export default function RegistrationClient({ slug }) {
     <form ref={formRef} data-registration-form className="space-y-5" aria-labelledby="review-heading" onSubmit={submit} noValidate>
       <div className="sr-only" aria-live="polite">{error || Object.values(fieldErrors)[0] || ""}</div>
       <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Registration preview</p><h2 id="review-heading" className="mt-1 text-2xl font-semibold">Review your details</h2><p className="mt-1 text-sm text-muted-foreground">Known account values are reused. Only missing required profile details can be entered here.</p></div>
-      <div className={`${styles.surface} rounded-2xl p-5`}><div className="mb-4 flex items-center justify-between gap-3"><div><h3 className="font-semibold">MCC account</h3><p className="text-sm text-muted-foreground">Account email cannot be changed here.</p></div><UserRound className="h-5 w-5 text-muted-foreground" /></div><ProfileFact label="Email" value={profileValue(preview.profile, "email")} /><div className="mt-4"><ProgressLink href={`/profile?returnTo=${encodeURIComponent(`/register/${slug}`)}`} className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">Correct an existing profile value <ExternalLink className="h-3.5 w-3.5" /></ProgressLink></div></div>
+      <section className={`${styles.surface} rounded-2xl p-5`} aria-label="Your saved profile">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="min-w-0"><h3 className="flex items-center gap-2 font-semibold"><UserRound className="h-4 w-4" aria-hidden="true" /> MCC account</h3><p className="mt-1 break-all text-sm text-muted-foreground">{profileValue(preview.profile, "email")}</p></div>
+          <ProgressLink href={`/profile?returnTo=${encodeURIComponent(`/register/${slug}`)}`} className="inline-flex min-h-11 items-center gap-1 text-sm text-primary underline-offset-4 hover:underline">Edit profile <ExternalLink className="h-3.5 w-3.5" /></ProgressLink>
+        </div>
+        {fields.some(field => field.mapUserField && !needsProfileInput(field)) && <div className="grid gap-5 pt-4 sm:grid-cols-2">{fields.filter(field => field.mapUserField && !needsProfileInput(field)).map(field => <ProfileFact key={field.id} label={field.label} value={profileValue(preview.profile, field.mapUserField)} pending={isPending(preview.profile, field.mapUserField)} />)}</div>}
+      </section>
       <div className="space-y-4">{fields.map((field) => {
         const missing = needsProfileInput(field);
-        if (field.mapUserField && !missing) return <div key={field.id} className={`${styles.surface} rounded-2xl p-5`}><ProfileFact label={field.label} value={profileValue(preview.profile, field.mapUserField)} pending={isPending(preview.profile, field.mapUserField)} help={field.helpText} /></div>;
+        if (field.mapUserField && !missing) return null;
         const value = field.mapUserField ? profileValues[field.mapUserField] ?? "" : answers[field.id] ?? (field.type === "checkbox" ? false : "");
         const change = (next) => field.mapUserField ? setProfileValues((old) => ({ ...old, [field.mapUserField]: next })) : setAnswers((old) => ({ ...old, [field.id]: next }));
         return <div key={field.id} className={`${styles.surface} rounded-2xl p-5`}><RegistrationField field={field} value={value} onChange={change} error={fieldErrors[field.id]} profileInput={missing} /></div>;

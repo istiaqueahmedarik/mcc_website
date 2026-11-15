@@ -7,6 +7,7 @@ describe("global form validation", () => {
     expect(normalizeMistId("12345678")).toBeNull();
     expect(normalizeMistId("１２３４５６７８９")).toBeNull();
     expect(normalizeMistId("12345678a")).toBeNull();
+    expect(normalizeMistId("012345678")).toBeNull();
   });
 
   test("rejects duplicate and privileged profile mappings", () => {
@@ -50,5 +51,11 @@ describe("global form validation", () => {
   test("profile versions change with profile data", () => {
     expect(profileVersion({ full_name: "A" })).toBe(profileVersion({ full_name: "A" }));
     expect(profileVersion({ full_name: "A" })).not.toBe(profileVersion({ full_name: "B" }));
+  });
+
+  test('number answers reject compound values and booleans', () => {
+    const fields: any[] = [{ id:'hours',label:'Hours',type:'number',required:false,mapUserField:null,options:[],helpText:'' }];
+    for (const value of [[], {}, true]) expect(validateSubmission(fields,{hours:value},{},{}).ok).toBe(false);
+    expect(validateSubmission(fields,{hours:'2.5'},{},{}).ok).toBe(true);
   });
 });

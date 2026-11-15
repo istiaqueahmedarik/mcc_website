@@ -89,6 +89,9 @@ export function validateFormDefinition(value: unknown):
     if (mapping && (!allowedMappings.has(mapping) || mappings.has(mapping))) {
       return { ok: false, error: `Field ${id} has an invalid or duplicate profile mapping` };
     }
+    if (mapping === 'mist_id' && type !== 'text') {
+      return { ok: false, error: 'Student ID fields must use short text to preserve identifier validation' };
+    }
     const options = Array.isArray(field.options)
       ? field.options.map((option) => normalizedText(option, 240)).filter(Boolean).slice(0, 100)
       : [];
@@ -139,6 +142,7 @@ export function validateSubmission(
     if (field.type === "checkbox") {
       if (typeof value !== "boolean") return { ok: false, error: `${field.label} must be true or false` };
     } else if (field.type === "number") {
+      if (typeof value !== 'number' && typeof value !== 'string') return { ok: false, error: `${field.label} must be a number` };
       const numberValue = typeof value === "number" ? value : Number(String(value).trim());
       if (!Number.isFinite(numberValue)) return { ok: false, error: `${field.label} must be a number` };
       normalized = numberValue;
