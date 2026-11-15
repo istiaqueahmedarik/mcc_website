@@ -1,5 +1,5 @@
 import sql from "../db";
-import { normalizeFullNameUpdate } from "../utils/basicProfile";
+import { normalizeFullNameUpdate, normalizeMistIdUpdate } from "../utils/basicProfile";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 import {
   CLASSROOM_UPDATE_PRIORITIES,
@@ -383,18 +383,14 @@ export const setMistId = async (c: any) => {
   if (!id || !email) return c.json({ error: "Unauthorized" }, 401);
   try {
     const { mist_id } = await c.req.json();
-    const sanitized = typeof mist_id === "string" ? mist_id.trim() : "";
-    if (!sanitized) {
-      return c.json({ error: "Invalid mist_id" }, 400);
-    }
-    const numeric = Number(sanitized);
-    if (Number.isNaN(numeric)) {
-      return c.json({ error: "MIST ID must be numeric" }, 400);
-    }
-    const rows =
-      await sql`update users set mist_id = ${numeric} where id = ${id} returning id, mist_id`;
+    const sanitized = normalizeMistIdUpdate(mist_id);
+    if (!sanitized) return c.json({ error: "MIST ID must be exactly nine digits" }, 400);
+    const rows = await sql.begin(async (tx) => {
+      const updated = await tx`update users set mist_id = ${Number(sanitized)} where id = ${id} returning id, mist_id`;
+      if (updated.length > 0) await markPreEnrollmentClaimsForUser(id, tx);
+      return updated;
+    });
     if (rows.length === 0) return c.json({ error: "User not found" }, 404);
-    await markPreEnrollmentClaimsForUser(id);
     return c.json({ result: rows[0] });
   } catch (e) {
     console.error(e);

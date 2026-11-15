@@ -392,6 +392,36 @@ export async function generateContestRoomReport(roomId, options = {}) {
   return contestRoomBackendPost(roomId, "report", options);
 }
 
+export async function getContestRoomReportEligibility(roomId) {
+  return get_uncached_with_token(
+    `contest-room/${encodeURIComponent(roomId)}/report-eligibility`,
+  );
+}
+
+export async function updateContestRoomReportEligibility(roomId, campaignId) {
+  const token = (await cookies()).get("token")?.value;
+  if (!token) return { success: false, error: "Unauthorized" };
+  try {
+    const response = await fetch(
+      `${API_URL}/contest-room/${encodeURIComponent(roomId)}/report-eligibility`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ campaignId: campaignId || null }),
+        cache: "no-store",
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    return { statusCode: response.status, ...data };
+  } catch (error) {
+    console.error("Error updating contest-report eligibility:", error);
+    return { success: false, error: "Failed to reach contest-report service" };
+  }
+}
+
 export async function publishContestRoomReport(roomId) {
   return contestRoomBackendPost(roomId, "publish", {});
 }

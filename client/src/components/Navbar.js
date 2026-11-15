@@ -23,6 +23,7 @@ import {
   ChartNoAxesCombined,
   Code,
   FileSpreadsheet,
+  Files,
   Globe,
   Keyboard,
   LogIn,
@@ -62,6 +63,7 @@ const Navbar = async () => {
 
   const adminTools = [
     { href: '/admin', icon: Settings, label: 'CMS' },
+    { href: '/admin/forms', icon: Files, label: 'Forms' },
     { href: '/admin/dashboard', icon: UserCheck, label: 'Admin Verification' },
     { href: '/admin/trainers', icon: UserCheck, label: 'Manage Trainers & Admins' },
     { href: '/admin/student-profiles', icon: FileSpreadsheet, label: 'Student Profile Export' },

@@ -1,0 +1,59 @@
+.workspace {
+  min-height: 100vh;
+  background: hsl(var(--muted) / 0.25);
+}
+
+.workspace button:not([role='checkbox']) { min-height: 44px; }
+
+.glassBar {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 20;
+  border: 1px solid hsl(var(--foreground) / 0.1);
+  background: hsl(var(--background) / 0.92);
+  box-shadow: 0 2px 12px -6px rgb(0 0 0 / 0.14);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .glassBar {
+    background: hsl(var(--background) / 0.9);
+    backdrop-filter: blur(16px);
+  }
+}
+
+.surface {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.04);
+}
+
+.pressable {
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), border-color 160ms ease-out;
+}
+
+.pressable:active:not(:focus-visible) { transform: scale(0.98); }
+
+.tableWrap { overflow: auto; overscroll-behavior: contain; }
+.tableWrap table { min-width: 760px; }
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .glassBar { background: hsl(var(--background)); backdrop-filter: none; border-color: hsl(var(--foreground)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable { transition: none; }
+  .pressable:active { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .glassBar, .surface { border: 1px solid CanvasText; box-shadow: none; }
+}
+
+@media (max-width: 1279px) {
+  .glassBar { position: relative; top: auto; }
+}
+
+.workspace input, .workspace textarea, .workspace select { scroll-margin-block: 10rem; }
+@media (max-width: 640px) {
+  .workspace input, .workspace textarea, .workspace select { font-size: 16px; scroll-margin-block: 2rem; }
+}

@@ -1,4 +1,12 @@
 export const MAX_FULL_NAME_LENGTH = 160;
+export const MIST_ID_PATTERN = /^\d{9}$/;
+
+export function normalizeMistIdUpdate(value: unknown): string | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const normalized = String(value).trim();
+  // Legacy users.mist_id is numeric. Reject representations that would lose digits.
+  return MIST_ID_PATTERN.test(normalized) && String(Number(normalized)) === normalized ? normalized : null;
+}
 
 type FullNameUpdate =
   | { shouldUpdate: false; name: null; error: null }

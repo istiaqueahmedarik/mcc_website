@@ -16,12 +16,14 @@ import {
   PlusCircle,
   Scale,
   ShieldCheck,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   getContestRoomContestById,
   getContestRoomScoring,
+  getContestRoomReportEligibility,
   getContestReportCodeforcesCredentials,
   insertContestRoomContest,
   replaceContestCodeforcesIdentityMapping,
@@ -30,6 +32,7 @@ import {
   saveContestReportCodeforcesCredentials,
   saveContestReportProviderSession,
   updateContestRoomContestWithWeight,
+  updateContestRoomReportEligibility,
 } from "@/actions/contest_details";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -161,6 +164,17 @@ async function handleUpdateWeight(formData, paramsBox) {
   }
 }
 
+async function handleReportEligibility(formData, roomId) {
+  "use server";
+  const campaignId = String(formData.get("campaign-id") || "").slice(0, 80) || null;
+  const result = await updateContestRoomReportEligibility(roomId, campaignId);
+  const query = new URLSearchParams();
+  if (campaignId) query.set("campaign", campaignId);
+  if (result?.success) query.set("eligibility", "updated");
+  else query.set("eligibilityError", result?.error || "Unable to update participant eligibility");
+  redirect(`/contests_report/details/${encodeURIComponent(roomId)}?${query.toString()}`);
+}
+
 async function page({ params, searchParams }) {
   const paramsBox = await params;
   const id = paramsBox.id;
@@ -185,9 +199,15 @@ async function page({ params, searchParams }) {
     : null;
   const codeforcesCredential = codeforcesCredentialRes?.credential || { configured: false };
   const scoringRes = await getContestRoomScoring(id);
+  const eligibilityRes = await getContestRoomReportEligibility(id);
   const scoringConfig = scoringRes?.config || null;
+  const reportEligibility = eligibilityRes?.eligibility || { mode: "all", campaignId: null, selectionVersion: 0 };
+  const campaigns = Array.isArray(eligibilityRes?.campaigns) ? eligibilityRes.campaigns : [];
+  const campaignQuery = reportEligibility.campaignId
+    ? `?campaign=${encodeURIComponent(reportEligibility.campaignId)}`
+    : "";
   const roomName = roomMeta?.["Room Name"] || "Contest room";
-  const reportBlocked = needsVjudge && !vjudgeConnected;
+  const reportBlocked = needsVjudge && !vjudgeConnected && !eligibilityRes?.hasSavedReport;
   /**
        * {
     result: [
@@ -239,6 +259,53 @@ async function page({ params, searchParams }) {
           </div>
         </div>
       </header>
+
+      <section aria-labelledby="participant-eligibility-heading" className="mb-6 rounded-2xl border bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <UsersRound className="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 id="participant-eligibility-heading" className="text-sm font-semibold">Form response filter</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Score everyone in provider standings, or only MCC students who submitted a selected registration campaign.
+              </p>
+            </div>
+          </div>
+          <form action={async (formData) => {
+            "use server";
+            await handleReportEligibility(formData, id);
+          }} className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+            <label htmlFor="campaign-id" className="sr-only">Registration form</label>
+            <select
+              id="campaign-id"
+              name="campaign-id"
+              defaultValue={reportEligibility.campaignId || ""}
+              className="min-h-11 min-w-0 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-w-80"
+            >
+              <option value="">All participants</option>
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.title} · {campaign.responseCount} submitted · {campaign.status}
+                </option>
+              ))}
+            </select>
+            <ContestReportSubmitButton pendingLabel="Applying…" className="min-h-11 px-5">
+              Apply filter
+            </ContestReportSubmitButton>
+          </form>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
+          <span>{reportEligibility.mode === "campaign" ? `${reportEligibility.responseCount} registered students` : "Provider standings include all participants"}</span>
+        </div>
+        {searchParamsBox?.eligibility && (
+          <p role="status" className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">Form response filter updated. Generate the report to score the selected students.</p>
+        )}
+        {searchParamsBox?.eligibilityError && (
+          <p role="alert" className="mt-3 text-sm text-destructive">{searchParamsBox.eligibilityError}</p>
+        )}
+      </section>
 
       {roomType === "TSC" && (
         <div className="mb-6 rounded-lg border border-border bg-muted/20 p-4 text-sm">
@@ -499,7 +566,7 @@ async function page({ params, searchParams }) {
               <Link
                 href={reportBlocked
                   ? "#provider-access"
-                  : `/contests_report/details/${paramsBox.id}/generate_report`}
+                  : `/contests_report/details/${paramsBox.id}/generate_report${campaignQuery}`}
                 className="flex items-center justify-center"
               >
                 <FileText className="mr-2 h-4 w-4" />
@@ -617,7 +684,7 @@ async function page({ params, searchParams }) {
                     <Link
                       href={contest.provider !== "codeforces" && !vjudgeConnected
                         ? "#provider-access"
-                        : `/contests_report/details/${paramsBox.id}/generate_report?item=${contest.id}`}
+                        : `/contests_report/details/${paramsBox.id}/generate_report?item=${contest.id}${reportEligibility.campaignId ? `&campaign=${encodeURIComponent(reportEligibility.campaignId)}` : ""}`}
                       className="flex items-center w-full justify-center"
                     >
                       <FileText className="h-4 w-4" />

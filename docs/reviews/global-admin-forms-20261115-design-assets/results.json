@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "incomplete hold validates without submitting",
+    "implicit form submit cannot bypass hold",
+    "short pointer press cancels",
+    "pointer leaving cancels",
+    "window blur cancels",
+    "short keyboard press cancels",
+    "full keyboard hold submits exactly once with disabled pending state",
+    "admin desktop/mobile layout",
+    "complete profile and reduced-motion mobile standard-button alternative",
+    "emulated touch hold completes with reduced motion"
+  ],
+  "errors": []
+}

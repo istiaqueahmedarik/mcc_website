@@ -41,6 +41,13 @@ import {
     markGlobalContestReportsStale,
     saveGlobalContestReportSnapshot,
 } from '../services/globalContestReportSnapshotService'
+import {
+    applyGlobalFormEligibilityToRankData,
+    listGlobalFormReportCampaigns,
+    loadGlobalFormReportEligibility,
+    setGlobalFormReportEligibility,
+    type GlobalFormReportEligibility,
+} from '../services/globalFormEligibilityService'
 
 function normalizeText(value: unknown, maxLength = 500) {
     return String(value ?? '').trim().slice(0, maxLength)
@@ -571,6 +578,8 @@ async function buildGlobalScoredReportSnapshot(
         contestItemId?: string | null;
         contestId?: string | null;
         fallbackSourceSnapshots?: Record<string, any>;
+        reuseSourceSnapshotsOnly?: boolean;
+        eligibility?: GlobalFormReportEligibility;
     } = {},
 ) {
     const room = await loadGlobalRoom(roomId)
@@ -590,7 +599,7 @@ async function buildGlobalScoredReportSnapshot(
     const rankDataByItemId = new Map<string, any>()
     const sourceSnapshots: Record<string, any> = {}
     const missingContests: any[] = []
-    const needsSavedCodeforcesHandles = items.some((item: any) => (
+    const needsSavedCodeforcesHandles = !options.reuseSourceSnapshotsOnly && items.some((item: any) => (
         normalizeContestProvider(item.provider) === 'codeforces'
         && normalizeText(item.codeforces_source_type, 20) !== 'group'
     ))
@@ -609,6 +618,42 @@ async function buildGlobalScoredReportSnapshot(
         const contestId = normalizeText(item.contest_id, 300)
         const provider = normalizeContestProvider(item.provider)
         const title = normalizeText(item.contest_name, 180) || `Contest ${contestId}`
+        const demerits = provider === 'vjudge'
+            ? await sql`
+                SELECT *
+                FROM public."Demerit"
+                WHERE contest_id = ${contestId}
+                ORDER BY created_at DESC
+              `
+            : []
+        if (options.reuseSourceSnapshotsOnly) {
+            const savedSource = options.fallbackSourceSnapshots?.[String(item.id)]
+            if (!savedSource?.rankData || !Array.isArray(savedSource.rankData.teams)) {
+                missingContests.push({
+                    id: item.id,
+                    provider,
+                    contestId,
+                    title,
+                    statusCode: 409,
+                    code: 'REPORT_SOURCE_CACHE_MISSING',
+                    error: 'Generate this report once with provider access before applying the form response filter.',
+                })
+                continue
+            }
+            const savedRankData = {
+                ...savedSource.rankData,
+                contestInfo: {
+                    ...(savedSource.rankData.contestInfo || {}),
+                    id: buildContestKey(provider, contestId),
+                    provider,
+                    externalContestId: contestId,
+                    title,
+                },
+            }
+            rankDataByItemId.set(String(item.id), applyGlobalDemeritsToRankData(savedRankData, demerits, provider))
+            sourceSnapshots[String(item.id)] = savedSource
+            continue
+        }
         if (
             provider === 'codeforces'
             && normalizeText(item.codeforces_source_type, 20) !== 'group'
@@ -625,14 +670,6 @@ async function buildGlobalScoredReportSnapshot(
             })
             continue
         }
-        const demerits = provider === 'vjudge'
-            ? await sql`
-                SELECT *
-                FROM public."Demerit"
-                WHERE contest_id = ${contestId}
-                ORDER BY created_at DESC
-              `
-            : []
         const fetched = await fetchClassroomContestRank({
             provider,
             externalContestId: contestId,
@@ -707,6 +744,13 @@ async function buildGlobalScoredReportSnapshot(
         }
     }
 
+    if (options.reuseSourceSnapshotsOnly && missingContests.length > 0) {
+        throw Object.assign(new Error('Saved provider source data is incomplete; refresh provider data before applying this form response filter'), {
+            statusCode: 409,
+            code: 'REPORT_SOURCE_CACHE_MISSING',
+            missingContests,
+        })
+    }
     if (rankDataByItemId.size === 0) {
         throw Object.assign(new Error('Fetch at least one contest before generating a report'), {
             statusCode: 400,
@@ -716,7 +760,9 @@ async function buildGlobalScoredReportSnapshot(
     }
 
     const roomType = normalizeContestType(room.contest_type)
-    const sources = globalItemsToScoringSources(items, rankDataByItemId)
+    const eligibility = options.eligibility || await loadGlobalFormReportEligibility(roomId)
+    const eligibilityResult = applyGlobalFormEligibilityToRankData(rankDataByItemId, eligibility)
+    const sources = globalItemsToScoringSources(items, eligibilityResult.rankDataByItemId)
     const saved = requestedContestItemId || requestedContestId
         ? {
             config: defaultScoringConfigForScope('global', roomType, sources.map((source) => String(source.formulaKey || ''))),
@@ -761,6 +807,13 @@ async function buildGlobalScoredReportSnapshot(
         legacyTsc,
         missingContests,
     })
+    const eligibilitySummary = {
+        ...eligibilityResult.summary,
+        linkedTfcCohortFixed: roomType === 'TSC' && Boolean(room.tfc_room_id),
+    }
+    if (eligibility.mode === 'campaign') {
+        scored.eligibility = eligibilitySummary
+    }
     return {
         room,
         items,
@@ -769,6 +822,8 @@ async function buildGlobalScoredReportSnapshot(
         configVersion: saved.version,
         missingContests,
         sourceSnapshots,
+        eligibility,
+        eligibilitySummary,
     }
 }
 
@@ -801,6 +856,10 @@ function generatedReportResponse(
         scoringConfigVersion: number;
         isStale: boolean;
         generatedAt: string;
+        eligibilityCampaignId: string | null;
+        eligibilityMembershipRevision: number | null;
+        eligibilitySelectionVersion: number;
+        eligibilityIsCurrent: boolean;
     },
     status: 'saved' | 'generated' | 'refreshed',
 ) {
@@ -808,11 +867,25 @@ function generatedReportResponse(
         success: true,
         merged: snapshot.report,
         missingContests: snapshot.missingContests,
+        eligibility: snapshot.report?.eligibility || {
+            mode: 'all',
+            campaignId: null,
+            campaignTitle: null,
+            campaignStatus: null,
+            membershipRevision: null,
+            selectionVersion: snapshot.eligibilitySelectionVersion,
+            responseCount: 0,
+            eligibleCount: Array.isArray(snapshot.report?.users) ? snapshot.report.users.length : 0,
+            excludedCount: 0,
+            unmappedCount: 0,
+            linkedTfcCohortFixed: false,
+        },
         cache: {
             status,
             generatedAt: snapshot.generatedAt,
             isStale: snapshot.isStale,
             scoringConfigVersion: snapshot.scoringConfigVersion,
+            eligibilityIsCurrent: snapshot.eligibilityIsCurrent,
         },
     }
 }
@@ -1329,10 +1402,13 @@ export const generateContestRoomReport = async (c: any) => {
             contestId: body?.contestId ?? body?.contest_id,
         })
         const refresh = body?.refresh === true
+        const eligibility = await loadGlobalFormReportEligibility(roomId)
         const savedSnapshot = await loadGlobalContestReportSnapshot(roomId, contestItemId)
-        if (savedSnapshot && !refresh) {
+        if (savedSnapshot && !refresh && savedSnapshot.eligibilityIsCurrent) {
             return c.json(generatedReportResponse(savedSnapshot, 'saved'))
         }
+
+        const eligibilityOnlyRefresh = Boolean(savedSnapshot && !refresh && !savedSnapshot.eligibilityIsCurrent)
 
         const snapshot = await buildGlobalScoredReportSnapshot(
             roomId,
@@ -1345,6 +1421,8 @@ export const generateContestRoomReport = async (c: any) => {
             {
                 contestItemId,
                 fallbackSourceSnapshots: savedSnapshot?.sourceSnapshots,
+                reuseSourceSnapshotsOnly: eligibilityOnlyRefresh,
+                eligibility,
             },
         )
         const persisted = await saveGlobalContestReportSnapshot({
@@ -1355,8 +1433,11 @@ export const generateContestRoomReport = async (c: any) => {
             missingContests: snapshot.missingContests,
             scoringConfigVersion: snapshot.configVersion,
             generatedBy: actor.id,
+            eligibilityCampaignId: eligibility.campaignId,
+            eligibilityMembershipRevision: eligibility.membershipRevision,
+            eligibilitySelectionVersion: eligibility.selectionVersion,
         })
-        return c.json(generatedReportResponse(persisted, refresh ? 'refreshed' : 'generated'))
+        return c.json(generatedReportResponse(persisted, refresh || eligibilityOnlyRefresh ? 'refreshed' : 'generated'))
     } catch (error: any) {
         console.error('Error generating contest room report:', error)
         return c.json({
@@ -1373,21 +1454,58 @@ export const publishContestRoomReport = async (c: any) => {
 
     try {
         const roomId = c.req.param('roomId')
-        const snapshot = await loadGlobalContestReportSnapshot(roomId, null)
-        if (!snapshot) {
-            return c.json({ error: 'Generate the full report before publishing it' }, 409)
-        }
-        if (snapshot.isStale) {
-            return c.json({ error: 'Refresh the saved report before publishing it' }, 409)
-        }
-        if (snapshot.missingContests.length > 0) {
-            return c.json({
-                error: 'All contest sources must be available before publishing this report',
-                missingContests: snapshot.missingContests,
-            }, 409)
-        }
-        const jsonString = JSON.stringify(snapshot.report)
-        const result = await sql.begin(async (tx) => {
+        const published = await sql.begin(async (tx) => {
+            const selectionHint = await tx`
+                SELECT campaign_id
+                FROM public.global_contest_report_eligibility
+                WHERE room_id = ${roomId}
+            `
+            const hintedCampaignId = selectionHint[0]?.campaign_id ? String(selectionHint[0].campaign_id) : null
+            let membershipRevision: number | null = null
+            if (hintedCampaignId) {
+                const campaignRows = await tx`
+                    SELECT revision FROM public.global_form_campaigns WHERE id = ${hintedCampaignId} FOR SHARE
+                `
+                membershipRevision = Number(campaignRows[0]?.revision || 0)
+            }
+            const selectionRows = await tx`
+                SELECT campaign_id, selection_version
+                FROM public.global_contest_report_eligibility
+                WHERE room_id = ${roomId}
+                FOR SHARE
+            `
+            const campaignId = selectionRows[0]?.campaign_id ? String(selectionRows[0].campaign_id) : null
+            const selectionVersion = Number(selectionRows[0]?.selection_version || 0)
+            if (campaignId !== hintedCampaignId) {
+                throw Object.assign(new Error('Participant eligibility changed; generate the report again'), {
+                    statusCode: 409,
+                    code: 'REPORT_ELIGIBILITY_CHANGED',
+                })
+            }
+            const snapshot = await loadGlobalContestReportSnapshot(roomId, null, tx, true)
+            if (!snapshot) {
+                throw Object.assign(new Error('Generate the full report before publishing it'), { statusCode: 409 })
+            }
+            if (snapshot.isStale) {
+                throw Object.assign(new Error('Refresh the saved report before publishing it'), { statusCode: 409 })
+            }
+            if (snapshot.missingContests.length > 0) {
+                throw Object.assign(new Error('All contest sources must be available before publishing this report'), {
+                    statusCode: 409,
+                    missingContests: snapshot.missingContests,
+                })
+            }
+            if (
+                campaignId !== snapshot.eligibilityCampaignId
+                || selectionVersion !== snapshot.eligibilitySelectionVersion
+                || membershipRevision !== snapshot.eligibilityMembershipRevision
+            ) {
+                throw Object.assign(new Error('Campaign respondents changed; generate the report again before publishing'), {
+                    statusCode: 409,
+                    code: 'REPORT_ELIGIBILITY_CHANGED',
+                })
+            }
+            const jsonString = JSON.stringify(snapshot.report)
             const existing = await tx`
                 SELECT id
                 FROM public."Public_contest_report"
@@ -1396,40 +1514,52 @@ export const publishContestRoomReport = async (c: any) => {
                 LIMIT 1
                 FOR UPDATE
             `
+            let result
             if (existing.length > 0) {
-                return tx`
+                result = await tx`
                     UPDATE public."Public_contest_report"
                     SET "JSON_string" = ${jsonString},
                         scoring_config_version = ${snapshot.scoringConfigVersion},
+                        eligibility_campaign_id = ${snapshot.eligibilityCampaignId},
+                        eligibility_membership_revision = ${snapshot.eligibilityMembershipRevision},
+                        eligibility_selection_version = ${snapshot.eligibilitySelectionVersion},
                         is_stale = false,
                         "Updated_at" = now()
                     WHERE id = ${existing[0].id}
                     RETURNING *
                 `
+            } else {
+                result = await tx`
+                    INSERT INTO public."Public_contest_report" (
+                        "Shared_contest_id",
+                        "JSON_string",
+                        scoring_config_version,
+                        eligibility_campaign_id,
+                        eligibility_membership_revision,
+                        eligibility_selection_version,
+                        is_stale
+                    )
+                    VALUES (
+                        ${roomId},
+                        ${jsonString},
+                        ${snapshot.scoringConfigVersion},
+                        ${snapshot.eligibilityCampaignId},
+                        ${snapshot.eligibilityMembershipRevision},
+                        ${snapshot.eligibilitySelectionVersion},
+                        false
+                    )
+                    RETURNING *
+                `
             }
-            return tx`
-                INSERT INTO public."Public_contest_report" (
-                    "Shared_contest_id",
-                    "JSON_string",
-                    scoring_config_version,
-                    is_stale
-                )
-                VALUES (
-                    ${roomId},
-                    ${jsonString},
-                    ${snapshot.scoringConfigVersion},
-                    false
-                )
-                RETURNING *
-            `
+            return { result, snapshot }
         })
 
         return c.json({
             success: true,
-            result,
-            report: result[0] || null,
-            merged: snapshot.report,
-            missingContests: snapshot.missingContests,
+            result: published.result,
+            report: published.result[0] || null,
+            merged: published.snapshot.report,
+            missingContests: published.snapshot.missingContests,
         })
     } catch (error: any) {
         console.error('Error publishing contest room report:', error)
@@ -1438,5 +1568,41 @@ export const publishContestRoomReport = async (c: any) => {
             code: error?.code,
             missingContests: error?.missingContests,
         }, error?.statusCode || 500)
+    }
+}
+
+export const getContestRoomReportEligibility = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    try {
+        const roomId = c.req.param('roomId')
+        const [eligibility, campaigns, savedReport] = await Promise.all([
+            loadGlobalFormReportEligibility(roomId),
+            listGlobalFormReportCampaigns(),
+            loadGlobalContestReportSnapshot(roomId, null),
+        ])
+        return c.json({ success: true, eligibility, campaigns, hasSavedReport: Boolean(savedReport) })
+    } catch (error: any) {
+        return c.json({ error: error?.message || 'Failed to load report eligibility' }, error?.statusCode || 500)
+    }
+}
+
+export const updateContestRoomReportEligibility = async (c: any) => {
+    const actor = await getAdminActor(c)
+    if ('error' in actor) return c.json({ error: actor.error }, actor.status)
+    try {
+        const roomId = c.req.param('roomId')
+        const body = await readJsonBody(c)
+        const rawCampaignId = body?.campaignId ?? body?.campaign_id ?? null
+        const campaignId = rawCampaignId === null || rawCampaignId === ''
+            ? null
+            : normalizeText(rawCampaignId, 80)
+        if (campaignId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(campaignId)) {
+            return c.json({ error: 'Invalid campaign ID' }, 400)
+        }
+        const eligibility = await setGlobalFormReportEligibility({ roomId, campaignId, actorId: actor.id })
+        return c.json({ success: true, eligibility })
+    } catch (error: any) {
+        return c.json({ error: error?.message || 'Failed to update report eligibility' }, error?.statusCode || 500)
     }
 }

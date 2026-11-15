@@ -3,6 +3,7 @@ import { deleteCookie } from "hono/cookie";
 import sql from "../db";
 import { sendEmail } from "../sendEmail";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
+import { normalizeMistIdUpdate } from "../utils/basicProfile";
 
 async function isAdminUser(c: any) {
   const { id, email } = c.get("jwtPayload") || {};
@@ -15,6 +16,10 @@ async function isAdminUser(c: any) {
     limit 1
   `;
   return rows.length > 0;
+}
+
+function payloadId(c: any) {
+  return c.get("jwtPayload")?.id || null;
 }
 
 export const signup = async (c: any) => {
@@ -37,10 +42,10 @@ export const signup = async (c: any) => {
       );
     }
 
-    const normalizedMistId = String(mist_id || "").trim();
+    const normalizedMistId = normalizeMistIdUpdate(mist_id);
     const normalizedBatchName = String(batch_name || "").trim();
-    if (!/^\d+$/.test(normalizedMistId)) {
-      return c.json({ error: "MIST Student ID must contain numbers only" }, 400);
+    if (!normalizedMistId) {
+      return c.json({ error: "MIST Student ID must be exactly nine digits" }, 400);
     }
     if (!normalizedBatchName) {
       return c.json({ error: "Batch details are required" }, 400);
@@ -60,13 +65,13 @@ export const signup = async (c: any) => {
       return c.json({ error: "This email already exists" }, 400);
     }
     const hash = await Bun.password.hash(password);
-    const result =
-      await sql`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name)
-        VALUES (${full_name}, ${profile_pic}, ${normalizedMistId}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName})
+    const result = await sql.begin(async (tx) => {
+      const inserted = await tx`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name)
+        VALUES (${full_name}, ${profile_pic}, ${Number(normalizedMistId)}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName})
         RETURNING *`;
-    if (result[0]?.id) {
-      await markPreEnrollmentClaimsForUser(result[0].id);
-    }
+      if (inserted[0]?.id) await markPreEnrollmentClaimsForUser(inserted[0].id, tx);
+      return inserted;
+    });
     return c.json({ result });
   } catch (error: any) {
     console.error("Database error in signup:", error.message);
@@ -280,7 +285,18 @@ export const pendingUser = async (c: any) => {
       return c.json({ error: "Admin access required" }, 403);
     }
 
-    const result = await sql`select * from users where granted = false`;
+    const result = await sql`
+      select u.*,
+        case when u.account_review_origin = 'profile_change' then 'profile_change' else 'signup' end as review_type,
+        review.prior_values as profile_review_prior_values,
+        review.proposed_values as profile_review_proposed_values
+      from users u
+      left join lateral (
+        select prior_values, proposed_values from global_form_profile_reviews
+        where user_id = u.id and status = 'pending' order by created_at desc limit 1
+      ) review on true
+      where u.granted = false
+    `;
     return c.json({ result });
   } catch (error) {
     console.log(error);
@@ -295,9 +311,38 @@ export const rejectUser = async (c: any) => {
       return c.json({ error: "Admin access required" }, 403);
     }
 
-    const result =
-      await sql`delete from users where id = ${userId} returning *`;
-    if (result.length === 0) return c.json({ error: "User not found" }, 404);
+    const profileChange = await sql.begin(async (tx) => {
+      const users = await tx`select * from users where id = ${userId} for update`;
+      const user = users[0];
+      if (!user || user.account_review_origin !== "profile_change") return null;
+      const reviews = await tx`
+        select * from global_form_profile_reviews
+        where user_id = ${userId} and status = 'pending' order by created_at desc limit 1 for update
+      `;
+      const review = reviews[0];
+      if (!review) return null;
+      const proposedName = review.proposed_values?.full_name;
+      if (user.full_name !== proposedName) return { conflict: true };
+      const hasPriorName = Object.prototype.hasOwnProperty.call(review.prior_values || {}, "full_name");
+      const storedPriorName = hasPriorName ? review.prior_values.full_name : undefined;
+      const priorName = storedPriorName === null || typeof storedPriorName === "string" ? storedPriorName : user.full_name;
+      await tx`
+        update users set full_name = ${priorName}, granted = true, account_review_origin = 'signup'
+        where id = ${userId}
+      `;
+      await tx`
+        update global_form_profile_reviews set status = 'rejected', reviewed_by = ${payloadId(c)}, reviewed_at = now()
+        where id = ${review.id}
+      `;
+      return { ...user, full_name: priorName, review_type: "profile_change" };
+    });
+    if (profileChange?.conflict) return c.json({ error: "Profile changed; reload before reviewing", code: "REVIEW_STALE" }, 409);
+    if (profileChange) return c.json({ result: [profileChange] });
+
+    const result = await sql`
+      delete from users where id = ${userId} and account_review_origin = 'signup' and granted = false returning *
+    `;
+    if (result.length === 0) return c.json({ error: "User review state changed; reload and try again" }, 409);
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Account Registration Status",
@@ -391,9 +436,33 @@ export const acceptUser = async (c: any) => {
       return c.json({ error: "Admin access required" }, 403);
     }
 
-    const result =
-      await sql`update users set granted = true where id = ${userId} returning *`;
+    const result = await sql.begin(async (tx) => {
+      const current = await tx`select id, full_name, granted, account_review_origin from users where id = ${userId} for update`;
+      if (!current[0]) return [];
+      if (current[0].granted) return [{ __conflict: true }];
+      const reviewType = current[0]?.account_review_origin === "profile_change" ? "profile_change" : "signup";
+      if (reviewType === "profile_change") {
+        const reviews = await tx`
+          select id, proposed_values from global_form_profile_reviews
+          where user_id = ${userId} and status = 'pending' order by created_at desc limit 1 for update
+        `;
+        if (!reviews[0] || current[0].full_name !== reviews[0].proposed_values?.full_name) {
+          return [{ __conflict: true }];
+        }
+      }
+      const rows = await tx`
+        update users set granted = true, account_review_origin = 'signup'
+        where id = ${userId} and granted = false returning *
+      `;
+      if (rows[0]) await tx`
+        update global_form_profile_reviews set status = 'approved', reviewed_by = ${payloadId(c)}, reviewed_at = now()
+        where user_id = ${userId} and status = 'pending'
+      `;
+      return rows.map((row: any) => ({ ...row, review_type: reviewType }));
+    });
     if (result.length === 0) return c.json({ error: "User not found" }, 404);
+    if (result[0].__conflict) return c.json({ error: "Review state changed; reload before reviewing", code: "REVIEW_STALE" }, 409);
+    if (result[0].review_type === "profile_change") return c.json({ result });
     await sendEmail(
       result[0].email,
       "MIST Computer Club - Welcome! Account Approved",

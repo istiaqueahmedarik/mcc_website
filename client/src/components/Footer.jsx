@@ -1,3 +1,4 @@
+import FooterBackdrop from '@/components/FooterBackdrop'
 import MccLogo from '@/components/IconChanger/MccLogo'
 import { Github, Linkedin, Mail, MessageSquare } from 'lucide-react'
 import Link from 'next/link'
@@ -23,7 +24,7 @@ const links = {
 export default function Footer() {
   return (
     <footer className="relative w-full border-t border-border/60 bg-background/70 backdrop-blur-md">
-      <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(circle_at_50%_0%,black,transparent_70%)] bg-gradient-to-b from-primary/10 via-background to-background" />
+      <FooterBackdrop />
       <div className="relative grid w-full gap-12 px-6 py-16 md:grid-cols-4">
         <div className="flex flex-col gap-4">
           <MccLogo w={120} h={120} />

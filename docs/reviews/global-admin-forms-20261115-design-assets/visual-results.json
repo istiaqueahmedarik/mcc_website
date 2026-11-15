@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "ring shows partial progress",
+    "footer gradient absent on feature pages",
+    "failed request retains agreement and enables retry",
+    "Escape cancels keyboard hold",
+    "390px dark/reduced-motion layout",
+    "forced-color keyboard focus visible",
+    "2560px admin layout"
+  ],
+  "errors": []
+}

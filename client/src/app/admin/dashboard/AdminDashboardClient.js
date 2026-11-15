@@ -11,6 +11,7 @@ import { get_with_token, pendingUsers, post_with_token } from '@/lib/action'
 import { AlertCircle, CheckCircle, ExternalLink, UserCheck, Users } from 'lucide-react'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 export default function AdminDashboardClient({ token }) {
    const [pendingU, setPendingU] = useState([])
@@ -23,6 +24,7 @@ export default function AdminDashboardClient({ token }) {
    })
    const [processingCf, setProcessingCf] = useState(new Set())
    const [processingVjudge, setProcessingVjudge] = useState(new Set())
+   const [processingProfile, setProcessingProfile] = useState(new Set())
    const [stats, setStats] = useState({
       totalPendingUsers: 0,
       totalCfPending: 0,
@@ -110,7 +112,26 @@ export default function AdminDashboardClient({ token }) {
       })
    }
 
-   console.log({ pendingU, cfPending, vjudgePending, stats })
+   const reviewProfile = async (userId, approve) => {
+      setProcessingProfile(previous => new Set([...previous, userId]))
+      try {
+         const response = await post_with_token(`auth/user/${approve ? 'accept' : 'reject'}`, { userId })
+         if (response?.error) {
+            toast.error(response.error)
+            return
+         }
+         toast.success(approve ? 'Profile update approved' : 'Profile update rejected. Account retained.')
+         await loadData()
+      } catch {
+         toast.error('Unable to review the profile update. Please try again.')
+      } finally {
+         setProcessingProfile(previous => {
+            const next = new Set(previous)
+            next.delete(userId)
+            return next
+         })
+      }
+   }
 
    // Show initial loading only if all sections are loading
    const isInitialLoading = loading.users && loading.cf && loading.vjudge
@@ -178,7 +199,7 @@ export default function AdminDashboardClient({ token }) {
                <Card>
                   <CardHeader>
                      <CardTitle>Pending User Approvals</CardTitle>
-                     <p className="text-sm text-muted-foreground">Review and approve new user registrations</p>
+                     <p className="text-sm text-muted-foreground">Review new accounts and profile updates. Rejecting a profile update keeps the existing account.</p>
                   </CardHeader>
                   <CardContent>
                      {loading.users ? (
@@ -198,12 +219,20 @@ export default function AdminDashboardClient({ token }) {
                            </TableHeader>
                            <TableBody>
                               {pendingU.map((user, index) => (
-                                 <TableRow key={index}>
-                                    <TableCell className="font-medium">{user.full_name}</TableCell>
+                                 <TableRow key={user.id || index}>
+                                    <TableCell className="font-medium">
+                                       {user.full_name}
+                                       {user.account_review_origin === 'profile_change' && (
+                                          <div className="mt-1 space-y-1">
+                                             <Badge variant="secondary">Profile update</Badge>
+                                             <p className="max-w-64 break-words text-xs font-normal text-muted-foreground">Previous name: {user.profile_review_prior_values?.full_name || 'Not provided'}</p>
+                                          </div>
+                                       )}
+                                    </TableCell>
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>{user.mist_id}</TableCell>
                                     <TableCell>
-                                       <Dialog>
+                                       {user.mist_id_card ? <Dialog>
                                           <DialogTrigger>
                                              <Image
                                                 src={user.mist_id_card}
@@ -227,12 +256,25 @@ export default function AdminDashboardClient({ token }) {
                                                 </DialogDescription>
                                              </DialogHeader>
                                           </DialogContent>
-                                       </Dialog>
+                                       </Dialog> : <span className="text-muted-foreground">Not provided</span>}
                                     </TableCell>
                                     <TableCell>
                                        <div className="flex gap-2">
-                                          <Accept userId={user.id} />
-                                          <Reject userId={user.id} />
+                                          {user.account_review_origin === 'profile_change' ? (
+                                             <>
+                                                <Button type="button" variant="outline" className="min-h-11" disabled={processingProfile.has(user.id)} onClick={() => reviewProfile(user.id, true)} aria-label={`Approve profile update for ${user.full_name || user.email}`}>
+                                                   {processingProfile.has(user.id) ? 'Reviewing…' : 'Approve update'}
+                                                </Button>
+                                                <Button type="button" variant="outline" className="min-h-11 text-destructive" disabled={processingProfile.has(user.id)} onClick={() => reviewProfile(user.id, false)} aria-label={`Reject profile update and keep account for ${user.full_name || user.email}`}>
+                                                   Reject update
+                                                </Button>
+                                             </>
+                                          ) : (
+                                             <>
+                                                <Accept userId={user.id} />
+                                                <Reject userId={user.id} />
+                                             </>
+                                          )}
                                        </div>
                                     </TableCell>
                                  </TableRow>

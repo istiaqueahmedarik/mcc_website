@@ -1,5 +1,15 @@
 # Project Index
 
+## 2026-11-15 - Global forms design revision
+
+The approved follow-up removes decorative gradients from forms and their shared footer, uses plain Form response filter / Registered students labels, and introduces a one-second registration hold with keyboard and standard-button alternatives. Reviewer order and local evidence: `docs/reviews/global-admin-forms-20261115-design-revision.md`.
+
+## 2026-11-15 - Global admin forms approved scope
+
+The user approved `docs/rsd/global-admin-forms-20261115-rsd.md` and autonomous completion. The implementation adds global admin templates/campaigns, authenticated student registration with ordinary profile verification effects, live response/activity counts, and canonical campaign eligibility for global contest reports. Technical decisions are in `docs/adr/20261115-global-admin-forms.md`; isolated work packages and verification order are in `docs/tasks/global-admin-forms-20261115-task-plan.md`. Approval authorizes implementation and local verification, not a hosted migration or deployment. Implementation evidence is recorded in the linked review.
+
+Implemented entry points are `client/src/app/admin/forms/`, `client/src/app/register/[slug]/`, `server/src/controllers/globalFormController.ts`, and `/global-forms` routes. The separate report cohort service is `server/src/services/globalFormEligibilityService.ts`. Apply `docs/sql/global-admin-forms-20261115.sql` before `docs/sql/global-form-report-eligibility-20261115.sql`. Review and exact local/synthetic verification boundaries: `docs/reviews/global-admin-forms-20261115-implementation-review.md`. Usage and local test entry points: `docs/features/global-admin-forms.md`. No hosted migration or deployment was performed.
+
 ## 2026-09-20 - Global contest report per-source refresh fallback
 
 Global contest report snapshots now persist server-only normalized source rank data in `source_snapshots`. A refresh uses live provider data when available and reuses the prior source snapshot independently when that source fails, while retaining the failure diagnostic and blocking publish until all sources are live. The rollout migration is `docs/sql/global-contest-report-source-fallback-20260920.sql`; rollback is the matching `-rollback.sql`. Older snapshots remain readable but cannot provide per-source fallback until a successful post-migration refresh stores source data.
