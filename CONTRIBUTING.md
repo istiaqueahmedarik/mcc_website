@@ -44,7 +44,7 @@ Recognition can include a contributor acknowledgement, reviewer mentorship, and 
 
 Use [MCC Website — Development](https://github.com/users/istiaqueahmedarik/projects/3), linked to this repository. The existing project was reused, preserving its original issues and private visibility. Access to the private board is managed separately from repository access.
 
-The numeric Story points field contains the agreed estimates for #48 (5), #50 (5), #51 (3), and #49 (8). The existing status workflow is Backlog, Ready, In progress, In review, and Done. Status and Assignees remain available. Keep the field aligned with the issue's sp label when changing an estimate.
+The numeric Story points field contains the agreed estimates for #48 (5), #50 (5), #51 (3), and #49 (8). The status workflow is Backlog → Todo → In progress → Ready for testing → In testing → Done. Workflow is the status board; Testing filters the two testing stages. Cards show assignees, priority, and story points. Ready for testing means implementation and test instructions are available; In testing means validation is underway. Done requires passed testing and accepted delivery. Failed validation returns work to In progress. Status and Assignees remain available. Keep the field aligned with the issue's sp label when changing an estimate.
 
 Point acceptance, cumulative totals, nominations, and promotions are manual. No bot currently awards points or changes permissions. Moving an item to Done alone does not award accepted credit.
 
