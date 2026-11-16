@@ -9,9 +9,9 @@ The master branch and the repository default branch are protected by two active 
 - A pull request with at least one eligible approval is required. New pushes dismiss stale approvals; the most recent reviewable push must be approved by someone other than its pusher. Review conversations must be resolved.
 - The GitHub Actions checks client, server, and docker must pass against the current base. The deploy job is deliberately not a pre-merge requirement.
 - Direct pushes, force pushes, and deletion of the protected branch are blocked.
-- Only repository administrators can merge, and only through a pull request. Currently istiaqueahmedarik is the sole administrator. The admin-only exception applies exclusively to the merge restriction, not to reviews or CI.
+- Only istiaqueahmedarik has an explicit always-allowed User bypass on both rulesets. The owner can merge without peer approval, override CI requirements, and push directly when needed. Everyone else must follow the rules above and cannot merge into the protected branch. The exception is bound to this account, not inherited by every future administrator.
 
-Existing Write collaborators can contribute and provide eligible reviews; they cannot merge into the protected branch. An owner-authored PR still needs another eligible collaborator to approve it. No CODEOWNERS requirement is enabled because the repository currently has no CODEOWNERS file. Assigning future administrators also grants merge authority, so do so deliberately.
+Existing Write collaborators can contribute and provide eligible reviews; they cannot merge into the protected branch. Owner-authored PRs do not require another collaborator's approval because the owner may bypass the review requirement. No CODEOWNERS requirement is enabled because the repository currently has no CODEOWNERS file. Any future administrator can edit repository settings; grant administration deliberately. The configured bypass list itself names only the owner.
 
 Current CI performs a client build, server dependency installation, and Docker builds; it does not run every application test or lint command. PR authors must still run checks appropriate to their change. Passing CI is not a substitute for review.
 
@@ -42,18 +42,16 @@ Recognition can include a contributor acknowledgement, reviewer mentorship, and 
 
 ## Projects board and accounting status
 
-Story-point labels are configured now. Point acceptance, totals, nominations, and promotions are manual; no bot currently awards points or changes permissions.
+Use [MCC Website — Development](https://github.com/users/istiaqueahmedarik/projects/3), linked to this repository. The existing project was reused, preserving its original issues and private visibility. Access to the private board is managed separately from repository access.
 
-The GitHub Projects board could not be created because the current CLI token lacks Projects scope and the available browser is signed out. The owner can authorize Projects access with:
+The numeric Story points field contains the agreed estimates for #48 (5), #50 (5), #51 (3), and #49 (8). The existing status workflow is Backlog, Ready, In progress, In review, and Done. Status and Assignees remain available. Keep the field aligned with the issue's sp label when changing an estimate.
 
-    gh auth refresh -h github.com -s project
-
-After authorization, create or reuse an MCC Website project, add the repository issues, and add a Number field named Story points plus Status and Assignees. Copy the agreed estimates into the field and keep the issue label and field aligned. Use labels as the source of truth until the board is configured. Permission promotion remains manual even after a board exists.
+Point acceptance, cumulative totals, nominations, and promotions are manual. No bot currently awards points or changes permissions. Moving an item to Done alone does not award accepted credit.
 
 ## Ruleset administration
 
 Review/CI rules: https://github.com/istiaqueahmedarik/mcc_website/rules/7545747
 
-Admin-only merges: https://github.com/istiaqueahmedarik/mcc_website/rules/27380497
+Owner-only updates and merges: https://github.com/istiaqueahmedarik/mcc_website/rules/27380497
 
-Both rulesets target the default branch and refs/heads/master, with no exclusions. Rulesets aggregate. Editing one does not bypass the other. The owner can edit rulesets administratively, but normal merges must satisfy the configured rules. Do not weaken protections to merge a routine PR.
+Both rulesets target the default branch and refs/heads/master, with no exclusions. Rulesets aggregate. Both explicitly allow only User istiaqueahmedarik (ID 69030256) to bypass at any time. The owner requested final authority over all repository changes. Other collaborators have no configured bypass. Prefer reviewed PRs and successful checks in normal work; exercising owner override is a deliberate exception.
