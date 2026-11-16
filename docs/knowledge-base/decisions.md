@@ -1210,3 +1210,8 @@ User authorized repository protection and contribution tracking setup. Ruleset 7
 ## 2026-11-16 - Owner override and Projects setup completed
 
 User superseded the owner peer-approval requirement: both rulesets now have a single User bypass for istiaqueahmedarik (69030256), mode always. GitHub reports current_user_can_bypass=always for both. Owner can override approval/CI/direct-push restrictions; other collaborators retain no bypass and cannot merge into master. This supersedes the earlier no-core-bypass/admin-PR-only policy. After Projects authorization, reused existing private project 3 as MCC Website — Development, linked the repository, renamed its empty numeric Estimate field to Story points, and populated #48=5, #49=8, #50=5, #51=3. Existing items/statuses and privacy preserved. Acceptance, totals, and promotions remain manual; no points credited.
+
+
+## 2026-11-16 - Linear-inspired project workflow
+
+User requested six stages: Backlog, Todo, In progress, Ready for testing, In testing, Done. Updated project 3 Status options in that order with distinct gray/blue/yellow/orange/purple/green colors. Preserved existing option IDs while renaming Ready and In review. Workflow is a Status-grouped board with assignees, priority, and story points. Testing view filters both testing stages. No issue statuses or estimates were deliberately changed. Existing views, privacy, and owner override remain intact. Project readme and CONTRIBUTING.md define testing handoff and failed-test return to In progress.
