@@ -1099,3 +1099,8 @@ Global reports contain eligible MCC students, not a provider roster. Drop provid
 Keep infrequent Group identity configuration out of the contest card's primary reading flow. Place a visible neutral `ID Mapping` action between destructive Delete and outcome-oriented Generate Report, then open the existing editor in a focus-managed, viewport-bounded dialog with a fixed save area and independently scrollable body.
 
 Global generated reports are cache-first. Persist normalized scored output in the private `global_contest_report_snapshots` table by full-room or contest-item scope, return it before touching providers, and reserve provider fetching for first generation or explicit Refresh. Keep network work outside transactions, atomically replace the snapshot after success, preserve the prior row on refresh failure, and publish by copying the saved full-room snapshot rather than fetching again.
+
+
+## 2026-11-16 - Contributor scorecard and assignment policy
+
+GitHub contribution automation validates config before mutation, executes default-branch code with least privilege, paginates issues, fetches current assignees, removes only unsupported accounts, and reconciles all issues per serialized run. Read-only preview and pure scoring tests separate calculations from external writes.

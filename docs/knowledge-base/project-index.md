@@ -1291,3 +1291,8 @@ Global report generation is persisted in service-only `global_contest_report_sna
 ## 2026-09-13 - Trainer action group presentation
 
 `TrainerVisualContext.jsx` scopes trainer-only visuals. `TrainerActionGroup.jsx` and its CSS module reuse `TrainerDockLens.jsx` for in-flow button rows. `ui/heroicons-animated/TrainerClassroomIcons.jsx` adapts local upstream icon sources for shared classroom components. Isolated QA route: `/trainer/dock-lens-prototype/actions`.
+
+
+## 2026-11-16 - Contributor scorecard and assignment policy
+
+Contributor scorecard #54 and project 3 Contributions view show category counts/points. Implementation: scripts/contributor-policy.mjs, .github/contribution-policy.json, and .github/workflows/contributor-policy.yml. Feature doc: docs/features/contributor-scorecard.md.
