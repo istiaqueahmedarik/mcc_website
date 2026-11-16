@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: invalid or empty rosters fail instead of removing everyone
+ok 1 - invalid or empty rosters fail instead of removing everyone
+  ---
+  duration_ms: 1.742806
+  type: 'test'
+  ...
+# Subtest: only approved member assignees qualify, case insensitive
+ok 2 - only approved member assignees qualify, case insensitive
+  ---
+  duration_ms: 0.630867
+  type: 'test'
+  ...
+# Subtest: credits types and totals once per completed accepted issue
+ok 3 - credits types and totals once per completed accepted issue
+  ---
+  duration_ms: 0.283249
+  type: 'test'
+  ...
+# Subtest: unaccepted work, PRs and dashboard never earn credit
+ok 4 - unaccepted work, PRs and dashboard never earn credit
+  ---
+  duration_ms: 0.12432
+  type: 'test'
+  ...
+# Subtest: reopened and not-planned issues do not earn credit
+ok 5 - reopened and not-planned issues do not earn credit
+  ---
+  duration_ms: 0.189534
+  type: 'test'
+  ...
+# Subtest: shared and ambiguous attribution is excluded, not double-counted
+ok 6 - shared and ambiguous attribution is excluded, not double-counted
+  ---
+  duration_ms: 0.207451
+  type: 'test'
+  ...
+# Subtest: missing, duplicate, noncanonical and unknown points or types require review
+ok 7 - missing, duplicate, noncanonical and unknown points or types require review
+  ---
+  duration_ms: 0.230036
+  type: 'test'
+  ...
+# Subtest: reconciles fresh API assignments and only removes nonmembers
+ok 8 - reconciles fresh API assignments and only removes nonmembers
+  ---
+  duration_ms: 0.204213
+  type: 'test'
+  ...
+# Subtest: PR assignments are outside this issue policy
+ok 9 - PR assignments are outside this issue policy
+  ---
+  duration_ms: 0.273951
+  type: 'test'
+  ...
+# Subtest: pagination includes issues beyond first page
+ok 10 - pagination includes issues beyond first page
+  ---
+  duration_ms: 0.388661
+  type: 'test'
+  ...
+# Subtest: API errors omit response body and credentials
+ok 11 - API errors omit response body and credentials
+  ---
+  duration_ms: 0.563816
+  type: 'test'
+  ...
+# Subtest: scorecard includes zero-point members and issue links
+ok 12 - scorecard includes zero-point members and issue links
+  ---
+  duration_ms: 0.252743
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 56.324811

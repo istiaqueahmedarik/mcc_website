@@ -55,3 +55,8 @@ Review/CI rules: https://github.com/istiaqueahmedarik/mcc_website/rules/7545747
 Owner-only updates and merges: https://github.com/istiaqueahmedarik/mcc_website/rules/27380497
 
 Both rulesets target the default branch and refs/heads/master, with no exclusions. Rulesets aggregate. Both explicitly allow only User istiaqueahmedarik (ID 69030256) to bypass at any time. The owner requested final authority over all repository changes. Other collaborators have no configured bypass. Prefer reviewed PRs and successful checks in normal work; exercising owner override is a deliberate exception.
+
+
+## Contributor scorecard and board-member assignments
+
+Use the [Contributions view](https://github.com/users/istiaqueahmedarik/projects/3/views/7) and [scorecard #54](https://github.com/istiaqueahmedarik/mcc_website/issues/54) for ticket types and accepted story points. The approved assignment roster mirrors private project access in .github/contribution-policy.json. Board access alone does not make GitHub assign a user automatically; its native picker remains unchanged. Once merged, the workflow asynchronously removes non-roster issue assignees. The owner must synchronize the roster whenever board access changes. No automatic access grants or promotions occur. See docs/features/contributor-scorecard.md for acceptance, exclusions, current-metadata accounting, membership drift, and operation details. Onboarding is a separate task.

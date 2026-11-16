@@ -992,3 +992,8 @@ If an action group must be shadowless, override every inherited shell state and 
 Do not merge a provider participant into an MCC account from a non-unique handle or student ID. Omit provider rows that do not resolve to exactly one eligible MCC student before scoring, including multi-member teams that resolve to multiple students. Provider aliases are audit data; immutable `users.id` is the aggregation key.
 
 Do not contact contest providers merely to view or publish a previously generated global report. Read the private saved snapshot first; only first generation or explicit Refresh may fetch providers. Preserve the prior snapshot when refresh fails, keep network calls outside transactions, mark snapshots stale after authoritative inputs change, and require a fresh full-room snapshot before publication.
+
+
+## 2026-11-16 - Contributor scorecard and assignment policy
+
+Do not equate project access with GitHub assignee eligibility or claim a native membership restriction. Disclose roster drift and asynchronous enforcement. Keep estimated points separate from accepted credit, exclude ambiguous/shared attribution, and distinguish current-metadata totals from durable historical accounting.

@@ -1210,3 +1210,8 @@ User authorized repository protection and contribution tracking setup. Ruleset 7
 ## 2026-11-16 - Owner override and Projects setup completed
 
 User superseded the owner peer-approval requirement: both rulesets now have a single User bypass for istiaqueahmedarik (69030256), mode always. GitHub reports current_user_can_bypass=always for both. Owner can override approval/CI/direct-push restrictions; other collaborators retain no bypass and cannot merge into master. This supersedes the earlier no-core-bypass/admin-PR-only policy. After Projects authorization, reused existing private project 3 as MCC Website — Development, linked the repository, renamed its empty numeric Estimate field to Story points, and populated #48=5, #49=8, #50=5, #51=3. Existing items/statuses and privacy preserved. Acceptance, totals, and promotions remain manual; no points credited.
+
+
+## 2026-11-16 - Contributor scorecard and assignment policy
+
+User requested contributor categories/totals and assignments limited to board members, explicitly separate from onboarding. Mirror the access list (owner and trqrizu) in a reviewed roster; apply eventual issue-assignment cleanup via trusted workflow, not a claimed native picker restriction. Credit closed-completed accepted issues with exactly one valid type/point label and one approved assignee; exclude ambiguous/shared credit. No immutable ledger, live membership sync, or automatic permission grants are claimed.
