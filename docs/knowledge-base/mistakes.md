@@ -528,3 +528,8 @@ The generated global report used the canonical mapped student projection, but th
 
 Prevention:
 Render published reports from `classroomMapping.student` first: use its name, `mistId`, profile image, VJudge ID, and Codeforces ID. Use `identityKey` for row/rank identity, query the public profile endpoint only with the mapped VJudge ID, and retain `username` only as a compatibility fallback for legacy VJudge-only snapshots.
+
+
+## 2026-11-17 - Improved and automatic contributor onboarding
+
+Onboarding masters were originally kept outside project manually, but project auto-add matched every open repository issue. Corrected its saved query to exclude onboarding and template labels. Preserve these exclusions and label generated issues at creation to prevent automatic import of a separate learning track.

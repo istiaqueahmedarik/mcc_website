@@ -997,3 +997,8 @@ Do not contact contest providers merely to view or publish a previously generate
 ## 2026-11-16 - Contributor scorecard and assignment policy
 
 Do not equate project access with GitHub assignee eligibility or claim a native membership restriction. Disclose roster drift and asynchronous enforcement. Keep estimated points separate from accepted credit, exclude ambiguous/shared attribution, and distinguish current-metadata totals from durable historical accounting.
+
+
+## 2026-11-17 - Improved and automatic contributor onboarding
+
+Never claim collaborator invitation or private project access changes automatically update an approved roster. Do not use public issue content as executable/template source for privileged automation. GITHUB_TOKEN issue writes do not trigger downstream issue workflows; validate required policies in the creating workflow itself.

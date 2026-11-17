@@ -1215,3 +1215,8 @@ User superseded the owner peer-approval requirement: both rulesets now have a si
 ## 2026-11-16 - Contributor scorecard and assignment policy
 
 User requested contributor categories/totals and assignments limited to board members, explicitly separate from onboarding. Mirror the access list (owner and trqrizu) in a reviewed roster; apply eventual issue-assignment cleanup via trusted workflow, not a claimed native picker restriction. Credit closed-completed accepted issues with exactly one valid type/point label and one approved assignee; exclude ambiguous/shared credit. No immutable ledger, live membership sync, or automatic permission grants are claimed.
+
+
+## 2026-11-17 - Improved and automatic contributor onboarding
+
+User requested improved onboarding and automatic creation for added contributors. Use additions to the approved roster, scheduled repair and manual dispatch; invitation-only member events are webhook events, not direct Actions triggers. Skip two existing baseline members. Reuse safe token/API helper; no new access grants. Keep onboarding outside Development and contribution credit.
