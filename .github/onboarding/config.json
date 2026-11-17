@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "baselineMembers": ["istiaqueahmedarik", "trqrizu"],
+  "defaultMentor": "istiaqueahmedarik",
+  "templateIssues": {"epic": 56, "setup": 57, "intro": 58, "technical": 59, "glossary": 60}
+}

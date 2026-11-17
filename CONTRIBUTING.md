@@ -60,3 +60,8 @@ Both rulesets target the default branch and refs/heads/master, with no exclusion
 ## Contributor scorecard and board-member assignments
 
 Use the [Contributions view](https://github.com/users/istiaqueahmedarik/projects/3/views/7) and [scorecard #54](https://github.com/istiaqueahmedarik/mcc_website/issues/54) for ticket types and accepted story points. The approved assignment roster mirrors private project access in .github/contribution-policy.json. Board access alone does not make GitHub assign a user automatically; its native picker remains unchanged. Once merged, the workflow asynchronously removes non-roster issue assignees. The owner must synchronize the roster whenever board access changes. No automatic access grants or promotions occur. See docs/features/contributor-scorecard.md for acceptance, exclusions, current-metadata accounting, membership drift, and operation details. Onboarding is a separate task.
+
+
+## New member onboarding
+
+Use master epic #56 and child templates #57–60 as a separate learning track. After Onboard approved contributors is merged, adding a new approved member to .github/contribution-policy.json triggers a personalized epic plus four sub-issues, with hourly/manual recovery and duplicate protection. Existing owner/trqrizu are baseline members and are not auto-onboarded. Repository or board invitations alone do not trigger the workflow. Keep the membership roster synchronized. Templates, mentor responsibilities, progress evidence, assignment limits, and manual-run instructions are documented in docs/features/contributor-onboarding.md. Onboarding/template tickets stay outside Development auto-add and never earn contribution points.

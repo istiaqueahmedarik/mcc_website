@@ -1296,3 +1296,8 @@ Global report generation is persisted in service-only `global_contest_report_sna
 ## 2026-11-16 - Contributor scorecard and assignment policy
 
 Contributor scorecard #54 and project 3 Contributions view show category counts/points. Implementation: scripts/contributor-policy.mjs, .github/contribution-policy.json, and .github/workflows/contributor-policy.yml. Feature doc: docs/features/contributor-scorecard.md.
+
+
+## 2026-11-17 - Improved and automatic contributor onboarding
+
+Onboarding master #56 and four children #57–60 now have stronger checkpoints and mentor handoffs. Versioned templates/config: .github/onboarding/. Reconciler: scripts/onboard-members.mjs. Workflow: onboard-contributors.yml. Feature doc: docs/features/contributor-onboarding.md.

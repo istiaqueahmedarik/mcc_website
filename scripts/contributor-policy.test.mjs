@@ -53,3 +53,8 @@ test('scorecard includes zero-point members and issue links',()=>{
   const text=renderScorecard([issue()],policy);
   assert.ok(text.includes('| @Owner | 0 / 0'));assert.ok(text.includes('[#1](https://github.com/owner/repo/issues/1)'));assert.ok(text.includes('not an immutable historical ledger'));
 });
+
+test('onboarding and reusable templates never earn contribution credit',()=>{
+ const r=scoreIssues([issue({labels:['onboarding','points:accepted','sp:5','type:documentation']}),issue({number:2,labels:['template','points:accepted','sp:5','type:documentation']})],policy);
+ assert.equal(r.rows[1].total,0);assert.equal(r.excluded.length,0);
+});

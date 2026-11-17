@@ -32,7 +32,7 @@ export function scoreIssues(issues, policy) {
     if (seen.has(issue.number)) continue;
     seen.add(issue.number);
     const labels = (issue.labels ?? []).map(x => typeof x === 'string' ? x : x.name);
-    if (issue.pull_request || issue.number === policy.dashboardIssueNumber || !labels.includes('points:accepted')) continue;
+    if (issue.pull_request || issue.number === policy.dashboardIssueNumber || labels.includes('onboarding') || labels.includes('template') || !labels.includes('points:accepted')) continue;
     let reason;
     const pointLabels = labels.filter(x => x.startsWith('sp:'));
     const typeLabels = labels.filter(x => x.startsWith('type:'));

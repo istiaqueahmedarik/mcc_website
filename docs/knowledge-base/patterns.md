@@ -1104,3 +1104,8 @@ Global generated reports are cache-first. Persist normalized scored output in th
 ## 2026-11-16 - Contributor scorecard and assignment policy
 
 GitHub contribution automation validates config before mutation, executes default-branch code with least privilege, paginates issues, fetches current assignees, removes only unsupported accounts, and reconciles all issues per serialized run. Read-only preview and pure scoring tests separate calculations from external writes.
+
+
+## 2026-11-17 - Improved and automatic contributor onboarding
+
+Idempotent issue-set creation uses owner/Actions-bot-authored per-user/per-step markers across paginated open and closed issues. Preflight duplicate markers and template values before writes; repair missing children and parent links separately. Verify actual assignment; preserve closed states and all content outside an epic managed-link region.
