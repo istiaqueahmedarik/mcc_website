@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validatePolicy, disallowedAssignees, scoreIssues, renderScorecard, listIssues, reconcileAssignments, createApi } from './contributor-policy.mjs';
+import { validatePolicy, disallowedAssignees, scoreIssues, renderScorecard, listIssues, reconcileAssignments, createApi, applyPolicy } from './contributor-policy.mjs';
 const policy = { repository: 'owner/repo', projectUrl: 'https://github.com/users/owner/projects/3', membershipVerifiedOn: '2026-11-16', owner: 'Owner', members: ['Owner', 'Member'], dashboardIssueNumber: 99 };
 const issue = (overrides = {}) => ({ number: 1, state: 'closed', state_reason: 'completed', labels: ['points:accepted','sp:5','type:feature'], assignees: [{login:'Member'}], ...overrides });
 test('invalid or empty rosters fail instead of removing everyone', () => {
@@ -57,4 +57,37 @@ test('scorecard includes zero-point members and issue links',()=>{
 test('onboarding and reusable templates never earn contribution credit',()=>{
  const r=scoreIssues([issue({labels:['onboarding','points:accepted','sp:5','type:documentation']}),issue({number:2,labels:['template','points:accepted','sp:5','type:documentation']})],policy);
  assert.equal(r.rows[1].total,0);assert.equal(r.excluded.length,0);
+});
+
+test('disabled publishing still enforces assignments without accessing or creating a dashboard',async()=>{
+ const calls=[];let assigned=[{login:'Member'},{login:'Outsider'}];
+ const api=async(path,options={})=>{
+  calls.push({path,...options});
+  if(path.startsWith('/issues?'))return [issue({state:'open',assignees:assigned})];
+  if(path==='/issues/1'&&!options.method)return issue({state:'open',assignees:assigned});
+  if(path==='/issues/1/assignees'&&options.method==='DELETE'){assigned=assigned.filter(x=>!options.body.assignees.includes(x.login));return {};}
+  assert.fail('Unexpected dashboard mutation: '+path);
+ };
+ const r=await applyPolicy(api,{...policy,dashboardIssueNumber:0});
+ assert.deepEqual(r.removed,[{number:1,assignees:['Outsider']}]);
+ assert.deepEqual(assigned,[{login:'Member'}]);
+ assert.ok(!calls.some(c=>c.path==='/issues/0'||c.method==='POST'||c.method==='PATCH'));
+});
+test('active publishing updates the configured dashboard',async()=>{
+ const calls=[];const api=async(path,options={})=>{
+  calls.push({path,...options});
+  if(path.startsWith('/issues?'))return [];
+  if(path==='/issues/99'&&!options.method)return {body:'old'};
+  if(path==='/issues/99'&&options.method==='PATCH')return {};
+  assert.fail(path);
+ };
+ await applyPolicy(api,policy);
+ assert.equal(calls.filter(c=>c.method==='PATCH').length,1);
+});
+test('genuine assignment API errors still fail visibly',async()=>{
+ const api=async(path)=>{if(path.startsWith('/issues?'))return [issue()];throw Error('API denied');};
+ await assert.rejects(applyPolicy(api,{...policy,dashboardIssueNumber:0}),/API denied/);
+});
+test('invalid policy fails before any API calls',async()=>{
+ await assert.rejects(applyPolicy(()=>assert.fail('API must not be called'),{...policy,members:[]}),/Invalid policy/);
 });

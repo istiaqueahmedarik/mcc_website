@@ -533,3 +533,8 @@ Render published reports from `classroomMapping.student` first: use its name, `m
 ## 2026-11-17 - Improved and automatic contributor onboarding
 
 Onboarding masters were originally kept outside project manually, but project auto-add matched every open repository issue. Corrected its saved query to exclude onboarding and template labels. Preserve these exclusions and label generated issues at creation to prevent automatic import of a separate learning track.
+
+
+## 2026-11-18 - Assignment roster recovery
+
+Manual board-access changes were not mirrored to the assignment roster, so newly approved members could be removed from issues. A deleted publishing target also made an otherwise successful assignment run look failed. Keep board/roster synchronization in the access-change checklist and allow deliberate publisher shutdown without disabling enforcement.

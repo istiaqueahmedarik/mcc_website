@@ -27,3 +27,10 @@ Acceptance approval is procedural: current Write collaborators can edit labels, 
 The workflow uses GitHub's repository token with contents:read and issues:write; it requires no new token/secret or private-project credential. It runs on issue events, relevant master pushes, manual dispatch, and daily. Global serialized runs each reconcile all issues so a superseded pending event is covered by a later run. It never checks out contributor PR code.
 
 Preview without writes: node scripts/contributor-policy.mjs --preview with GH_TOKEN supplied securely in the runtime environment. Do not paste credentials into a command history. Apply only deliberately with --apply after configuring dashboardIssueNumber. The workflow runs the focused tests first. No application database, migration, dependency installation, or deployment is involved. Onboarding remains separate.
+
+
+## 2026-11-18 - Roster recovery and inactive publishing
+
+Board access now has six approved users: istiaqueahmedarik, trqrizu, ADIB3883, arifulmist, ragibmahtab, rashed-48. The roster mirrors these names. Native GitHub issue-assignment eligibility is independent; trqrizu and ADIB3883 were not eligible on #63 when checked. A comment by the outside user on a specific issue can make them assignable without granting Write access.
+
+Scorecard #54 was deleted and is not recreated. dashboardIssueNumber=0 explicitly disables publishing while retaining membership enforcement and Actions summaries. Set a positive valid issue number deliberately to re-enable publishing. Real API errors are still reported. Merging roster changes also triggers the existing onboarding workflow for non-baseline members.

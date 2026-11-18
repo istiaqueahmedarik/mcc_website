@@ -1,0 +1,196 @@
+TAP version 13
+# Subtest: invalid or empty rosters fail instead of removing everyone
+ok 1 - invalid or empty rosters fail instead of removing everyone
+  ---
+  duration_ms: 2.405359
+  type: 'test'
+  ...
+# Subtest: only approved member assignees qualify, case insensitive
+ok 2 - only approved member assignees qualify, case insensitive
+  ---
+  duration_ms: 0.810546
+  type: 'test'
+  ...
+# Subtest: credits types and totals once per completed accepted issue
+ok 3 - credits types and totals once per completed accepted issue
+  ---
+  duration_ms: 0.369124
+  type: 'test'
+  ...
+# Subtest: unaccepted work, PRs and dashboard never earn credit
+ok 4 - unaccepted work, PRs and dashboard never earn credit
+  ---
+  duration_ms: 0.145217
+  type: 'test'
+  ...
+# Subtest: reopened and not-planned issues do not earn credit
+ok 5 - reopened and not-planned issues do not earn credit
+  ---
+  duration_ms: 0.22163
+  type: 'test'
+  ...
+# Subtest: shared and ambiguous attribution is excluded, not double-counted
+ok 6 - shared and ambiguous attribution is excluded, not double-counted
+  ---
+  duration_ms: 0.238513
+  type: 'test'
+  ...
+# Subtest: missing, duplicate, noncanonical and unknown points or types require review
+ok 7 - missing, duplicate, noncanonical and unknown points or types require review
+  ---
+  duration_ms: 0.308803
+  type: 'test'
+  ...
+# Subtest: reconciles fresh API assignments and only removes nonmembers
+ok 8 - reconciles fresh API assignments and only removes nonmembers
+  ---
+  duration_ms: 0.293342
+  type: 'test'
+  ...
+# Subtest: PR assignments are outside this issue policy
+ok 9 - PR assignments are outside this issue policy
+  ---
+  duration_ms: 0.298532
+  type: 'test'
+  ...
+# Subtest: pagination includes issues beyond first page
+ok 10 - pagination includes issues beyond first page
+  ---
+  duration_ms: 0.436183
+  type: 'test'
+  ...
+# Subtest: API errors omit response body and credentials
+ok 11 - API errors omit response body and credentials
+  ---
+  duration_ms: 0.613268
+  type: 'test'
+  ...
+# Subtest: scorecard includes zero-point members and issue links
+ok 12 - scorecard includes zero-point members and issue links
+  ---
+  duration_ms: 0.333429
+  type: 'test'
+  ...
+# Subtest: onboarding and reusable templates never earn contribution credit
+ok 13 - onboarding and reusable templates never earn contribution credit
+  ---
+  duration_ms: 0.139793
+  type: 'test'
+  ...
+# Subtest: disabled publishing still enforces assignments without accessing or creating a dashboard
+ok 14 - disabled publishing still enforces assignments without accessing or creating a dashboard
+  ---
+  duration_ms: 1.639974
+  type: 'test'
+  ...
+# Subtest: active publishing updates the configured dashboard
+ok 15 - active publishing updates the configured dashboard
+  ---
+  duration_ms: 0.268716
+  type: 'test'
+  ...
+# Subtest: genuine assignment API errors still fail visibly
+ok 16 - genuine assignment API errors still fail visibly
+  ---
+  duration_ms: 0.201967
+  type: 'test'
+  ...
+# Subtest: invalid policy fails before any API calls
+ok 17 - invalid policy fails before any API calls
+  ---
+  duration_ms: 0.127966
+  type: 'test'
+  ...
+# Subtest: targets only new roster members; manual request can include baseline members
+ok 18 - targets only new roster members; manual request can include baseline members
+  ---
+  duration_ms: 2.062236
+  type: 'test'
+  ...
+# Subtest: rejects invalid config and unapproved mentor before any mutation
+ok 19 - rejects invalid config and unapproved mentor before any mutation
+  ---
+  duration_ms: 0.807479
+  type: 'test'
+  ...
+# Subtest: renderer rejects missing values and leaves no execution interpretation
+ok 20 - renderer rejects missing values and leaves no execution interpretation
+  ---
+  duration_ms: 0.193084
+  type: 'test'
+  ...
+# Subtest: creates one epic and four labelled native sub-issues with assignments
+ok 21 - creates one epic and four labelled native sub-issues with assignments
+  ---
+  duration_ms: 1.435957
+  type: 'test'
+  ...
+# Subtest: rerun creates no duplicates or duplicate relationships
+ok 22 - rerun creates no duplicates or duplicate relationships
+  ---
+  duration_ms: 1.882033
+  type: 'test'
+  ...
+# Subtest: recovers a partial creation even when the response was lost
+ok 23 - recovers a partial creation even when the response was lost
+  ---
+  duration_ms: 0.748756
+  type: 'test'
+  ...
+# Subtest: repairs parent links independently of existing tickets
+ok 24 - repairs parent links independently of existing tickets
+  ---
+  duration_ms: 0.923601
+  type: 'test'
+  ...
+# Subtest: preserves closed children, learner notes and epic content outside managed links
+ok 25 - preserves closed children, learner notes and epic content outside managed links
+  ---
+  duration_ms: 0.903735
+  type: 'test'
+  ...
+# Subtest: fails duplicate trusted markers before any write
+ok 26 - fails duplicate trusted markers before any write
+  ---
+  duration_ms: 1.108789
+  type: 'test'
+  ...
+# Subtest: ignores marker spoofed by an untrusted issue author and ignores PRs
+ok 27 - ignores marker spoofed by an untrusted issue author and ignores PRs
+  ---
+  duration_ms: 0.525016
+  type: 'test'
+  ...
+# Subtest: reports silently ignored assignments rather than claiming success
+ok 28 - reports silently ignored assignments rather than claiming success
+  ---
+  duration_ms: 1.039025
+  type: 'test'
+  ...
+# Subtest: all-baseline automatic run does nothing
+ok 29 - all-baseline automatic run does nothing
+  ---
+  duration_ms: 0.218485
+  type: 'test'
+  ...
+# Subtest: repairs missing link region without overwriting other epic notes
+ok 30 - repairs missing link region without overwriting other epic notes
+  ---
+  duration_ms: 0.081816
+  type: 'test'
+  ...
+# Subtest: preflights all templates before creating anything
+ok 31 - preflights all templates before creating anything
+  ---
+  duration_ms: 0.198274
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 83.204276

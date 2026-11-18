@@ -110,25 +110,30 @@ export async function reconcileAssignments(api, issues, policy) {
   return removed;
 }
 
+// Publishing can be disabled independently of membership enforcement. A deleted
+// dashboard must be disabled deliberately rather than recreated without consent.
+export async function applyPolicy(api, policy) {
+  validatePolicy(policy);
+  const removed = await reconcileAssignments(api, await listIssues(api), policy);
+  const body = renderScorecard(await listIssues(api), policy);
+  if (policy.dashboardIssueNumber > 0) {
+    const current = await api(`/issues/${policy.dashboardIssueNumber}`);
+    if (current.body !== body) await api(`/issues/${policy.dashboardIssueNumber}`, { method: 'PATCH', body: { body } });
+  }
+  return { body, removed };
+}
+
 async function main() {
   const apply = process.argv.includes('--apply');
   if (!apply && !process.argv.includes('--preview')) throw new Error('Choose --preview (read-only) or --apply');
   const policy = validatePolicy(JSON.parse(await readFile(new URL('../.github/contribution-policy.json', import.meta.url), 'utf8')));
   if (!process.env.GH_TOKEN) throw new Error('GH_TOKEN is required');
   if (process.env.GITHUB_REPOSITORY && process.env.GITHUB_REPOSITORY !== policy.repository) throw new Error('Repository does not match approved policy');
-  if (apply && policy.dashboardIssueNumber < 1) throw new Error('Configure the dashboard issue before applying');
   const api = createApi({ repository: policy.repository, token: process.env.GH_TOKEN });
-  let issues = await listIssues(api);
-  if (apply) {
-    const removed = await reconcileAssignments(api, issues, policy);
-    console.log(JSON.stringify({ removed }));
-    issues = await listIssues(api);
-  }
-  const body = renderScorecard(issues, policy);
-  if (apply) {
-    const current = await api(`/issues/${policy.dashboardIssueNumber}`);
-    if (current.body !== body) await api(`/issues/${policy.dashboardIssueNumber}`, { method: 'PATCH', body: { body } });
-  }
+  const { body, removed } = apply
+    ? await applyPolicy(api, policy)
+    : { body: renderScorecard(await listIssues(api), policy), removed: [] };
+  if (apply) console.log(JSON.stringify({ removed, publishing: policy.dashboardIssueNumber > 0 ? 'enabled' : 'disabled' }));
   if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, body);
   if (!apply) process.stdout.write(body);
 }
