@@ -1229,3 +1229,7 @@ Correct the approved roster from two to the six observed board members. Do not g
 ## 2026-11-18 - Require PR conventions
 
 The user requested PR title and description enforcement. Use Conventional Commit-style titles and exact Problem, Changes, Validation, Review notes headings. Require useful non-placeholder prose. Publish GitHub Actions status `PR convention`, with explicit owner bypass preserved. Metadata is untrusted data; validate it using trusted default-branch code. The implementation PR bootstraps via owner bypass; merge activates checks for existing and future PRs.
+
+## 2026-11-19 - Report metadata failures on the associated PR
+
+The metadata workflow sweeps all open master PRs to repair stale statuses after shared-head changes. A PR-triggered job reports the triggering PR's validation outcome, including shared-head failures. Each checked head still receives its own required status. Base pushes and manual reconciliation report the whole sweep.
