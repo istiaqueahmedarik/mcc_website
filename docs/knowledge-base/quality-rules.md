@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-11-18 - Keep signup submissions recoverable
+
+Budget multipart metadata above the combined image limits. Validate the same files in the browser and Server Action, and test both images at the advertised size limit through the app. Handle rejected actions in the form so applicants can retry with their entries and files. Navigate to pending approval only after the signup service confirms account creation.
+
 ## 2026-11-16 - Test stalled streams through the application
 
 Verify pending connections, headers without messages, silence after healthy data, successful fallback, recovery without duplicate polling, late results, visibility cleanup, and permission loss. A healthy in-process SSE test alone does not verify proxy behavior. Never mark a live status healthy just because its HTTP connection opened.

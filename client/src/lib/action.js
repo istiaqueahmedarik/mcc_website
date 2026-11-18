@@ -7,6 +7,7 @@ import { cache } from "react";
 import { createClient } from "../utils/supabase/server";
 import { clearAuthCookies, setAuthCookies } from "./auth-cookies";
 import { getSafeReturnPath } from "./safe-return-path.mjs";
+import { validateSignupImages } from "./signup-validation.mjs";
 
 const serverBase =
   (process.env.SERVER_URL || process.env.NEXT_PUBLIC_SERVER_URL || "").replace(
@@ -391,9 +392,8 @@ export async function updateAchievement(prevState, formData) {
   };
 }
 
-export async function signUp(prevState, formData) {
-
-  let raw = Object.fromEntries(formData)
+export async function signUp(formData) {
+  const raw = Object.fromEntries(formData);
   
   // Validate password length
   if (!raw.password || raw.password.length < 8) {
@@ -426,25 +426,11 @@ export async function signUp(prevState, formData) {
     };
   }
 
-  const validateImage = (file, label) => {
-    if (!file || typeof file === "string" || file.size === 0) {
-      return `${label} is required`;
-    }
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      return `${label} must be a JPG or PNG image`;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      return `${label} must be 5MB or smaller`;
-    }
-    return "";
-  };
-
-  const profilePictureError = validateImage(raw.profile_pic, "Profile picture");
-  const idCardError = validateImage(raw.mist_id_card, "MIST ID card");
-  if (profilePictureError || idCardError) {
+  const imageError = validateSignupImages(raw);
+  if (imageError) {
     return {
       success: false,
-      message: profilePictureError || idCardError,
+      message: imageError,
     };
   }
 
@@ -473,17 +459,18 @@ export async function signUp(prevState, formData) {
   if (error) {
     return {
       success: false,
-      message: "Problem uploading image",
+      message: "Problem uploading MIST ID card",
     };
   }
   raw.mist_id_card = url;
   const response = await post("auth/signup", raw);
-  if (response.error)
+  if (typeof response?.error === "string" && response.error) {
     return {
       success: false,
       message: response.error,
     };
-  redirect("/signup/pending");
+  }
+  return { success: response?.result?.[0]?.id != null };
 }
 
 export async function login(prevState, formData) {
