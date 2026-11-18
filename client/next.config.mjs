@@ -32,7 +32,8 @@ const nextConfig = {
   experimental: {
     webpackMemoryOptimizations: true,
     serverActions: {
-      bodySizeLimit: "10mb",
+      // Signup can submit two 5 MiB images plus multipart metadata.
+      bodySizeLimit: "11mb",
     },
     viewTransition: true,
     // ppr: 'incremental',

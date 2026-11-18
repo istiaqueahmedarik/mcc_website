@@ -13,6 +13,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUp } from "@/lib/action";
+import {
+  validateSignupImage,
+  validateSignupImages,
+} from "@/lib/signup-validation.mjs";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -31,15 +35,15 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useActionState, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 
-const initialState = {
-  message: "",
-  success: false,
-};
+const submissionError = "We couldn't submit your registration. Please try again.";
 
 export default function Page() {
-  const [state, formAction, pending] = useActionState(signUp, initialState);
+  const router = useRouter();
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
   const [idCardImage, setIdCardImage] = useState(null);
   const fileInputRef = useRef(null);
   const [password, setPassword] = useState("");
@@ -49,27 +53,45 @@ export default function Page() {
   const [agree, setAgree] = useState(false);
   const [idError, setIdError] = useState("");
 
-  const maxIdSize = 5 * 1024 * 1024; // 5MB
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (pending || !agree) return;
 
-  const passwordStrength = (pw) => {
-    // Simple validation: just check if password is at least 8 characters
-    return pw.length >= 8 ? 1 : 0;
+    const formData = new FormData(event.currentTarget);
+    const imageError = validateSignupImages(Object.fromEntries(formData));
+    if (imageError) {
+      setMessage(imageError);
+      return;
+    }
+
+    setMessage("");
+    setPending(true);
+    try {
+      const result = await signUp(formData);
+      if (result?.success) {
+        router.push("/signup/pending");
+        return;
+      }
+      setMessage(result?.message || submissionError);
+    } catch {
+      setMessage(submissionError);
+    }
+    setPending(false);
   };
 
   const handlePickedFile = (file) => {
-    if (!file) return;
-    if (!["image/jpeg", "image/png"].includes(file.type)) {
-      setIdError("Please select a JPG or PNG image.");
+    const imageError = validateSignupImage(file, "MIST ID card");
+    setIdError(imageError);
+    setIdCardImage(null);
+    if (imageError) {
+      fileInputRef.current.value = "";
       return;
     }
-    if (file.size > maxIdSize) {
-      setIdError("File too large. Max 5MB.");
-      return;
-    }
-    setIdError("");
     const reader = new FileReader();
     reader.onload = () => {
-      setIdCardImage(reader.result);
+      if (fileInputRef.current?.files?.[0] === file) {
+        setIdCardImage(reader.result);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -156,7 +178,7 @@ export default function Page() {
                 animate="visible"
                 className="space-y-6"
               >
-                <form action={formAction} className="space-y-4">
+                <form method="post" onSubmit={handleSubmit} className="space-y-4">
                   <motion.div variants={itemVariants} className="space-y-2">
                     <Label htmlFor="full_name" className="text-sm font-medium">
                       Full Name
@@ -412,7 +434,6 @@ export default function Page() {
                         accept="image/jpeg,image/png"
                         className="hidden"
                         onChange={handleIdCardUpload}
-                        required
                       />
 
                       {!idCardImage ? (
@@ -464,15 +485,13 @@ export default function Page() {
                     </div>
                   </motion.div>
 
-                  {state?.message && (
+                  {message && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
-                      <Alert
-                        variant={state?.success ? "default" : "destructive"}
-                      >
-                        <AlertDescription>{state?.message}</AlertDescription>
+                      <Alert variant="destructive">
+                        <AlertDescription>{message}</AlertDescription>
                       </Alert>
                     </motion.div>
                   )}
