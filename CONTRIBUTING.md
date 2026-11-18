@@ -65,3 +65,26 @@ Use the [Contributions view](https://github.com/users/istiaqueahmedarik/projects
 ## New member onboarding
 
 Use master epic #56 and child templates #57–60 as a separate learning track. After Onboard approved contributors is merged, adding a new approved member to .github/contribution-policy.json triggers a personalized epic plus four sub-issues, with hourly/manual recovery and duplicate protection. Existing owner/trqrizu are baseline members and are not auto-onboarded. Repository or board invitations alone do not trigger the workflow. Keep the membership roster synchronized. Templates, mentor responsibilities, progress evidence, assignment limits, and manual-run instructions are documented in docs/features/contributor-onboarding.md. Onboarding/template tickets stay outside Development auto-add and never earn contribution points.
+
+## Pull request convention
+
+Use `type(optional-scope): summary`, for example `fix(forms): preserve campaign assignments` or `ci: enforce pull request conventions`.
+
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- Type and optional scope are lowercase. Scope may contain letters, numbers, dots, slashes, or hyphens and is at most 40 characters. An optional `!` before the colon flags a breaking change.
+- Explain the concrete change in a summary of at least 10 characters. Keep the complete title at most 100 characters, on one line, without a final period.
+
+Complete the default PR template with these exact level-two headings, once each:
+
+1. `## Problem`: describe the problem, trigger, reason, and related issue where relevant.
+2. `## Changes`: explain resulting behavior and key implementation decisions.
+3. `## Validation`: record actual checks/commands and results; explain checks not run. Do not claim testing that was not performed.
+4. `## Review notes`: give a logical file review order plus relevant risks, migration/rollback instructions, and UI evidence. Explain when these do not apply.
+
+Every section needs at least 20 characters and 3 words of substantive prose outside comments and fenced examples. Bare TODO, TBD, N/A, empty checklists, and the untouched template do not satisfy the check. Explain non-applicability rather than leaving a placeholder. Additional sections are welcome. Link issues with closing keywords such as `Fixes #123` where appropriate.
+
+The required **PR convention** status validates structure on opening, editing, reopening, new commits, and marking ready for review. Its workflow summary gives actionable errors. Editing a title/body reruns it without a code push. The default-branch workflow also checks all open PRs when the policy changes and supports manual recovery. The check reads current metadata and publishes to the PR head commit, including fork PRs, using only trusted default-branch code. It never executes PR code with a write token.
+
+This is a format check, not a judgment of factual correctness or review quality. Reviewers must still assess the explanation and evidence. Commit statuses are SHA-scoped: open PRs targeting master that share a head SHA must all satisfy the convention. Metadata edits have a short webhook processing window before the status updates; refresh/wait for the latest run before merging. The owner's existing explicit bypass remains unchanged.
+
+Rollout: the workflow starts after its implementation PR merges into master. The required status is registered in branch rules; the owner can merge the bootstrap PR using the existing bypass. Its push event then evaluates existing open PRs. Old PR descriptions may require updating.

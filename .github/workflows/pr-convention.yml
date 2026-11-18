@@ -1,0 +1,50 @@
+name: PR metadata convention
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, closed]
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/pr-convention.yml
+      - scripts/pr-convention.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: pr-convention
+  cancel-in-progress: true
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Only trusted default-branch code. Never checkout a PR head/merge commit.
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: '24.x'
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        with:
+          script: |
+            const { checkPullRequest } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/pr-convention.mjs`);
+            const repo = context.repo;
+            // Reconcile all open PRs so a sibling moving away from a shared SHA
+            // cannot leave the remaining PR stuck with its old failure.
+            const numbers = (await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', base: 'master', per_page: 100 })).map(pr => pr.number);
+            let failed = false;
+            for (const number of numbers) {
+              const errors = await checkPullRequest(github, repo, number, `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`);
+              // Summaries contain only validator-owned messages, never PR-supplied text.
+              await core.summary.addHeading(`PR #${number}`).addRaw(errors.length ? errors.join('\n\n') : 'Title and description passed.').addEOL().write();
+              if (errors.length) failed = true;
+            }
+            if (failed) core.setFailed('PR metadata needs attention. See the job summary and CONTRIBUTING.md.');
