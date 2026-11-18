@@ -1,0 +1,92 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { validatePullRequest, checkPullRequest } from './pr-convention.mjs';
+const valid = {
+  title: 'fix(forms): preserve campaign assignments',
+  body: '## Problem\nApproved board members lose their assignments.\n## Changes\nSynchronize the approved roster with board access.\n## Validation\nRan node tests and all policy tests passed.\n## Review notes\nRead the roster before the validator and tests; no migration needed.',
+};
+
+test('accepts all supported types, scopes, and breaking marker', () => {
+  for (const type of ['feat','fix','docs','style','refactor','perf','test','build','ci','chore','revert']) {
+    for (const suffix of ['', '(forms)', '!', '(forms)!']) assert.deepEqual(validatePullRequest({...valid,title:`${type}${suffix}: preserve campaign assignments`}), []);
+  }
+});
+test('rejects malformed, short, multiline, long, and punctuated titles', () => {
+  for (const title of ['Update forms', 'foo: preserve campaign assignments', 'fix: short', 'fix(Forms): preserve campaign assignments', 'fix: preserve campaign assignments.', 'fix: preserve\nassignments', `fix: ${'a'.repeat(100)}`]) assert.ok(validatePullRequest({...valid,title}).length, title);
+});
+test('requires each section exactly once and useful content', () => {
+  assert.equal(validatePullRequest({title:valid.title}).length, 4);
+  assert.ok(validatePullRequest({...valid,body:valid.body+'\n## Changes\nAnother explanation with sufficient detail.'}).some(e=>e.includes('duplicate')));
+  for (const placeholder of ['', 'TODO', 'TBD', 'N/A', '<!-- complete this section with a useful explanation -->', '- [ ] TODO']) {
+    assert.ok(validatePullRequest({...valid,body:valid.body.replace('Ran node tests and all policy tests passed.',placeholder)}).some(e=>e.includes('Validation')));
+  }
+});
+test('untouched template fails and explained non-applicability passes', () => {
+  assert.equal(validatePullRequest({...valid,body:readFileSync(new URL('../.github/pull_request_template.md',import.meta.url),'utf8')}).length,4);
+  assert.deepEqual(validatePullRequest({...valid,body:valid.body.replace('Ran node tests and all policy tests passed.','N/A: documentation only, manually checked all links and examples.')}),[]);
+});
+test('fenced headings and HTML comments cannot satisfy sections', () => {
+  for (const fence of ['```','~~~~']) assert.equal(validatePullRequest({...valid,body:`${fence}md\n${valid.body}\n${fence}`}).length,4);
+  assert.equal(validatePullRequest({...valid,body:`<!--\n${valid.body}\n-->`}).length,4);
+});
+test('supports CRLF, optional extra sections and executable text as plain data', () => {
+  assert.deepEqual(validatePullRequest({...valid,body:valid.body.replaceAll('\n','\r\n')+'\r\n## Related issues\r\nFixes #123'}),[]);
+  assert.deepEqual(validatePullRequest({...valid,title:'fix: handle $(touch /tmp/should-not-exist) safely'}),[]);
+});
+function fakeApi(sequence, statuses, fail = false) {
+  let i=0;
+  return {paginate:async()=>[],rest:{pulls:{get:async()=>({data:sequence[Math.min(i++,sequence.length-1)]})},repos:{createCommitStatus:async s=>{if(fail)throw Error('API denied'); statuses.push(s);}}}};
+}
+const open = {...valid,state:'open',head:{sha:'head-sha'}};
+test('publishes pending then success on current PR head', async()=>{
+  const statuses=[];
+  assert.deepEqual(await checkPullRequest(fakeApi([open],statuses),{owner:'owner',repo:'repo'},1,'https://example.com/run'),[]);
+  assert.deepEqual(statuses.map(s=>[s.sha,s.state,s.context]),[['head-sha','pending','PR convention'],['head-sha','success','PR convention']]);
+});
+test('invalid metadata produces failure with actionable messages',async()=>{
+  const statuses=[];
+  assert.ok((await checkPullRequest(fakeApi([{...open,body:''}],statuses),{},1,'url')).length);
+  assert.equal(statuses.at(-1).state,'failure');
+});
+test('metadata/head change during validation leaves pending instead of stale success',async()=>{
+  for(const changed of [{...open,title:'wrong'},{...open,body:''},{...open,head:{sha:'new-sha'}}]){
+    const statuses=[];
+    assert.ok((await checkPullRequest(fakeApi([open,open,changed],statuses),{},1,'url')).length);
+    assert.equal(statuses.at(-1).state,'pending');
+    assert.equal(statuses.at(-1).sha,changed.head.sha);
+  }
+});
+test('closed PRs are skipped and API failures propagate',async()=>{
+  const statuses=[];
+  assert.deepEqual(await checkPullRequest(fakeApi([{...open,state:'closed'}],statuses),{},1,'url'),[]);
+  assert.equal(statuses.length,0);
+  await assert.rejects(checkPullRequest(fakeApi([open],[],true),{},1,'url'),/API denied/);
+});
+
+test('an invalid open PR sharing the SHA prevents a passing status',async()=>{
+  const statuses=[];
+  const peer={...open,number:2,body:''};
+  const api=fakeApi([open],statuses);
+  api.paginate=async()=>[peer];
+  api.rest.pulls.get=async({pull_number})=>({data:pull_number===2?peer:open});
+  const errors=await checkPullRequest(api,{},1,'url');
+  assert.ok(errors.some(e=>e.startsWith('PR #2:')));
+  assert.equal(statuses.at(-1).state,'failure');
+});
+
+test('GitHub null descriptions produce actionable section errors',()=>{
+  assert.equal(validatePullRequest({...valid,body:null}).length,4);
+});
+test('a fence with trailing text does not close an example',()=>{
+  assert.equal(validatePullRequest({...valid,body:'```md\n```not-a-close\n'+valid.body+'\n```'}).length,4);
+});
+
+test('remaining PR passes after invalid peer moves to another commit',async()=>{
+  const statuses=[];
+  const moved={...open,number:2,body:'',head:{sha:'different-sha'}};
+  const api=fakeApi([open],statuses);
+  api.paginate=async()=>[moved];
+  assert.deepEqual(await checkPullRequest(api,{},1,'url'),[]);
+  assert.equal(statuses.at(-1).state,'success');
+});

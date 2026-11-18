@@ -1225,3 +1225,7 @@ User requested improved onboarding and automatic creation for added contributors
 ## 2026-11-18 - Assignment roster recovery
 
 Correct the approved roster from two to the six observed board members. Do not grant repository permissions to overcome native assignee limits. Treat dashboardIssueNumber=0 as explicit disabled publishing; keep membership reconciliation and summary generation active. Deleted scorecard54 is not recreated.
+
+## 2026-11-18 - Require PR conventions
+
+The user requested PR title and description enforcement. Use Conventional Commit-style titles and exact Problem, Changes, Validation, Review notes headings. Require useful non-placeholder prose. Publish GitHub Actions status `PR convention`, with explicit owner bypass preserved. Metadata is untrusted data; validate it using trusted default-branch code. The implementation PR bootstraps via owner bypass; merge activates checks for existing and future PRs.
