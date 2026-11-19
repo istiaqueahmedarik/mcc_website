@@ -1,5 +1,9 @@
 # Quality Rules
 
+## 2026-11-19 - Verify signup through the proxy size limit
+
+Test multipart signup through a reverse proxy with the deployed body cap. With a deliberately invalid field that prevents writes, verify that a request near the chosen upload budget reaches application validation and a larger request reproduces the proxy rejection. For success and approval, use real route handlers and disposable database state.
+
 ## 2026-11-18 - Keep signup submissions recoverable
 
 Budget multipart metadata above the combined image limits. Validate the same files in the browser and Server Action, and test both images at the advertised size limit through the app. Handle rejected actions in the form so applicants can retry with their entries and files. Navigate to pending approval only after the signup service confirms account creation.

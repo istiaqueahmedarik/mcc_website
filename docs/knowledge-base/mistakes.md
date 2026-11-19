@@ -1,4 +1,8 @@
 
+## 2026-11-19 - Signup verification stopped at Next.js
+
+The first signup fix removed the browser crash and verified the Next.js body limit locally. The production request still failed because nginx rejected larger submissions before they reached Next.js. A deliberately invalid signup reached live validation with 984,000 image bytes and got HTTP 413 with 1,060,000. Include a real proxy boundary in signup verification and record which parts of the account lifecycle were exercised against production and disposable services.
+
 ## 2026-11-16 - Forms Connecting had no escape path
 
 Normal dashboard reads succeeded independently of the live stream. The label could remain Connecting indefinitely because no deadline or fallback existed; healthy local SSE verification missed this failure condition. The correction adds a watchdog, truthful states, serialized polling, and a silent-stream fixture. Production buffering remains a hypothesis until inspected.

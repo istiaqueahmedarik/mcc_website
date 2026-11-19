@@ -66,9 +66,9 @@ export const signup = async (c: any) => {
     }
     const hash = await Bun.password.hash(password);
     const result = await sql.begin(async (tx) => {
-      const inserted = await tx`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name)
-        VALUES (${full_name}, ${profile_pic}, ${Number(normalizedMistId)}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName})
-        RETURNING *`;
+      const inserted = await tx`INSERT INTO users (full_name, profile_pic, mist_id, mist_id_card, email, phone, password, batch_name, granted)
+        VALUES (${full_name}, ${profile_pic}, ${Number(normalizedMistId)}, ${mist_id_card}, ${email}, ${phone}, ${hash}, ${normalizedBatchName}, false)
+        RETURNING id`;
       if (inserted[0]?.id) await markPreEnrollmentClaimsForUser(inserted[0].id, tx);
       return inserted;
     });

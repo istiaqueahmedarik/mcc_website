@@ -298,8 +298,11 @@ export async function markPreEnrollmentClaimsForUser(userId: string, executor: a
     FROM users placeholder
     WHERE placeholder.id = cs.student_id
       AND placeholder.is_pre_enrolled = true
-      AND cs.enrollment_status = ${ENROLLMENT_PRE_ENROLLED}
-      AND (cs.claimed_user_id IS NULL OR cs.claimed_user_id = ${user.id})
+      AND (
+        (cs.enrollment_status = ${ENROLLMENT_PRE_ENROLLED}
+          AND (cs.claimed_user_id IS NULL OR cs.claimed_user_id = ${user.id}))
+        OR (cs.enrollment_status = ${ENROLLMENT_LINK_PENDING} AND cs.claimed_user_id IS NULL)
+      )
       AND (
         (${mistId} <> '' AND placeholder.mist_id::text = ${mistId})
         OR (${email} <> '' AND lower(cs.pre_enrollment_email) = ${email})

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUp } from "@/lib/action";
+import { prepareSignupImages } from "@/lib/prepare-signup-images";
 import {
   validateSignupImage,
   validateSignupImages,
@@ -67,6 +68,12 @@ export default function Page() {
     setMessage("");
     setPending(true);
     try {
+      const preparationError = await prepareSignupImages(formData);
+      if (preparationError) {
+        setMessage(preparationError);
+        setPending(false);
+        return;
+      }
       const result = await signUp(formData);
       if (result?.success) {
         router.push("/signup/pending");
