@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validatePullRequest, checkPullRequest } from './pr-convention.mjs';
+import { validatePullRequest, checkPullRequest, reconcileOpenPullRequests } from './pr-convention.mjs';
 const valid = {
   title: 'fix(forms): preserve campaign assignments',
   body: '## Problem\nApproved board members lose their assignments.\n## Changes\nSynchronize the approved roster with board access.\n## Validation\nRan node tests and all policy tests passed.\n## Review notes\nRead the roster before the validator and tests; no migration needed.',
@@ -89,4 +89,67 @@ test('remaining PR passes after invalid peer moves to another commit',async()=>{
   api.paginate=async()=>[moved];
   assert.deepEqual(await checkPullRequest(api,{},1,'url'),[]);
   assert.equal(statuses.at(-1).state,'success');
+});
+
+function fakeRepository(pullRequests, statuses) {
+  const api = fakeApi(pullRequests, statuses);
+  api.paginate = async () => pullRequests;
+  api.rest.pulls.get = async ({ pull_number }) => ({
+    data: pullRequests.find(({ number }) => number === pull_number),
+  });
+  return api;
+}
+
+test('a valid triggering PR keeps a passing job while unrelated errors are reported', async () => {
+  const statuses = [];
+  const api = fakeRepository([
+    { ...open, number: 1 },
+    { ...open, number: 2, body: '', head: { sha: 'unrelated-sha' } },
+  ], statuses);
+
+  const { failed, reports } = await reconcileOpenPullRequests(api, {}, 'url', 1);
+
+  assert.equal(failed, false);
+  assert.deepEqual(reports.map(({ number, errors }) => [number, errors.length]), [[1, 0], [2, 4]]);
+  assert.deepEqual(statuses.filter(({ state }) => state !== 'pending').map(({ sha, state }) => [sha, state]), [
+    ['head-sha', 'success'],
+    ['unrelated-sha', 'failure'],
+  ]);
+});
+
+test('an invalid triggering PR and a repository-wide run both fail', async () => {
+  const statuses = [];
+  const api = fakeRepository([{ ...open, number: 2, body: '' }], statuses);
+
+  assert.equal((await reconcileOpenPullRequests(api, {}, 'url', 2)).failed, true);
+  assert.equal((await reconcileOpenPullRequests(api, {}, 'url')).failed, true);
+  assert.equal((await reconcileOpenPullRequests(api, {}, 'url', 3)).failed, false);
+});
+
+test('a valid triggering PR still fails when an invalid peer shares its head', async () => {
+  const statuses = [];
+  const api = fakeRepository([
+    { ...open, number: 1 },
+    { ...open, number: 2, body: '' },
+  ], statuses);
+
+  const { failed, reports } = await reconcileOpenPullRequests(api, {}, 'url', 1);
+
+  assert.equal(failed, true);
+  assert.ok(reports[0].errors.some(error => error.startsWith('PR #2:')));
+  assert.equal(statuses.at(-1).state, 'failure');
+});
+
+test('an API error on an unrelated PR still fails reconciliation', async () => {
+  const api = fakeRepository([
+    { ...open, number: 1 },
+    { ...open, number: 2, head: { sha: 'unrelated-sha' } },
+  ], []);
+  const getPull = api.rest.pulls.get;
+  api.rest.pulls.get = async (params) => {
+    if (params.pull_number === 2) throw new Error('API denied');
+    return getPull(params);
+  };
+
+  await assert.rejects(reconcileOpenPullRequests(api, {}, 'url', 1), /API denied/);
 });

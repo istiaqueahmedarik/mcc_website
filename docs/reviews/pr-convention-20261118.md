@@ -13,3 +13,9 @@ Review in this order:
 Validation: 45 Node tests pass across PR convention, contributor policy, and onboarding. git diff --check passes; both workflow YAML documents parse. Read-only delegated security review identified and prompted fixes for null descriptions, fenced-heading parsing, and shared-SHA status cleanup. No application build is needed for these metadata-only changes; regular repository CI still runs on the PR.
 
 Operational boundary: add required status PR convention bound to GitHub Actions integration 15368; preserve all existing rules and the owner's explicit bypass. The new target workflow is absent from master until merge, so no hosted enforcement run is claimed before merge. Owner bootstrap merge activates the workflow and its push event reconciles existing PRs. A status reflects the last processed metadata event, with normal webhook scheduling delay; it cannot guarantee substantive truth. Rollback removes the new required status before reverting implementation.
+
+## 2026-11-19 follow-up
+
+PR #86's required status passed while its `metadata` job failed because the sweep found invalid metadata on other open PRs. Read `.github/workflows/pr-convention.yml` for the triggering PR supplied to `reconcileOpenPullRequests`, then `scripts/pr-convention.mjs` for the job result and per-head status updates. `scripts/pr-convention.test.mjs` exercises unrelated and shared-head failures, repository-wide runs, and API errors.
+
+All 49 policy and onboarding tests passed. A local replay of both workflow scripts used current open PR metadata with mocked GitHub status writes. The proposed script passed the job for #86, reported the other PRs' errors in its summary, and produced the same per-head statuses. Policy push and manual runs still failed on the open metadata errors. The default-branch workflow picks up this behavior on merge and a fresh PR event.

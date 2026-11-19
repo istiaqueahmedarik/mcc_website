@@ -85,6 +85,8 @@ Every section needs at least 20 characters and 3 words of substantive prose outs
 
 The required **PR convention** status validates structure on opening, editing, reopening, new commits, and marking ready for review. Its workflow summary gives actionable errors. Editing a title/body reruns it without a code push. The default-branch workflow also checks all open PRs when the policy changes and supports manual recovery. The check reads current metadata and publishes to the PR head commit, including fork PRs, using only trusted default-branch code. It never executes PR code with a write token.
 
+Each PR event reports job failure for metadata errors affecting that PR's head commit. The summary still lists every open PR checked, and each head receives its own **PR convention** status. Policy pushes and manual runs report failure when any open PR needs attention.
+
 This is a format check, not a judgment of factual correctness or review quality. Reviewers must still assess the explanation and evidence. Commit statuses are SHA-scoped: open PRs targeting master that share a head SHA must all satisfy the convention. Metadata edits have a short webhook processing window before the status updates; refresh/wait for the latest run before merging. The owner's existing explicit bypass remains unchanged.
 
 Rollout: the workflow starts after its implementation PR merges into master. The required status is registered in branch rules; the owner can merge the bootstrap PR using the existing bypass. Its push event then evaluates existing open PRs. Old PR descriptions may require updating.

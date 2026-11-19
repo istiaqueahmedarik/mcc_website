@@ -83,6 +83,22 @@ export async function checkPullRequest(github, repo, number, targetUrl) {
   return errors;
 }
 
+export async function reconcileOpenPullRequests(github, repo, targetUrl, triggeringNumber) {
+  // Recheck every open PR to clear stale shared-head failures after a peer moves or closes.
+  const open = await github.paginate(github.rest.pulls.list, {
+    ...repo, state: 'open', base: 'master', per_page: 100,
+  });
+  const reports = [];
+  for (const { number } of open) {
+    const errors = await checkPullRequest(github, repo, number, targetUrl);
+    reports.push({ number, errors });
+  }
+  const failed = reports.some(({ number, errors }) =>
+    errors.length > 0 && (triggeringNumber === undefined || number === triggeringNumber),
+  );
+  return { reports, failed };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
   const errors = validatePullRequest(event.pull_request || event);

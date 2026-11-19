@@ -35,16 +35,17 @@ jobs:
       - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           script: |
-            const { checkPullRequest } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/pr-convention.mjs`);
+            const { reconcileOpenPullRequests } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/pr-convention.mjs`);
             const repo = context.repo;
-            // Reconcile all open PRs so a sibling moving away from a shared SHA
-            // cannot leave the remaining PR stuck with its old failure.
-            const numbers = (await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', base: 'master', per_page: 100 })).map(pr => pr.number);
-            let failed = false;
-            for (const number of numbers) {
-              const errors = await checkPullRequest(github, repo, number, `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`);
-              // Summaries contain only validator-owned messages, never PR-supplied text.
-              await core.summary.addHeading(`PR #${number}`).addRaw(errors.length ? errors.join('\n\n') : 'Title and description passed.').addEOL().write();
-              if (errors.length) failed = true;
+            const targetUrl = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`;
+            const triggeringNumber = context.eventName === 'pull_request_target' ? context.payload.pull_request.number : undefined;
+            const { reports, failed } = await reconcileOpenPullRequests(github, repo, targetUrl, triggeringNumber);
+            if (triggeringNumber !== undefined) {
+              core.summary.addRaw(`The job result reflects PR #${triggeringNumber}. Each open PR receives its own commit status.`).addEOL();
             }
+            for (const { number, errors } of reports) {
+              // Summaries contain only validator-owned messages, never PR-supplied text.
+              core.summary.addHeading(`PR #${number}`).addRaw(errors.length ? errors.join('\n\n') : 'Title and description passed.').addEOL();
+            }
+            await core.summary.write();
             if (failed) core.setFailed('PR metadata needs attention. See the job summary and CONTRIBUTING.md.');
