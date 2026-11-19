@@ -188,7 +188,32 @@ export default function RegistrationClient({ slug }) {
   }
 
   if (loading) return <PageShell><div className="flex min-h-64 items-center justify-center"><Loader2 className="mr-3 h-5 w-5 animate-spin" />Loading registration…</div></PageShell>;
-  if (error && !campaign) return <PageShell><StateCard icon={AlertCircle} title="Registration unavailable" text={error}><Button variant="outline" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" />Try again</Button></StateCard></PageShell>;
+  if (error && !campaign) {
+    const isMissingOrDeleted = error === "Campaign not found" || error.toLowerCase().includes("not found");
+    return (
+      <PageShell>
+        <StateCard
+          icon={AlertCircle}
+          title="Registration unavailable"
+          text={
+            isMissingOrDeleted
+              ? "This registration campaign does not exist or has been removed. Check your link or contact the contest administrator."
+              : error
+          }
+        >
+          {isMissingOrDeleted ? (
+            <ProgressLink href="/">
+              <Button variant="outline">Return home</Button>
+            </ProgressLink>
+          ) : (
+            <Button variant="outline" onClick={() => load()}>
+              <RefreshCw className="mr-2 h-4 w-4" />Try again
+            </Button>
+          )}
+        </StateCard>
+      </PageShell>
+    );
+  }
 
   if (authRequired) return <PageShell><CampaignHeader campaign={campaign} /><StateCard icon={LockKeyhole} title="Sign in to continue" text="Your profile and registration details stay private until you sign in with your MCC account."><ProgressLink href={`/login?returnTo=${encodeURIComponent(`/register/${slug}`)}`}><Button className={`${styles.press} min-h-11`}>Sign in and return</Button></ProgressLink><ProgressLink href="/signup" className="text-sm text-primary underline-offset-4 hover:underline">Need an MCC account? Create one</ProgressLink></StateCard></PageShell>;
   if (!preview) return <PageShell><CampaignHeader campaign={campaign} /><StateCard icon={AlertCircle} title="Your account cannot open this registration" text={error || "Check your account eligibility and try again."}><Button variant="outline" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" />Try again</Button></StateCard></PageShell>;

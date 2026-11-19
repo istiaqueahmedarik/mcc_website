@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { normalizeMistId, profileVersion, validateFormDefinition, validateSubmission } from "./globalFormService";
+import {
+  evaluateCampaignDeletion,
+  normalizeMistId,
+  profileVersion,
+  validateFormDefinition,
+  validateSubmission,
+} from "./globalFormService";
 
 describe("global form validation", () => {
   test("student IDs require exactly nine ASCII digits", () => {
@@ -57,5 +63,74 @@ describe("global form validation", () => {
     const fields: any[] = [{ id:'hours',label:'Hours',type:'number',required:false,mapUserField:null,options:[],helpText:'' }];
     for (const value of [[], {}, true]) expect(validateSubmission(fields,{hours:value},{},{}).ok).toBe(false);
     expect(validateSubmission(fields,{hours:'2.5'},{},{}).ok).toBe(true);
+  });
+});
+
+describe("campaign deletion evaluation", () => {
+  test("allows deletion for clean campaigns with zero dependencies", () => {
+    const result = evaluateCampaignDeletion({
+      responses: 0,
+      eligibility: 0,
+      snapshots: 0,
+      publicReports: 0,
+    });
+    expect(result).toEqual({ allowed: true });
+  });
+
+  test("blocks deletion when student responses exist and explains why", () => {
+    const result = evaluateCampaignDeletion({
+      responses: 12,
+      eligibility: 0,
+      snapshots: 0,
+      publicReports: 0,
+    });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toContain("12 submitted registration(s)");
+      expect(result.reason).toContain("End the campaign instead");
+      expect(result.counts.responses).toBe(12);
+    }
+  });
+
+  test("blocks deletion when referenced by contest room eligibility", () => {
+    const result = evaluateCampaignDeletion({
+      responses: 0,
+      eligibility: 2,
+      snapshots: 0,
+      publicReports: 0,
+    });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toContain("eligibility filter in 2 contest room(s)");
+      expect(result.counts.eligibility).toBe(2);
+    }
+  });
+
+  test("blocks deletion when referenced by historical report snapshots", () => {
+    const result = evaluateCampaignDeletion({
+      responses: 0,
+      eligibility: 0,
+      snapshots: 3,
+      publicReports: 0,
+    });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toContain("3 contest report snapshot(s)");
+      expect(result.counts.snapshots).toBe(3);
+    }
+  });
+
+  test("blocks deletion when referenced by published reports", () => {
+    const result = evaluateCampaignDeletion({
+      responses: 0,
+      eligibility: 0,
+      snapshots: 0,
+      publicReports: 1,
+    });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.reason).toContain("1 contest report snapshot(s) or published report(s)");
+      expect(result.counts.publicReports).toBe(1);
+    }
   });
 });

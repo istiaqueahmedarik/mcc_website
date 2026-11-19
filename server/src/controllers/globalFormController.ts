@@ -3,6 +3,7 @@ import sql from "../db";
 import { normalizeFullNameUpdate } from "../utils/basicProfile";
 import { markPreEnrollmentClaimsForUser } from "../utils/classroomPreEnrollment";
 import {
+  evaluateCampaignDeletion,
   GlobalFormField,
   normalizeMistId,
   normalizeSlug,
@@ -201,6 +202,62 @@ export async function cloneCampaign(c: Ctx) {
     from global_form_campaigns where id = ${c.req.param('id')} returning *
   `;
   return rows[0] ? c.json({ campaign: campaignShape(rows[0]) }, 201) : c.json({ error: 'Campaign not found' }, 404);
+}
+
+export async function deleteCampaign(c: Ctx) {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "Admin access required" }, 403);
+  const campaignId = c.req.param("id");
+
+  try {
+    const result = await sql.begin(async (tx) => {
+      const campaigns = await tx`
+        select id, title, slug, status from global_form_campaigns where id = ${campaignId} for update
+      `;
+      const campaign = campaigns[0];
+      if (!campaign) return { notFound: true };
+
+      const [responseCount] = await tx`
+        select count(*)::int as total from global_form_responses where campaign_id = ${campaign.id}
+      `;
+      const [eligibilityCount] = await tx`
+        select count(*)::int as total from global_contest_report_eligibility where campaign_id = ${campaign.id}
+      `;
+      const [snapshotCount] = await tx`
+        select count(*)::int as total from global_contest_report_snapshots where eligibility_campaign_id = ${campaign.id}
+      `;
+      const [publicReportCount] = await tx`
+        select count(*)::int as total from "Public_contest_report" where eligibility_campaign_id = ${campaign.id}
+      `;
+
+      const evaluation = evaluateCampaignDeletion({
+        responses: responseCount?.total || 0,
+        eligibility: eligibilityCount?.total || 0,
+        snapshots: snapshotCount?.total || 0,
+        publicReports: publicReportCount?.total || 0,
+      });
+
+      if (!evaluation.allowed) {
+        return {
+          blocked: true,
+          reason: evaluation.reason,
+          counts: evaluation.counts,
+        };
+      }
+
+      await tx`delete from global_form_campaigns where id = ${campaign.id}`;
+      return { success: true, id: campaign.id };
+    });
+
+    if (result.notFound) return c.json({ error: "Campaign not found" }, 404);
+    if (result.blocked) return c.json({ error: result.reason, details: result.counts }, 409);
+    return c.json({ success: true, id: result.id });
+  } catch (error: any) {
+    if (error?.code === "23503") {
+      return c.json({ error: "Cannot delete campaign due to existing database dependencies." }, 409);
+    }
+    throw error;
+  }
 }
 
 export async function updateCampaign(c: Ctx) {
