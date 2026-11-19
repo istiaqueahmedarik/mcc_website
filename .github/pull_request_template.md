@@ -1,4 +1,4 @@
-<!-- Title: type(optional-scope): summary. Example: fix(forms): preserve campaign assignments -->
+<!-- Title: <ISSUE>: <Title>. Examples: #47: Preserve campaign assignments | MCC-12: Support group contests | NO-ISSUE: Update agent docs -->
 <!-- Complete every section; remove these comments. Link issues with Fixes #123 where appropriate. -->
 
 ## Problem
