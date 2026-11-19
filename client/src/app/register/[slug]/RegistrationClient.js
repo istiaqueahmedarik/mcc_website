@@ -149,14 +149,15 @@ export default function RegistrationClient({ slug }) {
       const empty = value == null || (typeof value === "string" && value.trim() === "");
       if (field.required && (field.type === "checkbox" ? value !== true : empty)) errors[field.id] = "This field is required.";
       if (!empty && field.mapUserField === "mist_id" && !/^[1-9][0-9]{8}$/.test(String(value).trim())) errors[field.id] = "Student ID must be nine digits and cannot begin with zero.";
-      if (!empty && field.type === "select" && !(field.options || []).includes(value)) errors[field.id] = "Choose one of the available options.";
+      if (!empty && (field.type === "select" || field.type === "radio") && !(field.options || []).includes(value)) errors[field.id] = "Choose one of the available options.";
       if (!empty && field.type === "number" && !Number.isFinite(Number(value))) errors[field.id] = "Enter a valid number.";
       if (!empty && field.type === "date" && Number.isNaN(Date.parse(`${value}T00:00:00`))) errors[field.id] = "Enter a valid date.";
     }
     if (!agreement) errors.agreement = "You must agree before registering.";
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
-      requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]')?.focus());
+      // data-invalid marks radio inputs; ARIA places invalid state on their radiogroup instead.
+      requestAnimationFrame(() => formRef.current?.querySelector('[aria-invalid="true"]:not([role="radiogroup"]), [data-invalid="true"]')?.focus());
     }
     return Object.keys(errors).length === 0;
   }
@@ -227,12 +228,58 @@ function ProfileFact({ label, value, pending, help }) { return <div className="m
 function RegistrationField({ field, value, onChange, error, profileInput }) {
   const id = `field-${field.id}`;
   const common = { id, "aria-invalid": Boolean(error), "aria-describedby": error ? `${id}-error` : field.helpText ? `${id}-help` : undefined };
+  if (field.type === "radio") return <RadioQuestion field={field} id={id} value={value} onChange={onChange} error={error} />;
   let control;
   if (field.type === "long_text") control = <Textarea {...common} value={value} onChange={(event) => onChange(event.target.value)} />;
   else if (field.type === "select") control = <select {...common} className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose an option</option>{(field.options || []).map((option) => <option key={option} value={option}>{option}</option>)}</select>;
   else if (field.type === "checkbox") control = <label className="flex min-h-11 items-center gap-3"><Checkbox id={id} checked={Boolean(value)} onCheckedChange={(checked) => onChange(Boolean(checked))} aria-invalid={Boolean(error)} /><span className="text-sm">Yes</span></label>;
   else control = <Input {...common} type={field.mapUserField === "mist_id" ? "text" : field.type} inputMode={field.mapUserField === "mist_id" ? "numeric" : undefined} pattern={field.mapUserField === "mist_id" ? "[0-9]{9}" : undefined} value={value} onChange={(event) => onChange(event.target.value)} />;
   return <div className="space-y-2"><div className="flex flex-wrap items-center gap-2"><Label htmlFor={id}>{field.label}{field.required && <span aria-hidden="true"> *</span>}</Label>{profileInput && <Badge variant="outline">Completes profile</Badge>}</div>{control}{field.helpText && <p id={`${id}-help`} className="text-xs text-muted-foreground">{field.helpText}</p>}{error && <p id={`${id}-error`} className="text-sm text-destructive">{error}</p>}</div>;
+}
+
+// Native radios give one selection per group name, Tab into the group, and arrow-key movement.
+function RadioQuestion({ field, id, value, onChange, error }) {
+  const describedBy = [field.helpText && `${id}-help`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
+  return (
+    <fieldset
+      role="radiogroup"
+      aria-labelledby={`${id}-legend`}
+      aria-describedby={describedBy}
+      aria-required={field.required}
+      aria-invalid={Boolean(error)}
+      className="space-y-2"
+    >
+      <legend id={`${id}-legend`} className="mb-2 text-sm font-medium leading-none">
+        {field.label}{field.required && <span aria-hidden="true"> *</span>}
+      </legend>
+      <div className="grid gap-2">
+        {(field.options || []).map((option, index) => {
+          const optionId = `${id}-option-${index}`;
+          return (
+            <label
+              key={option}
+              htmlFor={optionId}
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/40 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 has-[:checked]:border-foreground/40 has-[:checked]:bg-muted/60"
+            >
+              <input
+                type="radio"
+                id={optionId}
+                name={id}
+                value={option}
+                checked={value === option}
+                onChange={() => onChange(option)}
+                data-invalid={Boolean(error)}
+                className="h-4 w-4 shrink-0 accent-primary focus-visible:outline-none"
+              />
+              <span className="min-w-0 break-words">{option}</span>
+            </label>
+          );
+        })}
+      </div>
+      {field.helpText && <p id={`${id}-help`} className="text-xs text-muted-foreground">{field.helpText}</p>}
+      {error && <p id={`${id}-error`} className="text-sm text-destructive">{error}</p>}
+    </fieldset>
+  );
 }
 
 function Receipt({ receipt }) {

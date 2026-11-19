@@ -21,8 +21,10 @@ import { watchCampaignUpdates } from "./live-campaign-updates.mjs";
 
 const FIELD_TYPES = [
   ["text", "Short text"], ["long_text", "Long text"], ["number", "Number"],
-  ["date", "Date"], ["select", "Select"], ["checkbox", "Checkbox"],
+  ["date", "Date"], ["select", "Select"], ["radio", "Radio buttons"], ["checkbox", "Checkbox"],
 ];
+const CHOICE_TYPES = new Set(["select", "radio"]);
+const MIN_RADIO_OPTIONS = 2;
 const PROFILE_FIELDS = [
   ["", "Custom answer"], ["mist_id", "Student ID"], ["full_name", "Full name"],
   ["cf_id", "Codeforces handle"], ["vjudge_id", "VJudge username"],
@@ -30,6 +32,26 @@ const PROFILE_FIELDS = [
   ["codechef_id", "CodeChef handle"], ["atcoder_id", "AtCoder handle"],
 ];
 const EMPTY_TEMPLATE = { title: "Untitled template", description: "", kind: "general", fields: [], agreement_text: "I confirm that these details are correct." };
+
+// Mirrors the server's optionLookKey: options a student would read as the same.
+function optionLookKey(option) {
+  return option.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function radioQuestionIssue(field) {
+  if (field.type !== "radio") return null;
+  const name = `"${field.label.trim()}"`;
+  if (field.mapUserField) return `${name} is a radio question and cannot use a profile mapping.`;
+  const options = field.options || [];
+  if (options.length < MIN_RADIO_OPTIONS) return `${name} needs at least ${MIN_RADIO_OPTIONS} options, one per line.`;
+  const seen = new Map();
+  for (const option of options) {
+    const earlier = seen.get(optionLookKey(option));
+    if (earlier !== undefined) return `${name} has options that look the same: "${earlier}" and "${option}".`;
+    seen.set(optionLookKey(option), option);
+  }
+  return null;
+}
 
 function newField() {
   return { id: `field_${crypto.randomUUID()}`, label: "New question", type: "text", required: false, mapUserField: null, options: [], helpText: "" };
@@ -177,6 +199,8 @@ export default function AdminFormsClient() {
     const mappings = draft.fields.map((field) => field.mapUserField).filter(Boolean);
     if (new Set(mappings).size !== mappings.length) return setError("A profile field can be mapped only once.");
     if (draft.fields.some((field) => field.type === "select" && !field.options?.length)) return setError("Every select question needs at least one option.");
+    const radioIssue = draft.fields.map(radioQuestionIssue).find(Boolean);
+    if (radioIssue) return setError(radioIssue);
     await perform("Template saved.", async () => {
       const path = draft.id ? `manage/templates/${draft.id}` : "manage/templates";
       const method = draft.id ? "PUT" : "POST";
@@ -186,7 +210,16 @@ export default function AdminFormsClient() {
   }
 
   function updateField(id, key, value) {
-    setTemplateDraft((draft) => ({ ...draft, fields: draft.fields.map((field) => field.id === id ? { ...field, [key]: value } : field) }));
+    setTemplateDraft((draft) => ({
+      ...draft,
+      fields: draft.fields.map((field) => {
+        if (field.id !== id) return field;
+        const next = { ...field, [key]: value };
+        // Radio answers are custom choices; a profile value may not match any option.
+        if (next.type === "radio") next.mapUserField = null;
+        return next;
+      }),
+    }));
   }
 
   function moveField(index, delta) {
@@ -269,7 +302,7 @@ export default function AdminFormsClient() {
           <div className="flex justify-end gap-2"><Button variant="outline" disabled={saving} onClick={() => setTemplateToDelete(null)}>Cancel</Button><Button variant="destructive" disabled={saving} onClick={() => perform("Template deleted.", async () => { await api(`manage/templates/${templateToDelete.id}`, { method: "DELETE" }); deletedTemplateRef.current = true; setTemplateToDelete(null); await refreshLists(); })}>{saving ? "Deleting…" : "Delete template"}</Button></div>
         </DialogContent>
       </Dialog>
-      <TemplateEditor draft={templateDraft} saving={saving} onClose={() => setTemplateDraft(null)} onChange={setTemplateDraft} onField={updateField} onMove={moveField} onSave={saveTemplate} />
+      <TemplateEditor draft={templateDraft} saving={saving} error={error} onClose={() => setTemplateDraft(null)} onChange={setTemplateDraft} onField={updateField} onMove={moveField} onSave={saveTemplate} />
       <TemplatePreview template={previewTemplate} onClose={() => setPreviewTemplate(null)} />
       <CampaignCreator draft={campaignDraft} templates={templates} saving={saving} onClose={() => setCampaignDraft(null)} onChange={setCampaignDraft} onSave={createCampaign} />
       <ResponseDetail response={responseDetail} fields={selectedCampaign?.fields || []} onClose={() => setResponseDetail(null)} />
@@ -284,8 +317,9 @@ function TemplatesView({ templates, saving, onCreate, onEdit, onPreview, onClone
   </section>;
 }
 
-function TemplateEditor({ draft, saving, onClose, onChange, onField, onMove, onSave }) {
-  return <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onClose()}><DialogContent className={`${styles.dialog} w-[calc(100vw-2rem)] max-h-[92vh] max-w-5xl overflow-y-auto`}><DialogHeader><DialogTitle>{draft?.id ? "Edit template" : "Create template"}</DialogTitle><DialogDescription>Arrange the questions students will see when they register.</DialogDescription></DialogHeader>{draft && <div className="space-y-5"><div className="grid gap-4 md:grid-cols-[1fr_12rem]"><FieldLabel label="Title"><Input value={draft.title} onChange={(event) => onChange({ ...draft, title: event.target.value })} /></FieldLabel><FieldLabel label="Kind"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={draft.kind} onChange={(event) => onChange({ ...draft, kind: event.target.value })}><option value="general">General</option><option value="tfc">TFC registration</option></select></FieldLabel></div><FieldLabel label="Description"><Textarea value={draft.description || ""} onChange={(event) => onChange({ ...draft, description: event.target.value })} /></FieldLabel><div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Questions</h3><p className="text-sm text-muted-foreground">Mapped values come from the student profile.</p></div><Button variant="outline" onClick={() => onChange({ ...draft, fields: [...draft.fields, newField()] })}><Plus className="mr-2 h-4 w-4" />Add</Button></div>{draft.fields.length === 0 && <Empty icon={Plus} title="No questions" text="Add at least one question before using this template." compact />}{draft.fields.map((field, index) => <div key={field.id} className={`${styles.surface} rounded-xl p-4`}><div className="mb-4 flex items-center justify-between gap-2"><Badge variant="outline">{index + 1}</Badge><div className="flex"><Button type="button" variant="ghost" size="icon" aria-label="Move question up" disabled={index === 0} onClick={() => onMove(index, -1)}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label="Move question down" disabled={index === draft.fields.length - 1} onClick={() => onMove(index, 1)}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label="Delete question" onClick={() => onChange({ ...draft, fields: draft.fields.filter((item) => item.id !== field.id) })}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div><div className="grid gap-4 md:grid-cols-2"><FieldLabel label="Label"><Input value={field.label} onChange={(event) => onField(field.id, "label", event.target.value)} /></FieldLabel><FieldLabel label="Type"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={field.type} onChange={(event) => onField(field.id, "type", event.target.value)}>{FIELD_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></FieldLabel><FieldLabel label="Profile mapping"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={field.mapUserField || ""} onChange={(event) => onField(field.id, "mapUserField", event.target.value || null)}>{PROFILE_FIELDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></FieldLabel><FieldLabel label="Help text"><Input value={field.helpText || ""} onChange={(event) => onField(field.id, "helpText", event.target.value)} /></FieldLabel>{field.type === "select" && <FieldLabel label="Options (one per line)" className="md:col-span-2"><Textarea value={field.optionsText ?? (field.options || []).join("\n")} onChange={(event) => onField(field.id, "optionsText", event.target.value)} /></FieldLabel>}</div><label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><Checkbox checked={Boolean(field.required)} onCheckedChange={(checked) => onField(field.id, "required", Boolean(checked))} />Required</label></div>)}</div><FieldLabel label="Agreement"><Textarea value={draft.agreement_text || ""} onChange={(event) => onChange({ ...draft, agreement_text: event.target.value })} /></FieldLabel><div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={saving} onClick={onSave}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save template</Button></div></div>}</DialogContent></Dialog>;
+// The page-level alert sits behind the modal overlay, so save errors are repeated inside the dialog.
+function TemplateEditor({ draft, saving, error, onClose, onChange, onField, onMove, onSave }) {
+  return <Dialog open={Boolean(draft)} onOpenChange={(open) => !open && onClose()}><DialogContent className={`${styles.dialog} w-[calc(100vw-2rem)] max-h-[92vh] max-w-5xl overflow-y-auto`}><DialogHeader><DialogTitle>{draft?.id ? "Edit template" : "Create template"}</DialogTitle><DialogDescription>Arrange the questions students will see when they register.</DialogDescription></DialogHeader>{draft && <div className="space-y-5"><div className="grid gap-4 md:grid-cols-[1fr_12rem]"><FieldLabel label="Title"><Input value={draft.title} onChange={(event) => onChange({ ...draft, title: event.target.value })} /></FieldLabel><FieldLabel label="Kind"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={draft.kind} onChange={(event) => onChange({ ...draft, kind: event.target.value })}><option value="general">General</option><option value="tfc">TFC registration</option></select></FieldLabel></div><FieldLabel label="Description"><Textarea value={draft.description || ""} onChange={(event) => onChange({ ...draft, description: event.target.value })} /></FieldLabel><div className="space-y-3"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Questions</h3><p className="text-sm text-muted-foreground">Mapped values come from the student profile.</p></div><Button variant="outline" onClick={() => onChange({ ...draft, fields: [...draft.fields, newField()] })}><Plus className="mr-2 h-4 w-4" />Add</Button></div>{draft.fields.length === 0 && <Empty icon={Plus} title="No questions" text="Add at least one question before using this template." compact />}{draft.fields.map((field, index) => <div key={field.id} className={`${styles.surface} rounded-xl p-4`}><div className="mb-4 flex items-center justify-between gap-2"><Badge variant="outline">{index + 1}</Badge><div className="flex"><Button type="button" variant="ghost" size="icon" aria-label="Move question up" disabled={index === 0} onClick={() => onMove(index, -1)}><ArrowUp className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label="Move question down" disabled={index === draft.fields.length - 1} onClick={() => onMove(index, 1)}><ArrowDown className="h-4 w-4" /></Button><Button type="button" variant="ghost" size="icon" aria-label="Delete question" onClick={() => onChange({ ...draft, fields: draft.fields.filter((item) => item.id !== field.id) })}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div><div className="grid gap-4 md:grid-cols-2"><FieldLabel label="Label"><Input value={field.label} onChange={(event) => onField(field.id, "label", event.target.value)} /></FieldLabel><FieldLabel label="Type"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={field.type} onChange={(event) => onField(field.id, "type", event.target.value)}>{FIELD_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></FieldLabel><FieldLabel label="Profile mapping"><select className="h-10 w-full rounded-md border bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-60" value={field.mapUserField || ""} disabled={field.type === "radio"} aria-describedby={field.type === "radio" ? `${field.id}-mapping-note` : undefined} onChange={(event) => onField(field.id, "mapUserField", event.target.value || null)}>{PROFILE_FIELDS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>{field.type === "radio" && <span id={`${field.id}-mapping-note`} className="text-xs font-normal text-muted-foreground">Radio questions always collect a custom answer.</span>}</FieldLabel><FieldLabel label="Help text"><Input value={field.helpText || ""} onChange={(event) => onField(field.id, "helpText", event.target.value)} /></FieldLabel>{CHOICE_TYPES.has(field.type) && <FieldLabel label={field.type === "radio" ? `Options (one per line, at least ${MIN_RADIO_OPTIONS})` : "Options (one per line)"} className="md:col-span-2"><Textarea value={field.optionsText ?? (field.options || []).join("\n")} onChange={(event) => onField(field.id, "optionsText", event.target.value)} /></FieldLabel>}</div><label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><Checkbox checked={Boolean(field.required)} onCheckedChange={(checked) => onField(field.id, "required", Boolean(checked))} />Required</label></div>)}</div><FieldLabel label="Agreement"><Textarea value={draft.agreement_text || ""} onChange={(event) => onChange({ ...draft, agreement_text: event.target.value })} /></FieldLabel>{error && <p role="alert" className="text-sm text-destructive dark:text-red-300">{error}</p>}<div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={saving} onClick={onSave}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save template</Button></div></div>}</DialogContent></Dialog>;
 }
 
 function CampaignsView({ campaigns, selected, dashboard, responses, responseTotal, query, page, totalPages, saving, onSelect, onCreate, onStart, onEnd, onClone, onCopy, onQuery, onPage, onExport, onDetail, onRefresh }) {
@@ -301,7 +335,7 @@ function TemplatePreview({ template, onClose }) {
 }
 
 function PreviewField({ field }) {
-  return <FieldLabel label={`${field.label}${field.required ? " *" : ""}`}><div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{field.mapUserField ? `Profile value · ${field.mapUserField}` : field.type === "checkbox" ? "Checkbox answer" : field.type === "select" ? field.options?.join(" / ") || "Select an option" : `${FIELD_TYPES.find(([value]) => value === field.type)?.[1] || "Answer"}`}</div>{field.helpText && <span className="text-xs text-muted-foreground">{field.helpText}</span>}</FieldLabel>;
+  return <FieldLabel label={`${field.label}${field.required ? " *" : ""}`}><div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{field.mapUserField ? `Profile value · ${field.mapUserField}` : field.type === "checkbox" ? "Checkbox answer" : CHOICE_TYPES.has(field.type) ? field.options?.join(" / ") || "Select an option" : `${FIELD_TYPES.find(([value]) => value === field.type)?.[1] || "Answer"}`}</div>{field.helpText && <span className="text-xs text-muted-foreground">{field.helpText}</span>}</FieldLabel>;
 }
 
 function ResponseDetail({ response, fields, onClose }) {

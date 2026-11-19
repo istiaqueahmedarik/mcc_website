@@ -1,5 +1,14 @@
 # Project Index
 
+## 2026-11-19 - Global forms radio-button questions
+
+Issue #50 adds a `radio` field type to global forms only; trainer/classroom forms are unchanged.
+- Server rules live in `server/src/services/globalFormService.ts`. Radio requires two or more non-blank options that do not look the same ignoring case, width, and spacing, and it cannot use a profile mapping. Answers must be one string from the campaign's frozen options.
+- The editor lives in `client/src/app/admin/forms/AdminFormsClient.js` and now also shows save errors inside the template dialog.
+- Students get a native radiogroup in `client/src/app/register/[slug]/RegistrationClient.js`.
+- Local checks: `server/scripts/verify-global-form-radio.ts` and `client/scripts/verify-global-form-radio-browser.mjs`.
+- No migration. RSD: `docs/rsd/global-forms-radio-questions-20261119-rsd.md`. Review: `docs/reviews/global-forms-radio-questions-20261119.md`. The four RSD decisions await maintainer confirmation in PR review.
+
 ## 2026-11-16 - Forms live status recovery
 
 A scoped correction adds a stats watchdog and serialized REST fallback so the admin dashboard does not remain Connecting indefinitely. Live now requires valid stats; Auto-refresh describes five-second fallback, while Offline retains prior data and Access changed stops updates. Review: `docs/reviews/global-forms-live-status-20261116.md`. No schema change.
