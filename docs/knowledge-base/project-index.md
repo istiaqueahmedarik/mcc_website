@@ -1301,3 +1301,7 @@ Contributor scorecard #54 and project 3 Contributions view show category counts/
 ## 2026-11-17 - Improved and automatic contributor onboarding
 
 Onboarding master #56 and four children #57–60 now have stronger checkpoints and mentor handoffs. Versioned templates/config: .github/onboarding/. Reconciler: scripts/onboard-members.mjs. Workflow: onboard-contributors.yml. Feature doc: docs/features/contributor-onboarding.md.
+
+## 2026-11-19 - Agentic setup (`DESIGN.md`, `AGENTS.md`, `CLAUDE.md`) and `<ISSUE>: <Title>` PR titles
+
+`DESIGN.md` documents verified light/dark/trainer tokens, dark-error contrast overrides, HCI rules, and motion constraints. `AGENTS.md` serves as the canonical cross-agent engineering guide, and `CLAUDE.md` imports `@AGENTS.md` and `@DESIGN.md`. PR title validation in `scripts/pr-convention.mjs` (tested in `scripts/pr-convention.test.mjs` and documented in `CONTRIBUTING.md` and `.github/pull_request_template.md`) enforces `<ISSUE>: <Title>` while preserving `.github/workflows/pr-convention.yml` and the four required description headings.

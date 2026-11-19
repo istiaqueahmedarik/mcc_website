@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 export const requiredSections = ['Problem', 'Changes', 'Validation', 'Review notes'];
-const titlePattern = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9][a-z0-9./-]{0,39}\))?!?: (\S.*)$/;
+const titlePattern = /^(#[1-9][0-9]*|[A-Z]{2,10}-[1-9][0-9]*|NO-ISSUE):\s?(\S.*)$/;
+const revertTitlePattern = /^Revert ".+"$/;
 
 // Comments and fenced examples are not evidence that the template was completed.
 function visibleLines(body) {
@@ -20,9 +21,12 @@ function visibleLines(body) {
 
 export function validatePullRequest({ title = '', body = '' }) {
   const errors = [];
+  const isSingleLine = !/[\r\n]/.test(title);
+  const isRevert = isSingleLine && title.length <= 100 && revertTitlePattern.test(title);
   const match = title.match(titlePattern);
-  if (!match || title.includes('\n') || title.length > 100 || match[3].length < 10 || /[.。]$/.test(title)) {
-    errors.push('Title: use type(optional-scope): summary; allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert. Summary must be at least 10 characters; title at most 100; no final period. Example: fix(forms): preserve campaign assignments');
+  const summary = match ? match[2].trim() : '';
+  if (!isRevert && (!match || !isSingleLine || title.length > 100 || summary.length < 10 || /[.。]$/.test(title))) {
+    errors.push('Title: use <ISSUE>: <Title> with #<number>, <KEY>-<number> (2-10 uppercase letters), NO-ISSUE, or GitHub Revert "...". Summary must be at least 10 characters; title at most 100, single line, no final period. Example: #47: Preserve campaign assignments');
   }
   const sections = new Map();
   let current = null;

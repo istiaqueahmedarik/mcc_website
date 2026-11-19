@@ -1014,3 +1014,7 @@ Never claim collaborator invitation or private project access changes automatica
 ## 2026-11-18 - PR metadata enforcement
 
 Use the documented typed title and four-section PR template. Format checks supplement human review. Metadata workflows run trusted default-branch code only, read text through the API, publish status to current head, and leave owner bypass intact. Never interpolate PR text into shell commands. Handle null descriptions and edits without commits. Required status activation and default-branch workflow deployment are separate rollout steps.
+
+## 2026-11-19 - Issue-prefixed PR title enforcement
+
+Validate PR titles against `<ISSUE>: <Title>` (`#<num>`, `<KEY>-<num>`, `NO-ISSUE`, or `Revert "..."`) with at least 10 summary chars, single-line length at most 100 (`<= 72` recommended), and no trailing period in `scripts/pr-convention.mjs`, while preserving the four-section description requirement, trusted default-branch workflow execution, and redacted error diagnostics (never echoing PR-supplied text).
