@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "delete is reached from response details and the confirmation identifies the response and its effect",
+    "cancel returns to details and changes nothing",
+    "failed delete keeps the response, shows an in-dialog error, and allows retry",
+    "dark mode keeps the confirmation and error readable",
+    "double activation sends one request with a disabled pending state",
+    "successful delete updates list, total, Submitted count and focus, and persists after reload",
+    "a response already removed elsewhere is reported and the list refreshes"
+  ],
+  "errors": []
+}

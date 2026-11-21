@@ -1233,3 +1233,7 @@ The user requested PR title and description enforcement. Use Conventional Commit
 ## 2026-11-19 - Report metadata failures on the associated PR
 
 The metadata workflow sweeps all open master PRs to repair stale statuses after shared-head changes. A PR-triggered job reports the triggering PR's validation outcome, including shared-head failures. Each checked head still receives its own required status. Base pushes and manual reconciliation report the whole sweep.
+
+## 2026-11-19 - Switch PR title convention to `<ISSUE>: <Title>` and add `DESIGN.md` / `CLAUDE.md`
+
+User selected `<ISSUE>: <Title>` (`#<number>`, `<KEY>-<number>` with 2–10 uppercase letters, `NO-ISSUE`, or `Revert "..."`) and requested enforcing it everywhere (`scripts/pr-convention.mjs`, `scripts/pr-convention.test.mjs`, `.github/pull_request_template.md`, `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md`), while preserving the four required PR description sections (`Problem`, `Changes`, `Validation`, `Review notes`) and trusted default-branch validation in `.github/workflows/pr-convention.yml`. Also added repository `DESIGN.md` and `CLAUDE.md` (`@AGENTS.md`, `@DESIGN.md`) and modernized `AGENTS.md` to eliminate rule drift.

@@ -3,17 +3,44 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { validatePullRequest, checkPullRequest, reconcileOpenPullRequests } from './pr-convention.mjs';
 const valid = {
-  title: 'fix(forms): preserve campaign assignments',
+  title: '#47: Preserve campaign assignments',
   body: '## Problem\nApproved board members lose their assignments.\n## Changes\nSynchronize the approved roster with board access.\n## Validation\nRan node tests and all policy tests passed.\n## Review notes\nRead the roster before the validator and tests; no migration needed.',
 };
 
-test('accepts all supported types, scopes, and breaking marker', () => {
-  for (const type of ['feat','fix','docs','style','refactor','perf','test','build','ci','chore','revert']) {
-    for (const suffix of ['', '(forms)', '!', '(forms)!']) assert.deepEqual(validatePullRequest({...valid,title:`${type}${suffix}: preserve campaign assignments`}), []);
+test('accepts #<num>, <KEY>-<num>, NO-ISSUE, rollout flags, and Revert titles', () => {
+  for (const title of [
+    '#1: Preserve campaign assignments',
+    '#47: Preserve campaign assignments',
+    '#47:Preserve campaign assignments',
+    '#47: Preserve campaign assignments [+sql]',
+    'MCC-12: Preserve campaign assignments',
+    'AB-9: Preserve campaign assignments',
+    'ABCDEFGHIJ-99: Preserve campaign assignments',
+    'NO-ISSUE: Add DESIGN.md and CLAUDE.md',
+    'Revert "#47: Preserve campaign assignments"',
+  ]) {
+    assert.deepEqual(validatePullRequest({ ...valid, title }), [], title);
   }
 });
-test('rejects malformed, short, multiline, long, and punctuated titles', () => {
-  for (const title of ['Update forms', 'foo: preserve campaign assignments', 'fix: short', 'fix(Forms): preserve campaign assignments', 'fix: preserve campaign assignments.', 'fix: preserve\nassignments', `fix: ${'a'.repeat(100)}`]) assert.ok(validatePullRequest({...valid,title}).length, title);
+test('rejects malformed, unprefixed, zero-id, short, multiline, long, and punctuated titles', () => {
+  for (const title of [
+    'Update forms',
+    'fix(forms): preserve campaign assignments',
+    '#0: Preserve campaign assignments',
+    'MCC-0: Preserve campaign assignments',
+    'mcc-12: Preserve campaign assignments',
+    'A-12: Preserve campaign assignments',
+    'TOOLONGPREFIX-12: Preserve campaign assignments',
+    '#47: short',
+    '#47: short     ',
+    '#47: Preserve campaign assignments.',
+    '#47: Preserve\ncampaign assignments',
+    '#47: Preserve\rcampaign assignments',
+    `#47: ${'a'.repeat(100)}`,
+    'Revert ""',
+  ]) {
+    assert.ok(validatePullRequest({ ...valid, title }).length, title);
+  }
 });
 test('requires each section exactly once and useful content', () => {
   assert.equal(validatePullRequest({title:valid.title}).length, 4);
@@ -32,7 +59,7 @@ test('fenced headings and HTML comments cannot satisfy sections', () => {
 });
 test('supports CRLF, optional extra sections and executable text as plain data', () => {
   assert.deepEqual(validatePullRequest({...valid,body:valid.body.replaceAll('\n','\r\n')+'\r\n## Related issues\r\nFixes #123'}),[]);
-  assert.deepEqual(validatePullRequest({...valid,title:'fix: handle $(touch /tmp/should-not-exist) safely'}),[]);
+  assert.deepEqual(validatePullRequest({...valid,title:'#47: Handle $(touch /tmp/should-not-exist) safely'}),[]);
 });
 function fakeApi(sequence, statuses, fail = false) {
   let i=0;

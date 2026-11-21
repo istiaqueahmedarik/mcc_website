@@ -68,11 +68,11 @@ Use master epic #56 and child templates #57–60 as a separate learning track. A
 
 ## Pull request convention
 
-Use `type(optional-scope): summary`, for example `fix(forms): preserve campaign assignments` or `ci: enforce pull request conventions`.
+Use `<ISSUE>: <Title>`, for example `#47: Preserve campaign assignments`, `MCC-12: Support Codeforces group contests`, or `NO-ISSUE: Add DESIGN.md and CLAUDE.md`.
 
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-- Type and optional scope are lowercase. Scope may contain letters, numbers, dots, slashes, or hyphens and is at most 40 characters. An optional `!` before the colon flags a breaking change.
-- Explain the concrete change in a summary of at least 10 characters. Keep the complete title at most 100 characters, on one line, without a final period.
+- Accepted `<ISSUE>` prefixes: `#<number>` (GitHub issue), `<KEY>-<number>` (2–10 uppercase ASCII letters + positive integer), `NO-ISSUE` (explicit opt-out for untracked chores, docs, or hotfixes), or GitHub's auto-generated `Revert "..."` format.
+- Use a single space after the colon (the validator also accepts `<ISSUE>:<Title>` without a space).
+- Explain the concrete change in a summary of at least 10 characters. Keep the complete title at most 100 characters (`<= 72` recommended), on one line, without a final period. Optional trailing rollout flags (`[+sql]`, `[!env]`) are permitted inside `<Title>`.
 
 Complete the default PR template with these exact level-two headings, once each:
 
