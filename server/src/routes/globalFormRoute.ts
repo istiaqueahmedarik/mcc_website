@@ -8,6 +8,7 @@ import {
   cloneCampaign,
   createCampaign,
   createTemplate,
+  deleteCampaign,
   deleteResponse,
   deleteTemplate,
   endCampaign,
@@ -51,6 +52,7 @@ route.post("/manage/templates/:id/clone", cloneTemplate);
 route.get("/manage/campaigns", listCampaigns);
 route.post("/manage/campaigns", bodyLimit({ maxSize: 32 * 1024 }), createCampaign);
 route.get("/manage/campaigns/:id", getCampaign);
+route.delete("/manage/campaigns/:id", deleteCampaign);
 route.put("/manage/campaigns/:id", bodyLimit({ maxSize: 32 * 1024 }), updateCampaign);
 route.post("/manage/campaigns/:id/start", startCampaign);
 route.post("/manage/campaigns/:id/clone", cloneCampaign);

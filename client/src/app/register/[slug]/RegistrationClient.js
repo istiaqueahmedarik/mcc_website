@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertCircle, CheckCircle2, Clock3, ExternalLink, Loader2, LockKeyhole, RefreshCw, Send, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./registration.module.css";
+import FormDescriptionRenderer from "@/components/FormDescriptionRenderer";
 
 async function api(path, options = {}) {
   const response = await fetch(`/api/global-forms/${path}`, {
@@ -187,7 +188,32 @@ export default function RegistrationClient({ slug }) {
   }
 
   if (loading) return <PageShell><div className="flex min-h-64 items-center justify-center"><Loader2 className="mr-3 h-5 w-5 animate-spin" />Loading registration…</div></PageShell>;
-  if (error && !campaign) return <PageShell><StateCard icon={AlertCircle} title="Registration unavailable" text={error}><Button variant="outline" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" />Try again</Button></StateCard></PageShell>;
+  if (error && !campaign) {
+    const isMissingOrDeleted = error === "Campaign not found" || error.toLowerCase().includes("not found");
+    return (
+      <PageShell>
+        <StateCard
+          icon={AlertCircle}
+          title="Registration unavailable"
+          text={
+            isMissingOrDeleted
+              ? "This registration campaign does not exist or has been removed. Check your link or contact the contest administrator."
+              : error
+          }
+        >
+          {isMissingOrDeleted ? (
+            <ProgressLink href="/">
+              <Button variant="outline">Return home</Button>
+            </ProgressLink>
+          ) : (
+            <Button variant="outline" onClick={() => load()}>
+              <RefreshCw className="mr-2 h-4 w-4" />Try again
+            </Button>
+          )}
+        </StateCard>
+      </PageShell>
+    );
+  }
 
   if (authRequired) return <PageShell><CampaignHeader campaign={campaign} /><StateCard icon={LockKeyhole} title="Sign in to continue" text="Your profile and registration details stay private until you sign in with your MCC account."><ProgressLink href={`/login?returnTo=${encodeURIComponent(`/register/${slug}`)}`}><Button className={`${styles.press} min-h-11`}>Sign in and return</Button></ProgressLink><ProgressLink href="/signup" className="text-sm text-primary underline-offset-4 hover:underline">Need an MCC account? Create one</ProgressLink></StateCard></PageShell>;
   if (!preview) return <PageShell><CampaignHeader campaign={campaign} /><StateCard icon={AlertCircle} title="Your account cannot open this registration" text={error || "Check your account eligibility and try again."}><Button variant="outline" onClick={() => load()}><RefreshCw className="mr-2 h-4 w-4" />Try again</Button></StateCard></PageShell>;
@@ -220,7 +246,29 @@ export default function RegistrationClient({ slug }) {
 }
 
 function PageShell({ children }) { return <main className={`${styles.page} px-4 py-8 sm:px-6 lg:py-12`}><div className="mx-auto max-w-3xl space-y-6">{children}</div></main>; }
-function CampaignHeader({ campaign }) { return <header className={`${styles.hero} rounded-[1.75rem] p-6 sm:p-8`}><div className="flex flex-wrap items-center gap-2"><Badge variant={campaign?.status === "open" ? "default" : "secondary"}>{campaign?.status || "Unavailable"}</Badge><span className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">MCC registration</span></div><h1 className="mt-4 break-words text-3xl font-semibold tracking-tight sm:text-4xl">{campaign?.title || "Registration"}</h1><p className="mt-3 max-w-2xl whitespace-pre-wrap text-sm leading-6 text-muted-foreground sm:text-base">{campaign?.description || "Review the campaign details and continue with your MCC account."}</p></header>; }
+function CampaignHeader({ campaign }) {
+  return (
+    <header className={`${styles.hero} rounded-[1.75rem] p-6 sm:p-8`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={campaign?.status === "open" ? "default" : "secondary"}>
+          {campaign?.status || "Unavailable"}
+        </Badge>
+        <span className="text-xs font-medium uppercase tracking-[0.15em] text-muted-foreground">
+          MCC registration
+        </span>
+      </div>
+      <h1 className="mt-4 break-words text-3xl font-semibold tracking-tight sm:text-4xl">
+        {campaign?.title || "Registration"}
+      </h1>
+      <div className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+        <FormDescriptionRenderer
+          content={campaign?.description}
+          fallback="Review the campaign details and continue with your MCC account."
+        />
+      </div>
+    </header>
+  );
+}
 function StateCard({ icon: Icon, title, text, children }) { return <section className={`${styles.surface} rounded-2xl px-6 py-12 text-center`}><Icon className="mx-auto h-9 w-9 text-muted-foreground" /><h2 className="mt-4 text-xl font-semibold">{title}</h2><p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-muted-foreground">{text}</p>{children && <div className="mt-6 flex flex-col items-center gap-3">{children}</div>}</section>; }
 function ProfileFact({ label, value, pending, help }) { return <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>{pending && <Badge variant="secondary"><Clock3 className="mr-1 h-3 w-3" />Pending verification</Badge>}</div><p className="mt-1 break-words text-base font-medium">{displayValue(value)}</p>{help && <p className="mt-1 text-xs text-muted-foreground">{help}</p>}</div>; }
 
