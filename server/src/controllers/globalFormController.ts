@@ -452,6 +452,32 @@ export async function listResponses(c: Ctx) {
   return c.json({ responses: rows, total: Number(counts[0]?.total || 0), page, page_size: PAGE_SIZE });
 }
 
+export async function deleteResponse(c: Ctx) {
+  const campaignId = c.req.param("id");
+  const responseId = c.req.param("responseId");
+  const result = await sql.begin(async (tx) => {
+    if (!(await requireAdmin(c, tx))) return { status: 403 as const };
+    // The immutability trigger accepts a delete only for the row named in this
+    // transaction-local setting (docs/sql/global-form-response-deletion-20261121.sql).
+    await tx`select set_config('mcc.global_form_response_delete', ${responseId}, true)`;
+    // Matching both IDs means a response from another campaign is never deleted.
+    // The delete trigger bumps the campaign revision, which marks dependent reports stale.
+    const deleted = await tx`
+      delete from global_form_responses
+      where id = ${responseId} and campaign_id = ${campaignId}
+      returning id
+    `;
+    if (!deleted[0]) return { status: 404 as const };
+    const campaigns = await tx`select revision from global_form_campaigns where id = ${campaignId}`;
+    return { status: 200 as const, id: deleted[0].id, revision: Number(campaigns[0]?.revision || 0) };
+  });
+  if (result.status === 403) return c.json({ error: "Admin access required" }, 403);
+  if (result.status === 404) {
+    return c.json({ error: "This response was not found in this campaign. It may already have been deleted.", code: "RESPONSE_NOT_FOUND" }, 404);
+  }
+  return c.json({ deleted: result.id, revision: result.revision });
+}
+
 async function dashboardStats(campaignId: string) {
   const rows = await sql`
     select c.revision,

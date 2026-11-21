@@ -1,5 +1,17 @@
 # Project Index
 
+## 2026-11-21 - Delete an individual global form response
+
+Issue #63 lets admins delete one response from response details after confirmation.
+
+- Endpoint: `DELETE /global-forms/manage/campaigns/:id/responses/:responseId`, handled by `deleteResponse` in `server/src/controllers/globalFormController.ts`. It is admin-only and requires both IDs to match.
+- Migration `docs/sql/global-form-response-deletion-20261121.sql` (with rollback) keeps responses immutable except for one transaction-authorized delete. Deleting bumps the campaign revision, so filtered reports go stale. Profile reviews survive with a null `response_id`.
+- The student may resubmit while the campaign is open.
+- UI: `client/src/app/admin/forms/AdminFormsClient.js`.
+- Local checks: `server/scripts/verify-global-form-response-deletion.ts` and `client/scripts/verify-global-form-response-deletion-browser.mjs`.
+- RSD: `docs/rsd/global-form-response-deletion-20261121-rsd.md`. Review: `docs/reviews/global-form-response-deletion-20261121.md`.
+- Apply the migration before merge. The five RSD decisions await maintainer confirmation in PR review.
+
 ## 2026-11-16 - Forms live status recovery
 
 A scoped correction adds a stats watchdog and serialized REST fallback so the admin dashboard does not remain Connecting indefinitely. Live now requires valid stats; Auto-refresh describes five-second fallback, while Offline retains prior data and Access changed stops updates. Review: `docs/reviews/global-forms-live-status-20261116.md`. No schema change.
