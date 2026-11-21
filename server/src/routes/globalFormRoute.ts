@@ -9,6 +9,7 @@ import {
   createCampaign,
   createTemplate,
   deleteCampaign,
+  deleteResponse,
   deleteTemplate,
   endCampaign,
   getCampaign,
@@ -57,6 +58,7 @@ route.post("/manage/campaigns/:id/start", startCampaign);
 route.post("/manage/campaigns/:id/clone", cloneCampaign);
 route.post("/manage/campaigns/:id/end", endCampaign);
 route.get("/manage/campaigns/:id/responses", listResponses);
+route.delete("/manage/campaigns/:id/responses/:responseId", deleteResponse);
 route.get("/manage/dashboard", getDashboard);
 route.get("/manage/stream", streamDashboard);
 
