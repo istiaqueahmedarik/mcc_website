@@ -218,3 +218,38 @@ export function normalizeSlug(value: unknown): string | null {
   const slug = value.trim().toLowerCase();
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && slug.length <= 100 ? slug : null;
 }
+
+export interface CampaignDependencyCounts {
+  responses: number;
+  eligibility: number;
+  snapshots: number;
+  publicReports: number;
+}
+
+export function evaluateCampaignDeletion(counts: CampaignDependencyCounts):
+  | { allowed: true }
+  | { allowed: false; reason: string; counts: CampaignDependencyCounts } {
+  if (counts.responses > 0) {
+    return {
+      allowed: false,
+      reason: `Cannot delete campaign because it contains ${counts.responses} submitted registration(s). End the campaign instead to preserve student records.`,
+      counts,
+    };
+  }
+  if (counts.eligibility > 0) {
+    return {
+      allowed: false,
+      reason: `Cannot delete campaign because it is linked as an eligibility filter in ${counts.eligibility} contest room(s).`,
+      counts,
+    };
+  }
+  const reportCount = (counts.snapshots || 0) + (counts.publicReports || 0);
+  if (reportCount > 0) {
+    return {
+      allowed: false,
+      reason: `Cannot delete campaign because it is referenced by ${reportCount} contest report snapshot(s) or published report(s).`,
+      counts,
+    };
+  }
+  return { allowed: true };
+}

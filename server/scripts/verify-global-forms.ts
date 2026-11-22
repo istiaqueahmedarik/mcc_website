@@ -115,6 +115,26 @@ try {
   const [retainedResponse] = await sql`select count(*)::int as count from global_form_responses where campaign_id=${secondCampaign.id} and user_id=${missingName.id}`;
   check(retainedResponse.count===1,'profile rejection preserves registration history');
 
+  // Verify campaign deletion semantics
+  check((await request(`/global-forms/manage/campaigns/${campaign.id}`, undefined, undefined, 'DELETE')).status === 401, 'unauthenticated campaign delete rejected');
+  check((await request(`/global-forms/manage/campaigns/${campaign.id}`, student, undefined, 'DELETE')).status === 403, 'student cannot delete campaign');
+  check((await request(`/global-forms/manage/campaigns/${campaign.id}`, trainer, undefined, 'DELETE')).status === 403, 'trainer cannot delete campaign');
+
+  const blockedDelete = await request(`/global-forms/manage/campaigns/${campaign.id}`, admin, undefined, 'DELETE');
+  check(blockedDelete.status === 409, 'campaign with responses blocks deletion');
+  check(blockedDelete.json.error.includes('submitted registration(s)'), 'blocked deletion provides actionable error');
+
+  const cleanSlug = `clean-delete-${crypto.randomUUID()}`;
+  const cleanCreated = await request('/global-forms/manage/campaigns', admin, { template_id: tfc.id, title: 'Clean campaign for deletion', slug: cleanSlug });
+  check(cleanCreated.status === 201, 'clean campaign created');
+  const cleanId = cleanCreated.json.campaign.id;
+  check((await request(`/global-forms/public/${cleanSlug}`)).status === 200, 'public clean campaign exists');
+
+  const cleanDelete = await request(`/global-forms/manage/campaigns/${cleanId}`, admin, undefined, 'DELETE');
+  check(cleanDelete.status === 200 && cleanDelete.json.success === true, 'clean campaign deleted successfully');
+  check((await request(`/global-forms/public/${cleanSlug}`)).status === 404, 'deleted campaign public URL returns 404');
+  check((await request(`/global-forms/manage/campaigns/${cleanId}`, admin, undefined, 'DELETE')).status === 404, 'repeat deletion returns 404');
+
   const streamResponse = await app.request(`/global-forms/manage/stream?campaign_id=${campaign.id}`,{headers:{Authorization:`Bearer ${admin.token}`}});
   check(streamResponse.headers.get('content-type')?.includes('text/event-stream'),'dashboard returns an SSE stream');
   const reader = streamResponse.body!.getReader();
