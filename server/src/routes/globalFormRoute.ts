@@ -21,6 +21,7 @@ import {
   listTemplates,
   previewCampaign,
   startCampaign,
+  resumeCampaign,
   streamDashboard,
   submitCampaign,
   updateCampaign,
@@ -57,6 +58,7 @@ route.put("/manage/campaigns/:id", bodyLimit({ maxSize: 32 * 1024 }), updateCamp
 route.post("/manage/campaigns/:id/start", startCampaign);
 route.post("/manage/campaigns/:id/clone", cloneCampaign);
 route.post("/manage/campaigns/:id/end", endCampaign);
+route.post("/manage/campaigns/:id/resume", resumeCampaign);
 route.get("/manage/campaigns/:id/responses", listResponses);
 route.delete("/manage/campaigns/:id/responses/:responseId", deleteResponse);
 route.get("/manage/dashboard", getDashboard);

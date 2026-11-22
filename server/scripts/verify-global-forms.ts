@@ -95,6 +95,39 @@ try {
   check((await request(`/global-forms/public/${slug}/submit`, other, { answers:{},profile_values:{},profile_version:preview.json.profile_version,agreement:true })).status === 409, 'closed campaign blocks new submit');
   check((await request(`/global-forms/public/${slug}/submit`, student, submission)).json.receipt.id === concurrent[0].json.receipt.id, 'lost receipt can be recovered after closure');
 
+  const resumePath = `/global-forms/manage/campaigns/${campaign.id}/resume`;
+  check((await request(resumePath, undefined, {})).status === 401, 'anonymous cannot resume');
+  for (const denied of [student, trainer]) {
+    check((await request(resumePath, denied, {})).status === 403, 'non-admin cannot resume');
+  }
+  check((await request(`/global-forms/manage/campaigns/${clonedCampaign.json.campaign.id}/resume`, admin, {})).status === 409, 'draft cannot resume');
+  const [beforeResume] = await sql`select * from global_form_campaigns where id=${campaign.id}`;
+  const beforeResponses = await sql`select * from global_form_responses where campaign_id=${campaign.id} order by id`;
+  check(Boolean(beforeResume.started_at && beforeResume.ended_at), 'ended campaign has lifecycle timestamps');
+  const resumed = await Promise.all([request(resumePath, admin, {}), request(resumePath, admin, {})]);
+  check(resumed.map(result => result.status).sort().join(',') === '200,409', 'concurrent resumes have exactly one winner');
+  const [afterResume] = await sql`select * from global_form_campaigns where id=${campaign.id}`;
+  const { status: oldStatus, ended_at: oldEnd, updated_at: oldUpdate, ...beforeIdentity } = beforeResume;
+  const { status: newStatus, ended_at: newEnd, updated_at: newUpdate, ...afterIdentity } = afterResume;
+  check(newStatus === 'open' && newEnd === null, 'resume opens campaign and clears ended_at');
+  assert.deepEqual(afterIdentity, beforeIdentity);
+  check(true, 'resume preserves identity, start time, frozen definition and revision');
+  assert.deepEqual(await sql`select * from global_form_responses where campaign_id=${campaign.id} order by id`, beforeResponses);
+  check(true, 'resume preserves complete historical responses');
+  check((await request(resumePath, admin, {})).status === 409, 'already-open campaign cannot resume');
+  check((await request(`/global-forms/public/${slug}`)).json.campaign.status === 'open', 'same public link reports open');
+  check((await request(`/global-forms/public/${slug}/submit`, student, submission)).json.receipt.id === concurrent[0].json.receipt.id, 'existing receipt remains stable after resume');
+  preview = await request(`/global-forms/public/${slug}/preview`, other);
+  const resumedSubmission = { answers:{}, profile_values:{}, profile_version:preview.json.profile_version, agreement:true };
+  check((await request(`/global-forms/public/${slug}/submit`, other, resumedSubmission)).status === 201, 'new eligible student can register after resume');
+  stats = await request(`/global-forms/manage/dashboard?campaign_id=${campaign.id}`, admin);
+  check(stats.json.submitted === 2 && stats.json.revision === 2, 'only new submission increments response revision');
+  check((await request(`/global-forms/manage/campaigns/${campaign.id}/end`, admin, {})).status === 200, 'resumed campaign can end again');
+  check((await request(resumePath, admin, {})).status === 200, 'campaign supports another resume cycle');
+  const [cycled] = await sql`select started_at, ended_at from global_form_campaigns where id=${campaign.id}`;
+  check(cycled.started_at.getTime() === beforeResume.started_at.getTime() && cycled.ended_at === null, 'repeated cycles preserve original start time');
+  await request(`/global-forms/manage/campaigns/${campaign.id}/end`, admin, {});
+
   const second = await request('/global-forms/manage/campaigns', admin, {template_id:tfc.id,title:'Profile race check',slug:`race-${crypto.randomUUID()}`});
   const secondCampaign = second.json.campaign;
   await request(`/global-forms/manage/campaigns/${secondCampaign.id}/start`,admin,{});
