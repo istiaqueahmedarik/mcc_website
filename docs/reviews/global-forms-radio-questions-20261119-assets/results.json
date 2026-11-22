@@ -1,0 +1,15 @@
+{
+  "checks": [
+    "radio type is offered and profile mapping is locked with an explanation",
+    "editor rejects fewer than two and look-alike options with question-specific errors visible inside the dialog",
+    "saved radio question keeps label, order, requiredness and ignores blank editor lines",
+    "radio group and options have accessible names and required state",
+    "required radio blocks submit, shows a question-level error and receives focus",
+    "keyboard Space/arrow keys select exactly one option",
+    "pointer selection replaces the previous choice",
+    "mobile layout has no horizontal scroll and 44px option targets",
+    "student submits the selected radio answer",
+    "response detail and CSV export show the chosen option"
+  ],
+  "errors": []
+}
