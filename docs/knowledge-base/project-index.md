@@ -1326,3 +1326,7 @@ Onboarding master #56 and four children #57–60 now have stronger checkpoints a
 ## 2026-11-19 - Agentic setup (`DESIGN.md`, `AGENTS.md`, `CLAUDE.md`) and `<ISSUE>: <Title>` PR titles
 
 `DESIGN.md` documents verified light/dark/trainer tokens, dark-error contrast overrides, HCI rules, and motion constraints. `AGENTS.md` serves as the canonical cross-agent engineering guide, and `CLAUDE.md` imports `@AGENTS.md` and `@DESIGN.md`. PR title validation in `scripts/pr-convention.mjs` (tested in `scripts/pr-convention.test.mjs` and documented in `CONTRIBUTING.md` and `.github/pull_request_template.md`) enforces `<ISSUE>: <Title>` while preserving `.github/workflows/pr-convention.yml` and the four required description headings.
+
+## 2026-11-22 - Admin Forms campaign resume
+
+Admin → Forms can resume an ended campaign through POST `/global-forms/manage/campaigns/:id/resume`, reusing the Next catch-all proxy. Read the [RSD](../rsd/global-forms-resume-20261122-rsd.md) and [implementation review](../reviews/global-forms-resume-20261122.md), then server lifecycle/route, admin UI and integration/browser regressions. No schema or environment changes.

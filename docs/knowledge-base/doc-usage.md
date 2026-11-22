@@ -525,3 +525,7 @@ This task used `AGENTS.md`, existing global/classroom report identity patterns, 
 
 Do not overgeneralize:
 The migration was not applied live, and no authenticated browser or production deployment verification was performed.
+
+## 2026-11-22 - Campaign resume sources and verification
+
+Used AGENTS.md, CONTRIBUTING.md, DESIGN.md, initial forms RSD/feature documentation, selective knowledge-base entries, UI design stack, PostgreSQL short-transaction guidance, Jev-routed read-only investigation/review and current official Hono app.request documentation through Context7. Real loopback handlers/database and Next proxy browser checks are recorded in the [implementation review](../reviews/global-forms-resume-20261122.md); hosted changes remain unverified.

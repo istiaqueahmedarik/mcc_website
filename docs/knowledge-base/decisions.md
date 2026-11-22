@@ -1237,3 +1237,7 @@ The metadata workflow sweeps all open master PRs to repair stale statuses after 
 ## 2026-11-19 - Switch PR title convention to `<ISSUE>: <Title>` and add `DESIGN.md` / `CLAUDE.md`
 
 User selected `<ISSUE>: <Title>` (`#<number>`, `<KEY>-<number>` with 2–10 uppercase letters, `NO-ISSUE`, or `Revert "..."`) and requested enforcing it everywhere (`scripts/pr-convention.mjs`, `scripts/pr-convention.test.mjs`, `.github/pull_request_template.md`, `CONTRIBUTING.md`, `AGENTS.md`, `CLAUDE.md`), while preserving the four required PR description sections (`Problem`, `Changes`, `Validation`, `Review notes`) and trusted default-branch validation in `.github/workflows/pr-convention.yml`. Also added repository `DESIGN.md` and `CLAUDE.md` (`@AGENTS.md`, `@DESIGN.md`) and modernized `AGENTS.md` to eliminate rule drift.
+
+## 2026-11-22 - Resume the same registration campaign
+
+User-authorized autonomous scope extends the initial forms lifecycle with Ended → Open. Preserve campaign identity, frozen definition, original start time, response rows and membership revision; clear ended_at. Only a new/deleted response changes membership freshness. Resume uses the existing database-admin guard and an atomic conditional update; invalid/concurrent losing requests return 409. See [RSD](../rsd/global-forms-resume-20261122-rsd.md) and [review](../reviews/global-forms-resume-20261122.md).

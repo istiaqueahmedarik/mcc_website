@@ -280,12 +280,12 @@ export async function updateCampaign(c: Ctx) {
   }
 }
 
-async function transitionCampaign(c: Ctx, from: "draft" | "open", to: "open" | "ended") {
+async function transitionCampaign(c: Ctx, from: "draft" | "open" | "ended", to: "open" | "ended") {
   if (!(await requireAdmin(c))) return c.json({ error: "Admin access required" }, 403);
   const rows = await sql`
     update global_form_campaigns set status = ${to},
-      started_at = case when ${to} = 'open' then now() else started_at end,
-      ended_at = case when ${to} = 'ended' then now() else ended_at end, updated_at = now()
+      started_at = case when ${from} = 'draft' then now() else started_at end,
+      ended_at = case when ${to} = 'ended' then now() else null end, updated_at = now()
     where id = ${c.req.param("id")} and status = ${from} returning *
   `;
   if (!rows[0]) return c.json({ error: `Campaign must be ${from}` }, 409);
@@ -294,6 +294,7 @@ async function transitionCampaign(c: Ctx, from: "draft" | "open", to: "open" | "
 
 export const startCampaign = (c: Ctx) => transitionCampaign(c, "draft", "open");
 export const endCampaign = (c: Ctx) => transitionCampaign(c, "open", "ended");
+export const resumeCampaign = (c: Ctx) => transitionCampaign(c, "ended", "open");
 
 export async function getPublicCampaign(c: Ctx) {
   const rows = await sql`select id, title, description, slug, status from global_form_campaigns where slug = ${c.req.param("slug")} limit 1`;
