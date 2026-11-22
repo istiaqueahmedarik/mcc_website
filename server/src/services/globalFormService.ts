@@ -7,6 +7,7 @@ export const GLOBAL_FORM_FIELD_TYPES = [
   "number",
   "date",
   "select",
+  "radio",
   "checkbox",
 ] as const;
 
@@ -44,9 +45,33 @@ export interface GlobalFormDefinition {
 
 const FIELD_ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 const MAX_FIELDS = 100;
+const MAX_OPTIONS = 100;
+const MAX_OPTION_LENGTH = 240;
+const MIN_RADIO_OPTIONS = 2;
 
 function normalizedText(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+/** How a student perceives an option: ignores case, full-width forms, and spacing. */
+function optionLookKey(option: string): string {
+  return option.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/** Radio options are rejected, never silently repaired, so admins see what to fix. */
+function radioOptionsError(id: string, rawOptions: unknown): string | null {
+  const raw = Array.isArray(rawOptions) ? rawOptions.slice(0, MAX_OPTIONS) : [];
+  const options = raw.map((option) => normalizedText(option, MAX_OPTION_LENGTH));
+  const blank = options.findIndex((option) => !option);
+  if (blank !== -1) return `Field ${id} option ${blank + 1} is blank`;
+  if (options.length < MIN_RADIO_OPTIONS) return `Field ${id} needs at least ${MIN_RADIO_OPTIONS} options`;
+  const seen = new Map<string, string>();
+  for (const option of options) {
+    const earlier = seen.get(optionLookKey(option));
+    if (earlier !== undefined) return `Field ${id} options "${earlier}" and "${option}" look the same`;
+    seen.set(optionLookKey(option), option);
+  }
+  return null;
 }
 
 export function normalizeMistId(value: unknown): string | null {
@@ -92,8 +117,13 @@ export function validateFormDefinition(value: unknown):
     if (mapping === 'mist_id' && type !== 'text') {
       return { ok: false, error: 'Student ID fields must use short text to preserve identifier validation' };
     }
+    if (type === "radio") {
+      if (mapping) return { ok: false, error: `Field ${id} is a radio question and cannot use a profile mapping` };
+      const radioError = radioOptionsError(id, field.options);
+      if (radioError) return { ok: false, error: radioError };
+    }
     const options = Array.isArray(field.options)
-      ? field.options.map((option) => normalizedText(option, 240)).filter(Boolean).slice(0, 100)
+      ? field.options.map((option) => normalizedText(option, MAX_OPTION_LENGTH)).filter(Boolean).slice(0, MAX_OPTIONS)
       : [];
     if (type === "select" && options.length === 0) return { ok: false, error: `Field ${id} requires options` };
     if (new Set(options).size !== options.length) return { ok: false, error: `Field ${id} options must be unique` };
@@ -158,7 +188,7 @@ export function validateSubmission(
           return { ok: false, error: `${field.label} must be a valid date` };
         }
       }
-      if (field.type === "select" && !field.options.includes(normalized as string)) {
+      if ((field.type === "select" || field.type === "radio") && !field.options.includes(normalized as string)) {
         return { ok: false, error: `${field.label} must use an available option` };
       }
     }

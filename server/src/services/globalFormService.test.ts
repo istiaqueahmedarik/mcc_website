@@ -134,3 +134,86 @@ describe("campaign deletion evaluation", () => {
     }
   });
 });
+
+describe("radio questions", () => {
+  const definition = (field: Record<string, unknown>) => validateFormDefinition({
+    title: "Radio", kind: "general", agreement_text: "",
+    fields: [{ id: "slot", label: "Slot", type: "radio", required: true, mapUserField: null, helpText: "", ...field }],
+  });
+
+  test("accepts a radio question and preserves label, option order, and requiredness", () => {
+    const result = definition({ options: ["Morning", "Evening"] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.fields[0]).toMatchObject({ label: "Slot", type: "radio", required: true, options: ["Morning", "Evening"] });
+  });
+
+  test("rejects unusable option configurations with a question-specific error", () => {
+    const cases: unknown[] = [
+      undefined,
+      [],
+      ["Morning"],
+      ["Morning", "   "],
+      ["Morning", 42],
+      ["Morning", " morning "],
+      ["Morning", "MORNING"],
+      ["Night shift", "night  shift"],
+    ];
+    for (const options of cases) {
+      const result = definition({ options });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain("slot");
+    }
+  });
+
+  test("cannot be mapped to a profile field", () => {
+    const result = definition({ options: ["S", "M", "L"], mapUserField: "tshirt_size" });
+    expect(result.ok).toBe(false);
+  });
+
+  test("leaves the existing select option rules unchanged", () => {
+    const select = validateFormDefinition({
+      title: "Select", kind: "general", fields: [
+        { id: "track", label: "Track", type: "select", required: false, mapUserField: null, options: ["Only", " "] },
+      ],
+    });
+    expect(select.ok).toBe(true);
+    if (select.ok) expect(select.value.fields[0].options).toEqual(["Only"]);
+  });
+
+  const fields: any[] = [
+    { id: "slot", label: "Slot", type: "radio", required: true, mapUserField: null, options: ["Morning", "Evening"], helpText: "" },
+    { id: "meal", label: "Meal", type: "radio", required: false, mapUserField: null, options: ["Veg", "Non-veg"], helpText: "" },
+  ];
+
+  test("accepts exactly one allowed option and stores it as a string", () => {
+    const result = validateSubmission(fields, { slot: " Evening " }, {}, {});
+    expect(result).toEqual({ ok: true, answers: { slot: "Evening" }, profileValues: {} });
+  });
+
+  test("rejects unlisted, multi-value, object, number, and boolean answers", () => {
+    for (const value of ["Afternoon", "morning", ["Morning"], ["Morning", "Evening"], {}, { value: "Morning" }, 1, true]) {
+      const result = validateSubmission(fields, { slot: value }, {}, {});
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  test("enforces requiredness and permits an unanswered optional question", () => {
+    for (const value of [undefined, null, "", "   "]) {
+      const result = validateSubmission(fields, { slot: value }, {}, {});
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toBe("Slot is required");
+    }
+    expect(validateSubmission(fields, { slot: "Morning" }, {}, {}).ok).toBe(true);
+    expect(validateSubmission(fields, { slot: "Morning", meal: "" }, {}, {}).ok).toBe(true);
+  });
+
+  test("validates against the options frozen on the campaign", () => {
+    const frozen: any[] = [{ ...fields[0], options: ["Morning", "Evening"] }];
+    const laterTemplate: any[] = [{ ...fields[0], options: ["Morning", "Night"] }];
+    expect(validateSubmission(frozen, { slot: "Night" }, {}, {}).ok).toBe(false);
+    expect(validateSubmission(laterTemplate, { slot: "Night" }, {}, {}).ok).toBe(true);
+    expect(validateSubmission(frozen, { slot: "Evening" }, {}, {}).ok).toBe(true);
+  });
+});
+
