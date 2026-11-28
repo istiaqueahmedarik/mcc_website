@@ -1109,3 +1109,16 @@ GitHub contribution automation validates config before mutation, executes defaul
 ## 2026-11-17 - Improved and automatic contributor onboarding
 
 Idempotent issue-set creation uses owner/Actions-bot-authored per-user/per-step markers across paginated open and closed issues. Preflight duplicate markers and template values before writes; repair missing children and parent links separately. Verify actual assignment; preserve closed states and all content outside an epic managed-link region.
+
+## 2026-11-28 - Recover saved scoring references after contest deletion
+
+Source:
+- `server/src/services/contestScoringService.ts` (`reconcileSavedScoringConfig`)
+- `server/src/controllers/contestRoomController.ts`
+- `server/src/controllers/classroomContestController.ts`
+
+Pattern:
+Both scoring-config loaders reconcile persisted exclusions and adjustment targets against current result-unit definitions before returning editor settings or generating reports. Preserve live and wildcard targets, formulas, composite groups, and config versions. Reconciliation is read-time only; the next ordinary version-checked save persists the cleaned config. Keep submitted preview/save configs on the strict validation path so unknown new targets still fail.
+
+Applies when:
+Maintaining global or classroom scoring after room membership changes. This does not repair invalid composite membership or rewrite formula expressions, and does not mutate published snapshots.

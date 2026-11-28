@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildScoredContestReport, defaultScoringConfigForScope } from './contestScoringService';
+import { buildScoredContestReport, defaultScoringConfigForScope, reconcileSavedScoringConfig } from './contestScoringService';
 
 const source = (overrides: any) => ({
   itemId: overrides.itemId,
@@ -425,5 +425,68 @@ describe('buildScoredContestReport', () => {
     expect(report.scoring.legacyTsc.highestTfcScore).toBe(100);
     expect(beta?.scoringVariables.tfc_score).toBe(100);
     expect(beta?.score).toBe(80);
+  });
+});
+
+
+describe('reconcileSavedScoringConfig', () => {
+  for (const scope of ['global', 'classroom'] as const) {
+    test(`${scope} recovers after deleting an excluded contest without losing live settings`, () => {
+      const sources = [
+        source({ itemId: 'remaining', contestKey: 'c101', formulaKey: 'alpha', teams: [team('alice', 3, 3, 20)] }),
+        source({ itemId: 'excluded', contestKey: 'c102', formulaKey: 'beta', teams: [team('alice', 9, 9, 90)] }),
+      ];
+      const saved = {
+        ...defaultScoringConfigForScope(scope, 'TPC', ['alpha', 'beta']),
+        solvedScoreFormula: 'sum(solved)',
+        penaltyScoreFormula: 'sum(penalty)',
+        excludedUnitKeys: ['cf_group_sxsydaslfo_717234', 'beta'],
+        adjustmentRules: [
+          { id: 'deleted', unitKey: 'cf_group_sxsydaslfo_717234', field: 'solved' as const, operation: 'add' as const, value: 100 },
+          { id: 'live', unitKey: 'alpha', field: 'solved' as const, operation: 'add' as const, value: 2 },
+          { id: 'all', unitKey: '*', field: 'penalty' as const, operation: 'add' as const, value: 1 },
+        ],
+        version: 7,
+      };
+      const config = reconcileSavedScoringConfig(saved, sources);
+      expect(config.excludedUnitKeys).toEqual(['beta']);
+      expect(config.adjustmentRules.map((rule) => rule.id)).toEqual(['live', 'all']);
+      expect(config.version).toBe(7);
+      expect(config.solvedScoreFormula).toBe(saved.solvedScoreFormula);
+      expect(saved.excludedUnitKeys).toHaveLength(2);
+      expect(saved.adjustmentRules).toHaveLength(3);
+      const report = buildScoredContestReport({ roomId: 'room-1', scope, sources, config });
+      expect(report.users[0].solvedScore).toBe(5);
+      expect(report.users[0].contests.beta.excluded).toBe(true);
+    });
+  }
+
+  test('preserves composite exclusions and adjustments against actual result units', () => {
+    const sources = ['a', 'b'].map((key) => source({ itemId: key, contestKey: key, formulaKey: key }));
+    const config = reconcileSavedScoringConfig({
+      groups: [{ name: 'Combo', formulaKey: 'combo', contestItemIds: ['a', 'b'] }],
+      excludedUnitKeys: ['combo', 'removed'],
+      adjustmentRules: [{ unitKey: 'combo', field: 'solved', operation: 'add', value: 1 }],
+    }, sources);
+    expect(config.excludedUnitKeys).toEqual(['combo']);
+    expect(config.adjustmentRules[0].unitKey).toBe('combo');
+    expect(config.groups[0].contestItemIds).toEqual(['a', 'b']);
+  });
+
+  test('handles deletion of the last contest', () => {
+    const config = reconcileSavedScoringConfig({ excludedUnitKeys: ['removed'] }, []);
+    expect(config.excludedUnitKeys).toEqual([]);
+  });
+
+  test('new invalid exclusions and adjustment targets still fail strict validation', () => {
+    const options = {
+      roomId: 'room-1', scope: 'global' as const,
+      sources: [source({ itemId: 'a', contestKey: 'a', formulaKey: 'alpha' })],
+    };
+    expect(() => buildScoredContestReport({ ...options, config: { excludedUnitKeys: ['unknown'] } }))
+      .toThrow('Cannot exclude unknown result unit "unknown"');
+    expect(() => buildScoredContestReport({ ...options, config: {
+      adjustmentRules: [{ unitKey: 'unknown', field: 'solved', operation: 'add', value: 1 }],
+    } })).toThrow('Score adjustment references unknown result unit "unknown"');
   });
 });
