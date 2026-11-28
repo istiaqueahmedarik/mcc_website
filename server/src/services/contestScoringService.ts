@@ -955,6 +955,21 @@ function buildVariables(
   return variables;
 }
 
+// Reconcile only persisted configuration against the current room membership.
+// Preview/save payloads still pass through strict buildScoredContestReport validation.
+export function reconcileSavedScoringConfig(
+  savedConfig: ContestScoringConfigInput,
+  sources: ContestSourceInput[],
+): Required<ContestScoringConfigInput> {
+  const config = normalizeScoringConfig(savedConfig);
+  const unitKeys = new Set(buildResultUnitDefinitions(sources, config).map((unit) => unit.key));
+  return {
+    ...config,
+    excludedUnitKeys: config.excludedUnitKeys.filter((key) => unitKeys.has(key)),
+    adjustmentRules: config.adjustmentRules.filter((rule) => rule.unitKey === '*' || unitKeys.has(String(rule.unitKey))),
+  };
+}
+
 function sortValue(row: any, key: string): number | string {
   if (key === 'name' || key === 'username') return normalizeText(row.username, 180).toLowerCase();
   if (key === 'rank') return numeric(row.rank, 0);

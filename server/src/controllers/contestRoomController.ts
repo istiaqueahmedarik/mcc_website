@@ -12,6 +12,7 @@ import {
     DEFAULT_COMPOSITE_PENALTY_FORMULA,
     defaultScoringConfigForScope,
     normalizeScoringConfig,
+    reconcileSavedScoringConfig,
     SORTABLE_SCORING_KEYS,
     type ContestScoringConfigInput,
     type ContestSourceInput,
@@ -508,7 +509,10 @@ async function loadGlobalScoringConfig(roomId: string, roomType: string, items: 
         String(item.contest_id || ''),
     ))
     const fallback = defaultScoringConfigForScope('global', roomType, unitKeys)
-    const config = rowToGlobalScoringConfig(configRows[0] || null, groups, fallback)
+    const config = reconcileSavedScoringConfig(
+        rowToGlobalScoringConfig(configRows[0] || null, groups, fallback),
+        globalItemsToScoringSources(items),
+    )
     return { config, groups, version: Number(configRows[0]?.version || 0), exists: configRows.length > 0 }
 }
 

@@ -529,3 +529,16 @@ The migration was not applied live, and no authenticated browser or production d
 ## 2026-11-22 - Campaign resume sources and verification
 
 Used AGENTS.md, CONTRIBUTING.md, DESIGN.md, initial forms RSD/feature documentation, selective knowledge-base entries, UI design stack, PostgreSQL short-transaction guidance, Jev-routed read-only investigation/review and current official Hono app.request documentation through Context7. Real loopback handlers/database and Next proxy browser checks are recorded in the [implementation review](../reviews/global-forms-resume-20261122.md); hosted changes remain unverified.
+
+## 2026-11-28 - Deleted scoring unit recovery review
+
+Sources used:
+- `AGENTS.md` and `CONTRIBUTING.md`
+- Contest-scoring/composite/adjustment entries in `project-index.md`, `decisions.md`, `patterns.md`, and `quality-rules.md`
+- Shared scoring service, both controller loaders, and existing scoring/formula tests
+
+Validation:
+From repository root, `bun test src/services/contestScoringService.test.ts src/services/contestFormula.test.ts` passed 27 tests with 119 assertions. `bun build server/src/controllers/contestRoomController.ts server/src/controllers/classroomContestController.ts --target=bun --packages=external --outdir=/tmp/mcc-scoring-delete-check` bundled both controller entry points successfully. `git diff --check` passed.
+
+Not verified:
+Hosted database, authenticated browser workflow, external provider credentials, production deployment, and full TypeScript type checking. No migration or environment change is required. This is a bounded backend bugfix; the UI is unchanged.

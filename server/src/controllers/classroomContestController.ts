@@ -34,6 +34,7 @@ import {
   DEFAULT_COMPOSITE_PENALTY_FORMULA,
   defaultScoringConfigForScope,
   normalizeScoringConfig,
+  reconcileSavedScoringConfig,
   SORTABLE_SCORING_KEYS,
   type ContestScoringConfigInput,
   type ContestSourceInput,
@@ -2521,7 +2522,10 @@ async function loadClassroomScoringConfig(classroomId: string, roomId: string, r
   ]);
   const unitKeys = items.map((item: any) => item.formula_key || formulaKeyForContest(normalizeContestProvider(item.provider), String(item.external_contest_id || '')));
   const fallback = defaultScoringConfigForScope('classroom', roomType, unitKeys);
-  const config = rowToScoringConfig(configRows[0] || null, groups, fallback);
+  const config = reconcileSavedScoringConfig(
+    rowToScoringConfig(configRows[0] || null, groups, fallback),
+    classroomItemsToScoringSources(items),
+  );
   return { config, groups, version: Number(configRows[0]?.version || 0), exists: configRows.length > 0 };
 }
 

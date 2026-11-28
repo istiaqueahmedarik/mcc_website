@@ -542,3 +542,11 @@ Onboarding masters were originally kept outside project manually, but project au
 ## 2026-11-18 - Assignment roster recovery
 
 Manual board-access changes were not mirrored to the assignment roster, so newly approved members could be removed from issues. A deleted publishing target also made an otherwise successful assignment run look failed. Keep board/roster synchronization in the access-change checklist and allow deliberate publisher shutdown without disabling enforcement.
+
+## 2026-11-28 - Deleted excluded contest blocked scoring config reads
+
+Problem:
+Deleting a contest could leave its formula key in saved `excluded_unit_keys` or targeted `adjustment_rules`. The scoring scaffold rejected the stale reference, preventing the manager from opening the editor to correct it.
+
+Prevention:
+Reconcile saved references at both global and classroom loader boundaries, using actual result units rather than just source keys. Keep strict validation for submitted configs. Regression coverage includes live exclusions, wildcard adjustments, composite keys, empty rooms, and new invalid references.
